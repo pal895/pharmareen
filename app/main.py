@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 import time
+import traceback
 from html import escape
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -23,8 +24,8 @@ if str(PROJECT_ROOT) not in sys.path:
 from app.ai import AIService
 from app.config import Settings, get_settings
 from app.intake import IntakeService
-from app.pdf_reports import reports_pdf_dir
-from app.reports import ReportService
+from app.pdf_reports import generate_daily_report_pdf, reports_pdf_dir
+from app.reports import LowStockWarning, ReportMetrics, ReportService
 from app.sheets import GoogleSheetsStore, SHEETS_UNAVAILABLE_MESSAGE, SheetsUnavailableError
 from app.transcription import TranscriptionService, TranscriptionUnavailableError
 from app.utils import now_in_timezone
@@ -271,7 +272,12 @@ def is_local_base_url(value: str | None) -> bool:
 
 def is_placeholder_base_url(value: str | None) -> bool:
     text = str(value or "").lower()
-    return "your-domain" in text or "your-production-domain" in text or "example.com" in text
+    placeholders = [
+        "your-domain",
+        "your-production-domain",
+        "your-public-url.example.com",
+    ]
+    return any(placeholder in text for placeholder in placeholders)
 
 
 def twilio_credentials_found(settings: Settings) -> bool:
@@ -280,6 +286,22 @@ def twilio_credentials_found(settings: Settings) -> bool:
         and settings.twilio_auth_token.strip()
         and settings.twilio_whatsapp_from.strip()
     )
+
+
+def google_credentials_present(settings: Settings) -> bool:
+    env_value = (
+        os.getenv("GOOGLE_SHEETS_CREDENTIALS")
+        or os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+        or ""
+    ).strip()
+    configured = str(settings.google_service_account_json or "").strip()
+    if env_value:
+        return True
+    if configured.startswith("{") and "client_email" in configured:
+        return True
+    if configured and Path(configured).expanduser().exists():
+        return True
+    return False
 
 
 def missing_startup_settings(settings: Settings) -> list[str]:
@@ -351,6 +373,112 @@ def test_google_sheets() -> dict[str, str]:
     }
 
 
+@app.get("/debug/config")
+def debug_config() -> dict[str, Any]:
+    settings = get_settings()
+    raw_base_url = (settings.public_base_url or "").strip()
+    return {
+        "app_running": True,
+        "app_base_url": raw_base_url,
+        "app_base_url_is_https": raw_base_url.lower().startswith("https://"),
+        "app_base_url_has_placeholder": is_placeholder_base_url(raw_base_url),
+        "twilio_account_sid_present": bool(settings.twilio_account_sid.strip()),
+        "twilio_auth_token_present": bool(settings.twilio_auth_token.strip()),
+        "twilio_whatsapp_number_present": bool(settings.twilio_whatsapp_from.strip()),
+        "owner_whatsapp_to_present": bool(settings.owner_whatsapp_to.strip()),
+        "google_sheet_id_present": bool(settings.google_sheets_spreadsheet_id.strip()),
+        "google_credentials_present": google_credentials_present(settings),
+        "openai_api_key_present": bool(settings.openai_api_key.strip()),
+    }
+
+
+@app.post("/debug/whatsapp-test")
+async def debug_whatsapp_test() -> JSONResponse:
+    settings = get_settings()
+    form_values = {
+        "Body": "start",
+        "From": "whatsapp:+254700000000",
+        "To": settings.twilio_whatsapp_from or "whatsapp:+14155238886",
+        "MessageSid": f"SMDEBUG{int(time.time() * 1000)}",
+        "NumMedia": "0",
+    }
+    try:
+        result = await process_twilio_form_values(form_values)
+        response_body = twiml_response(result.reply, media_url=result.media_url)
+        return JSONResponse(
+            {
+                "status": "ok" if result.success else "error",
+                "response_type": "twiml_xml",
+                "command_handler": result.command_handler,
+                "response_body_preview": response_body[:1000],
+                "exception": result.error_reason,
+            }
+        )
+    except Exception as exc:
+        logger.exception("Debug WhatsApp test failed")
+        traceback.print_exc()
+        return JSONResponse(
+            {
+                "status": "error",
+                "response_type": "exception",
+                "response_body_preview": "",
+                "exception": str(exc),
+            },
+            status_code=500,
+        )
+
+
+@app.get("/debug/report-test")
+def debug_report_test() -> JSONResponse:
+    settings = get_settings()
+    try:
+        today = now_in_timezone(settings.timezone).date().isoformat()
+        metrics = ReportMetrics(
+            report_date=today,
+            total_sales=440,
+            total_cost=280,
+            gross_profit=160,
+            total_items_sold=2,
+            sale_transactions=1,
+            most_requested=[("Panadol", 2), ("Insulin", 1)],
+            most_sold=[("Panadol", 2)],
+            missed_sales=[("Insulin", 1)],
+            not_sold=[],
+            low_stock_warnings=[LowStockWarning("Insulin", 1, 2)],
+            peak_activity_time="4PM - 6PM",
+            restocks=[("Panadol", 20)],
+            peak_sales_count=1,
+            peak_items_sold=2,
+        )
+        pdf_path = generate_daily_report_pdf(
+            metrics,
+            pharmacy_name=settings.pharmacy_name,
+            report_time=now_in_timezone(settings.timezone).strftime("%H:%M"),
+        )
+        public_pdf_url = f"{effective_app_base_url(settings)}/reports/download/{pdf_path.name}"
+        return JSONResponse(
+            {
+                "status": "ok",
+                "pdf_path": str(pdf_path),
+                "public_pdf_url": public_pdf_url,
+                "file_exists": pdf_path.exists(),
+            }
+        )
+    except Exception as exc:
+        logger.exception("Debug report test failed")
+        traceback.print_exc()
+        return JSONResponse(
+            {
+                "status": "error",
+                "pdf_path": "",
+                "public_pdf_url": "",
+                "file_exists": False,
+                "exception": str(exc),
+            },
+            status_code=500,
+        )
+
+
 @app.post("/intake/test")
 async def intake_test(request: Request) -> dict[str, str]:
     try:
@@ -390,6 +518,7 @@ async def twilio_whatsapp_webhook(request: Request) -> Response:
     print(f"FROM={from_number}", flush=True)
     print(f"TO={to_number}", flush=True)
     print(f"MESSAGESID={message_sid}", flush=True)
+    print(f"COMMAND_HANDLER={classify_command_handler(body) if body else 'voice_or_media'}", flush=True)
 
     media_url: str | None = None
     try:
@@ -428,6 +557,7 @@ async def twilio_whatsapp_webhook(request: Request) -> Response:
         error_reason = reply
     except Exception:
         logger.exception("Failed to process WhatsApp webhook")
+        traceback.print_exc()
         reply = "Sorry, I could not understand that. Please send it like: Panadol sold 2."
         error_reason = "Unhandled processing error"
     finally:
@@ -470,6 +600,114 @@ def generate_daily_report(
 class IncomingInput:
     text: str
     is_voice: bool = False
+
+
+@dataclass(frozen=True)
+class WhatsAppProcessResult:
+    reply: str
+    media_url: str | None = None
+    message_type: str = "text"
+    success: bool = False
+    error_reason: str = ""
+    command_handler: str = "unknown"
+
+
+async def process_twilio_form_values(form_values: dict[str, Any]) -> WhatsAppProcessResult:
+    body = str(form_values.get("Body") or "").strip()
+    from_number = str(form_values.get("From") or "").strip()
+    message_sid = str(form_values.get("MessageSid") or "").strip()
+    command_handler = classify_command_handler(body) if body else "voice_or_media"
+    message_type = "text"
+    media_url: str | None = None
+
+    try:
+        if message_sid and message_sid in processed_message_sids:
+            return WhatsAppProcessResult(
+                reply="Already processed.",
+                message_type=message_type,
+                success=True,
+                command_handler="duplicate_message",
+            )
+
+        pending = pending_voice_for_sender(from_number)
+        if body and pending and body.lower() == "yes":
+            command_handler = "voice_confirmation_yes"
+            incoming = IncomingInput(text=pending, is_voice=False)
+            clear_pending_voice(from_number)
+            reply = "✅ Confirmed. Records updated.\n\n" + get_intake_service().process_text(incoming.text)
+        elif body:
+            if pending:
+                command_handler = "voice_correction_text"
+                clear_pending_voice(from_number)
+            incoming = IncomingInput(text=body, is_voice=False)
+            reply = get_intake_service().process_text(incoming.text)
+        else:
+            whatsapp = get_whatsapp_client()
+            incoming = await incoming_text_from_form(form_values, whatsapp, get_transcription_service())
+            message_type = "voice" if incoming.is_voice else "text"
+            if incoming.is_voice and not voice_transcript_is_clear(incoming.text):
+                command_handler = "voice_note_confirmation_required"
+                store_pending_voice(from_number, incoming.text)
+                reply = pending_voice_reply(incoming.text)
+            else:
+                command_handler = "voice_note_processed" if incoming.is_voice else classify_command_handler(incoming.text)
+                reply = get_intake_service().process_text(incoming.text)
+                if incoming.is_voice:
+                    reply = voice_reply(incoming.text, reply)
+
+        media_url = media_url_from_reply(reply)
+        if media_url:
+            reply = reply_for_pdf_media(reply)
+        if message_sid:
+            processed_message_sids.add(message_sid)
+        return WhatsAppProcessResult(
+            reply=reply,
+            media_url=media_url,
+            message_type=message_type,
+            success=True,
+            command_handler=command_handler,
+        )
+    except UnsupportedInputError as exc:
+        return WhatsAppProcessResult(
+            reply=str(exc),
+            message_type=message_type,
+            success=False,
+            error_reason=str(exc),
+            command_handler=command_handler,
+        )
+    except Exception as exc:
+        logger.exception("Failed to process WhatsApp form values")
+        traceback.print_exc()
+        return WhatsAppProcessResult(
+            reply="Sorry, I could not understand that. Please send it like: Panadol sold 2.",
+            message_type=message_type,
+            success=False,
+            error_reason=str(exc),
+            command_handler=command_handler,
+        )
+
+
+def classify_command_handler(body: str) -> str:
+    text = str(body or "").strip().lower()
+    if not text:
+        return "empty"
+    if text in {"start", "help"}:
+        return "help_start"
+    if text == "share":
+        return "share"
+    if "report" in text or "daily pdf" in text or "download today" in text:
+        return "report"
+    if "profit" in text:
+        return "profit"
+    if "stock" in text:
+        return "stock_or_no_stock"
+    if text.startswith("+") or "restock" in text or text.startswith("add "):
+        return "restock"
+    if text.startswith("later ") or text.startswith("missed ") or " missed " in text:
+        return "late_sale"
+    if "sold" in text or any(character.isdigit() for character in text):
+        return "sale_or_batch"
+    return "natural_or_ai_parser"
 
 
 async def incoming_text_from_form(

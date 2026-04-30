@@ -98,6 +98,74 @@ def test_status_page_shows_production_ready_for_https_domain(monkeypatch):
     assert "https://pharmareen.example.co.ke/webhook/whatsapp" in response.text
 
 
+def test_debug_config_does_not_expose_secrets(monkeypatch):
+    settings = Settings(
+        _env_file=None,
+        APP_BASE_URL="https://pharmareen.replit.app",
+        twilio_account_sid="ACsecret",
+        twilio_auth_token="super-secret-token",
+        TWILIO_WHATSAPP_NUMBER="whatsapp:+14155238886",
+        OWNER_WHATSAPP_TO="whatsapp:+254700000000",
+        GOOGLE_SHEET_ID="sheet-id",
+        GOOGLE_SHEETS_CREDENTIALS='{"client_email":"test@example.com"}',
+        openai_api_key="sk-secret",
+    )
+    monkeypatch.setattr(main, "get_settings", lambda: settings)
+
+    with TestClient(main.app) as client:
+        response = client.get("/debug/config")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["app_running"] is True
+    assert data["app_base_url"] == "https://pharmareen.replit.app"
+    assert data["app_base_url_is_https"] is True
+    assert data["app_base_url_has_placeholder"] is False
+    assert data["twilio_account_sid_present"] is True
+    assert data["twilio_auth_token_present"] is True
+    assert data["google_credentials_present"] is True
+    assert "super-secret-token" not in response.text
+    assert "sk-secret" not in response.text
+
+
+def test_debug_whatsapp_test_returns_twiml(monkeypatch):
+    fake_intake = FakeIntake("👋 PharMareen Help")
+    monkeypatch.setattr(main, "get_intake_service", lambda: fake_intake)
+    monkeypatch.setattr(main, "get_settings", lambda: Settings(_env_file=None, TWILIO_WHATSAPP_NUMBER="whatsapp:+14155238886"))
+
+    with TestClient(main.app) as client:
+        response = client.post("/debug/whatsapp-test")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["response_type"] == "twiml_xml"
+    assert "<Response><Message>" in data["response_body_preview"]
+    assert data["command_handler"] == "help_start"
+    assert fake_intake.received == "start"
+
+
+def test_debug_report_test_generates_pdf(monkeypatch, tmp_path):
+    monkeypatch.setattr(main, "reports_pdf_dir", lambda: tmp_path)
+    monkeypatch.setenv("PHARMAREEN_REPORTS_DIR", str(tmp_path))
+    monkeypatch.setattr(main, "get_settings", lambda: Settings(_env_file=None, APP_BASE_URL="https://pharmareen.replit.app"))
+
+    with TestClient(main.app) as client:
+        response = client.get("/debug/report-test")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["file_exists"] is True
+    assert data["public_pdf_url"].startswith("https://pharmareen.replit.app/reports/download/")
+
+
+def test_smoke_test_script_exists():
+    root = Path(__file__).resolve().parents[1]
+
+    assert (root / "scripts" / "smoke_test.py").exists()
+
+
 def test_start_launcher_file_exists():
     root = Path(__file__).resolve().parents[1]
 

@@ -39,6 +39,9 @@ def main() -> int:
         ("/status route exists", lambda: route_exists("/status")),
         ("/webhook/whatsapp route exists", lambda: route_exists("/webhook/whatsapp")),
         ("old Twilio route still exists", lambda: route_exists("/webhooks/twilio/whatsapp")),
+        ("/debug/config route exists", lambda: route_exists("/debug/config")),
+        ("/debug/whatsapp-test route exists", lambda: route_exists("/debug/whatsapp-test")),
+        ("/debug/report-test route exists", lambda: route_exists("/debug/report-test")),
         ("APP_BASE_URL config works", app_base_url_config_works),
         (".env.example has required production env vars", env_example_has_required_keys),
         ("render.yaml exists", lambda: file_exists("render.yaml")),
@@ -46,6 +49,7 @@ def main() -> int:
         ("fly.toml exists", lambda: file_exists("fly.toml")),
         ("Procfile exists", lambda: file_exists("Procfile")),
         ("Dockerfile exists", lambda: file_exists("Dockerfile")),
+        ("smoke test script exists", lambda: file_exists("scripts/smoke_test.py")),
         ("deployment docs exist", lambda: file_exists("DEPLOY_NOW.md") and file_exists("README_PRODUCTION.md")),
         ("start command documented", start_command_documented),
     ]
