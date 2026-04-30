@@ -1,0 +1,2 @@
+"""Pharmacy Intelligence Assistant backend."""
+
