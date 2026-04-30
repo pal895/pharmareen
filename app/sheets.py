@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -107,9 +109,11 @@ class GoogleSheetsStore:
         self.unavailable_message = SHEETS_UNAVAILABLE_MESSAGE
 
         try:
-            credentials = self._load_credentials(settings.google_service_account_json)
+            credential_path = prepare_google_credentials_file(settings)
+            credentials = self._load_credentials(str(credential_path))
             client = gspread.authorize(credentials)
             self.spreadsheet = client.open_by_key(settings.google_sheets_spreadsheet_id)
+            logger.info("Google Sheets connected successfully")
         except Exception as exc:
             logger.warning("Google Sheets is unavailable: %s", exc)
 
@@ -370,3 +374,68 @@ class GoogleSheetsStore:
 
         path = Path(stripped).expanduser()
         return Credentials.from_service_account_file(path, scopes=scopes)
+
+
+def prepare_google_credentials_file(settings: Settings) -> Path:
+    """Create a service-account.json file from env JSON when provided.
+
+    Replit and Render store credentials as environment variables. The app
+    materializes that JSON into a local file so Google auth can use the same
+    file-based flow everywhere without printing secrets.
+    """
+    raw_credentials = (os.environ.get("GOOGLE_SHEETS_CREDENTIALS") or "").strip()
+    configured_value = str(settings.google_service_account_json or "").strip()
+
+    if raw_credentials.startswith("{"):
+        info = validate_service_account_json(raw_credentials)
+        output_path = service_account_output_path()
+        write_service_account_file(output_path, info)
+        return output_path
+
+    if configured_value.startswith("{"):
+        info = validate_service_account_json(configured_value)
+        output_path = service_account_output_path()
+        write_service_account_file(output_path, info)
+        return output_path
+
+    path_value = raw_credentials or configured_value or "service-account.json"
+    return Path(path_value).expanduser()
+
+
+def validate_service_account_json(raw_credentials: str) -> dict[str, Any]:
+    try:
+        info = json.loads(raw_credentials)
+    except json.JSONDecodeError as exc:
+        raise ValueError("GOOGLE_SHEETS_CREDENTIALS is not valid JSON") from exc
+
+    if not isinstance(info, dict):
+        raise ValueError("GOOGLE_SHEETS_CREDENTIALS must be a JSON object")
+
+    required_keys = {"type", "client_email", "private_key"}
+    missing = sorted(key for key in required_keys if not info.get(key))
+    if missing:
+        raise ValueError("GOOGLE_SHEETS_CREDENTIALS is missing required service account fields")
+    return info
+
+
+def service_account_output_path() -> Path:
+    configured = (os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") or "service-account.json").strip()
+    path = Path(configured).expanduser()
+    if path.name != "service-account.json":
+        path = path / "service-account.json" if path.suffix == "" else Path("service-account.json")
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    return path
+
+
+def write_service_account_file(path: Path, info: dict[str, Any]) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(info), encoding="utf-8")
+        logger.info("Google Sheets credentials file prepared: %s", path.name)
+        return
+    except OSError:
+        fallback = Path(tempfile.gettempdir()) / "service-account.json"
+        fallback.write_text(json.dumps(info), encoding="utf-8")
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(fallback)
+        logger.info("Google Sheets credentials file prepared: %s", fallback.name)

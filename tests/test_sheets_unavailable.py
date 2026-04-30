@@ -12,6 +12,7 @@ from app.sheets import (
     GoogleSheetsStore,
     SHEETS_UNAVAILABLE_MESSAGE,
     SheetsUnavailableError,
+    prepare_google_credentials_file,
 )
 
 
@@ -72,6 +73,40 @@ def test_store_starts_unavailable_for_missing_service_account():
     assert store.is_available is False
     with pytest.raises(SheetsUnavailableError, match="Google Sheets is not configured"):
         store.read_daily_logs("2026-04-27")
+
+
+def test_google_sheets_credentials_env_is_written_to_service_account_file(tmp_path, monkeypatch):
+    credentials_json = """
+    {
+      "type": "service_account",
+      "project_id": "test-project",
+      "private_key_id": "test-key-id",
+      "private_key": "-----BEGIN PRIVATE KEY-----\\nTEST\\n-----END PRIVATE KEY-----\\n",
+      "client_email": "test@example.iam.gserviceaccount.com",
+      "client_id": "123456789",
+      "token_uri": "https://oauth2.googleapis.com/token"
+    }
+    """
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GOOGLE_SHEETS_CREDENTIALS", credentials_json)
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", "service-account.json")
+
+    path = prepare_google_credentials_file(make_settings("./service-account.json"))
+
+    assert path == tmp_path / "service-account.json"
+    assert path.exists()
+    written = path.read_text(encoding="utf-8")
+    assert "test@example.iam.gserviceaccount.com" in written
+    assert "private_key" in written
+
+
+def test_google_sheets_credentials_env_invalid_json_fails_clearly(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GOOGLE_SHEETS_CREDENTIALS", "{not-json")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", "service-account.json")
+
+    with pytest.raises(ValueError, match="not valid JSON"):
+        prepare_google_credentials_file(make_settings("./service-account.json"))
 
 
 def test_health_and_test_endpoint_work_when_sheets_are_unavailable(monkeypatch):
