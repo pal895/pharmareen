@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: pharmareen
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: sh -c "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PHARMACY_NAME
+        value: PharMareen
+      - key: TIMEZONE
+        value: Africa/Nairobi
+      - key: APP_BASE_URL
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_NUMBER
+        sync: false
+      - key: OWNER_WHATSAPP_TO
+        sync: false
+      - key: GOOGLE_SHEET_ID
+        sync: false
+      - key: GOOGLE_SHEETS_CREDENTIALS
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ENABLE_VOICE_INPUT
+        value: "true"
+      - key: REPORT_STORAGE_MODE
+        value: local
+      - key: REPORT_PUBLIC_DIR
+        value: reports_pdf
