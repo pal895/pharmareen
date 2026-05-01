@@ -209,7 +209,7 @@ def test_voice_note_uses_mocked_transcription(monkeypatch):
     assert response.status_code == 200
     assert "Voice note received" in response.text
     assert "Records updated" in response.text
-    assert fake_intake.received == "Panadol two, later Cetrizine three"
+    assert fake_intake.received == "Panadol 2, later Cetrizine 3"
 
 
 def test_unclear_voice_note_returns_clear_message(monkeypatch):
@@ -230,7 +230,8 @@ def test_unclear_voice_note_returns_clear_message(monkeypatch):
         )
 
     assert response.status_code == 200
-    assert "I could not clearly understand the voice note" in response.text
+    assert "Sorry, I could not understand that voice note" in response.text
+    assert "Try saying: Panadol two" in response.text
 
 
 def test_voice_note_without_openai_key_fails_gracefully(monkeypatch):
@@ -251,7 +252,8 @@ def test_voice_note_without_openai_key_fails_gracefully(monkeypatch):
         )
 
     assert response.status_code == 200
-    assert "Voice not enabled. Send text like: Panadol 2" in response.text
+    assert "Voice received, but voice is not enabled yet" in response.text
+    assert "Send text like: Panadol 2" in response.text
 
 
 def test_twilio_pdf_media_payload_created_for_public_report(monkeypatch):

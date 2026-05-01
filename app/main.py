@@ -23,7 +23,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.ai import AIService
 from app.config import Settings, get_settings
-from app.intake import IntakeService
+from app.intake import IntakeService, normalize_spoken_command_text
 from app.pdf_reports import generate_daily_report_pdf, reports_pdf_dir
 from app.reports import LowStockWarning, ReportMetrics, ReportService
 from app.sheets import GoogleSheetsStore, SHEETS_UNAVAILABLE_MESSAGE, SheetsUnavailableError
@@ -730,16 +730,18 @@ async def incoming_text_from_form(
         if media_url and content_type.startswith("audio/"):
             if not transcription_service.is_available:
                 raise UnsupportedInputError(
-                    "Voice not enabled. Send text like: Panadol 2"
+                    "🎙️ Voice received, but voice is not enabled yet.\nSend text like: Panadol 2"
                 )
-            audio_bytes = await whatsapp.download_media(media_url)
             try:
+                audio_bytes = await whatsapp.download_media(media_url)
                 transcript = transcription_service.transcribe_audio(audio_bytes, content_type)
             except TranscriptionUnavailableError as exc:
-                raise UnsupportedInputError(str(exc)) from exc
+                raise UnsupportedInputError(voice_transcription_failed_message()) from exc
+            except Exception as exc:
+                raise UnsupportedInputError(voice_transcription_failed_message()) from exc
             if transcript:
-                return IncomingInput(text=transcript, is_voice=True)
-            raise UnsupportedInputError(unclear_voice_message())
+                return IncomingInput(text=normalize_spoken_command_text(transcript), is_voice=True)
+            raise UnsupportedInputError(voice_transcription_failed_message())
 
     if body:
         return IncomingInput(text=body, is_voice=False)
@@ -767,6 +769,10 @@ def voice_reply(transcript: str, processed_reply: str) -> str:
 
 def unclear_voice_message() -> str:
     return "⚠️ I could not clearly understand the voice note.\nPlease type it like:\nPanadol 2\nAmoxil 1"
+
+
+def voice_transcription_failed_message() -> str:
+    return "Sorry, I could not understand that voice note.\nTry saying: Panadol two"
 
 
 def voice_transcript_is_clear(transcript: str) -> bool:

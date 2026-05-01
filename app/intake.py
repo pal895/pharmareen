@@ -34,6 +34,15 @@ HELP_TEXT = "\n".join(
         "Restock with cost:",
         "+Panadol 20 2000",
         "",
+        "Bonus stock:",
+        "+Panadol 5 bonus",
+        "",
+        "Discounted stock:",
+        "+Panadol 20 1800 discount",
+        "",
+        "Budget vs paid:",
+        "+Panadol 20 ordered 2000 paid 1800",
+        "",
         "Check stock:",
         "Panadol stock",
         "",
@@ -49,9 +58,14 @@ HELP_TEXT = "\n".join(
         "report week",
         "",
         "Voice:",
-        'Send a voice note like: "Panadol two, Amoxil one"',
+        "Send a voice note like:",
+        '"Panadol two"',
+        '"Panadol two, Amoxil one"',
+        '"Add Panadol twenty bonus"',
+        '"Add Panadol twenty paid one thousand eight hundred"',
         "",
-        "If internet is off, write sales on paper briefly, then send them together later:",
+        "Offline:",
+        "If internet is off, write sales on paper then send them together later:",
         "Panadol 2",
         "Amoxil 1",
         "later Cetrizine 3",
@@ -153,12 +167,14 @@ class OperatingCommand:
     drug_name: str = ""
     quantity: int = 1
     total_cost: float | None = None
+    budgeted_cost: float | None = None
     restock_type: str = "normal"
     raw_text: str = ""
     error: str = ""
 
 
 NUMBER_WORDS = {
+    "zero": 0,
     "one": 1,
     "two": 2,
     "three": 3,
@@ -169,10 +185,25 @@ NUMBER_WORDS = {
     "eight": 8,
     "nine": 9,
     "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+    "thirteen": 13,
+    "fourteen": 14,
+    "fifteen": 15,
+    "sixteen": 16,
+    "seventeen": 17,
+    "eighteen": 18,
+    "nineteen": 19,
     "twenty": 20,
     "thirty": 30,
+    "forty": 40,
     "fifty": 50,
+    "sixty": 60,
+    "seventy": 70,
+    "eighty": 80,
+    "ninety": 90,
     "hundred": 100,
+    "thousand": 1000,
 }
 
 
@@ -643,11 +674,24 @@ class IntakeService:
             if total_added_cost is not None and command.quantity > 0
             else None
         )
+        saved_amount = (
+            command.budgeted_cost - total_added_cost
+            if command.budgeted_cost is not None and total_added_cost is not None
+            else None
+        )
         notes = f"Restock type: {command.restock_type}."
         if total_added_cost is not None:
             notes = (
                 f"Restock type: {command.restock_type}. "
                 f"Restock total cost {format_kes(total_added_cost)}. "
+                f"Calculated unit cost {format_kes(unit_added_cost)}."
+            )
+        if command.budgeted_cost is not None and total_added_cost is not None:
+            notes = (
+                f"Restock type: {command.restock_type}. "
+                f"Budgeted {format_kes(command.budgeted_cost)}. "
+                f"Paid {format_kes(total_added_cost)}. "
+                f"Saved {format_kes(saved_amount)}. "
                 f"Calculated unit cost {format_kes(unit_added_cost)}."
             )
         event = ParsedEvent(stock.drug_name, Action.RESTOCKED, quantity=command.quantity, notes=notes)
@@ -671,12 +715,24 @@ class IntakeService:
         except Exception:
             return EntryResult(logged=False, reply=SAVE_ERROR, summary_line="", category="errors")
 
-        reply_parts = [
-            f"✅ {event.drug_name} +{command.quantity} added",
-        ]
-        if command.restock_type != "normal":
-            reply_parts.append(f"Type: {command.restock_type}")
-        if new_average_cost is not None:
+        if command.restock_type == "bonus":
+            reply_parts = [
+                f"✅ {event.drug_name} +{command.quantity} bonus added",
+                "Cost: KES 0",
+            ]
+        elif command.restock_type == "discount":
+            reply_parts = [f"✅ {event.drug_name} +{command.quantity} added with discount"]
+            if command.budgeted_cost is not None:
+                reply_parts.append(f"Budgeted: {format_kes(command.budgeted_cost)}")
+            if total_added_cost is not None:
+                reply_parts.append(f"Paid: {format_kes(total_added_cost)}")
+            if saved_amount is not None:
+                reply_parts.append(f"Saved: {format_kes(saved_amount)}")
+        else:
+            reply_parts = [f"✅ {event.drug_name} +{command.quantity} added"]
+            if total_added_cost is not None:
+                reply_parts.append(f"Cost: {format_kes(total_added_cost)}")
+        if new_average_cost is not None and command.restock_type != "bonus":
             reply_parts.append(f"Avg cost: {format_kes(new_average_cost)}")
         reply_parts.append(f"New stock: {new_current_stock}")
         return EntryResult(
@@ -1012,6 +1068,38 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
         return OperatingCommand(kind="stock_check", drug_name=title_drug_name(stock_name), raw_text=text)
 
     match = re.fullmatch(
+        r"\+(.+?)\s+(\d+)\s+ordered\s+(\d+(?:\.\d+)?)\s+paid\s+(\d+(?:\.\d+)?)(?:\s+(disc|discount|discounted))?",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return OperatingCommand(
+            kind="restock",
+            drug_name=title_drug_name(match.group(1)),
+            quantity=positive_quantity(match.group(2)),
+            budgeted_cost=parse_money(match.group(3)),
+            total_cost=parse_money(match.group(4)),
+            restock_type="discount",
+            raw_text=text,
+        )
+
+    match = re.fullmatch(
+        r"\+(.+?)\s+(\d+)\s+cost\s+(\d+(?:\.\d+)?)(?:\s+(disc|discount|discounted))?",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        total_cost, restock_type = parse_restock_details(match.group(3), match.group(4))
+        return OperatingCommand(
+            kind="restock",
+            drug_name=title_drug_name(match.group(1)),
+            quantity=positive_quantity(match.group(2)),
+            total_cost=total_cost,
+            restock_type=restock_type,
+            raw_text=text,
+        )
+
+    match = re.fullmatch(
         r"\+(.+?)\s+(\d+)(?:\s+(\d+(?:\.\d+)?))?(?:\s+(bonus|disc|discount|discounted))?",
         clean,
         flags=re.IGNORECASE,
@@ -1085,7 +1173,7 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
             raw_text=text,
         )
 
-    match = re.fullmatch(r"(?:i\s+)?sold\s+(.+?)\s+(\d+)", clean, flags=re.IGNORECASE)
+    match = re.fullmatch(r"(?:i\s+)?(?:sold|sell|sale)\s+(.+?)\s+(\d+)", clean, flags=re.IGNORECASE)
     if match:
         return OperatingCommand(
             kind="sale",
@@ -1119,10 +1207,89 @@ def title_drug_name(value: str) -> str:
 
 
 def replace_number_words(text: str) -> str:
-    result = text
-    for word, number in sorted(NUMBER_WORDS.items(), key=lambda item: -len(item[0])):
-        result = re.sub(rf"\b{re.escape(word)}\b", str(number), result, flags=re.IGNORECASE)
-    return result
+    words = sorted(NUMBER_WORDS, key=len, reverse=True)
+    number_pattern = "|".join(re.escape(word) for word in words)
+    phrase_pattern = rf"\b(?:{number_pattern})(?:[\s-]+(?:and\s+)?(?:{number_pattern}))*\b"
+
+    def replace_match(match: re.Match[str]) -> str:
+        number = parse_number_phrase(match.group(0))
+        return str(number) if number is not None else match.group(0)
+
+    return re.sub(phrase_pattern, replace_match, text, flags=re.IGNORECASE)
+
+
+def parse_number_phrase(phrase: str) -> int | None:
+    tokens = re.split(r"[\s-]+", phrase.lower().strip())
+    total = 0
+    current = 0
+    found = False
+    for token in tokens:
+        if token == "and":
+            continue
+        if token not in NUMBER_WORDS:
+            return None
+        found = True
+        value = NUMBER_WORDS[token]
+        if token == "hundred":
+            current = max(current, 1) * value
+        elif token == "thousand":
+            total += max(current, 1) * value
+            current = 0
+        else:
+            current += value
+    if not found:
+        return None
+    return total + current
+
+
+def normalize_spoken_command_text(text: str) -> str:
+    clean = normalize_natural_text(replace_number_words(text))
+    single_line = " ".join(clean.split())
+
+    match = re.fullmatch(r"(?:sell|sale)\s+(.+?)\s+(\d+)", single_line, flags=re.IGNORECASE)
+    if match:
+        return f"{title_drug_name(match.group(1))} {positive_quantity(match.group(2))}"
+
+    match = re.fullmatch(
+        r"add\s+(.+?)\s+(\d+)\s+ordered\s+(\d+(?:\.\d+)?)\s+paid\s+(\d+(?:\.\d+)?)",
+        single_line,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return (
+            f"+{title_drug_name(match.group(1))} {positive_quantity(match.group(2))} "
+            f"ordered {format_plain_number(parse_money(match.group(3)))} "
+            f"paid {format_plain_number(parse_money(match.group(4)))}"
+        )
+
+    match = re.fullmatch(
+        r"add\s+(.+?)\s+(\d+)\s+paid\s+(\d+(?:\.\d+)?)",
+        single_line,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return (
+            f"+{title_drug_name(match.group(1))} {positive_quantity(match.group(2))} "
+            f"{format_plain_number(parse_money(match.group(3)))}"
+        )
+
+    match = re.fullmatch(r"add\s+(.+?)\s+(\d+)\s+bonus", single_line, flags=re.IGNORECASE)
+    if match:
+        return f"+{title_drug_name(match.group(1))} {positive_quantity(match.group(2))} bonus"
+
+    match = re.fullmatch(r"add\s+(.+?)\s+(\d+)", single_line, flags=re.IGNORECASE)
+    if match:
+        return f"+{title_drug_name(match.group(1))} {positive_quantity(match.group(2))}"
+
+    return clean
+
+
+def format_plain_number(value: float | None) -> str:
+    if value is None:
+        return ""
+    if abs(value - round(value)) < 0.005:
+        return str(int(round(value)))
+    return str(value)
 
 
 def normalize_natural_text(text: str) -> str:
