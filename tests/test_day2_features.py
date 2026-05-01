@@ -215,6 +215,9 @@ def test_voice_note_uses_mocked_transcription(monkeypatch):
 
     assert response.status_code == 200
     assert "Voice note received" in response.text
+    assert "Heard: Panadol two, later Cetrizine three" in response.text
+    assert "Command: Panadol 2, later Cetrizine 3" in response.text
+    assert "Result:" in response.text
     assert "Records updated" in response.text
     assert fake_intake.received == "Panadol 2, later Cetrizine 3"
 
@@ -332,7 +335,7 @@ def test_twilio_pdf_fallback_link_stays_when_not_attachable(monkeypatch):
     assert "Tap here to download" in response.text
 
 
-def test_unclear_voice_note_asks_confirmation_then_yes_processes(monkeypatch):
+def test_unclear_voice_note_asks_for_small_correction(monkeypatch):
     fake_intake = FakeIntake("✅ Panadol x2 recorded\nStock left: 18\nProfit: KES 160")
     monkeypatch.setattr(main, "get_whatsapp_client", lambda: FakeWhatsApp())
     monkeypatch.setattr(main, "get_transcription_service", lambda: FakeTranscription("maybe panadol"))
@@ -351,19 +354,10 @@ def test_unclear_voice_note_asks_confirmation_then_yes_processes(monkeypatch):
                 "MessageSid": "SMVOICECONFIRM1",
             },
         )
-        second = client.post(
-            "/webhook/whatsapp",
-            data={
-                "Body": "yes",
-                "From": "whatsapp:+254700000001",
-                "MessageSid": "SMVOICECONFIRM2",
-            },
-        )
 
-    assert "I’m not fully sure I understood" in first.text
-    assert "Please confirm by typing" in first.text
-    assert "Confirmed. Records updated" in second.text
-    assert fake_intake.received == "maybe panadol"
+    assert "I heard: maybe panadol. I need one small correction." in first.text
+    assert "Try: Panadol 2 / +Panadol 20 / bonus Panadol 5." in first.text
+    assert fake_intake.received == ""
 
 
 def test_voice_correction_processes_corrected_text(monkeypatch):

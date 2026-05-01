@@ -195,13 +195,12 @@ def test_help_command_returns_available_commands_without_parser():
     assert "+Panadol 20" in reply
     assert "add Panadol 20" in reply
     assert "bonus Panadol 5" in reply
-    assert "+Panadol 5 bonus" in reply
     assert "+Panadol 20 paid 1800" in reply
     assert "+Panadol 20 ordered 2000 paid 1800" in reply
     assert "Panadol stock" in reply
     assert "profit today" in reply
-    assert "report today" in reply
-    assert 'Say: "Panadol two"' in reply
+    assert "report today / report week" in reply
+    assert 'Say: "Panadol two" or "bonus Panadol five"' in reply
     assert parser.called is False
 
 
@@ -390,7 +389,7 @@ def test_simple_sale_command_records_sale_and_profit():
 
 
 def test_sale_aliases_are_customer_friendly():
-    for message in ["panadol two", "panadol x2", "sell panadol 2", "sold panadol 2"]:
+    for message in ["panadol two", "panadol x2", "sell panadol 2", "sold panadol 2", "sold two panadol"]:
         store = FakeStore()
         service = IntakeService(FailingParser(), store)
 
@@ -413,7 +412,7 @@ def test_simple_restock_plus_command_records_restock():
 
 
 def test_restock_aliases_add_received_and_stock_work():
-    for message in ["add Panadol 20", "received Panadol 20", "stock Panadol 20"]:
+    for message in ["add Panadol 20", "received Panadol 20", "stock Panadol 20", "add twenty panadol"]:
         store = FakeStore()
         service = IntakeService(FailingParser(), store)
 
@@ -674,14 +673,27 @@ def test_number_words_are_supported_for_voice_transcripts():
 
 
 def test_spoken_text_normalization_for_voice_commands():
+    assert normalize_spoken_command_text("sold two panadol") == "Panadol 2"
     assert normalize_spoken_command_text("Panadol two") == "Panadol 2"
     assert normalize_spoken_command_text("Panadol sold two") == "Panadol sold 2"
     assert normalize_spoken_command_text("sell Panadol two") == "Panadol 2"
     assert normalize_spoken_command_text("add Panadol twenty") == "+Panadol 20"
+    assert normalize_spoken_command_text("add twenty Panadol") == "+Panadol 20"
+    assert normalize_spoken_command_text("received twenty Panadol") == "+Panadol 20"
     assert normalize_spoken_command_text("add Panadol twenty bonus") == "+Panadol 20 bonus"
     assert normalize_spoken_command_text("bonus Panadol five") == "+Panadol 5 bonus"
+    assert normalize_spoken_command_text("five Panadol bonus") == "+Panadol 5 bonus"
+    assert normalize_spoken_command_text("Panadol five bonus") == "+Panadol 5 bonus"
+    assert normalize_spoken_command_text("bought twenty Panadol for one thousand eight hundred") == "+Panadol 20 1800"
     assert normalize_spoken_command_text("add Panadol twenty paid one thousand eight hundred") == "+Panadol 20 1800"
     assert normalize_spoken_command_text("Panadol twenty paid one thousand eight hundred") == "+Panadol 20 1800"
+    assert (
+        normalize_spoken_command_text("ordered twenty Panadol, budget two thousand, paid one thousand eight hundred")
+        == "+Panadol 20 ordered 2000 paid 1800"
+    )
+    assert normalize_spoken_command_text("panadol stock") == "panadol stock"
+    assert normalize_spoken_command_text("profit today") == "profit today"
+    assert normalize_spoken_command_text("report week") == "report week"
 
 
 def test_fifty_line_batch_does_not_crash_and_continues():

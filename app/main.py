@@ -573,6 +573,7 @@ def generate_daily_report(
 class IncomingInput:
     text: str
     is_voice: bool = False
+    original_text: str = ""
 
 
 @dataclass(frozen=True)
@@ -620,13 +621,12 @@ async def process_twilio_form_values(form_values: dict[str, Any]) -> WhatsAppPro
             message_type = "voice" if incoming.is_voice else "text"
             if incoming.is_voice and not voice_transcript_is_clear(incoming.text):
                 command_handler = "voice_note_confirmation_required"
-                store_pending_voice(from_number, incoming.text)
-                reply = pending_voice_reply(incoming.text)
+                reply = voice_needs_correction_reply(incoming.original_text or incoming.text)
             else:
                 command_handler = "voice_note_processed" if incoming.is_voice else classify_command_handler(incoming.text)
                 reply = get_intake_service().process_text(incoming.text)
                 if incoming.is_voice:
-                    reply = voice_reply(incoming.text, reply)
+                    reply = voice_reply(incoming.original_text or incoming.text, incoming.text, reply)
 
         media_url = media_url_from_reply(reply)
         if media_url:
@@ -716,7 +716,11 @@ async def incoming_text_from_form(
             except Exception as exc:
                 raise UnsupportedInputError(voice_transcription_failed_message()) from exc
             if transcript:
-                return IncomingInput(text=normalize_spoken_command_text(transcript), is_voice=True)
+                return IncomingInput(
+                    text=normalize_spoken_command_text(transcript),
+                    is_voice=True,
+                    original_text=transcript,
+                )
             raise UnsupportedInputError(voice_transcription_failed_message())
 
     if body:
@@ -724,9 +728,15 @@ async def incoming_text_from_form(
     raise UnsupportedInputError("Please send WhatsApp text or a voice note only.")
 
 
-def voice_reply(transcript: str, processed_reply: str) -> str:
-    if "could not understand" in processed_reply.lower() or "please send it like" in processed_reply.lower():
-        return unclear_voice_message()
+def voice_reply(original_transcript: str, interpreted_command: str, processed_reply: str) -> str:
+    lower_reply = processed_reply.lower()
+    if (
+        "could not understand" in lower_reply
+        or "please send it like" in lower_reply
+        or "didn’t understand" in lower_reply
+        or "didn't understand" in lower_reply
+    ):
+        return voice_needs_correction_reply(original_transcript)
     clean_reply = processed_reply
     if clean_reply.startswith("✅ Batch processed\n\n"):
         clean_reply = clean_reply.replace("✅ Batch processed\n\n", "", 1)
@@ -735,7 +745,10 @@ def voice_reply(transcript: str, processed_reply: str) -> str:
         [
             "🎙️ Voice note received",
             "",
-            "I understood:",
+            f"Heard: {original_transcript}",
+            f"Command: {interpreted_command}",
+            "",
+            "Result:",
             clean_reply,
             "",
             "✅ Records updated.",
@@ -745,6 +758,14 @@ def voice_reply(transcript: str, processed_reply: str) -> str:
 
 def unclear_voice_message() -> str:
     return "⚠️ I could not clearly understand the voice note.\nPlease type it like:\nPanadol 2\nAmoxil 1"
+
+
+def voice_needs_correction_reply(transcript: str) -> str:
+    heard = transcript.strip() or "nothing clear"
+    return (
+        f"I heard: {heard}. I need one small correction.\n"
+        "Try: Panadol 2 / +Panadol 20 / bonus Panadol 5."
+    )
 
 
 def voice_transcription_failed_message() -> str:

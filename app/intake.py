@@ -28,24 +28,26 @@ HELP_TEXT = "\n".join(
         "+Panadol 20",
         "add Panadol 20",
         "",
-        "Bonus/free stock:",
+        "Bonus:",
         "bonus Panadol 5",
-        "+Panadol 5 bonus",
         "",
-        "Discount / paid less:",
+        "Discount stock:",
         "+Panadol 20 paid 1800",
+        "",
+        "Budget vs paid:",
         "+Panadol 20 ordered 2000 paid 1800",
         "",
-        "Check:",
+        "Stock:",
         "Panadol stock",
         "",
-        "Reports:",
+        "Profit:",
         "profit today",
-        "report today",
-        "report week",
+        "",
+        "Reports:",
+        "report today / report week",
         "",
         "Voice:",
-        'Say: "Panadol two"',
+        'Say: "Panadol two" or "bonus Panadol five"',
     ]
 )
 AMBIGUOUS_ERROR = (
@@ -1053,6 +1055,28 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
             raw_text=text,
         )
 
+    match = re.fullmatch(r"(?:bonus|free|extra)\s+(\d+)\s+(.+)", clean, flags=re.IGNORECASE)
+    if match:
+        return OperatingCommand(
+            kind="restock",
+            drug_name=title_drug_name(match.group(2)),
+            quantity=positive_quantity(match.group(1)),
+            total_cost=0,
+            restock_type="bonus",
+            raw_text=text,
+        )
+
+    match = re.fullmatch(r"(\d+)\s+(.+?)\s+(?:bonus|free|extra)", clean, flags=re.IGNORECASE)
+    if match:
+        return OperatingCommand(
+            kind="restock",
+            drug_name=title_drug_name(match.group(2)),
+            quantity=positive_quantity(match.group(1)),
+            total_cost=0,
+            restock_type="bonus",
+            raw_text=text,
+        )
+
     match = re.fullmatch(r"(.+?)\s+(\d+)\s+(?:bonus|free|extra)", clean, flags=re.IGNORECASE)
     if match:
         return OperatingCommand(
@@ -1142,6 +1166,29 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
             raw_text=text,
         )
 
+    match = re.fullmatch(
+        r"(?:bought|received)\s+(\d+)\s+(.+?)\s+(?:for|paid|cost)\s+(\d+(?:\.\d+)?)",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return OperatingCommand(
+            kind="restock",
+            drug_name=title_drug_name(match.group(2)),
+            quantity=positive_quantity(match.group(1)),
+            total_cost=parse_money(match.group(3)),
+            raw_text=text,
+        )
+
+    match = re.fullmatch(r"(?:add|received|stock|restock|restocked)\s+(\d+)\s+(.+)", clean, flags=re.IGNORECASE)
+    if match:
+        return OperatingCommand(
+            kind="restock",
+            drug_name=title_drug_name(match.group(2)),
+            quantity=positive_quantity(match.group(1)),
+            raw_text=text,
+        )
+
     match = re.fullmatch(r"(.+?)\s+(\d+)\s+paid\s+(\d+(?:\.\d+)?)", clean, flags=re.IGNORECASE)
     if match:
         return OperatingCommand(
@@ -1207,6 +1254,15 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
             kind="sale",
             drug_name=title_drug_name(match.group(1)),
             quantity=positive_quantity(match.group(2)),
+            raw_text=text,
+        )
+
+    match = re.fullmatch(r"(?:i\s+)?(?:sold|sell|sale)\s+(\d+)\s+(.+)", clean, flags=re.IGNORECASE)
+    if match:
+        return OperatingCommand(
+            kind="sale",
+            drug_name=title_drug_name(match.group(2)),
+            quantity=positive_quantity(match.group(1)),
             raw_text=text,
         )
 
@@ -1281,11 +1337,27 @@ def parse_number_phrase(phrase: str) -> int | None:
 
 def normalize_spoken_command_text(text: str) -> str:
     clean = normalize_natural_text(replace_number_words(text))
-    single_line = " ".join(clean.split())
+    single_line = " ".join(clean.replace(",", " ").split())
+
+    match = re.fullmatch(r"(?:sold|sell|sale)\s+(\d+)\s+(.+)", single_line, flags=re.IGNORECASE)
+    if match:
+        return f"{title_drug_name(match.group(2))} {positive_quantity(match.group(1))}"
 
     match = re.fullmatch(r"(?:sell|sale)\s+(.+?)\s+(\d+)", single_line, flags=re.IGNORECASE)
     if match:
         return f"{title_drug_name(match.group(1))} {positive_quantity(match.group(2))}"
+
+    match = re.fullmatch(
+        r"ordered\s+(\d+)\s+(.+?)\s+budget\s+(\d+(?:\.\d+)?)\s+paid\s+(\d+(?:\.\d+)?)",
+        single_line,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return (
+            f"+{title_drug_name(match.group(2))} {positive_quantity(match.group(1))} "
+            f"ordered {format_plain_number(parse_money(match.group(3)))} "
+            f"paid {format_plain_number(parse_money(match.group(4)))}"
+        )
 
     match = re.fullmatch(
         r"add\s+(.+?)\s+(\d+)\s+ordered\s+(\d+(?:\.\d+)?)\s+paid\s+(\d+(?:\.\d+)?)",
@@ -1310,6 +1382,17 @@ def normalize_spoken_command_text(text: str) -> str:
             f"{format_plain_number(parse_money(match.group(3)))}"
         )
 
+    match = re.fullmatch(
+        r"(?:bought|received)\s+(\d+)\s+(.+?)\s+(?:for|paid|cost)\s+(\d+(?:\.\d+)?)",
+        single_line,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return (
+            f"+{title_drug_name(match.group(2))} {positive_quantity(match.group(1))} "
+            f"{format_plain_number(parse_money(match.group(3)))}"
+        )
+
     match = re.fullmatch(r"add\s+(.+?)\s+(\d+)\s+bonus", single_line, flags=re.IGNORECASE)
     if match:
         return f"+{title_drug_name(match.group(1))} {positive_quantity(match.group(2))} bonus"
@@ -1317,6 +1400,22 @@ def normalize_spoken_command_text(text: str) -> str:
     match = re.fullmatch(r"(?:bonus|free|extra)\s+(.+?)\s+(\d+)", single_line, flags=re.IGNORECASE)
     if match:
         return f"+{title_drug_name(match.group(1))} {positive_quantity(match.group(2))} bonus"
+
+    match = re.fullmatch(r"(?:bonus|free|extra)\s+(\d+)\s+(.+)", single_line, flags=re.IGNORECASE)
+    if match:
+        return f"+{title_drug_name(match.group(2))} {positive_quantity(match.group(1))} bonus"
+
+    match = re.fullmatch(r"(\d+)\s+(.+?)\s+(?:bonus|free|extra)", single_line, flags=re.IGNORECASE)
+    if match:
+        return f"+{title_drug_name(match.group(2))} {positive_quantity(match.group(1))} bonus"
+
+    match = re.fullmatch(r"(.+?)\s+(\d+)\s+(?:bonus|free|extra)", single_line, flags=re.IGNORECASE)
+    if match:
+        return f"+{title_drug_name(match.group(1))} {positive_quantity(match.group(2))} bonus"
+
+    match = re.fullmatch(r"(?:add|received)\s+(\d+)\s+(.+)", single_line, flags=re.IGNORECASE)
+    if match:
+        return f"+{title_drug_name(match.group(2))} {positive_quantity(match.group(1))}"
 
     match = re.fullmatch(
         r"(.+?)\s+(\d+)\s+paid\s+(\d+(?:\.\d+)?)",
