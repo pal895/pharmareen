@@ -23,6 +23,10 @@ class FakeTranscription:
         return self.text
 
 
+class UnavailableTranscription:
+    is_available = False
+
+
 class FakeIntake:
     def __init__(self, reply: str | None = None):
         self.received = ""
@@ -37,23 +41,22 @@ class FakeStatusStore:
     is_available = False
 
 
-def test_health_endpoint_is_day_2():
+def test_health_endpoint_is_simple_ok():
     with TestClient(main.app) as client:
         response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "status": "ok",
-        "service": "PharMareen",
-        "version": "day-2",
-    }
+    assert response.json() == {"status": "ok"}
 
 
 def test_landing_page_and_manifest_work():
     with TestClient(main.app) as client:
-        page = client.get("/")
+        root = client.get("/")
+        page = client.get("/landing")
         manifest = client.get("/manifest.json")
 
+    assert root.status_code == 200
+    assert root.json() == {"status": "running"}
     assert page.status_code == 200
     assert "Run your pharmacy from WhatsApp" in page.text
     assert "wa.me" in page.text
@@ -228,6 +231,27 @@ def test_unclear_voice_note_returns_clear_message(monkeypatch):
 
     assert response.status_code == 200
     assert "I could not clearly understand the voice note" in response.text
+
+
+def test_voice_note_without_openai_key_fails_gracefully(monkeypatch):
+    monkeypatch.setattr(main, "get_whatsapp_client", lambda: FakeWhatsApp())
+    monkeypatch.setattr(main, "get_transcription_service", lambda: UnavailableTranscription())
+    monkeypatch.setattr(main, "log_webhook_request", lambda *args, **kwargs: None)
+
+    with TestClient(main.app) as client:
+        response = client.post(
+            "/webhook/whatsapp",
+            data={
+                "NumMedia": "1",
+                "MediaContentType0": "audio/ogg",
+                "MediaUrl0": "https://example.com/audio.ogg",
+                "From": "whatsapp:+254700000003",
+                "MessageSid": "SMVOICENOKEY1",
+            },
+        )
+
+    assert response.status_code == 200
+    assert "Voice not enabled. Send text like: Panadol 2" in response.text
 
 
 def test_twilio_pdf_media_payload_created_for_public_report(monkeypatch):

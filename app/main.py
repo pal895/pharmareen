@@ -58,13 +58,14 @@ app = FastAPI(
 )
 
 
+@app.get("/")
+def root() -> dict[str, str]:
+    return {"status": "running"}
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {
-        "status": "ok",
-        "service": "PharMareen",
-        "version": "day-2",
-    }
+    return {"status": "ok"}
 
 
 @app.get("/status", response_class=HTMLResponse)
@@ -136,8 +137,8 @@ def startup_status_page() -> str:
           <div class="row"><span>Webhook URL for Twilio</span><span><code>{escape(webhook_url)}</code></span></div>
         </section>
         <section class="card">
-          <p><strong>Local app:</strong> <a href="http://localhost:8000">http://localhost:8000</a></p>
-          <p><strong>Health check:</strong> <a href="http://localhost:8000/health">http://localhost:8000/health</a></p>
+          <p><strong>Local app:</strong> <a href="http://localhost:5000">http://localhost:5000</a></p>
+          <p><strong>Health check:</strong> <a href="http://localhost:5000/health">http://localhost:5000/health</a></p>
           <p><strong>WhatsApp:</strong> needs a public HTTPS production URL before Twilio can reach this app.</p>
         </section>
       </main>
@@ -146,7 +147,7 @@ def startup_status_page() -> str:
     """
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/landing", response_class=HTMLResponse)
 def landing_page() -> str:
     settings = get_settings()
     whatsapp_number = settings.twilio_whatsapp_from.replace("whatsapp:", "") or "Your WhatsApp number"
@@ -215,7 +216,7 @@ def manifest() -> JSONResponse:
         {
             "name": "PharMareen",
             "short_name": "PharMareen",
-            "start_url": "/",
+            "start_url": "/landing",
             "display": "standalone",
             "background_color": "#f6f8fb",
             "theme_color": "#1f4e79",
@@ -258,7 +259,7 @@ def status_class(value: bool) -> str:
 
 
 def effective_app_base_url(settings: Settings) -> str:
-    return (settings.public_base_url or "http://localhost:8000").rstrip("/")
+    return (settings.public_base_url or "http://localhost:5000").rstrip("/")
 
 
 def webhook_url_for(settings: Settings) -> str:
@@ -321,7 +322,7 @@ def missing_startup_settings(settings: Settings) -> list[str]:
 
 def startup_console_lines() -> list[str]:
     settings = get_settings()
-    port = os.getenv("PORT", "8000")
+    port = os.getenv("PORT", "5000")
     lines = [
         "PharMareen System Running",
         f"Local app: http://localhost:{port}",
@@ -729,7 +730,7 @@ async def incoming_text_from_form(
         if media_url and content_type.startswith("audio/"):
             if not transcription_service.is_available:
                 raise UnsupportedInputError(
-                    "Voice notes are not ready yet. Please type it like:\nPanadol 2\nAmoxil 1"
+                    "Voice not enabled. Send text like: Panadol 2"
                 )
             audio_bytes = await whatsapp.download_media(media_url)
             try:
@@ -927,7 +928,7 @@ class UnsupportedInputError(Exception):
 def run_local_server() -> None:
     import uvicorn
 
-    port = int(os.getenv("PORT", "8000"))
+    port = int(os.getenv("PORT", "5000"))
     try:
         uvicorn.run(app, host="0.0.0.0", port=port, reload=False)
     except KeyboardInterrupt:

@@ -117,11 +117,7 @@ def test_health_and_test_endpoint_work_when_sheets_are_unavailable(monkeypatch):
         test_response = client.get("/test")
 
     assert health_response.status_code == 200
-    assert health_response.json() == {
-        "status": "ok",
-        "service": "PharMareen",
-        "version": "day-2",
-    }
+    assert health_response.json() == {"status": "ok"}
     assert test_response.status_code == 200
     assert test_response.json()["message"] == SHEETS_UNAVAILABLE_MESSAGE
 

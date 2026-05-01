@@ -153,6 +153,7 @@ class OperatingCommand:
     drug_name: str = ""
     quantity: int = 1
     total_cost: float | None = None
+    restock_type: str = "normal"
     raw_text: str = ""
     error: str = ""
 
@@ -208,6 +209,9 @@ class IntakeService:
 
         if is_customer_ordering_question(text):
             return ORDERING_TODO_REPLY
+
+        if is_process_batch_command(text):
+            return "No saved offline entries yet.\n\nSend sales together like:\nPanadol 2\nAmoxil 1"
 
         if is_profit_today_command(text):
             return self._profit_today_reply()
@@ -364,6 +368,15 @@ class IntakeService:
             lines.append("")
             lines.append("⚠️ Some items had missing price data, so profit may be incomplete.")
         return "\n".join(lines)
+
+    def _today_profit_line(self) -> str:
+        report_date = now_in_timezone(self.timezone).date().isoformat()
+        try:
+            transactions = self.store.read_transactions(report_date)
+        except Exception:
+            return ""
+        metrics = build_transaction_metrics(report_date, transactions, [])
+        return f"📊 Today Profit: {format_kes(metrics.gross_profit)}"
 
     def _weekly_report_reply(self) -> str:
         today = now_in_timezone(self.timezone).date()
@@ -577,6 +590,9 @@ class IntakeService:
             reply_parts.append("Stock left: not set.")
         if not is_late and not missing_profit_data:
             reply_parts.append(f"Profit: {format_kes(profit)}")
+        today_profit_line = self._today_profit_line()
+        if today_profit_line:
+            reply_parts.append(today_profit_line)
         if stock_plan.reply_warnings:
             reply_parts.extend(stock_plan.reply_warnings)
         reply = "\n".join(reply_parts)
@@ -615,27 +631,29 @@ class IntakeService:
 
         current_stock = stock.current_stock or 0
         new_current_stock = current_stock + command.quantity
+        total_added_cost = 0 if command.restock_type == "bonus" else command.total_cost
         new_average_cost = calculate_average_cost(
             current_stock=current_stock,
             current_cost=stock.cost_price,
             added_quantity=command.quantity,
-            total_added_cost=command.total_cost,
+            total_added_cost=total_added_cost,
         )
         unit_added_cost = (
-            command.total_cost / command.quantity
-            if command.total_cost is not None and command.quantity > 0
+            total_added_cost / command.quantity
+            if total_added_cost is not None and command.quantity > 0
             else None
         )
-        notes = ""
-        if command.total_cost is not None:
+        notes = f"Restock type: {command.restock_type}."
+        if total_added_cost is not None:
             notes = (
-                f"Restock total cost {format_kes(command.total_cost)}. "
+                f"Restock type: {command.restock_type}. "
+                f"Restock total cost {format_kes(total_added_cost)}. "
                 f"Calculated unit cost {format_kes(unit_added_cost)}."
             )
         event = ParsedEvent(stock.drug_name, Action.RESTOCKED, quantity=command.quantity, notes=notes)
 
         try:
-            if command.total_cost is not None:
+            if total_added_cost is not None:
                 self.store.update_current_stock_and_cost(stock, new_current_stock, new_average_cost)
             else:
                 self.store.update_current_stock(stock, new_current_stock)
@@ -645,7 +663,7 @@ class IntakeService:
                 stock.drug_name,
                 command.quantity,
                 unit_cost=unit_added_cost,
-                total_cost=command.total_cost,
+                total_cost=total_added_cost,
                 note=notes,
             )
         except SheetsUnavailableError:
@@ -656,6 +674,8 @@ class IntakeService:
         reply_parts = [
             f"✅ {event.drug_name} +{command.quantity} added",
         ]
+        if command.restock_type != "normal":
+            reply_parts.append(f"Type: {command.restock_type}")
         if new_average_cost is not None:
             reply_parts.append(f"Avg cost: {format_kes(new_average_cost)}")
         reply_parts.append(f"New stock: {new_current_stock}")
@@ -833,6 +853,10 @@ def is_customer_ordering_question(text: str) -> bool:
     )
 
 
+def is_process_batch_command(text: str) -> bool:
+    return normalize_key(text) == "process batch"
+
+
 def parse_stock_check_command(text: str) -> str | None:
     normalized = " ".join(text.strip().lower().split())
     if "no stock" in normalized or "out of stock" in normalized:
@@ -968,6 +992,16 @@ def parse_drug_quantity_list(text: str, kind: str) -> list[OperatingCommand]:
     return commands
 
 
+def parse_restock_details(cost_text: str | None, modifier: str | None = None) -> tuple[float | None, str]:
+    restock_type = "normal"
+    modifier_text = str(modifier or "").strip().lower()
+    if modifier_text == "bonus":
+        return 0, "bonus"
+    if modifier_text in {"disc", "discount", "discounted"}:
+        restock_type = "discount"
+    return parse_money(cost_text), restock_type
+
+
 def parse_single_operating_command(text: str) -> OperatingCommand | None:
     clean = " ".join(text.strip().split())
     if not clean:
@@ -977,13 +1011,19 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
     if stock_name:
         return OperatingCommand(kind="stock_check", drug_name=title_drug_name(stock_name), raw_text=text)
 
-    match = re.fullmatch(r"\+(.+?)\s+(\d+)(?:\s+(\d+(?:\.\d+)?))?", clean, flags=re.IGNORECASE)
+    match = re.fullmatch(
+        r"\+(.+?)\s+(\d+)(?:\s+(\d+(?:\.\d+)?))?(?:\s+(bonus|disc|discount|discounted))?",
+        clean,
+        flags=re.IGNORECASE,
+    )
     if match:
+        total_cost, restock_type = parse_restock_details(match.group(3), match.group(4))
         return OperatingCommand(
             kind="restock",
             drug_name=title_drug_name(match.group(1)),
             quantity=positive_quantity(match.group(2)),
-            total_cost=parse_money(match.group(3)),
+            total_cost=total_cost,
+            restock_type=restock_type,
             raw_text=text,
         )
 
@@ -996,23 +1036,35 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
             raw_text=text,
         )
 
-    match = re.fullmatch(r"(.+?)\s+(?:restock|restocked)\s+(\d+)(?:\s+(\d+(?:\.\d+)?))?", clean, flags=re.IGNORECASE)
+    match = re.fullmatch(
+        r"(.+?)\s+(?:restock|restocked)\s+(\d+)(?:\s+(\d+(?:\.\d+)?))?(?:\s+(bonus|disc|discount|discounted))?",
+        clean,
+        flags=re.IGNORECASE,
+    )
     if match:
+        total_cost, restock_type = parse_restock_details(match.group(3), match.group(4))
         return OperatingCommand(
             kind="restock",
             drug_name=title_drug_name(match.group(1)),
             quantity=positive_quantity(match.group(2)),
-            total_cost=parse_money(match.group(3)),
+            total_cost=total_cost,
+            restock_type=restock_type,
             raw_text=text,
         )
 
-    match = re.fullmatch(r"(?:add|restock|restocked)\s+(.+?)\s+(\d+)(?:\s+(?:for\s+)?(\d+(?:\.\d+)?))?", clean, flags=re.IGNORECASE)
+    match = re.fullmatch(
+        r"(?:add|restock|restocked)\s+(.+?)\s+(\d+)(?:\s+(?:for\s+)?(\d+(?:\.\d+)?))?(?:\s+(bonus|disc|discount|discounted))?",
+        clean,
+        flags=re.IGNORECASE,
+    )
     if match:
+        total_cost, restock_type = parse_restock_details(match.group(3), match.group(4))
         return OperatingCommand(
             kind="restock",
             drug_name=title_drug_name(match.group(1)),
             quantity=positive_quantity(match.group(2)),
-            total_cost=parse_money(match.group(3)),
+            total_cost=total_cost,
+            restock_type=restock_type,
             raw_text=text,
         )
 
@@ -1092,7 +1144,7 @@ def clean_app_base_url(value: str | None) -> str:
     text = str(value or "").strip().rstrip("/")
     lower = text.lower()
     if not text or "your-" in lower or "example.com" in lower:
-        return "http://localhost:8000"
+        return "http://localhost:5000"
     return text
 
 

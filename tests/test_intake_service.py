@@ -241,11 +241,10 @@ def test_sold_item_with_price_found_logs_total_and_reduces_stock():
 
     reply = service.process_text("Panadol sold 2")
 
-    assert reply == (
-        "✅ Panadol x2 recorded\n"
-        "Stock left: 18\n"
-        "Profit: KES 160"
-    )
+    assert "Panadol x2 recorded" in reply
+    assert "Stock left: 18" in reply
+    assert "Profit: KES 160" in reply
+    assert "Today Profit: KES 160" in reply
     assert store.logged[0][0].drug_name == "Panadol"
     assert store.logged[0][1] == 220
     assert store.logged[0][2] == 440
@@ -344,12 +343,11 @@ def test_sale_reply_includes_low_stock_warning():
 
     reply = service.process_text("Cough Syrup sold 2")
 
-    assert reply == (
-        "✅ Cough Syrup x2 recorded\n"
-        "Stock left: 2\n"
-        "Profit: KES 100\n"
-        "⚠️ LOW STOCK: Cough Syrup is at or below reorder level."
-    )
+    assert "Cough Syrup x2 recorded" in reply
+    assert "Stock left: 2" in reply
+    assert "Profit: KES 100" in reply
+    assert "Today Profit: KES 100" in reply
+    assert "LOW STOCK: Cough Syrup is at or below reorder level." in reply
 
 
 def test_multiple_items_in_one_message_logs_each_item():
@@ -409,6 +407,32 @@ def test_restock_with_total_cost_updates_average_cost():
     assert store.stocks["panadol"].current_stock == 40
 
 
+def test_bonus_restock_records_free_stock_type():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    reply = service.process_text("+Panadol 5 bonus")
+
+    assert "Type: bonus" in reply
+    assert "Avg cost: KES 112" in reply
+    assert store.stocks["panadol"].current_stock == 25
+    assert store.transactions[-1]["Total Cost"] == 0
+    assert "Restock type: bonus" in store.transactions[-1]["Note"]
+
+
+def test_discount_restock_records_discount_type():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    reply = service.process_text("+Panadol 20 1800 disc")
+
+    assert "Type: discount" in reply
+    assert "Avg cost: KES 115" in reply
+    assert store.stocks["panadol"].cost_price == 115
+    assert store.transactions[-1]["Total Cost"] == 1800
+    assert "Restock type: discount" in store.transactions[-1]["Note"]
+
+
 def test_late_sale_command_records_late_sale():
     store = FakeStore()
     service = IntakeService(FailingParser(), store)
@@ -442,6 +466,15 @@ def test_profit_today_command_summarizes_profit():
     assert "Sales: KES 440" in reply
     assert "Cost: KES 280" in reply
     assert "Gross Profit: KES 160" in reply
+
+
+def test_process_batch_command_gives_safe_instruction():
+    service = IntakeService(FailingParser(), FakeStore())
+
+    reply = service.process_text("process batch")
+
+    assert "No saved offline entries yet" in reply
+    assert "Panadol 2" in reply
 
 
 def test_report_week_command_summarizes_last_seven_days():
