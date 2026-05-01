@@ -521,50 +521,22 @@ async def twilio_whatsapp_webhook(request: Request) -> Response:
     print(f"MESSAGESID={message_sid}", flush=True)
     print(f"COMMAND_HANDLER={classify_command_handler(body) if body else 'voice_or_media'}", flush=True)
 
-    media_url: str | None = None
     try:
-        if message_sid and message_sid in processed_message_sids:
-            return Response(content=twiml_response("Already processed."), media_type="application/xml")
-
-        pending = pending_voice_for_sender(from_number)
-        if body and pending and body.lower() == "yes":
-            incoming = IncomingInput(text=pending, is_voice=False)
-            clear_pending_voice(from_number)
-            reply = "✅ Confirmed. Records updated.\n\n" + get_intake_service().process_text(incoming.text)
-        elif body:
-            if pending:
-                clear_pending_voice(from_number)
-            incoming = IncomingInput(text=body, is_voice=False)
-            reply = get_intake_service().process_text(incoming.text)
-        else:
-            whatsapp = get_whatsapp_client()
-            incoming = await incoming_text_from_form(form_values, whatsapp, get_transcription_service())
-            if incoming.is_voice and not voice_transcript_is_clear(incoming.text):
-                store_pending_voice(from_number, incoming.text)
-                reply = pending_voice_reply(incoming.text)
-            else:
-                reply = get_intake_service().process_text(incoming.text)
-                if incoming.is_voice:
-                    reply = voice_reply(incoming.text, reply)
-        message_type = "voice" if not body and "incoming" in locals() and incoming.is_voice else "text"
-        media_url = media_url_from_reply(reply)
-        if media_url:
-            reply = reply_for_pdf_media(reply)
-        success = True
-        if message_sid:
-            processed_message_sids.add(message_sid)
-    except UnsupportedInputError as exc:
-        reply = str(exc)
-        error_reason = reply
+        result = await process_twilio_form_values(form_values)
+        print(f"COMMAND_HANDLER_RESULT={result.command_handler}", flush=True)
+        log_webhook_request(from_number, result.message_type, result.success, result.error_reason)
+        return Response(
+            content=twiml_response(result.reply, media_url=result.media_url),
+            media_type="application/xml",
+        )
     except Exception:
         logger.exception("Failed to process WhatsApp webhook")
         traceback.print_exc()
         reply = "Sorry, I could not understand that. Please send it like: Panadol sold 2."
         error_reason = "Unhandled processing error"
-    finally:
         log_webhook_request(from_number, message_type, success, error_reason)
 
-    return Response(content=twiml_response(reply, media_url=media_url), media_type="application/xml")
+    return Response(content=twiml_response(reply), media_type="application/xml")
 
 
 @app.post("/reports/daily")
@@ -702,7 +674,11 @@ def classify_command_handler(body: str) -> str:
         return "profit"
     if "stock" in text:
         return "stock_or_no_stock"
-    if text.startswith("+") or "restock" in text or text.startswith("add "):
+    if (
+        text.startswith("+")
+        or "restock" in text
+        or text.startswith(("add ", "received ", "stock ", "bonus ", "free ", "extra ", "bought "))
+    ):
         return "restock"
     if text.startswith("later ") or text.startswith("missed ") or " missed " in text:
         return "late_sale"
@@ -772,7 +748,7 @@ def unclear_voice_message() -> str:
 
 
 def voice_transcription_failed_message() -> str:
-    return "Sorry, I could not understand that voice note.\nTry saying: Panadol two"
+    return '🎙️ I heard the voice but could not read it clearly. Try saying: "Panadol two" or type: Panadol 2.'
 
 
 def voice_transcript_is_clear(transcript: str) -> bool:

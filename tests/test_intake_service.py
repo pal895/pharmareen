@@ -189,18 +189,19 @@ def test_help_command_returns_available_commands_without_parser():
 
     reply = service.process_text("help")
 
-    assert "👋 PharMareen Help" in reply
+    assert "👋 PharMareen Quick Commands" in reply
     assert "Panadol 2" in reply
+    assert "Panadol two" in reply
     assert "+Panadol 20" in reply
-    assert "+Panadol 20 2000" in reply
+    assert "add Panadol 20" in reply
+    assert "bonus Panadol 5" in reply
     assert "+Panadol 5 bonus" in reply
-    assert "+Panadol 20 1800 discount" in reply
+    assert "+Panadol 20 paid 1800" in reply
     assert "+Panadol 20 ordered 2000 paid 1800" in reply
     assert "Panadol stock" in reply
-    assert "Insulin no stock" in reply
     assert "profit today" in reply
     assert "report today" in reply
-    assert "If internet is off" in reply
+    assert 'Say: "Panadol two"' in reply
     assert parser.called is False
 
 
@@ -388,6 +389,18 @@ def test_simple_sale_command_records_sale_and_profit():
     assert store.transactions[-1]["Type"] == "sale"
 
 
+def test_sale_aliases_are_customer_friendly():
+    for message in ["panadol two", "panadol x2", "sell panadol 2", "sold panadol 2"]:
+        store = FakeStore()
+        service = IntakeService(FailingParser(), store)
+
+        reply = service.process_text(message)
+
+        assert "Panadol x2 recorded" in reply
+        assert store.stocks["panadol"].current_stock == 18
+        assert store.transactions[-1]["Type"] == "sale"
+
+
 def test_simple_restock_plus_command_records_restock():
     store = FakeStore()
     service = IntakeService(FailingParser(), store)
@@ -397,6 +410,18 @@ def test_simple_restock_plus_command_records_restock():
     assert "✅ Panadol +20 added" in reply
     assert "New stock: 40" in reply
     assert store.transactions[-1]["Type"] == "restock"
+
+
+def test_restock_aliases_add_received_and_stock_work():
+    for message in ["add Panadol 20", "received Panadol 20", "stock Panadol 20"]:
+        store = FakeStore()
+        service = IntakeService(FailingParser(), store)
+
+        reply = service.process_text(message)
+
+        assert "✅ Panadol +20 added" in reply
+        assert "New stock: 40" in reply
+        assert store.transactions[-1]["Type"] == "restock"
 
 
 def test_restock_with_total_cost_updates_average_cost():
@@ -416,12 +441,23 @@ def test_bonus_restock_records_free_stock_type():
 
     reply = service.process_text("+Panadol 5 bonus")
 
-    assert "✅ Panadol +5 bonus added" in reply
-    assert "Cost: KES 0" in reply
+    assert "✅ Panadol bonus +5 added" in reply
     assert "New stock: 25" in reply
     assert store.stocks["panadol"].current_stock == 25
     assert store.transactions[-1]["Total Cost"] == 0
     assert "Restock type: bonus" in store.transactions[-1]["Note"]
+
+
+def test_bonus_restock_aliases_are_understood():
+    for message in ["bonus Panadol 5", "free Panadol 5", "extra Panadol 5", "Panadol 5 bonus"]:
+        store = FakeStore()
+        service = IntakeService(FailingParser(), store)
+
+        reply = service.process_text(message)
+
+        assert "✅ Panadol bonus +5 added" in reply
+        assert "New stock: 25" in reply
+        assert store.transactions[-1]["Total Cost"] == 0
 
 
 def test_discount_restock_records_discount_type():
@@ -430,7 +466,7 @@ def test_discount_restock_records_discount_type():
 
     reply = service.process_text("+Panadol 20 1800 disc")
 
-    assert "✅ Panadol +20 added with discount" in reply
+    assert "✅ Panadol +20 added" in reply
     assert "Paid: KES 1,800" in reply
     assert "Avg cost: KES 115" in reply
     assert store.stocks["panadol"].cost_price == 115
@@ -444,7 +480,7 @@ def test_discount_restock_disc_alias_records_discount_type():
 
     reply = service.process_text("+Panadol 20 2000 disc")
 
-    assert "✅ Panadol +20 added with discount" in reply
+    assert "✅ Panadol +20 added" in reply
     assert "Paid: KES 2,000" in reply
     assert store.transactions[-1]["Total Cost"] == 2000
     assert "Restock type: discount" in store.transactions[-1]["Note"]
@@ -457,9 +493,21 @@ def test_restock_cost_keyword_records_total_cost():
     reply = service.process_text("+Panadol 20 cost 1800")
 
     assert "✅ Panadol +20 added" in reply
-    assert "Cost: KES 1,800" in reply
+    assert "Paid: KES 1,800" in reply
     assert "Avg cost: KES 115" in reply
     assert store.transactions[-1]["Total Cost"] == 1800
+
+
+def test_restock_paid_cost_aliases_work():
+    for message in ["+Panadol 20 paid 1800", "bought Panadol 20 for 1800", "received Panadol 20 paid 1800"]:
+        store = FakeStore()
+        service = IntakeService(FailingParser(), store)
+
+        reply = service.process_text(message)
+
+        assert "✅ Panadol +20 added" in reply
+        assert "Paid: KES 1,800" in reply
+        assert store.transactions[-1]["Total Cost"] == 1800
 
 
 def test_ordered_paid_restock_records_budget_savings():
@@ -468,8 +516,8 @@ def test_ordered_paid_restock_records_budget_savings():
 
     reply = service.process_text("+Panadol 20 ordered 2000 paid 1800")
 
-    assert "✅ Panadol +20 added with discount" in reply
-    assert "Budgeted: KES 2,000" in reply
+    assert "✅ Panadol +20 added" in reply
+    assert "Budget: KES 2,000" in reply
     assert "Paid: KES 1,800" in reply
     assert "Saved: KES 200" in reply
     assert "Avg cost: KES 115" in reply
@@ -631,7 +679,9 @@ def test_spoken_text_normalization_for_voice_commands():
     assert normalize_spoken_command_text("sell Panadol two") == "Panadol 2"
     assert normalize_spoken_command_text("add Panadol twenty") == "+Panadol 20"
     assert normalize_spoken_command_text("add Panadol twenty bonus") == "+Panadol 20 bonus"
+    assert normalize_spoken_command_text("bonus Panadol five") == "+Panadol 5 bonus"
     assert normalize_spoken_command_text("add Panadol twenty paid one thousand eight hundred") == "+Panadol 20 1800"
+    assert normalize_spoken_command_text("Panadol twenty paid one thousand eight hundred") == "+Panadol 20 1800"
 
 
 def test_fifty_line_batch_does_not_crash_and_continues():

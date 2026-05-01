@@ -27,6 +27,13 @@ class UnavailableTranscription:
     is_available = False
 
 
+class FailingTranscription:
+    is_available = True
+
+    def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
+        raise RuntimeError("transcription failed")
+
+
 class FakeIntake:
     def __init__(self, reply: str | None = None):
         self.received = ""
@@ -230,8 +237,8 @@ def test_unclear_voice_note_returns_clear_message(monkeypatch):
         )
 
     assert response.status_code == 200
-    assert "Sorry, I could not understand that voice note" in response.text
-    assert "Try saying: Panadol two" in response.text
+    assert "I heard the voice but could not read it clearly" in response.text
+    assert 'Try saying: "Panadol two" or type: Panadol 2.' in response.text
 
 
 def test_voice_note_without_openai_key_fails_gracefully(monkeypatch):
@@ -254,6 +261,28 @@ def test_voice_note_without_openai_key_fails_gracefully(monkeypatch):
     assert response.status_code == 200
     assert "Voice received, but voice is not enabled yet" in response.text
     assert "Send text like: Panadol 2" in response.text
+
+
+def test_voice_webhook_with_fake_media_transcription_error_does_not_crash(monkeypatch):
+    monkeypatch.setattr(main, "get_whatsapp_client", lambda: FakeWhatsApp())
+    monkeypatch.setattr(main, "get_transcription_service", lambda: FailingTranscription())
+    monkeypatch.setattr(main, "log_webhook_request", lambda *args, **kwargs: None)
+
+    with TestClient(main.app) as client:
+        response = client.post(
+            "/webhook/whatsapp",
+            data={
+                "NumMedia": "1",
+                "MediaContentType0": "audio/ogg",
+                "MediaUrl0": "https://example.com/audio.ogg",
+                "From": "whatsapp:+254700000004",
+                "MessageSid": "SMVOICEFAIL1",
+            },
+        )
+
+    assert response.status_code == 200
+    assert "<Response><Message>" in response.text
+    assert "I heard the voice but could not read it clearly" in response.text
 
 
 def test_twilio_pdf_media_payload_created_for_public_report(monkeypatch):

@@ -18,39 +18,26 @@ UNDERSTAND_ERROR = "I didn’t understand that yet.\n\nTry:\nPanadol 2\n+Panadol
 SAVE_ERROR = "I could not save this record right now. Please check the Google Sheets connection."
 HELP_TEXT = "\n".join(
     [
-        "👋 PharMareen Help",
+        "👋 PharMareen Quick Commands",
         "",
         "Sell:",
         "Panadol 2",
-        "",
-        "Sell many:",
-        "Panadol 2",
-        "Amoxil 1",
-        "Cetrizine 3",
+        "Panadol two",
         "",
         "Restock:",
         "+Panadol 20",
+        "add Panadol 20",
         "",
-        "Restock with cost:",
-        "+Panadol 20 2000",
-        "",
-        "Bonus stock:",
+        "Bonus/free stock:",
+        "bonus Panadol 5",
         "+Panadol 5 bonus",
         "",
-        "Discounted stock:",
-        "+Panadol 20 1800 discount",
-        "",
-        "Budget vs paid:",
+        "Discount / paid less:",
+        "+Panadol 20 paid 1800",
         "+Panadol 20 ordered 2000 paid 1800",
         "",
-        "Check stock:",
+        "Check:",
         "Panadol stock",
-        "",
-        "Missed sale:",
-        "later Panadol 3",
-        "",
-        "No stock:",
-        "Insulin no stock",
         "",
         "Reports:",
         "profit today",
@@ -58,17 +45,7 @@ HELP_TEXT = "\n".join(
         "report week",
         "",
         "Voice:",
-        "Send a voice note like:",
-        '"Panadol two"',
-        '"Panadol two, Amoxil one"',
-        '"Add Panadol twenty bonus"',
-        '"Add Panadol twenty paid one thousand eight hundred"',
-        "",
-        "Offline:",
-        "If internet is off, write sales on paper then send them together later:",
-        "Panadol 2",
-        "Amoxil 1",
-        "later Cetrizine 3",
+        'Say: "Panadol two"',
     ]
 )
 AMBIGUOUS_ERROR = (
@@ -717,21 +694,17 @@ class IntakeService:
 
         if command.restock_type == "bonus":
             reply_parts = [
-                f"✅ {event.drug_name} +{command.quantity} bonus added",
-                "Cost: KES 0",
+                f"✅ {event.drug_name} bonus +{command.quantity} added",
             ]
-        elif command.restock_type == "discount":
-            reply_parts = [f"✅ {event.drug_name} +{command.quantity} added with discount"]
-            if command.budgeted_cost is not None:
-                reply_parts.append(f"Budgeted: {format_kes(command.budgeted_cost)}")
-            if total_added_cost is not None:
-                reply_parts.append(f"Paid: {format_kes(total_added_cost)}")
-            if saved_amount is not None:
-                reply_parts.append(f"Saved: {format_kes(saved_amount)}")
         else:
             reply_parts = [f"✅ {event.drug_name} +{command.quantity} added"]
-            if total_added_cost is not None:
-                reply_parts.append(f"Cost: {format_kes(total_added_cost)}")
+        if command.restock_type != "bonus" and total_added_cost is not None:
+            reply_parts.append(f"Paid: {format_kes(total_added_cost)}")
+        if command.budgeted_cost is not None and command.restock_type != "bonus":
+            if command.budgeted_cost is not None:
+                reply_parts.insert(1, f"Budget: {format_kes(command.budgeted_cost)}")
+            if saved_amount is not None:
+                reply_parts.append(f"Saved: {format_kes(saved_amount)}")
         if new_average_cost is not None and command.restock_type != "bonus":
             reply_parts.append(f"Avg cost: {format_kes(new_average_cost)}")
         reply_parts.append(f"New stock: {new_current_stock}")
@@ -917,6 +890,8 @@ def parse_stock_check_command(text: str) -> str | None:
     normalized = " ".join(text.strip().lower().split())
     if "no stock" in normalized or "out of stock" in normalized:
         return None
+    if re.fullmatch(r"stock\s+.+?\s+\d+", normalized, flags=re.IGNORECASE):
+        return None
     natural = re.fullmatch(r"(?:what\s+is|what's|check)\s+(.+?)\s+stock\??", text.strip(), flags=re.IGNORECASE)
     if natural:
         return natural.group(1).strip() or None
@@ -1067,6 +1042,28 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
     if stock_name:
         return OperatingCommand(kind="stock_check", drug_name=title_drug_name(stock_name), raw_text=text)
 
+    match = re.fullmatch(r"(?:bonus|free|extra)\s+(.+?)\s+(\d+)", clean, flags=re.IGNORECASE)
+    if match:
+        return OperatingCommand(
+            kind="restock",
+            drug_name=title_drug_name(match.group(1)),
+            quantity=positive_quantity(match.group(2)),
+            total_cost=0,
+            restock_type="bonus",
+            raw_text=text,
+        )
+
+    match = re.fullmatch(r"(.+?)\s+(\d+)\s+(?:bonus|free|extra)", clean, flags=re.IGNORECASE)
+    if match:
+        return OperatingCommand(
+            kind="restock",
+            drug_name=title_drug_name(match.group(1)),
+            quantity=positive_quantity(match.group(2)),
+            total_cost=0,
+            restock_type="bonus",
+            raw_text=text,
+        )
+
     match = re.fullmatch(
         r"\+(.+?)\s+(\d+)\s+ordered\s+(\d+(?:\.\d+)?)\s+paid\s+(\d+(?:\.\d+)?)(?:\s+(disc|discount|discounted))?",
         clean,
@@ -1084,7 +1081,7 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
         )
 
     match = re.fullmatch(
-        r"\+(.+?)\s+(\d+)\s+cost\s+(\d+(?:\.\d+)?)(?:\s+(disc|discount|discounted))?",
+        r"\+(.+?)\s+(\d+)\s+(?:cost|paid)\s+(\d+(?:\.\d+)?)(?:\s+(disc|discount|discounted))?",
         clean,
         flags=re.IGNORECASE,
     )
@@ -1115,6 +1112,46 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
             raw_text=text,
         )
 
+    match = re.fullmatch(
+        r"(?:received|stock|add|restock|restocked)\s+(.+?)\s+(\d+)\s+ordered\s+(\d+(?:\.\d+)?)\s+paid\s+(\d+(?:\.\d+)?)",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return OperatingCommand(
+            kind="restock",
+            drug_name=title_drug_name(match.group(1)),
+            quantity=positive_quantity(match.group(2)),
+            budgeted_cost=parse_money(match.group(3)),
+            total_cost=parse_money(match.group(4)),
+            restock_type="discount",
+            raw_text=text,
+        )
+
+    match = re.fullmatch(
+        r"(?:bought|received)\s+(.+?)\s+(\d+)\s+(?:for|paid|cost)\s+(\d+(?:\.\d+)?)",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return OperatingCommand(
+            kind="restock",
+            drug_name=title_drug_name(match.group(1)),
+            quantity=positive_quantity(match.group(2)),
+            total_cost=parse_money(match.group(3)),
+            raw_text=text,
+        )
+
+    match = re.fullmatch(r"(.+?)\s+(\d+)\s+paid\s+(\d+(?:\.\d+)?)", clean, flags=re.IGNORECASE)
+    if match:
+        return OperatingCommand(
+            kind="restock",
+            drug_name=title_drug_name(match.group(1)),
+            quantity=positive_quantity(match.group(2)),
+            total_cost=parse_money(match.group(3)),
+            raw_text=text,
+        )
+
     match = re.fullmatch(r"(?:later|missed|i\s+missed)\s+(.+?)\s+(\d+)", clean, flags=re.IGNORECASE)
     if match:
         return OperatingCommand(
@@ -1141,7 +1178,7 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
         )
 
     match = re.fullmatch(
-        r"(?:add|restock|restocked)\s+(.+?)\s+(\d+)(?:\s+(?:for\s+)?(\d+(?:\.\d+)?))?(?:\s+(bonus|disc|discount|discounted))?",
+        r"(?:add|received|stock|restock|restocked)\s+(.+?)\s+(\d+)(?:\s+(?:for\s+)?(\d+(?:\.\d+)?))?(?:\s+(bonus|disc|discount|discounted))?",
         clean,
         flags=re.IGNORECASE,
     )
@@ -1182,7 +1219,7 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
             raw_text=text,
         )
 
-    match = re.fullmatch(r"(.+?)\s+(\d+)", clean, flags=re.IGNORECASE)
+    match = re.fullmatch(r"(.+?)\s+x?(\d+)", clean, flags=re.IGNORECASE)
     if match and not clean.startswith("+"):
         return OperatingCommand(
             kind="sale",
@@ -1276,6 +1313,21 @@ def normalize_spoken_command_text(text: str) -> str:
     match = re.fullmatch(r"add\s+(.+?)\s+(\d+)\s+bonus", single_line, flags=re.IGNORECASE)
     if match:
         return f"+{title_drug_name(match.group(1))} {positive_quantity(match.group(2))} bonus"
+
+    match = re.fullmatch(r"(?:bonus|free|extra)\s+(.+?)\s+(\d+)", single_line, flags=re.IGNORECASE)
+    if match:
+        return f"+{title_drug_name(match.group(1))} {positive_quantity(match.group(2))} bonus"
+
+    match = re.fullmatch(
+        r"(.+?)\s+(\d+)\s+paid\s+(\d+(?:\.\d+)?)",
+        single_line,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return (
+            f"+{title_drug_name(match.group(1))} {positive_quantity(match.group(2))} "
+            f"{format_plain_number(parse_money(match.group(3)))}"
+        )
 
     match = re.fullmatch(r"add\s+(.+?)\s+(\d+)", single_line, flags=re.IGNORECASE)
     if match:
