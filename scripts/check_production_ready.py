@@ -41,6 +41,7 @@ def main() -> int:
         ("old Twilio route still exists", lambda: route_exists("/webhooks/twilio/whatsapp")),
         ("/debug/config route exists", lambda: route_exists("/debug/config")),
         ("/debug/whatsapp-test route exists", lambda: route_exists("/debug/whatsapp-test")),
+        ("/debug/twiml-test route exists", lambda: route_exists("/debug/twiml-test")),
         ("/debug/report-test route exists", lambda: route_exists("/debug/report-test")),
         ("APP_BASE_URL config works", app_base_url_config_works),
         (".env.example has required production env vars", env_example_has_required_keys),

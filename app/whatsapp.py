@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from html import escape
 from typing import Any
 
 import httpx
 from twilio.request_validator import RequestValidator
 from twilio.rest import Client
-from twilio.twiml.messaging_response import MessagingResponse
 
 from app.config import Settings
 
@@ -48,8 +48,17 @@ class WhatsAppClient:
 
 
 def twiml_response(message: str, media_url: str | None = None) -> str:
-    response = MessagingResponse()
-    twilio_message = response.message(message)
-    if media_url:
-        twilio_message.media(media_url)
-    return str(response)
+    safe_message = escape(str(message or ""), quote=False)
+    if not media_url:
+        return f'<?xml version="1.0" encoding="UTF-8"?><Response><Message>{safe_message}</Message></Response>'
+
+    safe_media_url = escape(str(media_url), quote=True)
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        "<Response>"
+        "<Message>"
+        f"<Body>{safe_message}</Body>"
+        f"<Media>{safe_media_url}</Media>"
+        "</Message>"
+        "</Response>"
+    )

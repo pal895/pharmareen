@@ -65,6 +65,22 @@ class FakeStore:
                 reorder_level=8,
                 row_number=6,
             ),
+            "antacid": StockItem(
+                drug_name="Antacid",
+                selling_price=250,
+                cost_price=170,
+                current_stock=30,
+                reorder_level=6,
+                row_number=7,
+            ),
+            "ors": StockItem(
+                drug_name="ORS",
+                selling_price=80,
+                cost_price=50,
+                current_stock=30,
+                reorder_level=10,
+                row_number=8,
+            ),
         }
         self.logged = []
         self.transactions = []
@@ -206,6 +222,10 @@ def test_help_command_returns_available_commands_without_parser():
     assert "report today" in reply
     assert "report week" in reply
     assert "later Panadol 5" in reply
+    assert "late Panadol 3" in reply
+    assert "Advanced Usage:" in reply
+    assert "Panadol 5, Antacid 3, ORS 2" in reply
+    assert "later Panadol 5, Antacid 2" in reply
     assert 'Say it naturally, for example: "sold two Panadol"' in reply
     assert parser.called is False
 
@@ -542,6 +562,18 @@ def test_late_sale_command_records_late_sale():
     assert store.logged[-1][0].action == Action.LATE_SALE
 
 
+def test_late_keyword_records_late_sale():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    reply = service.process_text("late Panadol 3")
+
+    assert "✅ Late sale recorded" in reply
+    assert "Panadol x3" in reply
+    assert store.transactions[-1]["Type"] == "late_sale"
+    assert store.logged[-1][0].action == Action.LATE_SALE
+
+
 def test_missed_sale_alias_records_late_sale():
     store = FakeStore()
     service = IntakeService(FailingParser(), store)
@@ -641,6 +673,35 @@ def test_natural_bulk_sale_message_processes_each_item():
     assert "- Amoxyl x1" in reply
     assert "- Cetirizine x3" in reply
     assert "Errors:\n- None" in reply
+
+
+def test_comma_separated_sales_process_each_item():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    reply = service.process_text("Panadol 5, ORS 3")
+
+    assert "✅ Batch processed" in reply
+    assert "Sales:" in reply
+    assert "- Panadol x5" in reply
+    assert "- ORS x3" in reply
+    assert "Errors:\n- None" in reply
+    assert [transaction["Type"] for transaction in store.transactions[-2:]] == ["sale", "sale"]
+
+
+def test_later_prefix_applies_to_comma_batch():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    reply = service.process_text("later Panadol 5, Antacid 2")
+
+    assert "✅ Batch processed" in reply
+    assert "Late Sales:" in reply
+    assert "- Panadol x5" in reply
+    assert "- Antacid x2" in reply
+    assert "Sales:\n- None" in reply
+    assert "Errors:\n- None" in reply
+    assert [transaction["Type"] for transaction in store.transactions[-2:]] == ["late_sale", "late_sale"]
 
 
 def test_natural_bulk_restock_message_processes_each_item():

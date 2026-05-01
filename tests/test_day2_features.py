@@ -48,6 +48,10 @@ class FakeStatusStore:
     is_available = False
 
 
+def twiml_payload(xml_text: str) -> str:
+    return xml_text.removeprefix('<?xml version="1.0" encoding="UTF-8"?>')
+
+
 def test_health_endpoint_is_simple_ok():
     with TestClient(main.app) as client:
         response = client.get("/health")
@@ -174,11 +178,26 @@ def test_twilio_webhook_logs_reply_length_and_returns_xml(monkeypatch, capsys):
 
     captured = capsys.readouterr().out
     assert response.status_code == 200
-    assert response.headers["content-type"].startswith("application/xml")
-    assert "<Response><Message>" in response.text
+    assert "xml" in response.headers["content-type"]
+    assert response.text.startswith('<?xml version="1.0" encoding="UTF-8"?>')
+    assert twiml_payload(response.text).startswith("<Response>")
+    assert "<Message>" in response.text
     assert "TWILIO_REPLY_LENGTH=" in captured
     assert "TWILIO_REPLY_PREVIEW=PharMareen Help" in captured
+    assert "TWILIO_REPLY_XML_PREVIEW=" in captured
+    assert "TWILIO_REPLY_CONTENT_TYPE=application/xml" in captured
     assert fake_intake.received == "Start"
+
+
+def test_debug_twiml_test_returns_valid_xml():
+    with TestClient(main.app) as client:
+        response = client.get("/debug/twiml-test")
+
+    assert response.status_code == 200
+    assert "xml" in response.headers["content-type"]
+    assert response.text.startswith('<?xml version="1.0" encoding="UTF-8"?>')
+    assert twiml_payload(response.text).startswith("<Response>")
+    assert "<Message>PharMareen TwiML test</Message>" in response.text
 
 
 def test_debug_report_test_generates_pdf(monkeypatch, tmp_path):

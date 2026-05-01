@@ -51,6 +51,17 @@ HELP_TEXT = "\n".join(
         "",
         "Voice:",
         'Say it naturally, for example: "sold two Panadol"',
+        "",
+        "Advanced Usage:",
+        "Late Sales:",
+        "later Panadol 5",
+        "late Panadol 3",
+        "records a sale that happened earlier",
+        "",
+        "Multiple Sales:",
+        "Panadol 5, Antacid 3, ORS 2",
+        "later Panadol 5, Antacid 2",
+        "records all items in one go",
     ]
 )
 AMBIGUOUS_ERROR = (
@@ -988,6 +999,14 @@ def parse_operating_commands(text: str) -> list[OperatingCommand] | None:
 
 
 def parse_natural_bulk_commands(text: str) -> list[OperatingCommand] | None:
+    late_sale_match = re.fullmatch(
+        r"(?:later|late|missed|i\s+missed)\s+(.+)",
+        text.strip(),
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if late_sale_match and "," in late_sale_match.group(1):
+        return parse_drug_quantity_list(late_sale_match.group(1), kind="late_sale")
+
     sale_match = re.fullmatch(r"(?:i\s+)?sold\s+(.+)", text.strip(), flags=re.IGNORECASE | re.DOTALL)
     if sale_match and ("," in sale_match.group(1)):
         return parse_drug_quantity_list(sale_match.group(1), kind="sale")
@@ -1202,7 +1221,7 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
             raw_text=text,
         )
 
-    match = re.fullmatch(r"(?:later|missed|i\s+missed)\s+(.+?)\s+(\d+)", clean, flags=re.IGNORECASE)
+    match = re.fullmatch(r"(?:later|late|missed|i\s+missed)\s+(.+?)\s+(\d+)", clean, flags=re.IGNORECASE)
     if match:
         return OperatingCommand(
             kind="late_sale",
