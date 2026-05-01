@@ -526,7 +526,7 @@ async def twilio_whatsapp_webhook(request: Request) -> Response:
         print(f"COMMAND_HANDLER_RESULT={result.command_handler}", flush=True)
         log_webhook_request(from_number, result.message_type, result.success, result.error_reason)
         return Response(
-            content=twiml_response(result.reply, media_url=result.media_url),
+            content=logged_twiml_response(result.reply, media_url=result.media_url),
             media_type="application/xml",
         )
     except Exception:
@@ -536,7 +536,7 @@ async def twilio_whatsapp_webhook(request: Request) -> Response:
         error_reason = "Unhandled processing error"
         log_webhook_request(from_number, message_type, success, error_reason)
 
-    return Response(content=twiml_response(reply), media_type="application/xml")
+    return Response(content=logged_twiml_response(reply), media_type="application/xml")
 
 
 @app.post("/reports/daily")
@@ -685,6 +685,14 @@ def classify_command_handler(body: str) -> str:
     if "sold" in text or any(character.isdigit() for character in text):
         return "sale_or_batch"
     return "natural_or_ai_parser"
+
+
+def logged_twiml_response(message: str, media_url: str | None = None) -> str:
+    clean_message = str(message or "")
+    preview = clean_message.replace("\r", " ").replace("\n", " ")[:200]
+    print(f"TWILIO_REPLY_LENGTH={len(clean_message)}", flush=True)
+    print(f"TWILIO_REPLY_PREVIEW={preview}", flush=True)
+    return twiml_response(clean_message, media_url=media_url)
 
 
 async def incoming_text_from_form(

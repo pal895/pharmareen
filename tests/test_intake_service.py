@@ -189,18 +189,24 @@ def test_help_command_returns_available_commands_without_parser():
 
     reply = service.process_text("help")
 
-    assert "👋 PharMareen Quick Commands" in reply
+    assert len(reply) < 1200
+    assert "PharMareen Help" in reply
     assert "Panadol 2" in reply
-    assert "Panadol two" in reply
+    assert "sold Panadol 2" in reply
+    assert "panadol two" in reply
     assert "+Panadol 20" in reply
-    assert "add Panadol 20" in reply
+    assert "received Panadol 20" in reply
     assert "bonus Panadol 5" in reply
-    assert "+Panadol 20 paid 1800" in reply
-    assert "+Panadol 20 ordered 2000 paid 1800" in reply
+    assert "free Panadol 5" in reply
+    assert "+Panadol 20 cost 1800" in reply
+    assert "bought Panadol 20 for 1800" in reply
+    assert "ordered Panadol 20 budget 2000 paid 1800" in reply
     assert "Panadol stock" in reply
     assert "profit today" in reply
-    assert "report today / report week" in reply
-    assert 'Say: "Panadol two" or "bonus Panadol five"' in reply
+    assert "report today" in reply
+    assert "report week" in reply
+    assert "later Panadol 5" in reply
+    assert 'Say it naturally, for example: "sold two Panadol"' in reply
     assert parser.called is False
 
 

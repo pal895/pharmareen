@@ -155,6 +155,32 @@ def test_debug_whatsapp_test_returns_twiml(monkeypatch):
     assert fake_intake.received == "start"
 
 
+def test_twilio_webhook_logs_reply_length_and_returns_xml(monkeypatch, capsys):
+    fake_intake = FakeIntake("PharMareen Help\n\nSell:\nPanadol 2")
+    monkeypatch.setattr(main, "get_intake_service", lambda: fake_intake)
+    monkeypatch.setattr(main, "log_webhook_request", lambda *args, **kwargs: None)
+    main.processed_message_sids.clear()
+
+    with TestClient(main.app) as client:
+        response = client.post(
+            "/webhook/whatsapp",
+            data={
+                "Body": "Start",
+                "From": "whatsapp:+254700000000",
+                "To": "whatsapp:+14155238886",
+                "MessageSid": "SMHELPLOG1",
+            },
+        )
+
+    captured = capsys.readouterr().out
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/xml")
+    assert "<Response><Message>" in response.text
+    assert "TWILIO_REPLY_LENGTH=" in captured
+    assert "TWILIO_REPLY_PREVIEW=PharMareen Help" in captured
+    assert fake_intake.received == "Start"
+
+
 def test_debug_report_test_generates_pdf(monkeypatch, tmp_path):
     monkeypatch.setattr(main, "reports_pdf_dir", lambda: tmp_path)
     monkeypatch.setenv("PHARMAREEN_REPORTS_DIR", str(tmp_path))
