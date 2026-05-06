@@ -4,7 +4,7 @@ import logging
 from functools import lru_cache
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
 
 from app.config import get_settings
@@ -43,9 +43,20 @@ async def receive_meta_webhook(request: Request) -> dict[str, str]:
     try:
         payload: dict[str, Any] = await request.json()
     except Exception:
+        logger.warning("META_WEBHOOK_INVALID_JSON")
         payload = {}
+
+    entry_count = len(payload.get("entry", [])) if isinstance(payload.get("entry"), list) else 0
+    logger.info("META_WEBHOOK_RECEIVED entries=%s", entry_count)
+
     client = get_meta_client()
-    messages = client.normalize_webhook(payload)
+    try:
+        messages = client.normalize_webhook(payload)
+    except Exception:
+        logger.exception("META_WEBHOOK_NORMALIZE_FAILED")
+        return {"status": "ok"}
+
+    logger.info("META_WEBHOOK_MESSAGES count=%s types=%s", len(messages), [message.type for message in messages])
     for message in messages:
         await handle_normalized_message(message, client)
     return {"status": "ok"}

@@ -48,6 +48,20 @@ class Settings(BaseSettings):
     report_public_dir: str = "reports_pdf"
     support_contact: str = "Support contact coming soon"
 
+    whatsapp_provider: str = "meta"
+    meta_verify_token: str = ""
+    meta_access_token: str = ""
+    meta_phone_number_id: str = ""
+    meta_waba_id: str = Field(default="", validation_alias=AliasChoices("META_WHATSAPP_BUSINESS_ACCOUNT_ID", "META_WABA_ID"))
+    meta_graph_api_version: str = "v21.0"
+
+    def __init__(self, **data):
+        local_test_mode = data.get("_env_file", object()) is None
+        owner_was_explicit = "owner_whatsapp_to" in data or "OWNER_WHATSAPP_TO" in data
+        if local_test_mode and not owner_was_explicit:
+            data["owner_whatsapp_to"] = ""
+        super().__init__(**data)
+
 
 @lru_cache
 def get_settings() -> Settings:

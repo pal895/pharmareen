@@ -7,6 +7,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_ENV_KEYS = [
     "APP_BASE_URL",
+    "WHATSAPP_PROVIDER",
+    "META_VERIFY_TOKEN",
+    "META_ACCESS_TOKEN",
+    "META_PHONE_NUMBER_ID",
+    "META_WHATSAPP_BUSINESS_ACCOUNT_ID",
+    "META_GRAPH_API_VERSION",
     "TWILIO_ACCOUNT_SID",
     "TWILIO_AUTH_TOKEN",
     "TWILIO_WHATSAPP_NUMBER",
@@ -38,6 +44,8 @@ def main() -> int:
         ("/health route exists", lambda: route_exists("/health")),
         ("/status route exists", lambda: route_exists("/status")),
         ("/webhook/whatsapp route exists", lambda: route_exists("/webhook/whatsapp")),
+        ("/webhooks/meta/whatsapp route exists", lambda: route_exists("/webhooks/meta/whatsapp")),
+        ("/sync/offline-actions route exists", lambda: route_exists("/sync/offline-actions")),
         ("old Twilio route still exists", lambda: route_exists("/webhooks/twilio/whatsapp")),
         ("/debug/config route exists", lambda: route_exists("/debug/config")),
         ("/debug/whatsapp-test route exists", lambda: route_exists("/debug/whatsapp-test")),
