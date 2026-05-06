@@ -117,3 +117,40 @@ def test_existing_public_routes_still_work():
 
     assert response.status_code == 200
     assert "PharMareen Offline" in response.text
+
+def test_meta_callback_url_verification_succeeds():
+    with TestClient(main.app) as client:
+        response = client.get(
+            "/meta/webhook",
+            params={
+                "hub.mode": "subscribe",
+                "hub.verify_token": "pharmareen123",
+                "hub.challenge": "12345",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.text == "12345"
+    assert response.headers["content-type"].startswith("text/plain")
+
+
+def test_meta_callback_url_verification_fails_wrong_token():
+    with TestClient(main.app) as client:
+        response = client.get(
+            "/meta/webhook",
+            params={"hub.mode": "subscribe", "hub.verify_token": "wrong", "hub.challenge": "12345"},
+        )
+
+    assert response.status_code == 403
+
+
+def test_meta_callback_post_accepts_sample_payload(monkeypatch):
+    fake_client = FakeMetaClient()
+    monkeypatch.setattr(meta_webhook, "get_meta_client", lambda: fake_client)
+    monkeypatch.setattr(meta_webhook, "get_message_router", lambda: FakeRouter())
+
+    with TestClient(main.app) as client:
+        response = client.post("/meta/webhook", json={"entry": [{"changes": [{"value": {"messages": [{}]}}]}]})
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}

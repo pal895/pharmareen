@@ -14,6 +14,8 @@ from app.services.message_router import MessageRouter, build_default_router
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks/meta/whatsapp", tags=["meta-whatsapp"])
+meta_callback_router = APIRouter(tags=["meta-whatsapp"])
+META_CALLBACK_VERIFY_TOKEN = "pharmareen123"
 
 
 @lru_cache
@@ -25,6 +27,22 @@ def get_meta_client() -> MetaWhatsAppClient:
 def get_message_router() -> MessageRouter:
     return build_default_router()
 
+
+
+@meta_callback_router.get("/meta/webhook")
+def verify_meta_callback_webhook(
+    hub_mode: str | None = Query(default=None, alias="hub.mode"),
+    hub_verify_token: str | None = Query(default=None, alias="hub.verify_token"),
+    hub_challenge: str | None = Query(default=None, alias="hub.challenge"),
+) -> PlainTextResponse:
+    if hub_mode == "subscribe" and hub_verify_token == META_CALLBACK_VERIFY_TOKEN:
+        return PlainTextResponse(hub_challenge or "")
+    raise HTTPException(status_code=403, detail="Invalid verify token")
+
+
+@meta_callback_router.post("/meta/webhook")
+async def receive_meta_callback_webhook(request: Request) -> dict[str, str]:
+    return await receive_meta_webhook(request)
 
 @router.get("")
 def verify_meta_webhook(
