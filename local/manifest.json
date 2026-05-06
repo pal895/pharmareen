@@ -1,0 +1,9 @@
+{
+  "name": "PharMareen",
+  "short_name": "Pharma",
+  "display": "standalone",
+  "start_url": "/offline_app/index.html",
+  "background_color": "#f7fafc",
+  "theme_color": "#1f4e79",
+  "icons": []
+}

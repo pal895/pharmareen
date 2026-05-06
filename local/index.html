@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="/offline_app/manifest.json">
+  <title>PharMareen Offline</title>
+  <style>
+    body { margin:0; font-family: Arial, sans-serif; background:#f7fafc; color:#102033; }
+    main { max-width: 720px; margin: 0 auto; padding: 18px; }
+    h1 { margin: 12px 0; font-size: 26px; }
+    .banner { position: sticky; top: 0; padding: 10px 12px; border-radius: 6px; font-weight: bold; }
+    .offline { background:#fff3cd; }
+    .online { background:#d1fae5; }
+    .syncing { background:#dbeafe; }
+    .error { background:#fee2e2; }
+    form { display:grid; gap:10px; background:white; border:1px solid #dde7ef; border-radius:8px; padding:14px; }
+    input, select, textarea, button { font: inherit; padding: 10px; border-radius:6px; border:1px solid #cbd5e1; }
+    button { background:#1f4e79; color:white; border:0; font-weight:bold; }
+    ul { padding-left: 20px; }
+  </style>
+</head>
+<body>
+  <main>
+    <div id="status" class="banner offline">Offline - saving safely</div>
+    <h1>PharMareen Offline</h1>
+    <form id="actionForm">
+      <select id="action_type">
+        <option value="sale">Sale</option>
+        <option value="restock">Restock</option>
+        <option value="stock_adjustment">Stock check</option>
+        <option value="issue">Bad/damaged drug</option>
+        <option value="return">Return</option>
+      </select>
+      <input id="drug_name" placeholder="Drug name" required>
+      <input id="quantity" type="number" min="1" value="1" placeholder="Quantity">
+      <input id="unit" placeholder="Unit, e.g. tablets or boxes">
+      <input id="expiry_date" placeholder="Optional expiry, e.g. 2027-01-31">
+      <textarea id="notes" placeholder="Optional notes"></textarea>
+      <input id="image" type="file" accept="image/*" capture="environment">
+      <input id="voice" type="file" accept="audio/*">
+      <button type="submit">Save Offline</button>
+      <button type="button" id="syncNow">Sync Now</button>
+    </form>
+    <h2>Pending Items</h2>
+    <ul id="pendingList"></ul>
+  </main>
+  <script src="/offline_app/offline.js"></script>
+</body>
+</html>

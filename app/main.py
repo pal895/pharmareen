@@ -16,6 +16,7 @@ from urllib.parse import quote
 
 from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -26,6 +27,8 @@ from app.config import Settings, get_settings
 from app.intake import IntakeService, normalize_spoken_command_text
 from app.pdf_reports import generate_daily_report_pdf, reports_pdf_dir
 from app.reports import LowStockWarning, ReportMetrics, ReportService
+from app.routes.meta_webhook import router as meta_whatsapp_router
+from app.routes.offline_sync import router as offline_sync_router
 from app.sheets import GoogleSheetsStore, SHEETS_UNAVAILABLE_MESSAGE, SheetsUnavailableError
 from app.transcription import TranscriptionService, TranscriptionUnavailableError
 from app.utils import now_in_timezone
@@ -58,6 +61,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+OFFLINE_APP_DIR = PROJECT_ROOT / "local"
+app.mount(
+    "/offline_app",
+    StaticFiles(directory=str(OFFLINE_APP_DIR), html=True),
+    name="offline_app",
+)
+
+app.include_router(meta_whatsapp_router)
+app.include_router(offline_sync_router)
+
 
 @app.get("/")
 def root() -> dict[str, str]:
@@ -67,6 +80,16 @@ def root() -> dict[str, str]:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/offline-test")
+def offline_test() -> dict[str, str]:
+    return {"offline": "ok"}
+
+
+@app.get("/offline-html-test", response_class=HTMLResponse)
+def offline_html_test() -> str:
+    return "<h1>PharMareen Offline Public Test OK</h1>"
 
 
 @app.get("/status", response_class=HTMLResponse)
