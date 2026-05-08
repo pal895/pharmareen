@@ -43,7 +43,7 @@ def main() -> int:
         ("requirements.txt exists", requirements_exists),
         ("requirements.txt has backend packages", requirements_has_packages),
         ("package.json has WhatsApp Web bridge packages", package_json_has_packages),
-        ("replit.nix exists for Node.js", lambda: file_exists("replit.nix")),
+        ("Replit run command avoids Nix recovery mode", replit_run_command_is_safe),
         ("start_with_whatsapp_web.sh exists", lambda: file_exists("start_with_whatsapp_web.sh")),
         ("Baileys fallback exists", lambda: file_exists("baileys-bridge.js")),
         ("app imports successfully", app_imports),
@@ -130,6 +130,11 @@ def env_example_has_required_keys() -> bool:
 
 def file_exists(name: str) -> bool:
     return (ROOT / name).exists()
+
+
+def replit_run_command_is_safe() -> bool:
+    text = (ROOT / ".replit").read_text(encoding="utf-8")
+    return 'run = "bash start.sh"' in text and not (ROOT / "replit.nix").exists()
 
 
 def start_command_documented() -> bool:

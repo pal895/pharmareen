@@ -1,1 +1,1 @@
-run = "./start_with_whatsapp_web.sh"
+run = "bash start.sh"

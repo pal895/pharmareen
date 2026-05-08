@@ -11,7 +11,7 @@
     "wa:puppeteer": "node whatsapp-web-bridge.js"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "7.0.0-rc.10",
+    "@whiskeysockets/baileys": "6.7.16",
     "axios": "^1.7.9",
     "dotenv": "^16.4.7",
     "pino": "^9.5.0",

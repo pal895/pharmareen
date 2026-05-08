@@ -63,6 +63,16 @@ echo "DEMO_MODE: ${DEMO_MODE:-false}"
 echo "GROUP REPLIES: DISABLED"
 echo "UNKNOWN NUMBER REPLIES: DISABLED"
 
+if [ "${RESET_NODE_DEPS:-false}" = "true" ]; then
+  echo "RESET_NODE_DEPS=true, clearing node_modules and package-lock.json"
+  rm -rf node_modules package-lock.json
+fi
+
+if [ -f package-lock.json ] && grep -q "7.0.0-rc.10" package-lock.json; then
+  echo "Old invalid Baileys version found in package-lock.json, reinstalling cleanly."
+  rm -rf node_modules package-lock.json
+fi
+
 if [ ! -d node_modules ]; then
   echo "Installing WhatsApp bridge packages..."
   if ! npm install; then
