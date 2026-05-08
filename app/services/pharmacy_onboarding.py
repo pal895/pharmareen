@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -11,6 +13,11 @@ from uuid import uuid4
 import gspread
 from google.oauth2.service_account import Credentials
 from gspread.exceptions import WorksheetNotFound
+
+try:
+    from googleapiclient.discovery import build as build_google_service
+except ImportError:  # pragma: no cover - exercised only when dependency is absent
+    build_google_service = None
 
 from app.config import Settings
 from app.sheets import (
@@ -150,6 +157,10 @@ STARTER_INVENTORY = [
     ("Insulin", 5, 300, 500, 2, "Default Supplier"),
 ]
 
+logger = logging.getLogger("uvicorn.error")
+SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets"
+DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file"
+
 
 @dataclass(frozen=True)
 class PharmacyPayload:
@@ -172,8 +183,18 @@ def local_registry_path() -> Path:
 
 
 def has_google_credentials(settings: Settings) -> bool:
-    raw = str(settings.google_service_account_json or "").strip()
+    raw = (
+        os.environ.get("GOOGLE_SHEETS_CREDENTIALS")
+        or str(settings.google_service_account_json or "")
+    ).strip()
     return raw.startswith("{") or bool(raw and Path(raw).expanduser().exists())
+
+
+def admin_sheet_id(settings: Settings) -> str:
+    return (
+        os.environ.get("PHARMAREEN_ADMIN_SHEET_ID")
+        or str(settings.pharmareen_admin_sheet_id or "")
+    ).strip()
 
 
 class PharmacyOnboardingService:
@@ -189,17 +210,35 @@ class PharmacyOnboardingService:
         created_at = now.isoformat(timespec="seconds")
         pharmacy_id = generate_pharmacy_id(pharmacy_name, now=now)
 
+        diagnostics = self.google_diagnostics()
+        logger.info(
+            "Phase 3 Google diagnostics: google credentials loaded: %s; "
+            "admin sheet id loaded: %s; google client initialized: %s; "
+            "google-api-python-client installed: %s",
+            "yes" if diagnostics["google_credentials_loaded"] else "no",
+            "yes" if diagnostics["admin_sheet_id_loaded"] else "no",
+            "yes" if diagnostics["google_client_initialized"] else "no",
+            "yes" if diagnostics["google_api_client_installed"] else "no",
+        )
+        logger.info(
+            "Phase 3 live sheet creation attempted: %s",
+            "yes" if diagnostics["google_credentials_loaded"] else "no",
+        )
+
+        google_error = ""
         try:
             result = self._create_google_sheet(pharmacy_id, payload, created_at)
-            status = "success"
+            status = "google_live"
             message = f"{pharmacy_name} database created successfully"
         except Exception as exc:
+            google_error = f"{type(exc).__name__}: {exc}"
+            logger.warning("Phase 3 live sheet creation failed: %s", google_error)
             result = {
                 "spreadsheet_id": f"local_{pharmacy_id}",
                 "spreadsheet_url": f"local://data/pharmacies_registry.json#{pharmacy_id}",
                 "tabs": list(PHASE3_SHEETS),
                 "local_fallback": True,
-                "error": str(exc),
+                "google_error": google_error,
             }
             status = "local_fallback"
             message = f"{pharmacy_name} saved locally. Connect Google Sheets to create a live database."
@@ -217,7 +256,16 @@ class PharmacyOnboardingService:
             "notes": payload.notes.strip(),
         }
         self._save_registry_record(record)
-        return {"ok": True, "message": message, **record, "tabs": result.get("tabs", list(PHASE3_SHEETS))}
+        response = {
+            "ok": True,
+            "message": message,
+            **record,
+            "tabs": result.get("tabs", list(PHASE3_SHEETS)),
+            "google_diagnostics": diagnostics,
+        }
+        if google_error:
+            response["google_error"] = google_error
+        return response
 
     def create_pharmacies_bulk(self, payloads: list[PharmacyPayload]) -> dict[str, Any]:
         created: list[dict[str, Any]] = []
@@ -230,12 +278,12 @@ class PharmacyOnboardingService:
         return {"ok": not failed, "created": created, "failed": failed}
 
     def list_pharmacies(self) -> list[dict[str, Any]]:
-        if self.settings.pharmareen_admin_sheet_id.strip() and has_google_credentials(self.settings):
+        if admin_sheet_id(self.settings) and has_google_credentials(self.settings):
             try:
                 worksheet = self._admin_worksheet()
                 return worksheet.get_all_records()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Could not read admin registry sheet: %s: %s", type(exc).__name__, exc)
         return self._read_local_registry()
 
     def get_pharmacy(self, pharmacy_id: str) -> dict[str, Any] | None:
@@ -249,8 +297,8 @@ class PharmacyOnboardingService:
         if not has_google_credentials(self.settings):
             raise RuntimeError("Google Sheets credentials are not configured")
 
-        client = self._gspread_client()
-        spreadsheet = client.create(f"PharMareen - {payload.pharmacy_name.strip()}")
+        logger.info("Phase 3 live sheet creation executing with Google API")
+        spreadsheet = self._create_live_spreadsheet(f"PharMareen - {payload.pharmacy_name.strip()}")
         ensure_spreadsheet_schema(spreadsheet)
         seed_pharmacy_sheet(spreadsheet, pharmacy_id, payload, created_at)
         return {
@@ -261,7 +309,7 @@ class PharmacyOnboardingService:
         }
 
     def _save_registry_record(self, record: dict[str, Any]) -> None:
-        if self.settings.pharmareen_admin_sheet_id.strip() and has_google_credentials(self.settings):
+        if admin_sheet_id(self.settings) and has_google_credentials(self.settings):
             try:
                 worksheet = self._admin_worksheet()
                 worksheet.append_row(
@@ -269,8 +317,8 @@ class PharmacyOnboardingService:
                     value_input_option="USER_ENTERED",
                 )
                 return
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Could not save admin registry sheet row: %s: %s", type(exc).__name__, exc)
         records = self._read_local_registry()
         records.append(record)
         path = local_registry_path()
@@ -290,19 +338,63 @@ class PharmacyOnboardingService:
         return [normalize_registry_record(record) for record in data if isinstance(record, dict)]
 
     def _admin_worksheet(self):
-        spreadsheet = self._gspread_client().open_by_key(self.settings.pharmareen_admin_sheet_id.strip())
+        spreadsheet = self._gspread_client().open_by_key(admin_sheet_id(self.settings))
         return ensure_worksheet(spreadsheet, "Pharmacies", PHARMACIES_HEADERS)
 
+    def _create_live_spreadsheet(self, title: str):
+        credentials = self._google_credentials()
+        client = gspread.authorize(credentials)
+
+        if build_google_service is not None:
+            service = build_google_service(
+                "sheets",
+                "v4",
+                credentials=credentials,
+                cache_discovery=False,
+            )
+            response = (
+                service.spreadsheets()
+                .create(
+                    body={"properties": {"title": title}},
+                    fields="spreadsheetId,spreadsheetUrl",
+                )
+                .execute()
+            )
+            spreadsheet_id = response.get("spreadsheetId")
+            if not spreadsheet_id:
+                raise RuntimeError("Google Sheets API did not return a spreadsheet ID")
+            return client.open_by_key(spreadsheet_id)
+
+        return client.create(title)
+
     def _gspread_client(self):
+        return gspread.authorize(self._google_credentials())
+
+    def _google_credentials(self):
         credential_path = prepare_google_credentials_file(self.settings)
-        credentials = Credentials.from_service_account_file(
+        return Credentials.from_service_account_file(
             str(credential_path),
             scopes=[
-                "https://www.googleapis.com/auth/spreadsheets",
-                "https://www.googleapis.com/auth/drive.file",
+                SHEETS_SCOPE,
+                DRIVE_FILE_SCOPE,
             ],
         )
-        return gspread.authorize(credentials)
+
+    def google_diagnostics(self) -> dict[str, bool]:
+        client_initialized = False
+        if has_google_credentials(self.settings):
+            try:
+                self._gspread_client()
+                client_initialized = True
+            except Exception as exc:
+                logger.warning("Google client initialization failed: %s: %s", type(exc).__name__, exc)
+
+        return {
+            "google_credentials_loaded": has_google_credentials(self.settings),
+            "admin_sheet_id_loaded": bool(admin_sheet_id(self.settings)),
+            "google_client_initialized": client_initialized,
+            "google_api_client_installed": build_google_service is not None,
+        }
 
 
 def ensure_spreadsheet_schema(spreadsheet: Any) -> None:

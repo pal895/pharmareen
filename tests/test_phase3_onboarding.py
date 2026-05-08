@@ -96,7 +96,32 @@ def test_single_pharmacy_onboarding_uses_local_fallback(tmp_path, monkeypatch):
     assert result["ok"] is True
     assert result["pharmacy_id"].startswith("abc_pharmacy_")
     assert result["spreadsheet_id"].startswith("local_")
+    assert result["status"] == "local_fallback"
+    assert "google_error" in result
     assert Path("data/pharmacies_registry.json").exists()
+
+
+def test_single_pharmacy_onboarding_reports_google_live(monkeypatch):
+    service = PharmacyOnboardingService(Settings(_env_file=None, GOOGLE_SERVICE_ACCOUNT_JSON=""))
+
+    def fake_create_google_sheet(pharmacy_id, payload, created_at):
+        return {
+            "spreadsheet_id": "live-sheet-123",
+            "spreadsheet_url": "https://docs.google.com/spreadsheets/d/live-sheet-123",
+            "tabs": list(PHASE3_SHEETS),
+        }
+
+    saved: list[dict[str, object]] = []
+    monkeypatch.setattr(service, "_create_google_sheet", fake_create_google_sheet)
+    monkeypatch.setattr(service, "_save_registry_record", lambda record: saved.append(record))
+
+    result = service.create_pharmacy(PharmacyPayload("Live Pharmacy", "Samuel", "0712222222", "Nairobi"))
+
+    assert result["ok"] is True
+    assert result["status"] == "google_live"
+    assert result["spreadsheet_id"] == "live-sheet-123"
+    assert result["spreadsheet_url"].startswith("https://docs.google.com/spreadsheets/d/")
+    assert saved[0]["status"] == "google_live"
 
 
 def test_bulk_pharmacy_onboarding(tmp_path, monkeypatch):
