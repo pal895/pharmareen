@@ -29,6 +29,7 @@ from app.demo_store import DemoPharmacyStore
 from app.intake import IntakeService, normalize_spoken_command_text
 from app.pdf_reports import generate_daily_report_pdf, reports_pdf_dir
 from app.reports import LowStockWarning, ReportMetrics, ReportService
+from app.routes.admin import router as admin_router
 from app.routes.meta_webhook import meta_callback_router, router as meta_whatsapp_router
 from app.routes.offline_sync import router as offline_sync_router
 from app.sheets import GoogleSheetsStore, SHEETS_UNAVAILABLE_MESSAGE, SheetsUnavailableError
@@ -73,6 +74,7 @@ app.mount(
 app.include_router(meta_whatsapp_router)
 app.include_router(meta_callback_router)
 app.include_router(offline_sync_router)
+app.include_router(admin_router)
 
 
 @app.get("/")

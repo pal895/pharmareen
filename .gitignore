@@ -221,3 +221,4 @@ node_modules/
 .wwebjs_cache/
 .baileys_auth/
 npm-debug.log*
+data/pharmacies_registry.json

@@ -33,6 +33,14 @@ class Settings(BaseSettings):
         default="./service-account.json",
         validation_alias=AliasChoices("GOOGLE_SHEETS_CREDENTIALS", "GOOGLE_SERVICE_ACCOUNT_JSON"),
     )
+    pharmareen_admin_sheet_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("PHARMAREEN_ADMIN_SHEET_ID", "ADMIN_SHEET_ID"),
+    )
+    pharmareen_default_pharmacy_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("PHARMAREEN_DEFAULT_PHARMACY_ID", "DEFAULT_PHARMACY_ID"),
+    )
 
     whatsapp_provider: str = "whatsapp_web"
     whatsapp_number: str = Field(
