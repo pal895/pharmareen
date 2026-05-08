@@ -43,6 +43,10 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("ALLOWED_WHATSAPP_NUMBERS", "ALLOWED_PHONE_NUMBERS"),
     )
+    allow_all_direct_chats_for_test: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("ALLOW_ALL_DIRECT_CHATS_FOR_TEST", "ALLOW_ALL_DIRECT_CHATS"),
+    )
     owner_whatsapp_to: str = ""
     demo_mode: bool = False
 

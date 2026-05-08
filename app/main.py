@@ -330,6 +330,13 @@ def phone_digits(value: str) -> str:
     return "".join(character for character in text if character.isdigit())
 
 
+def whatsapp_jid_domain(value: str) -> str:
+    text = str(value or "").strip().lower()
+    if "@" not in text:
+        return "unknown"
+    return f"@{text.rsplit('@', 1)[1].split(':', 1)[0]}"
+
+
 def is_direct_whatsapp_sender(sender: str, is_group: bool = False, is_broadcast: bool = False) -> bool:
     text = str(sender or "").strip().lower()
     if is_group or is_broadcast:
@@ -339,7 +346,7 @@ def is_direct_whatsapp_sender(sender: str, is_group: bool = False, is_broadcast:
     blocked_markers = ("@g.us", "status@broadcast", "@broadcast", "@newsletter", "newsletter", "channel")
     if any(marker in text for marker in blocked_markers):
         return False
-    return text.endswith("@s.whatsapp.net")
+    return whatsapp_jid_domain(text) in {"@s.whatsapp.net", "@lid"}
 
 
 def whatsapp_sender_allowed(
@@ -350,10 +357,16 @@ def whatsapp_sender_allowed(
 ) -> tuple[bool, str]:
     if not is_direct_whatsapp_sender(sender, is_group=is_group, is_broadcast=is_broadcast):
         return False, "not_direct_chat"
+    if settings.allow_all_direct_chats_for_test:
+        return True, "test_mode_allowed_direct_chat"
+    if whatsapp_jid_domain(sender) == "@lid":
+        return False, "sender_direct_but_no_phone_digits"
     allowed_numbers = parse_allowed_whatsapp_numbers(settings)
     if not allowed_numbers:
         return False, "safe_mode_no_allowlist"
     digits = phone_digits(sender)
+    if not digits:
+        return False, "sender_direct_but_no_phone_digits"
     if digits in allowed_numbers:
         return True, "allowed_number"
     return False, "sender_not_allowed"
@@ -597,7 +610,12 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
     settings = get_settings()
     allowed, reason = whatsapp_sender_allowed(sender, settings, is_group=is_group, is_broadcast=is_broadcast)
     if not allowed:
-        logger.info("WHATSAPP_WEB_IGNORED sender=%s reason=%s", mask_phone(sender), reason)
+        logger.info(
+            "WHATSAPP_WEB_IGNORED sender=%s jid_domain=%s reason=%s",
+            mask_phone(sender),
+            whatsapp_jid_domain(sender),
+            reason,
+        )
         return {
             "status": "ignored",
             "reply": "",

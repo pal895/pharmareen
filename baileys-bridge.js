@@ -10,6 +10,7 @@ const backendUrl = (process.env.PHARMAREEN_BACKEND_URL || 'http://localhost:5000
 const sessionPath = process.env.BAILEYS_SESSION_PATH || './.baileys_auth';
 const baileysLogLevel = process.env.BAILEYS_LOG_LEVEL || 'info';
 const autoResetOnLoggedOut = String(process.env.AUTO_RESET_BAILEYS_ON_LOGOUT || 'true').toLowerCase() !== 'false';
+const allowAllDirectChatsForTest = String(process.env.ALLOW_ALL_DIRECT_CHATS_FOR_TEST || 'false').toLowerCase() === 'true';
 const allowedNumbers = parseAllowedNumbers(process.env.ALLOWED_WHATSAPP_NUMBERS || '');
 
 function phoneDigits(value) {
@@ -45,18 +46,39 @@ function isBroadcastJid(jid) {
   );
 }
 
+function jidDomain(jid) {
+  const text = String(jid || '').toLowerCase();
+  const atIndex = text.lastIndexOf('@');
+  if (atIndex < 0) return 'unknown';
+  return `@${text.slice(atIndex + 1).split(':')[0]}`;
+}
+
 function isDirectUserJid(jid) {
-  return String(jid || '').toLowerCase().endsWith('@s.whatsapp.net');
+  const domain = jidDomain(jid);
+  return domain === '@s.whatsapp.net' || domain === '@lid';
+}
+
+function jidDebug(jid) {
+  return `jid_domain=${jidDomain(jid)}`;
 }
 
 function isAllowedDirectChat(jid) {
   if (!jid || isGroupJid(jid) || isBroadcastJid(jid) || !isDirectUserJid(jid)) {
     return { allowed: false, reason: 'not_direct_chat' };
   }
+  if (allowAllDirectChatsForTest) {
+    return { allowed: true, reason: 'test_mode_allowed_direct_chat' };
+  }
+  if (jidDomain(jid) === '@lid') {
+    return { allowed: false, reason: 'sender_direct_but_no_phone_digits' };
+  }
   if (allowedNumbers.size === 0) {
     return { allowed: false, reason: 'safe_mode_no_allowlist' };
   }
   const digits = phoneDigits(jid);
+  if (!digits) {
+    return { allowed: false, reason: 'sender_direct_but_no_phone_digits' };
+  }
   return allowedNumbers.has(digits)
     ? { allowed: true, reason: 'allowed_number' }
     : { allowed: false, reason: 'sender_not_allowed' };
@@ -142,6 +164,9 @@ async function startBaileys(options = {}) {
   } else {
     console.log(`Safety allowlist active: ${allowedNumbers.size} number(s).`);
   }
+  if (allowAllDirectChatsForTest) {
+    console.log('TEST MODE ACTIVE: allowing all direct chats that are not groups/broadcasts/status/newsletters/channels.');
+  }
   console.log(`DEMO_MODE: ${process.env.DEMO_MODE || 'false'}`);
   console.log('GROUP REPLIES: DISABLED');
   console.log('UNKNOWN NUMBER REPLIES: DISABLED');
@@ -196,7 +221,7 @@ async function startBaileys(options = {}) {
       const sender = msg.key.remoteJid || 'unknown';
       const safety = isAllowedDirectChat(sender);
       if (!safety.allowed) {
-        console.log(`Ignored WhatsApp message from ${maskSender(sender)} reason=${safety.reason}`);
+        console.log(`Ignored WhatsApp message from ${maskSender(sender)} ${jidDebug(sender)} reason=${safety.reason}`);
         continue;
       }
 

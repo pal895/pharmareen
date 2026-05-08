@@ -63,6 +63,18 @@ set ALLOWED_WHATSAPP_NUMBERS=254757637709
 start_local_whatsapp_bridge.bat
 ```
 
+Phase 2 temporary test mode for newer Baileys direct-chat JIDs:
+
+```cmd
+cd /d "C:\Users\Pal\Desktop\pharmareen-git"
+set PHARMAREEN_BACKEND_URL=https://pharmareen-1--pal895.replit.app
+set ALLOWED_WHATSAPP_NUMBERS=254757637709
+set ALLOW_ALL_DIRECT_CHATS_FOR_TEST=true
+node local_whatsapp_bridge.js
+```
+
+This still blocks groups, broadcasts, status, newsletters, and channels. Use it only while testing `@lid` direct chats.
+
 ## 4. Scan the QR
 
 When the QR appears:
