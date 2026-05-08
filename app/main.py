@@ -25,6 +25,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.ai import AIService
 from app.config import Settings, get_settings
+from app.demo_store import DemoPharmacyStore
 from app.intake import IntakeService, normalize_spoken_command_text
 from app.pdf_reports import generate_daily_report_pdf, reports_pdf_dir
 from app.reports import LowStockWarning, ReportMetrics, ReportService
@@ -314,6 +315,54 @@ def whatsapp_bridge_configured(settings: Settings) -> bool:
     return True
 
 
+def parse_allowed_whatsapp_numbers(settings: Settings) -> set[str]:
+    raw = str(settings.allowed_whatsapp_numbers or "")
+    numbers: set[str] = set()
+    for item in raw.replace(";", ",").split(","):
+        digits = phone_digits(item)
+        if digits:
+            numbers.add(digits)
+    return numbers
+
+
+def phone_digits(value: str) -> str:
+    text = str(value or "").replace("whatsapp:", "")
+    return "".join(character for character in text if character.isdigit())
+
+
+def is_direct_whatsapp_sender(sender: str, is_group: bool = False, is_broadcast: bool = False) -> bool:
+    text = str(sender or "").strip().lower()
+    if is_group or is_broadcast:
+        return False
+    if not text:
+        return False
+    blocked_markers = ("@g.us", "status@broadcast", "@broadcast", "@newsletter")
+    return not any(marker in text for marker in blocked_markers)
+
+
+def whatsapp_sender_allowed(
+    sender: str,
+    settings: Settings,
+    is_group: bool = False,
+    is_broadcast: bool = False,
+) -> tuple[bool, str]:
+    if not is_direct_whatsapp_sender(sender, is_group=is_group, is_broadcast=is_broadcast):
+        return False, "not_direct_chat"
+    allowed_numbers = parse_allowed_whatsapp_numbers(settings)
+    if not allowed_numbers:
+        return True, "allowed_direct_chat_no_allowlist"
+    digits = phone_digits(sender)
+    if digits in allowed_numbers:
+        return True, "allowed_number"
+    return False, "sender_not_allowed"
+
+
+def should_use_demo_store(settings: Settings) -> bool:
+    if settings.demo_mode:
+        return True
+    return not (settings.google_sheets_spreadsheet_id.strip() and google_credentials_present(settings))
+
+
 def google_credentials_present(settings: Settings) -> bool:
     env_value = (
         os.getenv("GOOGLE_SHEETS_CREDENTIALS")
@@ -404,6 +453,8 @@ def debug_config() -> dict[str, Any]:
         "app_base_url_has_placeholder": is_placeholder_base_url(raw_base_url),
         "whatsapp_provider": settings.whatsapp_provider,
         "whatsapp_number_present": bool(settings.whatsapp_number.strip()),
+        "allowed_whatsapp_numbers_configured": bool(parse_allowed_whatsapp_numbers(settings)),
+        "demo_mode_active": should_use_demo_store(settings),
         "whatsapp_web_bridge_endpoint": whatsapp_bridge_url_for(settings),
         "owner_whatsapp_to_present": bool(settings.owner_whatsapp_to.strip()),
         "google_sheet_id_present": bool(settings.google_sheets_spreadsheet_id.strip()),
@@ -536,8 +587,30 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
     message_id = str(payload.get("message_id") or payload.get("id") or "").strip()
     media_base64 = str(payload.get("media_base64") or "").strip()
     media_mime_type = str(payload.get("media_mime_type") or payload.get("mimetype") or "").strip()
+    is_group = bool(payload.get("is_group"))
+    is_broadcast = bool(payload.get("is_broadcast"))
     if not message and not media_base64:
         raise HTTPException(status_code=400, detail="Message or media is required.")
+
+    settings = get_settings()
+    allowed, reason = whatsapp_sender_allowed(sender, settings, is_group=is_group, is_broadcast=is_broadcast)
+    if not allowed:
+        logger.info("WHATSAPP_WEB_IGNORED sender=%s reason=%s", mask_phone(sender), reason)
+        return {
+            "status": "ignored",
+            "reply": "",
+            "media_url": None,
+            "message_type": "ignored",
+            "command_handler": "ignored",
+            "error_reason": reason,
+        }
+
+    logger.info(
+        "WHATSAPP_WEB_ACCEPTED sender=%s message_length=%s has_media=%s",
+        mask_phone(sender),
+        len(message),
+        bool(media_base64),
+    )
 
     result = await process_whatsapp_web_payload(
         message=message,
@@ -1004,7 +1077,10 @@ def log_webhook_request(sender: str, message_type: str, success: bool, error_rea
 
 
 def mask_phone(value: str) -> str:
-    text = str(value or "").replace("whatsapp:", "").strip()
+    digits = phone_digits(value)
+    if digits:
+        return f"***{digits[-4:]}"
+    text = str(value or "").strip()
     if len(text) <= 4:
         return "hidden"
     return f"***{text[-4:]}"
@@ -1021,8 +1097,12 @@ def get_transcription_service() -> TranscriptionService:
 
 
 @lru_cache
-def get_sheet_store() -> GoogleSheetsStore:
-    return GoogleSheetsStore(get_settings())
+def get_sheet_store():
+    settings = get_settings()
+    if should_use_demo_store(settings):
+        logger.warning("Using DEMO_MODE local store. Google Sheets writes are disabled.")
+        return DemoPharmacyStore(settings)
+    return GoogleSheetsStore(settings)
 
 
 @lru_cache

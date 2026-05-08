@@ -69,3 +69,37 @@ report today
 ## If whatsapp-web.js Fails on Replit
 
 If Chromium cannot start, the backend is still ready. Use Baileys as the next fallback because it does not require a full browser session.
+
+## Safety Guardrails
+
+The WhatsApp Web bridge is locked down for demo safety:
+
+- Group chats are ignored.
+- Broadcast/status/newsletter messages are ignored.
+- Only direct 1-to-1 chats are processed.
+- Logs mask phone numbers and do not print full message bodies from unknown chats.
+- Replies are only sent to allowed direct chats.
+
+Set this in Replit Secrets before a real demo:
+
+```env
+ALLOWED_WHATSAPP_NUMBERS=2547XXXXXXXX
+```
+
+Use comma-separated numbers for more than one staff phone.
+
+## Demo Mode
+
+If Google Sheets credentials are missing, PharMareen automatically uses safe local demo data so commands can be tested without changing real pharmacy records.
+
+You can force this mode with:
+
+```env
+DEMO_MODE=true
+```
+
+For a real pharmacy, add Google Sheets credentials and set:
+
+```env
+DEMO_MODE=false
+```

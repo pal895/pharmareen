@@ -39,7 +39,12 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("WHATSAPP_NUMBER", "WHATSAPP_WEB_NUMBER"),
     )
+    allowed_whatsapp_numbers: str = Field(
+        default="",
+        validation_alias=AliasChoices("ALLOWED_WHATSAPP_NUMBERS", "ALLOWED_PHONE_NUMBERS"),
+    )
     owner_whatsapp_to: str = ""
+    demo_mode: bool = False
 
     report_trigger_token: str | None = None
     report_storage_mode: str = "local"
