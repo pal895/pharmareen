@@ -1,15 +1,18 @@
 {
   "name": "pharmareen-whatsapp-web-bridge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "commonjs",
   "scripts": {
     "wa:bridge": "node whatsapp-web-bridge.js",
-    "wa:dev": "node whatsapp-web-bridge.js"
+    "wa:dev": "node whatsapp-web-bridge.js",
+    "wa:baileys": "node baileys-bridge.js"
   },
   "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.12",
     "axios": "^1.7.9",
     "dotenv": "^16.4.7",
+    "pino": "^9.5.0",
     "qrcode-terminal": "^0.12.0",
     "whatsapp-web.js": "^1.26.0"
   }

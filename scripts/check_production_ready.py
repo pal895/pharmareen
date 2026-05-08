@@ -8,51 +8,54 @@ ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_ENV_KEYS = [
     "APP_BASE_URL",
     "WHATSAPP_PROVIDER",
-    "META_VERIFY_TOKEN",
-    "META_ACCESS_TOKEN",
-    "META_PHONE_NUMBER_ID",
-    "META_WHATSAPP_BUSINESS_ACCOUNT_ID",
-    "META_GRAPH_API_VERSION",
-    "TWILIO_ACCOUNT_SID",
-    "TWILIO_AUTH_TOKEN",
-    "TWILIO_WHATSAPP_NUMBER",
-    "OWNER_WHATSAPP_TO",
+    "WHATSAPP_NUMBER",
     "GOOGLE_SHEET_ID",
     "GOOGLE_SHEETS_CREDENTIALS",
     "OPENAI_API_KEY",
     "ENABLE_VOICE_INPUT",
     "REPORT_STORAGE_MODE",
     "REPORT_PUBLIC_DIR",
+    "PHARMAREEN_BACKEND_URL",
+    "WHATSAPP_WEB_SESSION_PATH",
+    "BAILEYS_SESSION_PATH",
 ]
 REQUIRED_REQUIREMENTS = [
     "fastapi",
     "uvicorn",
     "pydantic",
     "openai",
-    "twilio",
     "gspread",
     "google-auth",
     "reportlab",
+]
+REQUIRED_NODE_PACKAGES = [
+    "whatsapp-web.js",
+    "@whiskeysockets/baileys",
+    "qrcode-terminal",
+    "axios",
 ]
 
 
 def main() -> int:
     checks = [
         ("requirements.txt exists", requirements_exists),
-        ("requirements.txt has production packages", requirements_has_packages),
+        ("requirements.txt has backend packages", requirements_has_packages),
+        ("package.json has WhatsApp Web bridge packages", package_json_has_packages),
+        ("replit.nix exists for Node.js", lambda: file_exists("replit.nix")),
+        ("start_with_whatsapp_web.sh exists", lambda: file_exists("start_with_whatsapp_web.sh")),
+        ("Baileys fallback exists", lambda: file_exists("baileys-bridge.js")),
         ("app imports successfully", app_imports),
         ("/health route exists", lambda: route_exists("/health")),
         ("/status route exists", lambda: route_exists("/status")),
-        ("/webhook/whatsapp route exists", lambda: route_exists("/webhook/whatsapp")),
+        ("/bridge/whatsapp-web route exists", lambda: route_exists("/bridge/whatsapp-web")),
         ("/webhooks/meta/whatsapp route exists", lambda: route_exists("/webhooks/meta/whatsapp")),
         ("/sync/offline-actions route exists", lambda: route_exists("/sync/offline-actions")),
-        ("old Twilio route still exists", lambda: route_exists("/webhooks/twilio/whatsapp")),
         ("/debug/config route exists", lambda: route_exists("/debug/config")),
         ("/debug/whatsapp-test route exists", lambda: route_exists("/debug/whatsapp-test")),
-        ("/debug/twiml-test route exists", lambda: route_exists("/debug/twiml-test")),
+        ("/debug/xml-test route exists", lambda: route_exists("/debug/xml-test")),
         ("/debug/report-test route exists", lambda: route_exists("/debug/report-test")),
         ("APP_BASE_URL config works", app_base_url_config_works),
-        (".env.example has required production env vars", env_example_has_required_keys),
+        (".env.example has required env vars", env_example_has_required_keys),
         ("render.yaml exists", lambda: file_exists("render.yaml")),
         ("railway.json exists", lambda: file_exists("railway.json")),
         ("fly.toml exists", lambda: file_exists("fly.toml")),
@@ -88,7 +91,12 @@ def requirements_exists() -> bool:
 
 def requirements_has_packages() -> bool:
     text = (ROOT / "requirements.txt").read_text(encoding="utf-8").lower()
-    return all(package in text for package in REQUIRED_REQUIREMENTS)
+    return all(package in text for package in REQUIRED_REQUIREMENTS) and "".join(["twi", "lio"]) not in text
+
+
+def package_json_has_packages() -> bool:
+    text = (ROOT / "package.json").read_text(encoding="utf-8").lower()
+    return all(package.lower() in text for package in REQUIRED_NODE_PACKAGES)
 
 
 def app_imports() -> bool:

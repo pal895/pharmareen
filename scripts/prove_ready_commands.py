@@ -81,7 +81,7 @@ def post_whatsapp(message: str) -> str:
         }
     ).encode("utf-8")
     request = urllib.request.Request(
-        f"{BASE_URL}/webhooks/twilio/whatsapp",
+        f"{BASE_URL}/bridge/whatsapp-web",
         data=data,
         headers={"Content-Type": "application/x-www-form-urlencoded"},
         method="POST",

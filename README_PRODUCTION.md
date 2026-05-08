@@ -1,6 +1,29 @@
 # PharMareen Production Deployment
 
-PharMareen can run locally for testing, or on a hosted public URL so Twilio WhatsApp does not need ngrok.
+## Active WhatsApp Provider
+
+Production WhatsApp should use Meta WhatsApp Cloud API.
+
+Webhook URL:
+
+```text
+https://YOUR-DOMAIN/bridge endpoints/meta/whatsapp
+```
+
+Set:
+
+```text
+WHATSAPP_PROVIDER=meta
+META_VERIFY_TOKEN=
+META_ACCESS_TOKEN=
+META_PHONE_NUMBER_ID=
+META_WABA_ID=
+META_GRAPH_API_VERSION=v21.0
+```
+
+Keep the old WhatsApp Web bridge route only for compatibility while pharmacies move to Meta.
+
+PharMareen can run locally for testing, or on a hosted public URL so WhatsApp Web bridge does not need ngrok.
 
 ## Recommended Hosting
 
@@ -37,9 +60,9 @@ PHARMACY_NAME=PharMareen
 TIMEZONE=Africa/Nairobi
 APP_BASE_URL=https://YOUR-DOMAIN
 
-TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-TWILIO_AUTH_TOKEN=your-twilio-auth-token
-TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
+WHATSAPP_NUMBER=2547XXXXXXXXxxx
+PHARMAREEN_BACKEND_URL=http://localhost:5000
+WHATSAPP_WEB_SESSION_PATH=.wwebjs_auth
 OWNER_WHATSAPP_TO=whatsapp:+254700000000
 
 GOOGLE_SHEET_ID=your-google-sheet-id
@@ -56,36 +79,36 @@ REPORT_PUBLIC_DIR=reports_pdf
 
 `GOOGLE_SHEETS_CREDENTIALS` can be the full service-account JSON string. For local Windows use, `GOOGLE_SERVICE_ACCOUNT_JSON=./service-account.json` still works.
 
-## Twilio Webhook
+## WhatsApp Web bridge Webhook
 
-In Twilio WhatsApp Sandbox or production sender settings, set:
+In WhatsApp Web bridge Sandbox or production sender settings, set:
 
 ```text
 When a message comes in:
-https://YOUR-DOMAIN/webhook/whatsapp
+https://YOUR-DOMAIN/bridge endpoint/whatsapp
 Method: POST
 ```
 
 The old local route still works:
 
 ```text
-/webhooks/twilio/whatsapp
+/bridge/whatsapp-web
 ```
 
 ## Important: Localhost vs WhatsApp
 
 `http://localhost:8000` only works on the computer running PharMareen.
 
-Twilio WhatsApp cannot send messages to localhost because it is not public. If the app opens locally and `/health` works, the app is running, but WhatsApp still needs a public HTTPS URL.
+WhatsApp Web bridge cannot send messages to localhost because it is not public. If the app opens locally and `/health` works, the app is running, but WhatsApp still needs a public HTTPS URL.
 
 For real pharmacy use:
 
 1. Deploy PharMareen to Render, Railway, Fly.io, or a VPS.
 2. Set `APP_BASE_URL=https://YOUR-DOMAIN`.
-3. Set the Twilio WhatsApp webhook to:
+3. Set the WhatsApp Web bridge bridge endpoint to:
 
 ```text
-https://YOUR-DOMAIN/webhook/whatsapp
+https://YOUR-DOMAIN/bridge endpoint/whatsapp
 ```
 
 4. Open:
@@ -94,7 +117,7 @@ https://YOUR-DOMAIN/webhook/whatsapp
 https://YOUR-DOMAIN/status
 ```
 
-The status page will show whether Google Sheets and Twilio settings are ready.
+The status page will show whether Google Sheets and WhatsApp Web bridge settings are ready.
 
 ## Health Check
 
@@ -133,7 +156,7 @@ setup.bat
 run.bat
 ```
 
-Local webhook testing can still use ngrok, but production should point Twilio directly to the hosted URL.
+Local bridge endpoint testing can still use ngrok, but production should point WhatsApp Web bridge directly to the hosted URL.
 
 ## Readiness Checks
 

@@ -6,6 +6,81 @@ The app receives a WhatsApp update, uses AI to understand what happened, logs th
 
 Default pharmacy name: `PharMareen`.
 
+## Meta WhatsApp Cloud API Mode
+
+Meta is now the active WhatsApp provider for production.
+
+Run the backend:
+
+```bash
+python -m uvicorn app.main:app --host 0.0.0.0 --port 5000
+```
+
+Set these environment variables:
+
+```text
+WHATSAPP_PROVIDER=meta
+META_VERIFY_TOKEN=
+META_ACCESS_TOKEN=
+META_PHONE_NUMBER_ID=
+META_WABA_ID=
+META_GRAPH_API_VERSION=v21.0
+OPENAI_API_KEY=
+GOOGLE_SHEET_ID=
+GOOGLE_SHEETS_CREDENTIALS=
+```
+
+Meta bridge endpoint URL:
+
+```text
+https://YOUR-DOMAIN/bridge endpoints/meta/whatsapp
+```
+
+In Meta dashboard, paste that URL, set your verify token, then subscribe to WhatsApp messages.
+
+## AI Safety Rules
+
+Low-risk messages save automatically:
+
+```text
+Panadol sold 2
+Panadol stock
+report today
+```
+
+High-risk messages ask before saving:
+
+```text
+Panadol bad
+Return Panadol
+Panadol restocked 100 exp Jan 2027
+```
+
+Reply `YES` to confirm, `EDIT` to correct, or `CANCEL` to discard.
+
+## Offline App
+
+Open:
+
+```text
+/offline_app/index.html
+```
+
+The offline app saves sales/restocks locally when internet is poor. When the connection returns, it auto-syncs to:
+
+```text
+POST /sync/offline-actions
+```
+
+It retries every 30 seconds, tracks failed items, and keeps a visible status banner:
+
+- Offline - saving safely
+- Syncing...
+- Synced
+- Some items not synced yet
+
+Images and voice files can be queued offline. They are uploaded and processed only after internet returns.
+
 ## Easiest Windows Setup
 
 For beginner-friendly Windows setup, open:
@@ -26,7 +101,7 @@ Common one-click scripts:
 - `run.bat`: start the app at `http://localhost:8000`.
 - `seed_prices.bat`: add sample testing prices to `Master_Stock`.
 - `daily_report.bat`: generate today's report from the local app.
-- `ngrok_start.bat`: start ngrok for local Twilio testing.
+- `ngrok_start.bat`: start ngrok for local WhatsApp Web bridge testing.
 - `test.bat`: run tests.
 
 For production without ngrok, see `README_PRODUCTION.md`.
@@ -155,7 +230,7 @@ Copy `.env.example` to `.env` and fill in:
 PHARMACY_NAME=Zilla Pharmacy
 TIMEZONE=Africa/Nairobi
 PUBLIC_BASE_URL=https://your-public-url.example.com
-VALIDATE_TWILIO_SIGNATURE=true
+WHATSAPP_PROVIDER=whatsapp_web
 REPORT_TRIGGER_TOKEN=change-this-report-token
 
 OPENAI_API_KEY=sk-your-openai-key
@@ -165,9 +240,9 @@ OPENAI_TRANSCRIPTION_MODEL=whisper-1
 GOOGLE_SHEETS_SPREADSHEET_ID=your-google-sheet-id
 GOOGLE_SERVICE_ACCOUNT_JSON=./service-account.json
 
-TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-TWILIO_AUTH_TOKEN=your-twilio-auth-token
-TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
+WHATSAPP_NUMBER=2547XXXXXXXXxxx
+PHARMAREEN_BACKEND_URL=http://localhost:5000
+WHATSAPP_WEB_SESSION_PATH=.wwebjs_auth
 OWNER_WHATSAPP_TO=whatsapp:+254700000000
 ```
 
@@ -189,7 +264,7 @@ notepad .env
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Expose local server for Twilio:
+Expose local server for WhatsApp Web bridge:
 
 ```powershell
 ngrok http 8000
@@ -197,23 +272,23 @@ ngrok http 8000
 
 Set `PUBLIC_BASE_URL` to the ngrok HTTPS URL.
 
-## Connect Twilio WhatsApp
+## Connect WhatsApp Web bridge
 
-In Twilio WhatsApp sandbox or sender settings, set the incoming message webhook to:
+In WhatsApp Web bridge sandbox or sender settings, set the incoming message bridge endpoint to:
 
 ```text
-POST https://your-public-url/webhooks/twilio/whatsapp
+POST https://your-public-url/bridge/whatsapp-web
 ```
 
-Keep `VALIDATE_TWILIO_SIGNATURE=true` in production.
+Keep `WHATSAPP_PROVIDER=whatsapp_web` in production.
 
 ## Voice Notes
 
 Voice note flow:
 
 1. Owner sends WhatsApp voice note.
-2. Twilio sends the media URL to the webhook.
-3. App downloads the audio from Twilio.
+2. WhatsApp Web bridge sends the media URL to the bridge endpoint.
+3. App downloads the audio from WhatsApp Web bridge.
 4. OpenAI transcribes the audio to text.
 5. The same parser handles the transcript.
 6. One or multiple entries are logged.
@@ -318,10 +393,10 @@ Logged 3 entries:
 pytest
 ```
 
-Tests use fake services and do not call Twilio, OpenAI, or Google Sheets.
+Tests use fake services and do not call WhatsApp Web bridge, OpenAI, or Google Sheets.
 
 ## API Summary
 
 - `GET /health`: health check.
-- `POST /webhooks/twilio/whatsapp`: Twilio WhatsApp webhook.
+- `POST /bridge/whatsapp-web`: WhatsApp Web bridge bridge endpoint.
 - `POST /reports/daily`: generate, save, and optionally send the daily report.

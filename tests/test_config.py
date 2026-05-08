@@ -12,9 +12,7 @@ def test_pharmacy_name_fallback_when_env_missing(monkeypatch):
         openai_parse_model="gpt-5",
         google_sheets_spreadsheet_id="test-sheet",
         google_service_account_json="{}",
-        twilio_account_sid="ACtest",
-        twilio_auth_token="test-token",
-        twilio_whatsapp_from="whatsapp:+10000000000",
+        whatsapp_number="254100000000",
         owner_whatsapp_to="whatsapp:+20000000000",
     )
 
@@ -27,21 +25,20 @@ def test_production_env_aliases_are_supported():
         APP_BASE_URL="https://pharmareen.example.com",
         GOOGLE_SHEET_ID="sheet-id",
         GOOGLE_SHEETS_CREDENTIALS='{"client_email":"test@example.com"}',
-        TWILIO_WHATSAPP_NUMBER="whatsapp:+14155238886",
+        WHATSAPP_NUMBER="25414155238886",
         owner_whatsapp_to="whatsapp:+254700000000",
     )
 
     assert settings.public_base_url == "https://pharmareen.example.com"
     assert settings.google_sheets_spreadsheet_id == "sheet-id"
     assert settings.google_service_account_json == '{"client_email":"test@example.com"}'
-    assert settings.twilio_whatsapp_from == "whatsapp:+14155238886"
-    assert settings.app_version == "day-2"
+    assert settings.whatsapp_number == "25414155238886"
+    assert settings.app_version == "whatsapp-web-mvp"
 
 
 def test_missing_env_values_do_not_crash_local_mode():
     settings = Settings(_env_file=None)
 
     assert settings.owner_whatsapp_to == ""
-    assert settings.twilio_account_sid == ""
-    assert settings.twilio_auth_token == ""
+    assert settings.whatsapp_number == ""
     assert settings.google_sheets_spreadsheet_id == ""

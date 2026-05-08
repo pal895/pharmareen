@@ -53,27 +53,37 @@ client.on('disconnected', (reason) => {
   console.error('WhatsApp Web disconnected:', reason);
 });
 
+async function buildPayload(message) {
+  const payload = {
+    message: (message.body || '').trim(),
+    from: message.from || 'unknown',
+    message_id: message.id && (message.id._serialized || message.id.id) ? (message.id._serialized || message.id.id) : ''
+  };
+
+  if (message.hasMedia) {
+    const media = await message.downloadMedia();
+    if (media && media.data) {
+      payload.media_base64 = media.data;
+      payload.media_mime_type = media.mimetype || '';
+      payload.media_filename = media.filename || '';
+    }
+  }
+  return payload;
+}
+
 client.on('message', async (message) => {
   if (message.fromMe) return;
 
-  const text = (message.body || '').trim();
-  const sender = message.from || 'unknown';
-  const messageId = message.id && (message.id._serialized || message.id.id) ? (message.id._serialized || message.id.id) : '';
-
-  if (!text) {
-    await message.reply('Please send text for now, like: Panadol 2');
-    return;
-  }
-
-  console.log(`Incoming WhatsApp Web message from ${sender}: ${text}`);
-
   try {
-    const response = await axios.post(`${backendUrl}/bridge/whatsapp-web`, {
-      message: text,
-      from: sender,
-      message_id: messageId
-    }, { timeout: 60000 });
+    const payload = await buildPayload(message);
+    if (!payload.message && !payload.media_base64) {
+      await message.reply('Please send text for now, like: Panadol 2');
+      return;
+    }
 
+    console.log(`Incoming WhatsApp Web message from ${payload.from}: ${payload.message || payload.media_mime_type || 'media'}`);
+
+    const response = await axios.post(`${backendUrl}/bridge/whatsapp-web`, payload, { timeout: 60000 });
     const reply = response.data && response.data.reply ? String(response.data.reply) : 'I received it, but no reply was generated.';
     await message.reply(reply.slice(0, 4000));
 
@@ -89,6 +99,6 @@ client.on('message', async (message) => {
 
 client.initialize().catch((error) => {
   console.error('Failed to start WhatsApp Web bridge:', error);
-  console.error('If Replit cannot launch Chromium, use the Baileys fallback option next.');
+  console.error('The startup script will try the Baileys fallback next if ENABLE_BAILEYS_FALLBACK is true.');
   process.exit(1);
 });

@@ -43,9 +43,7 @@ def make_settings(service_account_path: str) -> Settings:
         openai_parse_model="gpt-5",
         google_sheets_spreadsheet_id="test-sheet",
         google_service_account_json=service_account_path,
-        twilio_account_sid="ACtest",
-        twilio_auth_token="test-token",
-        twilio_whatsapp_from="whatsapp:+10000000000",
+        whatsapp_number="254100000000",
         owner_whatsapp_to="whatsapp:+20000000000",
     )
 

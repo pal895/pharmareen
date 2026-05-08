@@ -48,7 +48,7 @@ class FakeStatusStore:
     is_available = False
 
 
-def twiml_payload(xml_text: str) -> str:
+def xml_payload(xml_text: str) -> str:
     return xml_text.removeprefix('<?xml version="1.0" encoding="UTF-8"?>')
 
 
@@ -88,18 +88,16 @@ def test_status_page_shows_startup_readiness_and_localhost_warning(monkeypatch):
     assert response.status_code == 200
     assert "App running" in response.text
     assert "Google Sheets connected" in response.text
-    assert "Twilio credentials found" in response.text
-    assert "http://localhost:8000/webhook/whatsapp" in response.text
-    assert "WhatsApp will NOT reply while APP_BASE_URL is localhost" in response.text
+    assert "WhatsApp provider" in response.text
+    assert "http://localhost:8000/bridge/whatsapp-web" in response.text
+    assert "WhatsApp Web MVP can still run locally" in response.text
 
 
 def test_status_page_shows_production_ready_for_https_domain(monkeypatch):
     settings = Settings(
         _env_file=None,
         APP_BASE_URL="https://pharmareen.example.co.ke",
-        TWILIO_ACCOUNT_SID="ACtest",
-        TWILIO_AUTH_TOKEN="token",
-        TWILIO_WHATSAPP_NUMBER="whatsapp:+14155238886",
+        WHATSAPP_NUMBER="25414155238886",
     )
     monkeypatch.setattr(main, "get_settings", lambda: settings)
     monkeypatch.setattr(main, "get_sheet_store", lambda: FakeStatusStore())
@@ -108,17 +106,15 @@ def test_status_page_shows_production_ready_for_https_domain(monkeypatch):
         response = client.get("/status")
 
     assert response.status_code == 200
-    assert "Production URL looks ready" in response.text
-    assert "https://pharmareen.example.co.ke/webhook/whatsapp" in response.text
+    assert "Public URL looks ready" in response.text
+    assert "https://pharmareen.example.co.ke/bridge/whatsapp-web" in response.text
 
 
 def test_debug_config_does_not_expose_secrets(monkeypatch):
     settings = Settings(
         _env_file=None,
         APP_BASE_URL="https://pharmareen.replit.app",
-        twilio_account_sid="ACsecret",
-        twilio_auth_token="super-secret-token",
-        TWILIO_WHATSAPP_NUMBER="whatsapp:+14155238886",
+        WHATSAPP_NUMBER="25414155238886",
         OWNER_WHATSAPP_TO="whatsapp:+254700000000",
         GOOGLE_SHEET_ID="sheet-id",
         GOOGLE_SHEETS_CREDENTIALS='{"client_email":"test@example.com"}',
@@ -135,17 +131,17 @@ def test_debug_config_does_not_expose_secrets(monkeypatch):
     assert data["app_base_url"] == "https://pharmareen.replit.app"
     assert data["app_base_url_is_https"] is True
     assert data["app_base_url_has_placeholder"] is False
-    assert data["twilio_account_sid_present"] is True
-    assert data["twilio_auth_token_present"] is True
+    assert data["whatsapp_provider"] == "whatsapp_web"
+    assert data["whatsapp_number_present"] is True
     assert data["google_credentials_present"] is True
     assert "super-secret-token" not in response.text
     assert "sk-secret" not in response.text
 
 
-def test_debug_whatsapp_test_returns_twiml(monkeypatch):
+def test_debug_whatsapp_test_returns_xml(monkeypatch):
     fake_intake = FakeIntake("👋 PharMareen Help")
     monkeypatch.setattr(main, "get_intake_service", lambda: fake_intake)
-    monkeypatch.setattr(main, "get_settings", lambda: Settings(_env_file=None, TWILIO_WHATSAPP_NUMBER="whatsapp:+14155238886"))
+    monkeypatch.setattr(main, "get_settings", lambda: Settings(_env_file=None, WHATSAPP_NUMBER="25414155238886"))
 
     with TestClient(main.app) as client:
         response = client.post("/debug/whatsapp-test")
@@ -153,13 +149,13 @@ def test_debug_whatsapp_test_returns_twiml(monkeypatch):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert data["response_type"] == "twiml_xml"
+    assert data["response_type"] == "whatsapp_xml"
     assert "<Response><Message>" in data["response_body_preview"]
     assert data["command_handler"] == "help_start"
     assert fake_intake.received == "start"
 
 
-def test_twilio_webhook_logs_reply_length_and_returns_xml(monkeypatch, capsys):
+def test_legacy_form_webhook_logs_reply_length_and_returns_xml(monkeypatch, capsys):
     fake_intake = FakeIntake("PharMareen Help\n\nSell:\nPanadol 2")
     monkeypatch.setattr(main, "get_intake_service", lambda: fake_intake)
     monkeypatch.setattr(main, "log_webhook_request", lambda *args, **kwargs: None)
@@ -180,24 +176,24 @@ def test_twilio_webhook_logs_reply_length_and_returns_xml(monkeypatch, capsys):
     assert response.status_code == 200
     assert "xml" in response.headers["content-type"]
     assert response.text.startswith('<?xml version="1.0" encoding="UTF-8"?>')
-    assert twiml_payload(response.text).startswith("<Response>")
+    assert xml_payload(response.text).startswith("<Response>")
     assert "<Message>" in response.text
-    assert "TWILIO_REPLY_LENGTH=" in captured
-    assert "TWILIO_REPLY_PREVIEW=PharMareen Help" in captured
-    assert "TWILIO_REPLY_XML_PREVIEW=" in captured
-    assert "TWILIO_REPLY_CONTENT_TYPE=application/xml" in captured
+    assert "WHATSAPP_REPLY_LENGTH=" in captured
+    assert "WHATSAPP_REPLY_PREVIEW=PharMareen Help" in captured
+    assert "WHATSAPP_REPLY_XML_PREVIEW=" in captured
+    assert "WHATSAPP_REPLY_CONTENT_TYPE=application/xml" in captured
     assert fake_intake.received == "Start"
 
 
-def test_debug_twiml_test_returns_valid_xml():
+def test_debug_xml_test_returns_valid_xml():
     with TestClient(main.app) as client:
-        response = client.get("/debug/twiml-test")
+        response = client.get("/debug/xml-test")
 
     assert response.status_code == 200
     assert "xml" in response.headers["content-type"]
     assert response.text.startswith('<?xml version="1.0" encoding="UTF-8"?>')
-    assert twiml_payload(response.text).startswith("<Response>")
-    assert "<Message>PharMareen TwiML test</Message>" in response.text
+    assert xml_payload(response.text).startswith("<Response>")
+    assert "<Message>PharMareen XML test</Message>" in response.text
 
 
 def test_debug_report_test_generates_pdf(monkeypatch, tmp_path):
@@ -333,7 +329,7 @@ def test_voice_webhook_with_fake_media_transcription_error_does_not_crash(monkey
     assert "I heard the voice but could not read it clearly" in response.text
 
 
-def test_twilio_pdf_media_payload_created_for_public_report(monkeypatch):
+def test_xml_pdf_media_payload_created_for_public_report(monkeypatch):
     fake_intake = FakeIntake(
         "📊 Daily Report\n\nSales: KES 440\n\n📎 PDF report attached below.\nhttps://reports.pharmareen.app/reports/download/report.pdf"
     )
@@ -358,7 +354,7 @@ def test_twilio_pdf_media_payload_created_for_public_report(monkeypatch):
     )
 
 
-def test_twilio_pdf_fallback_link_stays_when_not_attachable(monkeypatch):
+def test_xml_pdf_fallback_link_stays_when_not_attachable(monkeypatch):
     fake_intake = FakeIntake(
         "📊 Daily Report\n\nSales: KES 440\n\n📄 PDF report:\nTap here to download: http://localhost:8000/reports/download/report.pdf"
     )

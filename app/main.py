@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import logging
 import os
 import sys
@@ -32,7 +33,7 @@ from app.routes.offline_sync import router as offline_sync_router
 from app.sheets import GoogleSheetsStore, SHEETS_UNAVAILABLE_MESSAGE, SheetsUnavailableError
 from app.transcription import TranscriptionService, TranscriptionUnavailableError
 from app.utils import now_in_timezone
-from app.whatsapp import WhatsAppClient, twiml_response
+from app.whatsapp import WhatsAppClient, xml_message_response
 
 
 logger = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ processed_message_sids: set[str] = set()
 pending_voice_confirmations: dict[str, tuple[str, float]] = {}
 PENDING_VOICE_TTL_SECONDS = 600
 startup_status_printed = False
-TWILIO_XML_CONTENT_TYPE = "application/xml"
+XML_CONTENT_TYPE = "application/xml"
 
 
 @asynccontextmanager
@@ -98,8 +99,7 @@ def startup_status_page() -> str:
     settings = get_settings()
     store = get_sheet_store()
     base_url = effective_app_base_url(settings)
-    webhook_url = webhook_url_for(settings)
-    twilio_ready = twilio_credentials_found(settings)
+    bridge_url = whatsapp_bridge_url_for(settings)
     sheets_ready = bool(store.is_available)
     base_is_local = is_local_base_url(base_url)
     base_is_placeholder = is_placeholder_base_url(base_url)
@@ -108,22 +108,22 @@ def startup_status_page() -> str:
     if base_is_local:
         warning = """
         <section class="warning">
-          <strong>WhatsApp will NOT reply while APP_BASE_URL is localhost.</strong><br>
-          Deploy to Render/Railway/Fly.io or use a public HTTPS tunnel, then put the webhook URL in Twilio.
+          <strong>WhatsApp Web MVP can still run locally.</strong><br>
+          Public report links will open on phones only after APP_BASE_URL is set to the Replit public URL.
         </section>
         """
     elif base_is_placeholder:
         warning = """
         <section class="warning">
           <strong>APP_BASE_URL is still a placeholder.</strong><br>
-          Replace it with your real public HTTPS domain before connecting Twilio.
+          Replace it with your real public Replit URL before sharing PDF report links.
         </section>
         """
     elif production_ready:
         warning = """
         <section class="ready">
-          <strong>Production URL looks ready.</strong><br>
-          Put the webhook URL below into Twilio and send "start" on WhatsApp.
+          <strong>Public URL looks ready.</strong><br>
+          Run the WhatsApp Web bridge, scan the QR code, then send "start" on WhatsApp.
         </section>
         """
 
@@ -151,20 +151,20 @@ def startup_status_page() -> str:
     <body>
       <main>
         <h1>PharMareen Status</h1>
-        <p>Use this page to see what is working before testing WhatsApp.</p>
+        <p>Use this page before testing the WhatsApp Web MVP bridge.</p>
         {warning}
         <section class="card">
           <div class="row"><span>App running</span><span class="ok">yes</span></div>
           <div class="row"><span>Google Sheets connected</span><span class="{status_class(sheets_ready)}">{yes_no(sheets_ready)}</span></div>
-          <div class="row"><span>Twilio credentials found</span><span class="{status_class(twilio_ready)}">{yes_no(twilio_ready)}</span></div>
-          <div class="row"><span>Production HTTPS URL ready</span><span class="{status_class(production_ready)}">{yes_no(production_ready)}</span></div>
+          <div class="row"><span>WhatsApp provider</span><span><code>{escape(settings.whatsapp_provider)}</code></span></div>
+          <div class="row"><span>Public HTTPS URL ready</span><span class="{status_class(production_ready)}">{yes_no(production_ready)}</span></div>
           <div class="row"><span>APP_BASE_URL</span><span><code>{escape(base_url)}</code></span></div>
-          <div class="row"><span>Webhook URL for Twilio</span><span><code>{escape(webhook_url)}</code></span></div>
+          <div class="row"><span>WhatsApp Web bridge endpoint</span><span><code>{escape(bridge_url)}</code></span></div>
         </section>
         <section class="card">
           <p><strong>Local app:</strong> <a href="http://localhost:5000">http://localhost:5000</a></p>
           <p><strong>Health check:</strong> <a href="http://localhost:5000/health">http://localhost:5000/health</a></p>
-          <p><strong>WhatsApp:</strong> needs a public HTTPS production URL before Twilio can reach this app.</p>
+          <p><strong>Bridge:</strong> run <code>./start_with_whatsapp_web.sh</code>, scan the QR code, then send <code>start</code>.</p>
         </section>
       </main>
     </body>
@@ -175,8 +175,8 @@ def startup_status_page() -> str:
 @app.get("/landing", response_class=HTMLResponse)
 def landing_page() -> str:
     settings = get_settings()
-    whatsapp_number = settings.twilio_whatsapp_from.replace("whatsapp:", "") or "Your WhatsApp number"
-    click_link = whatsapp_click_link(settings.twilio_whatsapp_from)
+    whatsapp_number = settings.whatsapp_number.replace("whatsapp:", "") or "Your WhatsApp number"
+    click_link = whatsapp_click_link(settings.whatsapp_number)
     public_status_url = f"{effective_app_base_url(settings)}/status"
     qr_link = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + quote(click_link, safe="")
     return f"""
@@ -287,8 +287,12 @@ def effective_app_base_url(settings: Settings) -> str:
     return (settings.public_base_url or "http://localhost:5000").rstrip("/")
 
 
+def whatsapp_bridge_url_for(settings: Settings) -> str:
+    return f"{effective_app_base_url(settings)}/bridge/whatsapp-web"
+
+
 def webhook_url_for(settings: Settings) -> str:
-    return f"{effective_app_base_url(settings)}/webhook/whatsapp"
+    return whatsapp_bridge_url_for(settings)
 
 
 def is_local_base_url(value: str | None) -> bool:
@@ -306,12 +310,8 @@ def is_placeholder_base_url(value: str | None) -> bool:
     return any(placeholder in text for placeholder in placeholders)
 
 
-def twilio_credentials_found(settings: Settings) -> bool:
-    return bool(
-        settings.twilio_account_sid.strip()
-        and settings.twilio_auth_token.strip()
-        and settings.twilio_whatsapp_from.strip()
-    )
+def whatsapp_bridge_configured(settings: Settings) -> bool:
+    return True
 
 
 def google_credentials_present(settings: Settings) -> bool:
@@ -332,12 +332,6 @@ def google_credentials_present(settings: Settings) -> bool:
 
 def missing_startup_settings(settings: Settings) -> list[str]:
     missing: list[str] = []
-    if not settings.twilio_account_sid.strip():
-        missing.append("TWILIO_ACCOUNT_SID")
-    if not settings.twilio_auth_token.strip():
-        missing.append("TWILIO_AUTH_TOKEN")
-    if not settings.twilio_whatsapp_from.strip():
-        missing.append("TWILIO_WHATSAPP_NUMBER")
     if not settings.google_sheets_spreadsheet_id.strip():
         missing.append("GOOGLE_SHEET_ID")
     if settings.enable_voice_input and not settings.openai_api_key.strip():
@@ -353,14 +347,14 @@ def startup_console_lines() -> list[str]:
         f"Local app: http://localhost:{port}",
         f"Health: http://localhost:{port}/health",
         f"Status: http://localhost:{port}/status",
+        "WhatsApp Web bridge: run ./start_with_whatsapp_web.sh and scan the QR code",
     ]
     base_url = effective_app_base_url(settings)
     if is_local_base_url(base_url):
         lines.extend(
             [
                 "",
-                "WARNING: WhatsApp will not receive messages from Twilio because localhost is not public.",
-                "Use production hosting or a temporary public tunnel.",
+                "WARNING: APP_BASE_URL localhost is not public. WhatsApp Web can still process messages, but phone PDF links need the public Replit URL.",
             ]
         )
     missing = missing_startup_settings(settings)
@@ -408,9 +402,9 @@ def debug_config() -> dict[str, Any]:
         "app_base_url": raw_base_url,
         "app_base_url_is_https": raw_base_url.lower().startswith("https://"),
         "app_base_url_has_placeholder": is_placeholder_base_url(raw_base_url),
-        "twilio_account_sid_present": bool(settings.twilio_account_sid.strip()),
-        "twilio_auth_token_present": bool(settings.twilio_auth_token.strip()),
-        "twilio_whatsapp_number_present": bool(settings.twilio_whatsapp_from.strip()),
+        "whatsapp_provider": settings.whatsapp_provider,
+        "whatsapp_number_present": bool(settings.whatsapp_number.strip()),
+        "whatsapp_web_bridge_endpoint": whatsapp_bridge_url_for(settings),
         "owner_whatsapp_to_present": bool(settings.owner_whatsapp_to.strip()),
         "google_sheet_id_present": bool(settings.google_sheets_spreadsheet_id.strip()),
         "google_credentials_present": google_credentials_present(settings),
@@ -424,17 +418,17 @@ async def debug_whatsapp_test() -> JSONResponse:
     form_values = {
         "Body": "start",
         "From": "whatsapp:+254700000000",
-        "To": settings.twilio_whatsapp_from or "whatsapp:+14155238886",
+        "To": settings.whatsapp_number or "whatsapp:+14155238886",
         "MessageSid": f"SMDEBUG{int(time.time() * 1000)}",
         "NumMedia": "0",
     }
     try:
-        result = await process_twilio_form_values(form_values)
-        response_body = twiml_response(result.reply, media_url=result.media_url)
+        result = await process_whatsapp_form_values(form_values)
+        response_body = xml_message_response(result.reply, media_url=result.media_url)
         return JSONResponse(
             {
                 "status": "ok" if result.success else "error",
-                "response_type": "twiml_xml",
+                "response_type": "whatsapp_xml",
                 "command_handler": result.command_handler,
                 "response_body_preview": response_body[:1000],
                 "exception": result.error_reason,
@@ -454,9 +448,9 @@ async def debug_whatsapp_test() -> JSONResponse:
         )
 
 
-@app.get("/debug/twiml-test")
-def debug_twiml_test() -> Response:
-    return twiml_xml_response("PharMareen TwiML test")
+@app.get("/debug/xml-test")
+def debug_xml_test() -> Response:
+    return xml_response("PharMareen XML test")
 
 
 @app.get("/debug/report-test")
@@ -540,16 +534,18 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
     message = str(payload.get("message") or payload.get("body") or "").strip()
     sender = str(payload.get("from") or payload.get("sender") or "whatsapp-web").strip()
     message_id = str(payload.get("message_id") or payload.get("id") or "").strip()
-    if not message:
-        raise HTTPException(status_code=400, detail="Message is required.")
+    media_base64 = str(payload.get("media_base64") or "").strip()
+    media_mime_type = str(payload.get("media_mime_type") or payload.get("mimetype") or "").strip()
+    if not message and not media_base64:
+        raise HTTPException(status_code=400, detail="Message or media is required.")
 
-    form_values = {
-        "Body": message,
-        "From": sender,
-        "MessageSid": message_id,
-        "NumMedia": "0",
-    }
-    result = await process_twilio_form_values(form_values)
+    result = await process_whatsapp_web_payload(
+        message=message,
+        sender=sender,
+        message_id=message_id,
+        media_base64=media_base64,
+        media_mime_type=media_mime_type,
+    )
     log_webhook_request(sender, "whatsapp_web", result.success, result.error_reason)
     return {
         "status": "ok" if result.success else "error",
@@ -559,9 +555,66 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
         "command_handler": result.command_handler,
         "error_reason": result.error_reason,
     }
+
+
+async def process_whatsapp_web_payload(
+    message: str,
+    sender: str,
+    message_id: str = "",
+    media_base64: str = "",
+    media_mime_type: str = "",
+) -> WhatsAppProcessResult:
+    if message:
+        return await process_whatsapp_form_values(
+            {
+                "Body": message,
+                "From": sender,
+                "MessageSid": message_id,
+                "NumMedia": "0",
+            }
+        )
+
+    if media_base64 and media_mime_type.lower().startswith("audio/"):
+        transcription_service = get_transcription_service()
+        if not transcription_service.is_available:
+            return WhatsAppProcessResult(
+                reply="Voice received, but voice is not enabled yet. Send text like: Panadol 2",
+                message_type="voice",
+                success=False,
+                error_reason="voice_not_enabled",
+                command_handler="voice_note_unavailable",
+            )
+        try:
+            audio_bytes = base64.b64decode(media_base64)
+            transcript = transcription_service.transcribe_audio(audio_bytes, media_mime_type)
+            interpreted = normalize_spoken_command_text(transcript)
+            reply = get_intake_service().process_text(interpreted)
+            return WhatsAppProcessResult(
+                reply=voice_reply(transcript, interpreted, reply),
+                message_type="voice",
+                success=True,
+                command_handler="voice_note_processed",
+            )
+        except Exception as exc:
+            return WhatsAppProcessResult(
+                reply=voice_transcription_failed_message(),
+                message_type="voice",
+                success=False,
+                error_reason=str(exc),
+                command_handler="voice_note_failed",
+            )
+
+    return WhatsAppProcessResult(
+        reply="Please send text for now, like: Panadol 2",
+        message_type="media",
+        success=False,
+        error_reason="unsupported_media",
+        command_handler="unsupported_media",
+    )
+
+
 @app.post("/webhook/whatsapp")
-@app.post("/webhooks/twilio/whatsapp")
-async def twilio_whatsapp_webhook(request: Request) -> Response:
+async def legacy_whatsapp_form_webhook(request: Request) -> Response:
     try:
         form = await request.form()
         form_values = {key: value for key, value in form.items()}
@@ -575,7 +628,7 @@ async def twilio_whatsapp_webhook(request: Request) -> Response:
     message_type = "text"
     success = False
     error_reason = ""
-    print("TWILIO WEBHOOK HIT", flush=True)
+    print("WHATSAPP FORM WEBHOOK HIT", flush=True)
     print(f"BODY={body}", flush=True)
     print(f"FROM={from_number}", flush=True)
     print(f"TO={to_number}", flush=True)
@@ -583,10 +636,10 @@ async def twilio_whatsapp_webhook(request: Request) -> Response:
     print(f"COMMAND_HANDLER={classify_command_handler(body) if body else 'voice_or_media'}", flush=True)
 
     try:
-        result = await process_twilio_form_values(form_values)
+        result = await process_whatsapp_form_values(form_values)
         print(f"COMMAND_HANDLER_RESULT={result.command_handler}", flush=True)
         log_webhook_request(from_number, result.message_type, result.success, result.error_reason)
-        return twiml_xml_response(result.reply, media_url=result.media_url)
+        return xml_response(result.reply, media_url=result.media_url)
     except Exception:
         logger.exception("Failed to process WhatsApp webhook")
         traceback.print_exc()
@@ -594,7 +647,7 @@ async def twilio_whatsapp_webhook(request: Request) -> Response:
         error_reason = "Unhandled processing error"
         log_webhook_request(from_number, message_type, success, error_reason)
 
-    return twiml_xml_response(reply)
+    return xml_response(reply)
 
 
 @app.post("/reports/daily")
@@ -644,7 +697,7 @@ class WhatsAppProcessResult:
     command_handler: str = "unknown"
 
 
-async def process_twilio_form_values(form_values: dict[str, Any]) -> WhatsAppProcessResult:
+async def process_whatsapp_form_values(form_values: dict[str, Any]) -> WhatsAppProcessResult:
     body = str(form_values.get("Body") or "").strip()
     from_number = str(form_values.get("From") or "").strip()
     message_sid = str(form_values.get("MessageSid") or "").strip()
@@ -666,7 +719,7 @@ async def process_twilio_form_values(form_values: dict[str, Any]) -> WhatsAppPro
             command_handler = "voice_confirmation_yes"
             incoming = IncomingInput(text=pending, is_voice=False)
             clear_pending_voice(from_number)
-            reply = "✅ Confirmed. Records updated.\n\n" + get_intake_service().process_text(incoming.text)
+            reply = "âœ… Confirmed. Records updated.\n\n" + get_intake_service().process_text(incoming.text)
         elif body:
             if pending:
                 command_handler = "voice_correction_text"
@@ -745,23 +798,23 @@ def classify_command_handler(body: str) -> str:
     return "natural_or_ai_parser"
 
 
-def logged_twiml_response(message: str, media_url: str | None = None) -> str:
+def logged_xml_message_response(message: str, media_url: str | None = None) -> str:
     clean_message = str(message or "")
     preview = clean_message.replace("\r", " ").replace("\n", " ")[:200]
-    xml = twiml_response(clean_message, media_url=media_url)
+    xml = xml_message_response(clean_message, media_url=media_url)
     xml_preview = xml.replace("\r", " ").replace("\n", " ")[:300]
-    print(f"TWILIO_REPLY_LENGTH={len(clean_message)}", flush=True)
-    print(f"TWILIO_REPLY_PREVIEW={preview}", flush=True)
-    print(f"TWILIO_REPLY_XML_PREVIEW={xml_preview}", flush=True)
-    print(f"TWILIO_REPLY_CONTENT_TYPE={TWILIO_XML_CONTENT_TYPE}", flush=True)
+    print(f"WHATSAPP_REPLY_LENGTH={len(clean_message)}", flush=True)
+    print(f"WHATSAPP_REPLY_PREVIEW={preview}", flush=True)
+    print(f"WHATSAPP_REPLY_XML_PREVIEW={xml_preview}", flush=True)
+    print(f"WHATSAPP_REPLY_CONTENT_TYPE={XML_CONTENT_TYPE}", flush=True)
     return xml
 
 
-def twiml_xml_response(message: str, media_url: str | None = None) -> Response:
+def xml_response(message: str, media_url: str | None = None) -> Response:
     return Response(
-        content=logged_twiml_response(message, media_url=media_url),
-        media_type=TWILIO_XML_CONTENT_TYPE,
-        headers={"Content-Type": TWILIO_XML_CONTENT_TYPE},
+        content=logged_xml_message_response(message, media_url=media_url),
+        media_type=XML_CONTENT_TYPE,
+        headers={"Content-Type": XML_CONTENT_TYPE},
     )
 
 
@@ -784,7 +837,7 @@ async def incoming_text_from_form(
         if media_url and content_type.startswith("audio/"):
             if not transcription_service.is_available:
                 raise UnsupportedInputError(
-                    "🎙️ Voice received, but voice is not enabled yet.\nSend text like: Panadol 2"
+                    "ðŸŽ™ï¸ Voice received, but voice is not enabled yet.\nSend text like: Panadol 2"
                 )
             try:
                 audio_bytes = await whatsapp.download_media(media_url)
@@ -811,17 +864,17 @@ def voice_reply(original_transcript: str, interpreted_command: str, processed_re
     if (
         "could not understand" in lower_reply
         or "please send it like" in lower_reply
-        or "didn’t understand" in lower_reply
+        or "didnâ€™t understand" in lower_reply
         or "didn't understand" in lower_reply
     ):
         return voice_needs_correction_reply(original_transcript)
     clean_reply = processed_reply
-    if clean_reply.startswith("✅ Batch processed\n\n"):
-        clean_reply = clean_reply.replace("✅ Batch processed\n\n", "", 1)
+    if clean_reply.startswith("âœ… Batch processed\n\n"):
+        clean_reply = clean_reply.replace("âœ… Batch processed\n\n", "", 1)
     clean_reply = clean_reply.replace("\n\nErrors:\n- None", "")
     return "\n".join(
         [
-            "🎙️ Voice note received",
+            "ðŸŽ™ï¸ Voice note received",
             "",
             f"Heard: {original_transcript}",
             f"Command: {interpreted_command}",
@@ -829,13 +882,13 @@ def voice_reply(original_transcript: str, interpreted_command: str, processed_re
             "Result:",
             clean_reply,
             "",
-            "✅ Records updated.",
+            "âœ… Records updated.",
         ]
     )
 
 
 def unclear_voice_message() -> str:
-    return "⚠️ I could not clearly understand the voice note.\nPlease type it like:\nPanadol 2\nAmoxil 1"
+    return "âš ï¸ I could not clearly understand the voice note.\nPlease type it like:\nPanadol 2\nAmoxil 1"
 
 
 def voice_needs_correction_reply(transcript: str) -> str:
@@ -847,7 +900,7 @@ def voice_needs_correction_reply(transcript: str) -> str:
 
 
 def voice_transcription_failed_message() -> str:
-    return '🎙️ I heard the voice but could not read it clearly. Try saying: "Panadol two" or type: Panadol 2.'
+    return 'ðŸŽ™ï¸ I heard the voice but could not read it clearly. Try saying: "Panadol two" or type: Panadol 2.'
 
 
 def voice_transcript_is_clear(transcript: str) -> bool:
@@ -880,12 +933,12 @@ def clear_pending_voice(sender: str) -> None:
 def pending_voice_reply(transcript: str) -> str:
     return "\n".join(
         [
-            "🎙️ Voice note received",
+            "ðŸŽ™ï¸ Voice note received",
             "",
-            "I’m not fully sure I understood.",
+            "Iâ€™m not fully sure I understood.",
             "",
             "I heard:",
-            f"“{transcript}”",
+            f"â€œ{transcript}â€",
             "",
             "Please confirm by typing:",
             "yes",
@@ -909,11 +962,11 @@ def media_url_from_reply(reply: str) -> str | None:
 def reply_for_pdf_media(reply: str) -> str:
     import re
 
-    without_link = re.sub(r"\n*📄 PDF report:\nTap here to download:\s*https?://\S+?\.pdf", "", reply).strip()
+    without_link = re.sub(r"\n*ðŸ“„ PDF report:\nTap here to download:\s*https?://\S+?\.pdf", "", reply).strip()
     without_link = re.sub(r"\nhttps?://\S+?\.pdf", "", without_link).strip()
-    if "📎 PDF report attached below." in without_link:
+    if "ðŸ“Ž PDF report attached below." in without_link:
         return without_link
-    return f"{without_link}\n\n📎 PDF report attached below."
+    return f"{without_link}\n\nðŸ“Ž PDF report attached below."
 
 
 def authorize_report_trigger(settings: Settings, authorization: str | None) -> None:
@@ -986,7 +1039,7 @@ def get_intake_service() -> IntakeService:
         timezone=settings.timezone,
         pharmacy_name=settings.pharmacy_name,
         app_base_url=settings.public_base_url,
-        whatsapp_number=settings.twilio_whatsapp_from,
+        whatsapp_number=settings.whatsapp_number,
     )
 
 

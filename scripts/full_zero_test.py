@@ -85,7 +85,7 @@ class ZeroTest:
             ],
         )
 
-        twilio_ok = any(
+        bridge_ok = any(
             "<Response><Message>" in response
             for response in [
                 sale_response,
@@ -96,7 +96,7 @@ class ZeroTest:
                 report_response,
             ]
         )
-        self.pass_fail("TWILIO WEBHOOK TEST", twilio_ok, "Webhook did not return TwiML XML.")
+        self.pass_fail("WHATSAPP WEB BRIDGE TEST", bridge_ok, "Bridge did not return a valid response.")
 
         if store is not None:
             self.check_google_sheet_logging(store)
@@ -237,7 +237,7 @@ def post_whatsapp(message: str) -> str:
         }
     ).encode("utf-8")
     request = urllib.request.Request(
-        f"{BASE_URL}/webhooks/twilio/whatsapp",
+        f"{BASE_URL}/bridge/whatsapp-web",
         data=data,
         headers={"Content-Type": "application/x-www-form-urlencoded"},
         method="POST",

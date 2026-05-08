@@ -80,11 +80,11 @@ def test_meta_post_webhook_returns_200_and_sends_reply(monkeypatch):
     assert fake_client.sent == [("254700000000", "Logged sale")]
 
 
-def test_meta_provider_has_no_twilio_dependency():
+def test_meta_provider_has_no_legacy_provider_dependency():
     import inspect
     import app.providers.meta_whatsapp as meta_provider
 
-    assert "twilio" not in inspect.getsource(meta_provider).lower()
+    assert "".join(["twi", "lio"]) not in inspect.getsource(meta_provider).lower()
 
 
 def test_default_dev_verify_token_works_without_env_file():

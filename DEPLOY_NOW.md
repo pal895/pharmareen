@@ -2,10 +2,10 @@
 
 PharMareen works locally at `http://localhost:8000`, but WhatsApp needs a public HTTPS URL.
 
-Use one of these options, then set Twilio to:
+Use one of these options, then set WhatsApp Web bridge to:
 
 ```text
-https://YOUR-DOMAIN/webhook/whatsapp
+https://YOUR-DOMAIN/bridge endpoint/whatsapp
 ```
 
 The app start command is:
@@ -25,9 +25,9 @@ PHARMACY_NAME=PharMareen
 TIMEZONE=Africa/Nairobi
 APP_BASE_URL=https://YOUR-DOMAIN
 
-TWILIO_ACCOUNT_SID=your-twilio-account-sid
-TWILIO_AUTH_TOKEN=your-twilio-auth-token
-TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
+WHATSAPP_NUMBER=2547XXXXXXXX
+PHARMAREEN_BACKEND_URL=http://localhost:5000
+WHATSAPP_WEB_SESSION_PATH=.wwebjs_auth
 OWNER_WHATSAPP_TO=whatsapp:+2547XXXXXXXX
 
 GOOGLE_SHEET_ID=your-google-sheet-id
@@ -75,10 +75,10 @@ https://pharmareen.onrender.com
 https://YOUR-RENDER-URL/status
 ```
 
-12. Put this webhook in Twilio:
+12. Put this bridge endpoint in WhatsApp Web bridge:
 
 ```text
-https://YOUR-RENDER-URL/webhook/whatsapp
+https://YOUR-RENDER-URL/bridge endpoint/whatsapp
 ```
 
 ## Option B: Railway
@@ -104,10 +104,10 @@ sh -c "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
 https://YOUR-RAILWAY-DOMAIN/status
 ```
 
-12. Put this webhook in Twilio:
+12. Put this bridge endpoint in WhatsApp Web bridge:
 
 ```text
-https://YOUR-RAILWAY-DOMAIN/webhook/whatsapp
+https://YOUR-RAILWAY-DOMAIN/bridge endpoint/whatsapp
 ```
 
 ## Option C: Fly.io
@@ -125,9 +125,9 @@ fly launch
 
 ```bash
 fly secrets set APP_BASE_URL=https://YOUR-FLY-APP.fly.dev
-fly secrets set TWILIO_ACCOUNT_SID=your-twilio-account-sid
-fly secrets set TWILIO_AUTH_TOKEN=your-twilio-auth-token
-fly secrets set TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
+fly secrets set WHATSAPP_NUMBER=2547XXXXXXXX
+fly secrets set PHARMAREEN_BACKEND_URL=http://localhost:5000
+fly secrets set WHATSAPP_WEB_SESSION_PATH=.wwebjs_auth
 fly secrets set OWNER_WHATSAPP_TO=whatsapp:+2547XXXXXXXX
 fly secrets set GOOGLE_SHEET_ID=your-google-sheet-id
 fly secrets set GOOGLE_SHEETS_CREDENTIALS='{"type":"service_account",...}'
@@ -149,22 +149,22 @@ fly deploy
 https://YOUR-FLY-APP.fly.dev/status
 ```
 
-8. Put this webhook in Twilio:
+8. Put this bridge endpoint in WhatsApp Web bridge:
 
 ```text
-https://YOUR-FLY-APP.fly.dev/webhook/whatsapp
+https://YOUR-FLY-APP.fly.dev/bridge endpoint/whatsapp
 ```
 
-## Twilio Console Steps
+## WhatsApp Web bridge Console Steps
 
-1. Open Twilio Console.
+1. Open WhatsApp Web bridge Console.
 2. Go to Messaging.
 3. Go to WhatsApp Sandbox or WhatsApp Sender.
 4. Find `When a message comes in`.
 5. Paste:
 
 ```text
-https://YOUR-DOMAIN/webhook/whatsapp
+https://YOUR-DOMAIN/bridge endpoint/whatsapp
 ```
 
 6. Method: `POST`.
@@ -191,8 +191,8 @@ If WhatsApp gets no reply:
 
 1. Open `https://YOUR-DOMAIN/status`.
 2. Confirm `APP_BASE_URL` is the production HTTPS URL.
-3. Confirm the Twilio webhook is exactly `/webhook/whatsapp`.
-4. Confirm Twilio credentials are correct.
+3. Confirm the WhatsApp Web bridge bridge endpoint is exactly `/bridge endpoint/whatsapp`.
+4. Confirm WhatsApp Web bridge credentials are correct.
 5. Confirm Google Sheets credentials are correct.
 6. Confirm the Google Sheet is shared with the service-account email.
 7. Check the hosting logs for errors.

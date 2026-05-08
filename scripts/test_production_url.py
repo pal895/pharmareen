@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import json
 import sys
 import time
-import urllib.parse
 import urllib.request
 
 
@@ -22,9 +22,9 @@ def main() -> int:
 
     checks = [
         ("GET /health", lambda: get_contains(base_url, "/health", '"status":"ok"')),
-        ("GET /status", lambda: get_contains(base_url, "/status", "Webhook URL for Twilio")),
-        ("GET /", lambda: get_contains(base_url, "/", "Run your pharmacy from WhatsApp")),
-        ("POST /webhook/whatsapp", lambda: post_twilio_sample(base_url)),
+        ("GET /status", lambda: get_contains(base_url, "/status", "WhatsApp Web bridge endpoint")),
+        ("GET /landing", lambda: get_contains(base_url, "/landing", "Run your pharmacy from WhatsApp")),
+        ("POST /bridge/whatsapp-web", lambda: post_bridge_sample(base_url)),
     ]
 
     failed = 0
@@ -54,25 +54,23 @@ def get_contains(base_url: str, path: str, expected: str) -> tuple[bool, str]:
     return compact_expected in compact_body, f"{response.status} {url}"
 
 
-def post_twilio_sample(base_url: str) -> tuple[bool, str]:
-    url = f"{base_url}/webhook/whatsapp"
-    data = urllib.parse.urlencode(
+def post_bridge_sample(base_url: str) -> tuple[bool, str]:
+    url = f"{base_url}/bridge/whatsapp-web"
+    data = json.dumps(
         {
-            "Body": "start",
-            "From": "whatsapp:+254700000000",
-            "To": "whatsapp:+14155238886",
-            "MessageSid": f"SMPRODTEST{int(time.time() * 1000)}",
-            "NumMedia": "0",
+            "message": "start",
+            "from": "254700000000@c.us",
+            "message_id": f"WEBPRODTEST{int(time.time() * 1000)}",
         }
     ).encode("utf-8")
     request = urllib.request.Request(
         url,
         data=data,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        headers={"Content-Type": "application/json"},
         method="POST",
     )
     response, body = open_with_retry(request)
-    ok = response.status == 200 and "<Response><Message>" in body
+    ok = response.status == 200 and "reply" in body and "Panadol" in body
     return ok, f"{response.status} {url}"
 
 

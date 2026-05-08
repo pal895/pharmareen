@@ -30,9 +30,9 @@ def test_env_example_has_required_production_keys():
     text = (ROOT / ".env.example").read_text(encoding="utf-8")
     required_keys = [
         "APP_BASE_URL=",
-        "TWILIO_ACCOUNT_SID=",
-        "TWILIO_AUTH_TOKEN=",
-        "TWILIO_WHATSAPP_NUMBER=",
+        "WHATSAPP_PROVIDER=",
+        "WHATSAPP_NUMBER=",
+        "PHARMAREEN_BACKEND_URL=",
         "OWNER_WHATSAPP_TO=",
         "GOOGLE_SHEET_ID=",
         "GOOGLE_SHEETS_CREDENTIALS=",

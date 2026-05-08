@@ -4,7 +4,6 @@ import json
 import sys
 import time
 import urllib.error
-import urllib.parse
 import urllib.request
 
 
@@ -25,9 +24,9 @@ def main() -> int:
 
     checks = [
         ("HEALTH", lambda: get_json_contains(base_url, "/health", '"status":"ok"')),
-        ("STATUS PAGE", lambda: get_text_contains(base_url, "/status", "Webhook URL for Twilio")),
+        ("STATUS PAGE", lambda: get_text_contains(base_url, "/status", "WhatsApp Web bridge endpoint")),
         ("DEBUG CONFIG", lambda: get_debug_config(base_url)),
-        ("WHATSAPP WEBHOOK DEBUG", lambda: post_debug_whatsapp(base_url)),
+        ("WHATSAPP WEB BRIDGE DEBUG", lambda: post_debug_whatsapp(base_url)),
         ("PDF REPORT DEBUG", lambda: get_report_debug(base_url)),
     ]
 
@@ -72,10 +71,8 @@ def get_debug_config(base_url: str) -> tuple[bool, str]:
         "app_base_url",
         "app_base_url_is_https",
         "app_base_url_has_placeholder",
-        "twilio_account_sid_present",
-        "twilio_auth_token_present",
-        "twilio_whatsapp_number_present",
-        "owner_whatsapp_to_present",
+        "whatsapp_provider",
+        "whatsapp_web_bridge_endpoint",
         "google_sheet_id_present",
         "google_credentials_present",
         "openai_api_key_present",
@@ -85,7 +82,7 @@ def get_debug_config(base_url: str) -> tuple[bool, str]:
     detail = (
         f"HTTP {status}; APP_BASE_URL={data.get('app_base_url')}; "
         f"https={data.get('app_base_url_is_https')}; "
-        f"twilio={data.get('twilio_account_sid_present') and data.get('twilio_auth_token_present') and data.get('twilio_whatsapp_number_present')}; "
+        f"provider={data.get('whatsapp_provider')}; "
         f"sheets={data.get('google_sheet_id_present') and data.get('google_credentials_present')}"
     )
     if missing:

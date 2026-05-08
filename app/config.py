@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     app_name: str = "Pharmacy Intelligence Assistant"
     pharmacy_name: str = "PharMareen"
-    app_version: str = "day-2"
+    app_version: str = "whatsapp-web-mvp"
     timezone: str = "Africa/Nairobi"
     public_base_url: str | None = Field(default=None, validation_alias=AliasChoices("APP_BASE_URL", "PUBLIC_BASE_URL"))
 
@@ -34,21 +34,18 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("GOOGLE_SHEETS_CREDENTIALS", "GOOGLE_SERVICE_ACCOUNT_JSON"),
     )
 
-    twilio_account_sid: str = ""
-    twilio_auth_token: str = ""
-    twilio_whatsapp_from: str = Field(
+    whatsapp_provider: str = "whatsapp_web"
+    whatsapp_number: str = Field(
         default="",
-        validation_alias=AliasChoices("TWILIO_WHATSAPP_NUMBER", "TWILIO_WHATSAPP_FROM"),
+        validation_alias=AliasChoices("WHATSAPP_NUMBER", "WHATSAPP_WEB_NUMBER"),
     )
     owner_whatsapp_to: str = ""
-    validate_twilio_signature: bool = True
 
     report_trigger_token: str | None = None
     report_storage_mode: str = "local"
     report_public_dir: str = "reports_pdf"
     support_contact: str = "Support contact coming soon"
 
-    whatsapp_provider: str = "meta"
     meta_verify_token: str = ""
     meta_access_token: str = ""
     meta_phone_number_id: str = ""

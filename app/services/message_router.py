@@ -205,7 +205,7 @@ def build_default_router() -> MessageRouter:
             timezone=settings.timezone,
             pharmacy_name=settings.pharmacy_name,
             app_base_url=settings.public_base_url,
-            whatsapp_number=settings.twilio_whatsapp_from,
+            whatsapp_number=settings.whatsapp_number,
         ),
         store=store,
         ai_service=ai_service,
