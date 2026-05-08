@@ -354,10 +354,12 @@ def whatsapp_sender_allowed(
     settings: Settings,
     is_group: bool = False,
     is_broadcast: bool = False,
+    allow_all_direct_chats_for_test: bool | None = None,
 ) -> tuple[bool, str]:
     if not is_direct_whatsapp_sender(sender, is_group=is_group, is_broadcast=is_broadcast):
         return False, "not_direct_chat"
-    if settings.allow_all_direct_chats_for_test:
+    effective_test_mode = settings.allow_all_direct_chats_for_test or bool(allow_all_direct_chats_for_test)
+    if effective_test_mode:
         return True, "test_mode_allowed_direct_chat"
     if whatsapp_jid_domain(sender) == "@lid":
         return False, "sender_direct_but_no_phone_digits"
@@ -604,11 +606,18 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
     media_mime_type = str(payload.get("media_mime_type") or payload.get("mimetype") or "").strip()
     is_group = bool(payload.get("is_group"))
     is_broadcast = bool(payload.get("is_broadcast"))
+    allow_all_direct_chats_for_test = bool(payload.get("allow_all_direct_chats_for_test"))
     if not message and not media_base64:
         raise HTTPException(status_code=400, detail="Message or media is required.")
 
     settings = get_settings()
-    allowed, reason = whatsapp_sender_allowed(sender, settings, is_group=is_group, is_broadcast=is_broadcast)
+    allowed, reason = whatsapp_sender_allowed(
+        sender,
+        settings,
+        is_group=is_group,
+        is_broadcast=is_broadcast,
+        allow_all_direct_chats_for_test=allow_all_direct_chats_for_test,
+    )
     if not allowed:
         logger.info(
             "WHATSAPP_WEB_IGNORED sender=%s jid_domain=%s reason=%s",

@@ -92,8 +92,14 @@ async function safeSendReply(sock, jid, text) {
   }
   const body = String(text || '').slice(0, 4000);
   if (!body) return false;
-  await sock.sendMessage(jid, { text: body });
-  return true;
+  try {
+    await sock.sendMessage(jid, { text: body });
+    console.log(`WHATSAPP_REPLY_SENT to ${maskSender(jid)} ${jidDebug(jid)} length=${body.length}`);
+    return true;
+  } catch (error) {
+    console.error(`WHATSAPP_SEND_FAILED to ${maskSender(jid)} ${jidDebug(jid)}: ${error.message}`);
+    return false;
+  }
 }
 
 function extractText(message) {
@@ -111,7 +117,8 @@ async function sendToBackend(text, sender, messageId) {
     from: sender,
     message_id: messageId || '',
     is_group: isGroupJid(sender),
-    is_broadcast: isBroadcastJid(sender)
+    is_broadcast: isBroadcastJid(sender),
+    allow_all_direct_chats_for_test: allowAllDirectChatsForTest
   }, { timeout: 60000 });
   return response.data || {};
 }
@@ -224,6 +231,9 @@ async function startBaileys(options = {}) {
         console.log(`Ignored WhatsApp message from ${maskSender(sender)} ${jidDebug(sender)} reason=${safety.reason}`);
         continue;
       }
+      if (safety.reason === 'test_mode_allowed_direct_chat') {
+        console.log(`TEST MODE ACCEPTED DIRECT CHAT from ${maskSender(sender)} ${jidDebug(sender)}`);
+      }
 
       const text = extractText(msg).trim();
       const messageId = msg.key.id || '';
@@ -236,6 +246,7 @@ async function startBaileys(options = {}) {
       console.log(`Incoming allowed direct message from ${maskSender(sender)} length=${text.length}`);
       try {
         const data = await sendToBackend(text, sender, messageId);
+        console.log(`BACKEND_REPLY_RECEIVED from ${maskSender(sender)} status=${data.status || 'unknown'} handler=${data.command_handler || 'unknown'} reason=${data.error_reason || 'none'}`);
         if (data.status === 'ignored') {
           console.log(`Backend ignored message from ${maskSender(sender)} reason=${data.error_reason || 'unknown'}`);
           continue;

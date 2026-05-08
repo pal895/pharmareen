@@ -189,6 +189,37 @@ def test_whatsapp_web_bridge_allows_lid_sender_in_test_mode(monkeypatch):
     assert data["command_handler"] == "help_start"
 
 
+def test_whatsapp_web_bridge_allows_lid_sender_when_payload_sets_test_mode(monkeypatch):
+    monkeypatch.setattr(main, "get_settings", lambda: Settings(_env_file=None))
+
+    with TestClient(main.app) as client:
+        payload = bridge_payload("help", sender="894365771@lid")
+        payload["allow_all_direct_chats_for_test"] = True
+        response = client.post("/bridge/whatsapp-web", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "Panadol" in data["reply"]
+    assert data["command_handler"] == "help_start"
+
+
+def test_whatsapp_web_bridge_payload_test_mode_still_blocks_group(monkeypatch):
+    monkeypatch.setattr(main, "get_settings", lambda: Settings(_env_file=None))
+
+    with TestClient(main.app) as client:
+        payload = bridge_payload("help", sender="120363000000000000@g.us")
+        payload["allow_all_direct_chats_for_test"] = True
+        payload["is_group"] = True
+        response = client.post("/bridge/whatsapp-web", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ignored"
+    assert data["reply"] == ""
+    assert data["error_reason"] == "not_direct_chat"
+
+
 def test_demo_mode_still_requires_allowlist(monkeypatch):
     main.get_sheet_store.cache_clear()
     main.get_intake_service.cache_clear()
@@ -256,7 +287,12 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "@s.whatsapp.net" in source
     assert "domain === '@lid'" in source
     assert "ALLOW_ALL_DIRECT_CHATS_FOR_TEST" in source
+    assert "allow_all_direct_chats_for_test" in source
     assert "jid_domain=" in source
+    assert "TEST MODE ACCEPTED DIRECT CHAT" in source
+    assert "BACKEND_REPLY_RECEIVED" in source
+    assert "WHATSAPP_REPLY_SENT" in source
+    assert "WHATSAPP_SEND_FAILED" in source
     assert "SAFE MODE: no allowed numbers configured" in source
     assert "GROUP REPLIES: DISABLED" in source
     assert "UNKNOWN NUMBER REPLIES: DISABLED" in source
@@ -273,6 +309,7 @@ def test_windows_local_bridge_helper_requires_backend_and_allowlist():
 
     assert "PHARMAREEN_BACKEND_URL is missing" in script
     assert "ALLOWED_WHATSAPP_NUMBERS is missing" in script
+    assert "TEST MODE ACTIVE" in script
     assert "GROUP REPLIES: DISABLED" in script
     assert "UNKNOWN NUMBER REPLIES: DISABLED" in script
     assert "node baileys-bridge.js" in script

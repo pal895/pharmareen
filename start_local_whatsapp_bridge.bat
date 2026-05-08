@@ -41,7 +41,9 @@ if "%PHARMAREEN_BACKEND_URL%"=="" (
   exit /b 1
 )
 
-if "%ALLOWED_WHATSAPP_NUMBERS%"=="" (
+if /I "%ALLOW_ALL_DIRECT_CHATS_FOR_TEST%"=="true" (
+  echo TEST MODE ACTIVE: allowing direct chats after group/broadcast/status/newsletter/channel checks.
+) else if "%ALLOWED_WHATSAPP_NUMBERS%"=="" (
   echo ALLOWED_WHATSAPP_NUMBERS is missing.
   echo For safety, the bridge will not start without an allowlist.
   echo Example:
@@ -56,7 +58,11 @@ if "%AUTO_RESET_BAILEYS_ON_LOGOUT%"=="" set AUTO_RESET_BAILEYS_ON_LOGOUT=true
 
 echo Backend:
 echo %PHARMAREEN_BACKEND_URL%
-echo Allowlist configured.
+if /I "%ALLOW_ALL_DIRECT_CHATS_FOR_TEST%"=="true" (
+  echo Test mode active.
+) else (
+  echo Allowlist configured.
+)
 echo Session path:
 echo %BAILEYS_SESSION_PATH%
 echo GROUP REPLIES: DISABLED
