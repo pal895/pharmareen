@@ -528,6 +528,37 @@ async def intake_test(request: Request) -> dict[str, str]:
     }
 
 
+
+
+@app.post("/bridge/whatsapp-web")
+async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Send JSON like: {\"message\":\"Panadol 2\", \"from\":\"254700000000\"}") from None
+
+    message = str(payload.get("message") or payload.get("body") or "").strip()
+    sender = str(payload.get("from") or payload.get("sender") or "whatsapp-web").strip()
+    message_id = str(payload.get("message_id") or payload.get("id") or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message is required.")
+
+    form_values = {
+        "Body": message,
+        "From": sender,
+        "MessageSid": message_id,
+        "NumMedia": "0",
+    }
+    result = await process_twilio_form_values(form_values)
+    log_webhook_request(sender, "whatsapp_web", result.success, result.error_reason)
+    return {
+        "status": "ok" if result.success else "error",
+        "reply": result.reply,
+        "media_url": result.media_url,
+        "message_type": result.message_type,
+        "command_handler": result.command_handler,
+        "error_reason": result.error_reason,
+    }
 @app.post("/webhook/whatsapp")
 @app.post("/webhooks/twilio/whatsapp")
 async def twilio_whatsapp_webhook(request: Request) -> Response:
