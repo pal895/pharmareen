@@ -7,10 +7,11 @@
     "wa:bridge": "node baileys-bridge.js",
     "wa:dev": "node baileys-bridge.js",
     "wa:baileys": "node baileys-bridge.js",
+    "wa:qr-debug": "node scripts/baileys_qr_debug.js",
     "wa:puppeteer": "node whatsapp-web-bridge.js"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.7.12",
+    "@whiskeysockets/baileys": "7.0.0-rc.10",
     "axios": "^1.7.9",
     "dotenv": "^16.4.7",
     "pino": "^9.5.0",

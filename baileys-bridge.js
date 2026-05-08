@@ -3,10 +3,13 @@ const { DisconnectReason, fetchLatestBaileysVersion, useMultiFileAuthState } = r
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
 const P = require('pino');
+const fs = require('fs');
 require('dotenv').config();
 
 const backendUrl = (process.env.PHARMAREEN_BACKEND_URL || 'http://localhost:5000').replace(/\/$/, '');
 const sessionPath = process.env.BAILEYS_SESSION_PATH || './.baileys_auth';
+const baileysLogLevel = process.env.BAILEYS_LOG_LEVEL || 'info';
+const autoResetOnLoggedOut = String(process.env.AUTO_RESET_BAILEYS_ON_LOGOUT || 'true').toLowerCase() !== 'false';
 const allowedNumbers = parseAllowedNumbers(process.env.ALLOWED_WHATSAPP_NUMBERS || '');
 
 function phoneDigits(value) {
@@ -91,9 +94,49 @@ async function sendToBackend(text, sender, messageId) {
   return response.data || {};
 }
 
-async function startBaileys() {
+function describeDisconnect(lastDisconnect) {
+  const error = lastDisconnect && lastDisconnect.error ? lastDisconnect.error : undefined;
+  const output = error && error.output ? error.output : undefined;
+  return {
+    errorMessage: error && error.message ? error.message : '',
+    statusCode: output && output.statusCode ? output.statusCode : undefined,
+    boomStatusCode: output && output.statusCode ? output.statusCode : undefined,
+    boomPayloadStatusCode: output && output.payload ? output.payload.statusCode : undefined,
+    boomPayloadError: output && output.payload ? output.payload.error : undefined,
+    boomPayloadMessage: output && output.payload ? output.payload.message : undefined
+  };
+}
+
+function logConnectionUpdate(update) {
+  const info = describeDisconnect(update.lastDisconnect);
+  console.log(
+    'BAILEYS_CONNECTION_UPDATE',
+    JSON.stringify({
+      connection: update.connection || '',
+      hasQr: Boolean(update.qr),
+      receivedPendingNotifications: Boolean(update.receivedPendingNotifications),
+      isNewLogin: Boolean(update.isNewLogin),
+      errorMessage: info.errorMessage,
+      statusCode: info.statusCode,
+      boomStatusCode: info.boomStatusCode,
+      boomPayloadStatusCode: info.boomPayloadStatusCode,
+      boomPayloadError: info.boomPayloadError,
+      boomPayloadMessage: info.boomPayloadMessage
+    })
+  );
+}
+
+function clearBaileysSession(reason) {
+  console.log(`Clearing Baileys session at ${sessionPath}. Reason: ${reason}`);
+  fs.rmSync(sessionPath, { recursive: true, force: true });
+}
+
+async function startBaileys(options = {}) {
+  const sessionResetAttempted = Boolean(options.sessionResetAttempted);
   console.log('PharMareen Baileys bridge starting...');
   console.log(`Backend: ${backendUrl}`);
+  console.log(`Baileys session path: ${sessionPath}`);
+  console.log(`Baileys log level: ${baileysLogLevel}`);
   if (allowedNumbers.size === 0) {
     console.log('SAFE MODE: no allowed numbers configured');
   } else {
@@ -107,18 +150,23 @@ async function startBaileys() {
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
   const { version } = await fetchLatestBaileysVersion();
+  console.log(`Baileys version: ${version.join('.')}`);
   const sock = makeWASocket({
     auth: state,
     version,
-    logger: P({ level: 'silent' }),
+    logger: P({ level: baileysLogLevel }),
     printQRInTerminal: false,
-    browser: ['PharMareen', 'Chrome', '1.0']
+    browser: ['PharMareen', 'Chrome', '1.0'],
+    markOnlineOnConnect: false,
+    syncFullHistory: false,
+    connectTimeoutMs: 60000
   });
 
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect, qr } = update;
+    logConnectionUpdate(update);
     if (qr) {
       console.log('\nSCAN THIS QR WITH WHATSAPP:');
       console.log('WhatsApp > Linked devices > Link a device\n');
@@ -132,8 +180,13 @@ async function startBaileys() {
         ? lastDisconnect.error.output.statusCode
         : undefined;
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-      console.log(`Baileys disconnected. Reconnect: ${shouldReconnect}`);
-      if (shouldReconnect) startBaileys().catch((error) => console.error('Baileys reconnect failed:', error.message));
+      console.log(`Baileys disconnected. statusCode=${statusCode || 'unknown'} reconnect=${shouldReconnect}`);
+      if (!shouldReconnect && autoResetOnLoggedOut && !sessionResetAttempted) {
+        clearBaileysSession('logged out or invalid stale session');
+        startBaileys({ sessionResetAttempted: true }).catch((error) => console.error('Baileys reconnect after reset failed:', error.message));
+        return;
+      }
+      if (shouldReconnect) startBaileys({ sessionResetAttempted }).catch((error) => console.error('Baileys reconnect failed:', error.message));
     }
   });
 

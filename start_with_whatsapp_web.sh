@@ -4,6 +4,17 @@ set -euo pipefail
 PORT="${PORT:-5000}"
 export PHARMAREEN_BACKEND_URL="${PHARMAREEN_BACKEND_URL:-http://localhost:$PORT}"
 export BAILEYS_SESSION_PATH="${BAILEYS_SESSION_PATH:-./.baileys_auth}"
+export AUTO_RESET_BAILEYS_ON_LOGOUT="${AUTO_RESET_BAILEYS_ON_LOGOUT:-true}"
+
+echo "Baileys session path: $BAILEYS_SESSION_PATH"
+if [ "${RESET_BAILEYS_SESSION:-false}" = "true" ]; then
+  echo "RESET_BAILEYS_SESSION=true, clearing $BAILEYS_SESSION_PATH"
+  rm -rf "$BAILEYS_SESSION_PATH"
+fi
+if [ "${RESET_LEGACY_BAILEYS_SESSION:-false}" = "true" ]; then
+  echo "RESET_LEGACY_BAILEYS_SESSION=true, clearing legacy ./auth_info_baileys"
+  rm -rf ./auth_info_baileys
+fi
 
 echo "Starting PharMareen FastAPI backend on port $PORT..."
 ./start.sh > server.log 2>&1 &
@@ -41,6 +52,7 @@ fi
 
 echo "Node: $(node -v)"
 echo "npm: $(npm -v)"
+echo "Baileys package version: $(node -e \"console.log(require('@whiskeysockets/baileys/package.json').version)\" 2>/dev/null || echo 'not installed yet')"
 
 if [ -z "${ALLOWED_WHATSAPP_NUMBERS:-}" ]; then
   echo "SAFE MODE: no allowed numbers configured"
@@ -59,6 +71,9 @@ if [ ! -d node_modules ]; then
     exit 0
   fi
 fi
+
+echo "Baileys package version: $(node -e \"console.log(require('@whiskeysockets/baileys/package.json').version)\")"
+echo "Baileys session path in use: $BAILEYS_SESSION_PATH"
 
 echo "Starting Baileys WhatsApp bridge first."
 echo "SCAN THE QR CODE BELOW WITH WHATSAPP: Linked devices > Link a device"
