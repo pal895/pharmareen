@@ -32,6 +32,7 @@ from app.sheets import (
     TRANSACTIONS,
     TRANSACTION_HEADERS,
     prepare_google_credentials_file,
+    validate_service_account_json,
 )
 
 
@@ -159,7 +160,13 @@ STARTER_INVENTORY = [
 
 logger = logging.getLogger("uvicorn.error")
 SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets"
+DRIVE_SCOPE = "https://www.googleapis.com/auth/drive"
 DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file"
+SCOPES = [
+    SHEETS_SCOPE,
+    DRIVE_SCOPE,
+    DRIVE_FILE_SCOPE,
+]
 
 
 @dataclass(frozen=True)
@@ -214,11 +221,14 @@ class PharmacyOnboardingService:
         logger.info(
             "Phase 3 Google diagnostics: google credentials loaded: %s; "
             "admin sheet id loaded: %s; google client initialized: %s; "
-            "google-api-python-client installed: %s",
+            "google-api-python-client installed: %s; "
+            "scopes include spreadsheets: %s; scopes include drive: %s",
             "yes" if diagnostics["google_credentials_loaded"] else "no",
             "yes" if diagnostics["admin_sheet_id_loaded"] else "no",
             "yes" if diagnostics["google_client_initialized"] else "no",
             "yes" if diagnostics["google_api_client_installed"] else "no",
+            "yes" if diagnostics["credentials_scopes_include_spreadsheets"] else "no",
+            "yes" if diagnostics["credentials_scopes_include_drive"] else "no",
         )
         logger.info(
             "Phase 3 live sheet creation attempted: %s",
@@ -344,6 +354,13 @@ class PharmacyOnboardingService:
     def _create_live_spreadsheet(self, title: str):
         credentials = self._google_credentials()
         client = gspread.authorize(credentials)
+        logger.info(
+            "Phase 3 live sheet creation using scoped credentials: "
+            "spreadsheets=%s; drive=%s; drive.file=%s",
+            "yes" if SHEETS_SCOPE in (credentials.scopes or []) else "no",
+            "yes" if DRIVE_SCOPE in (credentials.scopes or []) else "no",
+            "yes" if DRIVE_FILE_SCOPE in (credentials.scopes or []) else "no",
+        )
 
         if build_google_service is not None:
             service = build_google_service(
@@ -371,20 +388,41 @@ class PharmacyOnboardingService:
         return gspread.authorize(self._google_credentials())
 
     def _google_credentials(self):
+        raw_credentials = (os.environ.get("GOOGLE_SHEETS_CREDENTIALS") or "").strip()
+        configured_value = str(self.settings.google_service_account_json or "").strip()
+
+        if raw_credentials.startswith("{"):
+            info = validate_service_account_json(raw_credentials)
+            prepare_google_credentials_file(self.settings)
+            return Credentials.from_service_account_info(info, scopes=SCOPES)
+
+        if configured_value.startswith("{"):
+            info = validate_service_account_json(configured_value)
+            prepare_google_credentials_file(self.settings)
+            return Credentials.from_service_account_info(info, scopes=SCOPES)
+
         credential_path = prepare_google_credentials_file(self.settings)
         return Credentials.from_service_account_file(
             str(credential_path),
-            scopes=[
-                SHEETS_SCOPE,
-                DRIVE_FILE_SCOPE,
-            ],
+            scopes=SCOPES,
         )
 
     def google_diagnostics(self) -> dict[str, bool]:
         client_initialized = False
+        scopes_include_spreadsheets = False
+        scopes_include_drive = False
+        scopes_include_drive_file = False
         if has_google_credentials(self.settings):
             try:
-                self._gspread_client()
+                credentials = self._google_credentials()
+                scopes = set(credentials.scopes or [])
+                scopes_include_spreadsheets = SHEETS_SCOPE in scopes
+                scopes_include_drive = DRIVE_SCOPE in scopes
+                scopes_include_drive_file = DRIVE_FILE_SCOPE in scopes
+                gspread.authorize(credentials)
+                if build_google_service is not None:
+                    build_google_service("sheets", "v4", credentials=credentials, cache_discovery=False)
+                    build_google_service("drive", "v3", credentials=credentials, cache_discovery=False)
                 client_initialized = True
             except Exception as exc:
                 logger.warning("Google client initialization failed: %s: %s", type(exc).__name__, exc)
@@ -394,6 +432,9 @@ class PharmacyOnboardingService:
             "admin_sheet_id_loaded": bool(admin_sheet_id(self.settings)),
             "google_client_initialized": client_initialized,
             "google_api_client_installed": build_google_service is not None,
+            "credentials_scopes_include_spreadsheets": scopes_include_spreadsheets,
+            "credentials_scopes_include_drive": scopes_include_drive,
+            "credentials_scopes_include_drive_file": scopes_include_drive_file,
         }
 
 
