@@ -220,3 +220,20 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
 
     send_lines = [line.strip() for line in source.splitlines() if "sock.sendMessage" in line]
     assert send_lines == ["await sock.sendMessage(jid, { text: body });"]
+
+
+def test_windows_local_bridge_helper_requires_backend_and_allowlist():
+    root = Path(__file__).resolve().parents[1]
+    script = (root / "start_local_whatsapp_bridge.bat").read_text()
+    guide = (root / "WINDOWS_WHATSAPP_BRIDGE.md").read_text()
+    wrapper = (root / "local_whatsapp_bridge.js").read_text()
+
+    assert "PHARMAREEN_BACKEND_URL is missing" in script
+    assert "ALLOWED_WHATSAPP_NUMBERS is missing" in script
+    assert "GROUP REPLIES: DISABLED" in script
+    assert "UNKNOWN NUMBER REPLIES: DISABLED" in script
+    assert "node baileys-bridge.js" in script
+    assert "https://nodejs.org/en/download" in guide
+    assert "set PHARMAREEN_BACKEND_URL=https://pharmareen-1--pal895.replit.app" in guide
+    assert "set ALLOWED_WHATSAPP_NUMBERS=254757637709" in guide
+    assert "require('./baileys-bridge')" in wrapper

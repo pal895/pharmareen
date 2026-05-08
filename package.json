@@ -7,6 +7,7 @@
     "wa:bridge": "node baileys-bridge.js",
     "wa:dev": "node baileys-bridge.js",
     "wa:baileys": "node baileys-bridge.js",
+    "wa:local": "node local_whatsapp_bridge.js",
     "wa:qr-debug": "node scripts/baileys_qr_debug.js",
     "wa:puppeteer": "node whatsapp-web-bridge.js"
   },
