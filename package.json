@@ -4,9 +4,10 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "wa:bridge": "node whatsapp-web-bridge.js",
-    "wa:dev": "node whatsapp-web-bridge.js",
-    "wa:baileys": "node baileys-bridge.js"
+    "wa:bridge": "node baileys-bridge.js",
+    "wa:dev": "node baileys-bridge.js",
+    "wa:baileys": "node baileys-bridge.js",
+    "wa:puppeteer": "node whatsapp-web-bridge.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.12",
