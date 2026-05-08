@@ -19,7 +19,10 @@ function parseAllowedNumbers(raw) {
 
 function maskSender(value) {
   const digits = phoneDigits(value);
-  if (digits) return `***${digits.slice(-4)}`;
+  if (digits) {
+    if (digits.length <= 6) return `****${digits.slice(-2)}`;
+    return `${digits.slice(0, 4)}******${digits.slice(-2)}`;
+  }
   const text = String(value || 'unknown');
   return text.length <= 4 ? 'hidden' : `***${text.slice(-4)}`;
 }
@@ -30,20 +33,42 @@ function isGroupJid(jid) {
 
 function isBroadcastJid(jid) {
   const text = String(jid || '').toLowerCase();
-  return text === 'status@broadcast' || text.endsWith('@broadcast') || text.endsWith('@newsletter');
+  return (
+    text === 'status@broadcast' ||
+    text.endsWith('@broadcast') ||
+    text.endsWith('@newsletter') ||
+    text.includes('newsletter') ||
+    text.includes('channel')
+  );
+}
+
+function isDirectUserJid(jid) {
+  return String(jid || '').toLowerCase().endsWith('@s.whatsapp.net');
 }
 
 function isAllowedDirectChat(jid) {
-  if (!jid || isGroupJid(jid) || isBroadcastJid(jid)) {
+  if (!jid || isGroupJid(jid) || isBroadcastJid(jid) || !isDirectUserJid(jid)) {
     return { allowed: false, reason: 'not_direct_chat' };
   }
   if (allowedNumbers.size === 0) {
-    return { allowed: true, reason: 'direct_chat_no_allowlist' };
+    return { allowed: false, reason: 'safe_mode_no_allowlist' };
   }
   const digits = phoneDigits(jid);
   return allowedNumbers.has(digits)
     ? { allowed: true, reason: 'allowed_number' }
     : { allowed: false, reason: 'sender_not_allowed' };
+}
+
+async function safeSendReply(sock, jid, text) {
+  const safety = isAllowedDirectChat(jid);
+  if (!safety.allowed) {
+    console.log(`Reply blocked to ${maskSender(jid)} reason=${safety.reason}`);
+    return false;
+  }
+  const body = String(text || '').slice(0, 4000);
+  if (!body) return false;
+  await sock.sendMessage(jid, { text: body });
+  return true;
 }
 
 function extractText(message) {
@@ -70,11 +95,14 @@ async function startBaileys() {
   console.log('PharMareen Baileys bridge starting...');
   console.log(`Backend: ${backendUrl}`);
   if (allowedNumbers.size === 0) {
-    console.log('SAFETY WARNING: ALLOWED_WHATSAPP_NUMBERS is empty. Direct 1-to-1 chats are allowed for demo mode.');
+    console.log('SAFE MODE: no allowed numbers configured');
   } else {
     console.log(`Safety allowlist active: ${allowedNumbers.size} number(s).`);
   }
-  console.log('Groups, broadcasts, and status messages are ignored.');
+  console.log(`DEMO_MODE: ${process.env.DEMO_MODE || 'false'}`);
+  console.log('GROUP REPLIES: DISABLED');
+  console.log('UNKNOWN NUMBER REPLIES: DISABLED');
+  console.log('Groups, broadcasts, newsletters, channels, and status messages are ignored.');
   console.log('A QR code will appear below if login is needed.');
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
@@ -123,7 +151,7 @@ async function startBaileys() {
       const messageId = msg.key.id || '';
       if (!text) {
         console.log(`Allowed direct message from ${maskSender(sender)} had no text.`);
-        await sock.sendMessage(sender, { text: 'Please send text for now, like: Panadol 2' });
+        await safeSendReply(sock, sender, 'Please send text for now, like: Panadol 2');
         continue;
       }
 
@@ -135,14 +163,14 @@ async function startBaileys() {
           continue;
         }
         const reply = data.reply ? String(data.reply) : 'I received it, but no reply was generated.';
-        await sock.sendMessage(sender, { text: reply.slice(0, 4000) });
+        await safeSendReply(sock, sender, reply);
         if (data.media_url) {
-          await sock.sendMessage(sender, { text: `Report file: ${data.media_url}` });
+          await safeSendReply(sock, sender, `Report file: ${data.media_url}`);
         }
       } catch (error) {
         const status = error.response && error.response.status ? error.response.status : 'no-status';
         console.error(`Backend bridge error for ${maskSender(sender)} status=${status}: ${error.message}`);
-        await sock.sendMessage(sender, { text: 'PharMareen is running, but I could not process that message right now.' });
+        await safeSendReply(sock, sender, 'PharMareen is running, but I could not process that message right now.');
       }
     }
   });

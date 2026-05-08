@@ -42,6 +42,15 @@ fi
 echo "Node: $(node -v)"
 echo "npm: $(npm -v)"
 
+if [ -z "${ALLOWED_WHATSAPP_NUMBERS:-}" ]; then
+  echo "SAFE MODE: no allowed numbers configured"
+else
+  echo "ALLOWED_WHATSAPP_NUMBERS: configured"
+fi
+echo "DEMO_MODE: ${DEMO_MODE:-false}"
+echo "GROUP REPLIES: DISABLED"
+echo "UNKNOWN NUMBER REPLIES: DISABLED"
+
 if [ ! -d node_modules ]; then
   echo "Installing WhatsApp bridge packages..."
   if ! npm install; then

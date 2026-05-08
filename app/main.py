@@ -336,8 +336,10 @@ def is_direct_whatsapp_sender(sender: str, is_group: bool = False, is_broadcast:
         return False
     if not text:
         return False
-    blocked_markers = ("@g.us", "status@broadcast", "@broadcast", "@newsletter")
-    return not any(marker in text for marker in blocked_markers)
+    blocked_markers = ("@g.us", "status@broadcast", "@broadcast", "@newsletter", "newsletter", "channel")
+    if any(marker in text for marker in blocked_markers):
+        return False
+    return text.endswith("@s.whatsapp.net")
 
 
 def whatsapp_sender_allowed(
@@ -350,7 +352,7 @@ def whatsapp_sender_allowed(
         return False, "not_direct_chat"
     allowed_numbers = parse_allowed_whatsapp_numbers(settings)
     if not allowed_numbers:
-        return True, "allowed_direct_chat_no_allowlist"
+        return False, "safe_mode_no_allowlist"
     digits = phone_digits(sender)
     if digits in allowed_numbers:
         return True, "allowed_number"
@@ -1079,7 +1081,9 @@ def log_webhook_request(sender: str, message_type: str, success: bool, error_rea
 def mask_phone(value: str) -> str:
     digits = phone_digits(value)
     if digits:
-        return f"***{digits[-4:]}"
+        if len(digits) <= 6:
+            return f"****{digits[-2:]}"
+        return f"{digits[:4]}******{digits[-2:]}"
     text = str(value or "").strip()
     if len(text) <= 4:
         return "hidden"
