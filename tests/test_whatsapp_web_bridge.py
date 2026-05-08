@@ -280,7 +280,7 @@ def test_blocked_sender_logs_masked_phone_without_message_body(monkeypatch, capl
 
 
 def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
-    source = (Path(__file__).resolve().parents[1] / "baileys-bridge.js").read_text()
+    source = (Path(__file__).resolve().parents[1] / "baileys-bridge.js").read_text(encoding="utf-8-sig")
 
     assert "async function safeSendReply" in source
     assert "safe_mode_no_allowlist" in source
@@ -291,14 +291,25 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "jid_domain=" in source
     assert "TEST MODE ACCEPTED DIRECT CHAT" in source
     assert "BACKEND_REPLY_RECEIVED" in source
+    assert "BACKEND_REQUEST_URL" in source
+    assert "BACKEND_HTTP_STATUS" in source
+    assert "BACKEND_JSON_RESPONSE" in source
+    assert "INCOMING_SENDER_JID" in source
+    assert "INCOMING_MESSAGE_TEXT" in source
+    assert "EXTRACTED_REPLY_TEXT" in source
+    assert "WHATSAPP_SEND_TARGET" in source
     assert "WHATSAPP_REPLY_SENT" in source
     assert "WHATSAPP_SEND_FAILED" in source
+    assert "message_id=" in source
+    assert "extractBackendReply" in source
+    assert "whatsapp_reply" in source
+    assert "✅ PharMareen received your message." in source
     assert "SAFE MODE: no allowed numbers configured" in source
     assert "GROUP REPLIES: DISABLED" in source
     assert "UNKNOWN NUMBER REPLIES: DISABLED" in source
 
     send_lines = [line.strip() for line in source.splitlines() if "sock.sendMessage" in line]
-    assert send_lines == ["await sock.sendMessage(jid, { text: body });"]
+    assert send_lines == ["const result = await sock.sendMessage(jid, { text: body });"]
 
 
 def test_windows_local_bridge_helper_requires_backend_and_allowlist():

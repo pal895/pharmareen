@@ -92,12 +92,14 @@ async function safeSendReply(sock, jid, text) {
   }
   const body = String(text || '').slice(0, 4000);
   if (!body) return false;
+  console.log(`WHATSAPP_SEND_TARGET jid=${maskSender(jid)} ${jidDebug(jid)} length=${body.length}`);
   try {
-    await sock.sendMessage(jid, { text: body });
-    console.log(`WHATSAPP_REPLY_SENT to ${maskSender(jid)} ${jidDebug(jid)} length=${body.length}`);
+    const result = await sock.sendMessage(jid, { text: body });
+    const messageId = result && result.key ? result.key.id : '';
+    console.log(`WHATSAPP_REPLY_SENT to ${maskSender(jid)} ${jidDebug(jid)} message_id=${messageId || 'unknown'} length=${body.length}`);
     return true;
   } catch (error) {
-    console.error(`WHATSAPP_SEND_FAILED to ${maskSender(jid)} ${jidDebug(jid)}: ${error.message}`);
+    console.error(`WHATSAPP_SEND_FAILED to ${maskSender(jid)} ${jidDebug(jid)}: ${error.stack || error.message}`);
     return false;
   }
 }
@@ -112,15 +114,32 @@ function extractText(message) {
 }
 
 async function sendToBackend(text, sender, messageId) {
-  const response = await axios.post(`${backendUrl}/bridge/whatsapp-web`, {
+  const url = `${backendUrl}/bridge/whatsapp-web`;
+  const payload = {
     message: text,
     from: sender,
     message_id: messageId || '',
     is_group: isGroupJid(sender),
     is_broadcast: isBroadcastJid(sender),
     allow_all_direct_chats_for_test: allowAllDirectChatsForTest
-  }, { timeout: 60000 });
+  };
+  console.log(`BACKEND_REQUEST_URL ${url}`);
+  console.log(`BACKEND_REQUEST_PAYLOAD sender=${maskSender(sender)} ${jidDebug(sender)} message_length=${String(text || '').length} test_mode=${allowAllDirectChatsForTest}`);
+  const response = await axios.post(url, payload, { timeout: 60000 });
+  console.log(`BACKEND_HTTP_STATUS ${response.status}`);
+  console.log(`BACKEND_JSON_RESPONSE ${JSON.stringify(response.data || {})}`);
   return response.data || {};
+}
+
+function extractBackendReply(data) {
+  const keys = ['reply', 'message', 'text', 'response', 'whatsapp_reply'];
+  for (const key of keys) {
+    const value = data && data[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+  return '✅ PharMareen received your message.';
 }
 
 function describeDisconnect(lastDisconnect) {
@@ -237,6 +256,7 @@ async function startBaileys(options = {}) {
 
       const text = extractText(msg).trim();
       const messageId = msg.key.id || '';
+      console.log(`INCOMING_SENDER_JID ${maskSender(sender)} ${jidDebug(sender)}`);
       if (!text) {
         console.log(`Allowed direct message from ${maskSender(sender)} had no text.`);
         await safeSendReply(sock, sender, 'Please send text for now, like: Panadol 2');
@@ -244,6 +264,7 @@ async function startBaileys(options = {}) {
       }
 
       console.log(`Incoming allowed direct message from ${maskSender(sender)} length=${text.length}`);
+      console.log(`INCOMING_MESSAGE_TEXT ${text}`);
       try {
         const data = await sendToBackend(text, sender, messageId);
         console.log(`BACKEND_REPLY_RECEIVED from ${maskSender(sender)} status=${data.status || 'unknown'} handler=${data.command_handler || 'unknown'} reason=${data.error_reason || 'none'}`);
@@ -251,7 +272,8 @@ async function startBaileys(options = {}) {
           console.log(`Backend ignored message from ${maskSender(sender)} reason=${data.error_reason || 'unknown'}`);
           continue;
         }
-        const reply = data.reply ? String(data.reply) : 'I received it, but no reply was generated.';
+        const reply = extractBackendReply(data);
+        console.log(`EXTRACTED_REPLY_TEXT ${reply}`);
         await safeSendReply(sock, sender, reply);
         if (data.media_url) {
           await safeSendReply(sock, sender, `Report file: ${data.media_url}`);
