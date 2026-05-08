@@ -337,6 +337,14 @@ def whatsapp_jid_domain(value: str) -> str:
     return f"@{text.rsplit('@', 1)[1].split(':', 1)[0]}"
 
 
+def boolish(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
 def is_direct_whatsapp_sender(sender: str, is_group: bool = False, is_broadcast: bool = False) -> bool:
     text = str(sender or "").strip().lower()
     if is_group or is_broadcast:
@@ -358,7 +366,7 @@ def whatsapp_sender_allowed(
 ) -> tuple[bool, str]:
     if not is_direct_whatsapp_sender(sender, is_group=is_group, is_broadcast=is_broadcast):
         return False, "not_direct_chat"
-    effective_test_mode = settings.allow_all_direct_chats_for_test or bool(allow_all_direct_chats_for_test)
+    effective_test_mode = settings.allow_all_direct_chats_for_test or boolish(allow_all_direct_chats_for_test)
     if effective_test_mode:
         return True, "test_mode_allowed_direct_chat"
     if whatsapp_jid_domain(sender) == "@lid":
@@ -606,7 +614,10 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
     media_mime_type = str(payload.get("media_mime_type") or payload.get("mimetype") or "").strip()
     is_group = bool(payload.get("is_group"))
     is_broadcast = bool(payload.get("is_broadcast"))
-    allow_all_direct_chats_for_test = bool(payload.get("allow_all_direct_chats_for_test"))
+    allow_all_direct_chats_for_test = boolish(
+        payload.get("allow_all_direct_chats_for_test")
+        or payload.get("ALLOW_ALL_DIRECT_CHATS_FOR_TEST")
+    )
     if not message and not media_base64:
         raise HTTPException(status_code=400, detail="Message or media is required.")
 
@@ -634,6 +645,9 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
             "error_reason": reason,
         }
 
+    if allow_all_direct_chats_for_test and whatsapp_jid_domain(sender) == "@lid":
+        logger.info("BACKEND_TEST_MODE_ACCEPTED_LID sender=%s jid_domain=%s", mask_phone(sender), whatsapp_jid_domain(sender))
+
     logger.info(
         "WHATSAPP_WEB_ACCEPTED sender=%s message_length=%s has_media=%s",
         mask_phone(sender),
@@ -649,6 +663,7 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
         media_mime_type=media_mime_type,
     )
     log_webhook_request(sender, "whatsapp_web", result.success, result.error_reason)
+    logger.info("BACKEND_REPLY_TEXT sender=%s reply=%s", mask_phone(sender), result.reply)
     return {
         "status": "ok" if result.success else "error",
         "reply": result.reply,

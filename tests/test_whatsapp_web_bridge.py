@@ -204,6 +204,21 @@ def test_whatsapp_web_bridge_allows_lid_sender_when_payload_sets_test_mode(monke
     assert data["command_handler"] == "help_start"
 
 
+def test_whatsapp_web_bridge_allows_lid_sender_when_payload_test_mode_is_string(monkeypatch):
+    monkeypatch.setattr(main, "get_settings", lambda: Settings(_env_file=None))
+
+    with TestClient(main.app) as client:
+        payload = bridge_payload("help", sender="894365771@lid")
+        payload["allow_all_direct_chats_for_test"] = "true"
+        response = client.post("/bridge/whatsapp-web", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["reply"]
+    assert data["command_handler"] == "help_start"
+
+
 def test_whatsapp_web_bridge_payload_test_mode_still_blocks_group(monkeypatch):
     monkeypatch.setattr(main, "get_settings", lambda: Settings(_env_file=None))
 
@@ -281,6 +296,7 @@ def test_blocked_sender_logs_masked_phone_without_message_body(monkeypatch, capl
 
 def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     source = (Path(__file__).resolve().parents[1] / "baileys-bridge.js").read_text(encoding="utf-8-sig")
+    backend_source = (Path(__file__).resolve().parents[1] / "app" / "main.py").read_text(encoding="utf-8")
 
     assert "async function safeSendReply" in source
     assert "safe_mode_no_allowlist" in source
@@ -304,6 +320,9 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "extractBackendReply" in source
     assert "whatsapp_reply" in source
     assert "✅ PharMareen received your message." in source
+    assert "BACKEND_TEST_MODE_ACCEPTED_LID" in backend_source
+    assert "BACKEND_REPLY_TEXT" in backend_source
+    assert "boolish" in backend_source
     assert "SAFE MODE: no allowed numbers configured" in source
     assert "GROUP REPLIES: DISABLED" in source
     assert "UNKNOWN NUMBER REPLIES: DISABLED" in source
