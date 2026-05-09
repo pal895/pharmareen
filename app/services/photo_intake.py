@@ -12,9 +12,16 @@ PHOTO_LOG_RELATIVE_PATH = Path("data") / "photo_intake_log.jsonl"
 INVOICE_EXTRACTION_SCHEMA: dict[str, Any] = {
     "drug_name": None,
     "quantity": None,
+    "ordered_quantity": None,
+    "bonus_quantity": 0,
+    "total_received_quantity": None,
     "buying_price": None,
-    "expiry_date": None,
+    "expected_total_cost": None,
+    "discount_amount": 0,
+    "actual_paid_amount": None,
     "supplier": None,
+    "expiry_date": None,
+    "notes": "",
     "confidence": 0.0,
     "extraction_status": "waiting_for_openai_credits",
 }
@@ -26,10 +33,15 @@ GOOGLE_SHEETS_PREPARATION: dict[str, list[str]] = {
         "Message ID",
         "File Path",
         "Drug Name",
-        "Quantity",
+        "Ordered Quantity",
+        "Bonus Quantity",
+        "Total Received Quantity",
         "Buying Price",
-        "Expiry Date",
+        "Expected Total Cost",
+        "Discount Amount",
+        "Actual Paid Amount",
         "Supplier",
+        "Expiry Date",
         "Confidence",
         "Extraction Status",
         "Notes",
@@ -37,8 +49,13 @@ GOOGLE_SHEETS_PREPARATION: dict[str, list[str]] = {
     "Stock_Intake": [
         "Timestamp",
         "Drug Name",
-        "Quantity",
+        "Ordered Quantity",
+        "Bonus Quantity",
+        "Total Received Quantity",
         "Buying Price",
+        "Expected Total Cost",
+        "Discount Amount",
+        "Actual Paid Amount",
         "Supplier",
         "Expiry Date",
         "Source Photo",
@@ -49,6 +66,7 @@ GOOGLE_SHEETS_PREPARATION: dict[str, list[str]] = {
         "Supplier",
         "Invoice File",
         "Detected Items",
+        "Bonus/Discount Notes",
         "Processing Status",
         "Notes",
     ],
@@ -57,7 +75,9 @@ GOOGLE_SHEETS_PREPARATION: dict[str, list[str]] = {
         "Drug Name",
         "Batch",
         "Expiry Date",
-        "Quantity",
+        "Ordered Quantity",
+        "Bonus Quantity",
+        "Total Received Quantity",
         "Source Photo",
         "Status",
     ],
@@ -103,6 +123,13 @@ def image_extension(media_type: str) -> str:
 def build_invoice_extraction_placeholder(extraction_status: str = "waiting_for_openai_credits") -> dict[str, Any]:
     result = dict(INVOICE_EXTRACTION_SCHEMA)
     result["extraction_status"] = extraction_status
+    ordered_quantity = result.get("ordered_quantity") or 0
+    bonus_quantity = result.get("bonus_quantity") or 0
+    result["total_received_quantity"] = ordered_quantity + bonus_quantity if ordered_quantity or bonus_quantity else None
+    expected_total_cost = result.get("expected_total_cost")
+    discount_amount = result.get("discount_amount") or 0
+    if result.get("actual_paid_amount") is None and expected_total_cost is not None and discount_amount:
+        result["actual_paid_amount"] = expected_total_cost - discount_amount
     return result
 
 

@@ -65,6 +65,14 @@ class FakeStore:
                 reorder_level=8,
                 row_number=6,
             ),
+            "amoxicillin": StockItem(
+                drug_name="Amoxicillin",
+                selling_price=500,
+                cost_price=360,
+                current_stock=10,
+                reorder_level=5,
+                row_number=9,
+            ),
             "antacid": StockItem(
                 drug_name="Antacid",
                 selling_price=250,
@@ -203,32 +211,24 @@ def test_help_command_returns_available_commands_without_parser():
     parser = FailingParser()
     service = IntakeService(parser, store)
 
-    reply = service.process_text("help")
+    for command in ["help", "menu", "commands"]:
+        reply = service.process_text(command)
 
-    assert len(reply) < 1200
-    assert "PharMareen Help" in reply
-    assert "Panadol 2" in reply
-    assert "sold Panadol 2" in reply
-    assert "panadol two" in reply
-    assert "+Panadol 20" in reply
-    assert "received Panadol 20" in reply
-    assert "bonus Panadol 5" in reply
-    assert "free Panadol 5" in reply
-    assert "+Panadol 20 cost 1800" in reply
-    assert "bought Panadol 20 for 1800" in reply
-    assert "ordered Panadol 20 budget 2000 paid 1800" in reply
-    assert "Panadol stock" in reply
-    assert "profit today" in reply
-    assert "report today" in reply
-    assert "report week" in reply
-    assert "later Panadol 5" in reply
-    assert "late Panadol 3" in reply
-    assert "Advanced Usage:" in reply
-    assert "Panadol 5, Antacid 3, ORS 2" in reply
-    assert "later Panadol 5, Antacid 2" in reply
-    assert 'Say it naturally, for example: "sold two Panadol"' in reply
-    assert parser.called is False
-
+        assert len(reply) < 1200
+        assert "PHARMAREEN QUICK COMMANDS" in reply
+        assert "Panadol sold 2" in reply
+        assert "Insulin sold 1" in reply
+        assert "Panadol stock" in reply
+        assert "Panadol restock 20" in reply
+        assert "Panadol +20" in reply
+        assert "Panadol restock 20 cost 2000" in reply
+        assert "Panadol restock 20 bonus 5" in reply
+        assert "Panadol bought 20 plus 5 bonus" in reply
+        assert "Amoxicillin received 30 paid 2500 discount 300" in reply
+        assert "Panadol restock 20 supplier DawaPlus expiry Dec 2026" in reply
+        assert "Send invoice photo" in reply
+        assert "Panadol sold two" in reply
+        assert parser.called is False
 
 def test_stock_check_returns_current_stock_price_and_reorder_level():
     store = FakeStore()
@@ -352,11 +352,10 @@ def test_restock_item_increases_current_stock_and_logs():
 
     reply = service.process_text("Panadol restock 20")
 
-    assert reply == (
-        "✅ Panadol +20 added\n"
-        "Avg cost: KES 140\n"
-        "New stock: 40"
-    )
+    assert "Restock recorded: Panadol +20" in reply
+    assert "✅ Panadol +20 added" in reply
+    assert "Avg cost: KES 140" in reply
+    assert "New stock: 40" in reply
     assert store.stocks["panadol"].current_stock == 40
     assert store.logged[0][0].action == Action.RESTOCKED
     assert store.logged[0][1] is None
@@ -548,6 +547,77 @@ def test_ordered_paid_restock_records_budget_savings():
     assert "Avg cost: KES 115" in reply
     assert store.transactions[-1]["Total Cost"] == 1800
     assert "Budgeted KES 2,000" in store.transactions[-1]["Note"]
+
+
+def test_natural_restock_cost_phrase_records_cost():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    reply = service.process_text("Panadol restock 20 cost 2000")
+
+    assert "Restock recorded: Panadol +20" in reply
+    assert "Paid: KES 2,000" in reply
+    assert "New stock: 40" in reply
+    assert store.transactions[-1]["Total Cost"] == 2000
+
+
+def test_bonus_restock_with_cost_records_total_received():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    reply = service.process_text("Panadol restock 20 bonus 5 cost 2000")
+
+    assert "Restock recorded: Panadol +25 total" in reply
+    assert "Bought 20 + bonus 5" in reply
+    assert "Paid: KES 2,000" in reply
+    assert "New stock: 45" in reply
+    assert store.transactions[-1]["Quantity"] == 25
+    assert store.transactions[-1]["Total Cost"] == 2000
+    assert "Bonus quantity 5" in store.transactions[-1]["Note"]
+
+
+def test_discount_restock_natural_phrase_records_discount():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    reply = service.process_text("Amoxicillin received 30 paid 2500 discount 300")
+
+    assert "Restock recorded: Amoxicillin +30" in reply
+    assert "Paid: KES 2,500" in reply
+    assert "Discount noted: KES 300" in reply
+    assert store.stocks["amoxicillin"].current_stock == 40
+    assert store.transactions[-1]["Total Cost"] == 2500
+    assert "Discount KES 300" in store.transactions[-1]["Note"]
+
+
+def test_bonus_and_supplier_expiry_restock_phrase_records_metadata():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    reply = service.process_text("Panadol restock 20 bonus 5 cost 2000 supplier DawaPlus expiry Dec 2026")
+
+    assert "Restock recorded: Panadol +25 total" in reply
+    assert "Supplier: DawaPlus" in reply
+    assert "Expiry: Dec 2026" in reply
+    assert store.transactions[-1]["Quantity"] == 25
+    assert "Supplier: DawaPlus" in store.transactions[-1]["Note"]
+    assert "Expiry: Dec 2026" in store.transactions[-1]["Note"]
+
+
+def test_natural_supplier_gave_bonus_and_paid_for_bonus_phrases():
+    for message, drug_key, expected_stock in [
+        ("Supplier gave Panadol 20, bonus 5", "panadol", 45),
+        ("Bought Cetirizine 50, paid for 45, bonus 5", "cetirizine", 80),
+    ]:
+        store = FakeStore()
+        service = IntakeService(FailingParser(), store)
+
+        reply = service.process_text(message)
+
+        assert "Restock recorded" in reply
+        assert "bonus 5" in reply
+        assert store.stocks[drug_key].current_stock == expected_stock
+        assert store.transactions[-1]["Quantity"] in {25, 55}
 
 
 def test_late_sale_command_records_late_sale():

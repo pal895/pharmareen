@@ -60,7 +60,7 @@ last_openai_error: dict[str, Any] = {
     "timestamp": "",
 }
 VOICE_QUOTA_REPLY = "🎧 Voice received safely. AI transcription is ready but OpenAI credits are not active yet."
-PHOTO_QUOTA_REPLY = "Photo received safely. AI invoice extraction is installed and waiting for OpenAI credits activation."
+PHOTO_QUOTA_REPLY = "\U0001F4F8 Photo received safely. Invoice AI is ready. OpenAI credits are not active yet."
 
 
 @asynccontextmanager
@@ -1032,7 +1032,7 @@ def classify_command_handler(body: str) -> str:
     text = str(body or "").strip().lower()
     if not text:
         return "empty"
-    if text in {"start", "help"}:
+    if text in {"start", "help", "menu", "commands"}:
         return "help_start"
     if text == "share":
         return "share"

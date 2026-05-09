@@ -316,7 +316,7 @@ def test_whatsapp_web_bridge_photo_quota_fallback(monkeypatch, tmp_path):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert data["reply"] == "Photo received safely. AI invoice extraction is installed and waiting for OpenAI credits activation."
+    assert data["reply"] == "\U0001F4F8 Photo received safely. Invoice AI is ready. OpenAI credits are not active yet."
     assert data["message_type"] == "image"
     assert data["command_handler"] == "photo_received_waiting_for_openai_credits"
     saved_images = list((tmp_path / "data" / "photo_uploads").glob("*.jpg"))

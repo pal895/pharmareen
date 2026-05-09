@@ -18,50 +18,42 @@ UNDERSTAND_ERROR = "I didn’t understand that yet.\n\nTry:\nPanadol 2\n+Panadol
 SAVE_ERROR = "I could not save this record right now. Please check the Google Sheets connection."
 HELP_TEXT = "\n".join(
     [
-        "PharMareen Help",
+        "PHARMAREEN QUICK COMMANDS",
         "",
-        "Sell:",
-        "Panadol 2",
-        "sold Panadol 2",
-        "panadol two",
+        "Sales:",
+        "- Panadol sold 2",
+        "- Insulin sold 1",
         "",
-        "Stock in:",
-        "+Panadol 20",
-        "received Panadol 20",
+        "Stock:",
+        "- Panadol stock",
+        "",
+        "Restock:",
+        "- Panadol restock 20",
+        "- Panadol +20",
+        "- Panadol restock 20 cost 2000",
         "",
         "Bonus:",
-        "bonus Panadol 5",
-        "free Panadol 5",
+        "- Panadol restock 20 bonus 5",
+        "- Panadol bought 20 plus 5 bonus",
         "",
-        "Cost / discount:",
-        "+Panadol 20 cost 1800",
-        "bought Panadol 20 for 1800",
-        "ordered Panadol 20 budget 2000 paid 1800",
+        "Discount:",
+        "- Amoxicillin received 30 paid 2500 discount 300",
         "",
-        "Check:",
-        "Panadol stock",
+        "Supplier/Expiry:",
+        "- Panadol restock 20 supplier DawaPlus expiry Dec 2026",
         "",
-        "Reports:",
-        "profit today",
-        "report today",
-        "report week",
-        "",
-        "Late sales:",
-        "later Panadol 5",
+        "Photos:",
+        "- Send invoice photo",
+        "- Send supplier receipt photo",
         "",
         "Voice:",
-        'Say it naturally, for example: "sold two Panadol"',
+        "- Send voice note: Panadol sold two",
         "",
-        "Advanced Usage:",
-        "Late Sales:",
-        "later Panadol 5",
-        "late Panadol 3",
-        "records a sale that happened earlier",
+        "Late sales:",
+        "- later Panadol 5",
         "",
-        "Multiple Sales:",
-        "Panadol 5, Antacid 3, ORS 2",
-        "later Panadol 5, Antacid 2",
-        "records all items in one go",
+        "Multiple sales:",
+        "- Panadol 5, Antacid 3, ORS 2",
     ]
 )
 AMBIGUOUS_ERROR = (
@@ -162,6 +154,14 @@ class OperatingCommand:
     total_cost: float | None = None
     budgeted_cost: float | None = None
     restock_type: str = "normal"
+    ordered_quantity: int | None = None
+    bonus_quantity: int = 0
+    expected_total_cost: float | None = None
+    discount_amount: float = 0
+    actual_paid_amount: float | None = None
+    supplier: str = ""
+    expiry_date: str = ""
+    notes: str = ""
     raw_text: str = ""
     error: str = ""
 
@@ -558,6 +558,22 @@ class IntakeService:
         action = Action.LATE_SALE if is_late else Action.SOLD
         stock_plan = build_stock_update_plan(stock, quantity)
         notes = merge_notes(note, stock_plan.warning_notes)
+        fefo_reply = ""
+        try:
+            from app.services.batch_service import BatchService
+
+            deductions = BatchService(self.store).deduct_fefo(stock.drug_name, quantity)
+            if deductions:
+                first_deduction = deductions[0]
+                expiry_text = first_deduction.expiry_date or "earliest batch"
+                fefo_reply = f"Deducted from earliest expiry batch: {expiry_text}."
+                batch_notes = ", ".join(
+                    f"{deduction.batch_id}:{deduction.quantity}"
+                    for deduction in deductions
+                )
+                notes = merge_notes(notes, f"Batch deductions: {batch_notes}")
+        except Exception:
+            fefo_reply = ""
         event = ParsedEvent(stock.drug_name, action, quantity=quantity, notes=notes)
         total_sales = stock.selling_price * quantity if stock.selling_price is not None else None
         total_cost = stock.cost_price * quantity if stock.cost_price is not None else None
@@ -612,6 +628,8 @@ class IntakeService:
             reply_parts.append(f"Stock left: {stock_plan.new_current_stock}")
         else:
             reply_parts.append("Stock left: not set.")
+        if fefo_reply:
+            reply_parts.append(fefo_reply)
         if not is_late and not missing_profit_data:
             reply_parts.append(f"Profit: {format_kes(profit)}")
         today_profit_line = self._today_profit_line()
@@ -654,8 +672,19 @@ class IntakeService:
             )
 
         current_stock = stock.current_stock or 0
+        bonus_quantity = max(command.bonus_quantity or 0, 0)
+        if command.restock_type == "bonus" and bonus_quantity == 0 and command.total_cost == 0:
+            bonus_quantity = command.quantity
+            ordered_quantity = command.ordered_quantity if command.ordered_quantity is not None else 0
+        else:
+            ordered_quantity = command.ordered_quantity if command.ordered_quantity is not None else max(command.quantity - bonus_quantity, 0)
         new_current_stock = current_stock + command.quantity
-        total_added_cost = 0 if command.restock_type == "bonus" else command.total_cost
+        actual_paid_amount = command.actual_paid_amount if command.actual_paid_amount is not None else command.total_cost
+        expected_total_cost = command.expected_total_cost if command.expected_total_cost is not None else command.budgeted_cost
+        discount_amount = command.discount_amount or 0
+        if actual_paid_amount is None and expected_total_cost is not None and discount_amount:
+            actual_paid_amount = max(expected_total_cost - discount_amount, 0)
+        total_added_cost = 0 if command.restock_type == "bonus" and actual_paid_amount is None else actual_paid_amount
         new_average_cost = calculate_average_cost(
             current_stock=current_stock,
             current_cost=stock.cost_price,
@@ -668,25 +697,29 @@ class IntakeService:
             else None
         )
         saved_amount = (
-            command.budgeted_cost - total_added_cost
-            if command.budgeted_cost is not None and total_added_cost is not None
-            else None
+            expected_total_cost - total_added_cost
+            if expected_total_cost is not None and total_added_cost is not None
+            else discount_amount if discount_amount else None
         )
-        notes = f"Restock type: {command.restock_type}."
+        note_parts = [f"Restock type: {command.restock_type}."]
+        if ordered_quantity or bonus_quantity:
+            note_parts.append(f"Ordered quantity {ordered_quantity}. Bonus quantity {bonus_quantity}. Total received {command.quantity}.")
         if total_added_cost is not None:
-            notes = (
-                f"Restock type: {command.restock_type}. "
-                f"Restock total cost {format_kes(total_added_cost)}. "
-                f"Calculated unit cost {format_kes(unit_added_cost)}."
-            )
-        if command.budgeted_cost is not None and total_added_cost is not None:
-            notes = (
-                f"Restock type: {command.restock_type}. "
-                f"Budgeted {format_kes(command.budgeted_cost)}. "
-                f"Paid {format_kes(total_added_cost)}. "
-                f"Saved {format_kes(saved_amount)}. "
-                f"Calculated unit cost {format_kes(unit_added_cost)}."
-            )
+            note_parts.append(f"Restock total cost {format_kes(total_added_cost)}.")
+            note_parts.append(f"Calculated unit cost {format_kes(unit_added_cost)}.")
+        if expected_total_cost is not None:
+            note_parts.append(f"Budgeted {format_kes(expected_total_cost)}.")
+        if discount_amount:
+            note_parts.append(f"Discount {format_kes(discount_amount)}.")
+        if saved_amount is not None and expected_total_cost is not None:
+            note_parts.append(f"Saved {format_kes(saved_amount)}.")
+        if command.supplier:
+            note_parts.append(f"Supplier: {command.supplier}.")
+        if command.expiry_date:
+            note_parts.append(f"Expiry: {command.expiry_date}.")
+        if command.notes:
+            note_parts.append(command.notes)
+        notes = " ".join(note_parts)
         event = ParsedEvent(stock.drug_name, Action.RESTOCKED, quantity=command.quantity, notes=notes)
 
         try:
@@ -708,21 +741,38 @@ class IntakeService:
         except Exception:
             return EntryResult(logged=False, reply=SAVE_ERROR, summary_line="", category="errors")
 
-        if command.restock_type == "bonus":
+        has_bonus = bonus_quantity > 0
+        has_discount = bool(discount_amount) or command.restock_type in {"discount", "bonus_discount"}
+        if has_bonus and ordered_quantity:
             reply_parts = [
-                f"✅ {event.drug_name} bonus +{command.quantity} added",
+                f"\u2705 Restock recorded: {event.drug_name} +{command.quantity} total. Bought {ordered_quantity} + bonus {bonus_quantity}.",
             ]
+        elif has_bonus:
+            reply_parts = [f"\u2705 Restock recorded: {event.drug_name} +{command.quantity} total. Bonus {bonus_quantity}."]
         else:
-            reply_parts = [f"✅ {event.drug_name} +{command.quantity} added"]
-        if command.restock_type != "bonus" and total_added_cost is not None:
+            reply_parts = [f"\u2705 Restock recorded: {event.drug_name} +{command.quantity}."]
+
+        if command.restock_type == "bonus" and not ordered_quantity:
+            reply_parts.append(f"\u2705 {event.drug_name} bonus +{command.quantity} added")
+        else:
+            reply_parts.append(f"\u2705 {event.drug_name} +{command.quantity} added")
+        if total_added_cost is not None and total_added_cost != 0:
             reply_parts.append(f"Paid: {format_kes(total_added_cost)}")
-        if command.budgeted_cost is not None and command.restock_type != "bonus":
-            if command.budgeted_cost is not None:
-                reply_parts.insert(1, f"Budget: {format_kes(command.budgeted_cost)}")
-            if saved_amount is not None:
-                reply_parts.append(f"Saved: {format_kes(saved_amount)}")
-        if new_average_cost is not None and command.restock_type != "bonus":
+        if expected_total_cost is not None:
+            reply_parts.insert(1, f"Budget: {format_kes(expected_total_cost)}")
+        if has_discount and discount_amount:
+            if has_bonus:
+                reply_parts.append(f"Discount: {format_kes(discount_amount)}.")
+            else:
+                reply_parts.append(f"Discount noted: {format_kes(discount_amount)}")
+        if saved_amount is not None and expected_total_cost is not None:
+            reply_parts.append(f"Saved: {format_kes(saved_amount)}")
+        if new_average_cost is not None and total_added_cost != 0:
             reply_parts.append(f"Avg cost: {format_kes(new_average_cost)}")
+        if command.supplier:
+            reply_parts.append(f"Supplier: {command.supplier}")
+        if command.expiry_date:
+            reply_parts.append(f"Expiry: {command.expiry_date}")
         reply_parts.append(f"New stock: {new_current_stock}")
         return EntryResult(
             logged=True,
@@ -864,7 +914,7 @@ def merge_notes(existing: str, extra_notes: list[str]) -> str:
 
 
 def is_help_command(text: str) -> bool:
-    return text.strip().lower() in {"help", "start"}
+    return text.strip().lower() in {"help", "start", "menu", "commands"}
 
 
 def is_share_command(text: str) -> bool:
@@ -983,6 +1033,9 @@ def parse_operating_commands(text: str) -> list[OperatingCommand] | None:
         ]
 
     if "," in clean_text:
+        complex_restock = parse_complex_restock_command(clean_text, clean_text)
+        if complex_restock is not None:
+            return [complex_restock]
         commands: list[OperatingCommand] = []
         for part in clean_text.split(","):
             part = part.strip()
@@ -1057,6 +1110,184 @@ def parse_restock_details(cost_text: str | None, modifier: str | None = None) ->
     return parse_money(cost_text), restock_type
 
 
+def extract_restock_metadata(clean: str) -> tuple[str, str, str]:
+    supplier = ""
+    expiry_date = ""
+    supplier_match = re.search(r"\bsupplier\s+(.+?)(?=\s+expiry\b|\s+exp\b|$)", clean, flags=re.IGNORECASE)
+    if supplier_match:
+        supplier = supplier_match.group(1).strip(" ,")
+    expiry_match = re.search(r"\b(?:expiry|expires?|exp)\s+(.+)$", clean, flags=re.IGNORECASE)
+    if expiry_match:
+        expiry_date = expiry_match.group(1).strip(" ,")
+    cleaned = re.sub(r"\s+supplier\s+.+?(?=\s+expiry\b|\s+exp\b|$)", "", clean, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+(?:expiry|expires?|exp)\s+.+$", "", cleaned, flags=re.IGNORECASE)
+    return " ".join(cleaned.split()), supplier, expiry_date
+
+
+def make_restock_command(
+    *,
+    drug_name: str,
+    ordered_quantity: int,
+    bonus_quantity: int = 0,
+    actual_paid_amount: float | None = None,
+    expected_total_cost: float | None = None,
+    discount_amount: float | None = None,
+    restock_type: str | None = None,
+    supplier: str = "",
+    expiry_date: str = "",
+    raw_text: str = "",
+    notes: str = "",
+) -> OperatingCommand:
+    bonus_quantity = max(int(bonus_quantity or 0), 0)
+    ordered_quantity = positive_quantity(ordered_quantity)
+    discount_value = parse_money(discount_amount) or 0
+    expected_value = parse_money(expected_total_cost)
+    paid_value = parse_money(actual_paid_amount)
+    if paid_value is None and expected_value is not None and discount_value:
+        paid_value = max(expected_value - discount_value, 0)
+    total_received = ordered_quantity + bonus_quantity
+    if restock_type is None:
+        if bonus_quantity and discount_value:
+            restock_type = "bonus_discount"
+        elif bonus_quantity:
+            restock_type = "bonus"
+        elif discount_value:
+            restock_type = "discount"
+        else:
+            restock_type = "normal"
+    total_cost = 0 if restock_type == "bonus" and paid_value is None else paid_value
+    return OperatingCommand(
+        kind="restock",
+        drug_name=title_drug_name(drug_name),
+        quantity=total_received,
+        total_cost=total_cost,
+        budgeted_cost=expected_value,
+        restock_type=restock_type,
+        ordered_quantity=ordered_quantity,
+        bonus_quantity=bonus_quantity,
+        expected_total_cost=expected_value,
+        discount_amount=discount_value,
+        actual_paid_amount=paid_value,
+        supplier=supplier,
+        expiry_date=expiry_date,
+        notes=notes,
+        raw_text=raw_text,
+    )
+
+
+def parse_complex_restock_command(clean: str, raw_text: str) -> OperatingCommand | None:
+    detail_clean, supplier, expiry_date = extract_restock_metadata(clean)
+
+    match = re.fullmatch(r"supplier\s+gave\s+(.+?)\s+(\d+),?\s+bonus\s+(\d+)", detail_clean, flags=re.IGNORECASE)
+    if match:
+        return make_restock_command(
+            drug_name=match.group(1),
+            ordered_quantity=positive_quantity(match.group(2)),
+            bonus_quantity=positive_quantity(match.group(3)),
+            supplier=supplier,
+            expiry_date=expiry_date,
+            raw_text=raw_text,
+        )
+
+    match = re.fullmatch(r"bought\s+(.+?)\s+(\d+),?\s+paid\s+for\s+(\d+),?\s+bonus\s+(\d+)", detail_clean, flags=re.IGNORECASE)
+    if match:
+        return make_restock_command(
+            drug_name=match.group(1),
+            ordered_quantity=positive_quantity(match.group(2)),
+            bonus_quantity=positive_quantity(match.group(4)),
+            supplier=supplier,
+            expiry_date=expiry_date,
+            notes=f"Paid for {positive_quantity(match.group(3))} units.",
+            raw_text=raw_text,
+        )
+
+    match = re.fullmatch(r"(.+?)\s+bought\s+(\d+)\s+plus\s+(\d+)\s+bonus", detail_clean, flags=re.IGNORECASE)
+    if match:
+        return make_restock_command(
+            drug_name=match.group(1),
+            ordered_quantity=positive_quantity(match.group(2)),
+            bonus_quantity=positive_quantity(match.group(3)),
+            supplier=supplier,
+            expiry_date=expiry_date,
+            raw_text=raw_text,
+        )
+
+    match = re.fullmatch(
+        r"(.+?)\s+(?:restock|restocked|received|bought)\s+(\d+)\s+(?:plus\s+)?bonus\s+(\d+)(?:\s+(?:cost|paid)\s+(\d+(?:\.\d+)?))?(?:\s+discount\s+(\d+(?:\.\d+)?))?",
+        detail_clean,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        paid_value = parse_money(match.group(4))
+        discount_value = parse_money(match.group(5)) or 0
+        return make_restock_command(
+            drug_name=match.group(1),
+            ordered_quantity=positive_quantity(match.group(2)),
+            bonus_quantity=positive_quantity(match.group(3)),
+            actual_paid_amount=paid_value,
+            discount_amount=discount_value,
+            supplier=supplier,
+            expiry_date=expiry_date,
+            raw_text=raw_text,
+        )
+
+    match = re.fullmatch(
+        r"(.+?)\s+(?:received|restock|restocked|bought)\s+(\d+)\s+paid\s+(\d+(?:\.\d+)?)(?:\s+discount\s+(\d+(?:\.\d+)?))?",
+        detail_clean,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        discount_value = parse_money(match.group(4)) or 0
+        return make_restock_command(
+            drug_name=match.group(1),
+            ordered_quantity=positive_quantity(match.group(2)),
+            actual_paid_amount=parse_money(match.group(3)),
+            discount_amount=discount_value,
+            restock_type="discount" if discount_value else "normal",
+            supplier=supplier,
+            expiry_date=expiry_date,
+            raw_text=raw_text,
+        )
+
+    match = re.fullmatch(
+        r"(.+?)\s+(?:restock|restocked|received|bought)\s+(\d+)\s+(?:cost|paid)\s+(\d+(?:\.\d+)?)",
+        detail_clean,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return make_restock_command(
+            drug_name=match.group(1),
+            ordered_quantity=positive_quantity(match.group(2)),
+            actual_paid_amount=parse_money(match.group(3)),
+            supplier=supplier,
+            expiry_date=expiry_date,
+            raw_text=raw_text,
+        )
+
+    match = re.fullmatch(r"(.+?)\s+\+(\d+)", detail_clean, flags=re.IGNORECASE)
+    if match:
+        return make_restock_command(
+            drug_name=match.group(1),
+            ordered_quantity=positive_quantity(match.group(2)),
+            supplier=supplier,
+            expiry_date=expiry_date,
+            raw_text=raw_text,
+        )
+
+    if supplier or expiry_date:
+        match = re.fullmatch(r"(.+?)\s+(?:restock|restocked|received|bought)\s+(\d+)", detail_clean, flags=re.IGNORECASE)
+        if match:
+            return make_restock_command(
+                drug_name=match.group(1),
+                ordered_quantity=positive_quantity(match.group(2)),
+                supplier=supplier,
+                expiry_date=expiry_date,
+                raw_text=raw_text,
+            )
+
+    return None
+
+
 def parse_single_operating_command(text: str) -> OperatingCommand | None:
     clean = " ".join(text.strip().split())
     if not clean:
@@ -1065,6 +1296,10 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
     stock_name = parse_stock_check_command(clean)
     if stock_name:
         return OperatingCommand(kind="stock_check", drug_name=title_drug_name(stock_name), raw_text=text)
+
+    complex_restock = parse_complex_restock_command(clean, text)
+    if complex_restock is not None:
+        return complex_restock
 
     match = re.fullmatch(r"(?:bonus|free|extra)\s+(.+?)\s+(\d+)", clean, flags=re.IGNORECASE)
     if match:

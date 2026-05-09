@@ -53,15 +53,23 @@ def test_invoice_extraction_placeholder_schema():
     assert set(extraction) == {
         "drug_name",
         "quantity",
+        "ordered_quantity",
+        "bonus_quantity",
+        "total_received_quantity",
         "buying_price",
-        "expiry_date",
+        "expected_total_cost",
+        "discount_amount",
+        "actual_paid_amount",
         "supplier",
+        "expiry_date",
+        "notes",
         "confidence",
         "extraction_status",
     }
     assert extraction["confidence"] == 0.0
+    assert extraction["bonus_quantity"] == 0
+    assert extraction["discount_amount"] == 0
     assert extraction["extraction_status"] == "waiting_for_openai_credits"
-
 
 def test_google_sheets_preparation_helpers_include_phase5_tabs():
     helpers = google_sheets_preparation_helpers()
@@ -71,4 +79,6 @@ def test_google_sheets_preparation_helpers_include_phase5_tabs():
     assert "Supplier_Logs" in helpers
     assert "Expiry_Tracking" in helpers
     assert "Drug Name" in helpers["Invoices"]
+    assert "Bonus Quantity" in helpers["Invoices"]
+    assert "Actual Paid Amount" in helpers["Stock_Intake"]
     assert "Expiry Date" in helpers["Expiry_Tracking"]
