@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import logging
 import os
 import sys
@@ -44,6 +45,14 @@ pending_voice_confirmations: dict[str, tuple[str, float]] = {}
 PENDING_VOICE_TTL_SECONDS = 600
 startup_status_printed = False
 XML_CONTENT_TYPE = "application/xml"
+last_openai_error: dict[str, Any] = {
+    "feature": "",
+    "message": "",
+    "quota_missing": False,
+    "timestamp": "",
+}
+VOICE_QUOTA_REPLY = "🎧 Voice received safely. AI transcription is ready but OpenAI credits are not active yet."
+PHOTO_QUOTA_REPLY = "📸 Photo received safely. Invoice/photo AI extraction is ready but OpenAI credits are not active yet."
 
 
 @asynccontextmanager
@@ -490,6 +499,20 @@ def debug_config() -> dict[str, Any]:
     }
 
 
+@app.get("/debug/voice-ai")
+def debug_voice_ai() -> dict[str, Any]:
+    settings = get_settings()
+    return {
+        "voice_pipeline_installed": True,
+        "photo_pipeline_installed": True,
+        "openai_key_present": bool(settings.openai_api_key.strip()),
+        "last_openai_error": last_openai_error.get("message") or "",
+        "last_openai_feature": last_openai_error.get("feature") or "",
+        "last_openai_error_at": last_openai_error.get("timestamp") or "",
+        "quota_missing": bool(last_openai_error.get("quota_missing")),
+    }
+
+
 @app.post("/debug/whatsapp-test")
 async def debug_whatsapp_test() -> JSONResponse:
     settings = get_settings()
@@ -712,6 +735,7 @@ async def process_whatsapp_web_payload(
         try:
             audio_bytes = base64.b64decode(media_base64)
             transcript = transcription_service.transcribe_audio(audio_bytes, media_mime_type)
+            clear_last_openai_error("voice")
             if voice_transcribe_only:
                 clean_transcript = transcript.strip()
                 if not clean_transcript:
@@ -731,12 +755,98 @@ async def process_whatsapp_web_payload(
                 command_handler="voice_note_processed",
             )
         except Exception as exc:
+            record_openai_error("voice", exc)
+            if is_openai_quota_error(exc):
+                return WhatsAppProcessResult(
+                    reply=VOICE_QUOTA_REPLY,
+                    message_type="voice",
+                    success=True,
+                    error_reason="openai_insufficient_quota",
+                    command_handler="voice_note_quota_missing",
+                )
             return WhatsAppProcessResult(
                 reply=voice_transcription_failed_message(),
                 message_type="voice",
                 success=False,
                 error_reason=str(exc),
                 command_handler="voice_note_failed",
+            )
+
+    if media_base64 and media_mime_type.lower().startswith("image/"):
+        try:
+            image_bytes = base64.b64decode(media_base64)
+        except Exception as exc:
+            return WhatsAppProcessResult(
+                reply="📸 Photo received, but I could not read the image file. Please resend a clearer photo.",
+                message_type="image",
+                success=False,
+                error_reason=str(exc),
+                command_handler="photo_decode_failed",
+            )
+
+        metadata = save_photo_metadata(
+            sender=sender,
+            message_id=message_id,
+            media_mime_type=media_mime_type,
+            byte_count=len(image_bytes),
+        )
+        logger.info(
+            "PHOTO_RECEIVED sender=%s message_id=%s mime=%s bytes=%s metadata_path=%s",
+            mask_phone(sender),
+            message_id,
+            media_mime_type,
+            len(image_bytes),
+            metadata.get("metadata_path", ""),
+        )
+
+        ai_service = get_ai_service()
+        if ai_service.client is None:
+            return WhatsAppProcessResult(
+                reply="📸 Photo received safely. Invoice/photo AI extraction is ready but OpenAI key is not active yet.",
+                message_type="image",
+                success=True,
+                command_handler="photo_received_ai_unavailable",
+            )
+
+        if bool(last_openai_error.get("quota_missing")):
+            return WhatsAppProcessResult(
+                reply=PHOTO_QUOTA_REPLY,
+                message_type="image",
+                success=True,
+                error_reason="openai_insufficient_quota",
+                command_handler="photo_quota_missing",
+            )
+
+        try:
+            extraction = ai_service.extract_restock_from_image(image_bytes, media_mime_type)
+            clear_last_openai_error("photo")
+            message = str(extraction.get("message") or "").strip()
+            item_count = len(extraction.get("items") or [])
+            detail = f" I found {item_count} possible item(s)." if item_count else ""
+            if message:
+                detail = f" {message}"
+            return WhatsAppProcessResult(
+                reply=f"📸 Photo received safely.{detail}\nI have not changed stock yet. Confirmation will come in Phase 5.",
+                message_type="image",
+                success=True,
+                command_handler="photo_ai_extracted",
+            )
+        except Exception as exc:
+            record_openai_error("photo", exc)
+            if is_openai_quota_error(exc):
+                return WhatsAppProcessResult(
+                    reply=PHOTO_QUOTA_REPLY,
+                    message_type="image",
+                    success=True,
+                    error_reason="openai_insufficient_quota",
+                    command_handler="photo_quota_missing",
+                )
+            return WhatsAppProcessResult(
+                reply="📸 Photo received safely. I could not extract the invoice/photo yet, but the upload path is working.",
+                message_type="image",
+                success=True,
+                error_reason=str(exc),
+                command_handler="photo_ai_failed",
             )
 
     return WhatsAppProcessResult(
@@ -1120,6 +1230,69 @@ def external_request_url(request: Request, settings: Settings) -> str:
     path = request.url.path
     query = request.url.query
     return f"{base}{path}{'?' + query if query else ''}"
+
+
+def record_openai_error(feature: str, exc: Exception) -> None:
+    message = sanitize_error_message(exc)
+    last_openai_error.update(
+        {
+            "feature": feature,
+            "message": message,
+            "quota_missing": is_openai_quota_error(exc),
+            "timestamp": now_in_timezone(get_settings().timezone).isoformat(timespec="seconds"),
+        }
+    )
+    logger.warning(
+        "OPENAI_MEDIA_ERROR feature=%s quota_missing=%s error=%s",
+        feature,
+        last_openai_error["quota_missing"],
+        message,
+    )
+
+
+def clear_last_openai_error(feature: str) -> None:
+    if last_openai_error.get("feature") == feature:
+        last_openai_error.update({"feature": "", "message": "", "quota_missing": False, "timestamp": ""})
+
+
+def is_openai_quota_error(exc: Exception) -> bool:
+    text = sanitize_error_message(exc).lower()
+    status_code = str(getattr(exc, "status_code", "") or getattr(getattr(exc, "response", None), "status_code", ""))
+    return (
+        "insufficient_quota" in text
+        or ("quota" in text and "429" in text)
+        or (status_code == "429" and "quota" in text)
+    )
+
+
+def sanitize_error_message(exc: Exception) -> str:
+    text = str(exc or "").replace("\n", " ").replace("\r", " ").strip()
+    if not text:
+        text = type(exc).__name__
+    return text[:500]
+
+
+def save_photo_metadata(
+    sender: str,
+    message_id: str,
+    media_mime_type: str,
+    byte_count: int,
+) -> dict[str, Any]:
+    metadata_dir = PROJECT_ROOT / "data"
+    metadata_dir.mkdir(parents=True, exist_ok=True)
+    metadata_path = metadata_dir / "photo_intake_log.jsonl"
+    row = {
+        "timestamp": now_in_timezone(get_settings().timezone).isoformat(timespec="seconds"),
+        "sender": mask_phone(sender),
+        "message_id": message_id,
+        "media_mime_type": media_mime_type,
+        "byte_count": byte_count,
+        "source": "whatsapp_web_bridge",
+        "metadata_path": str(metadata_path.name),
+    }
+    with metadata_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(row, ensure_ascii=True) + "\n")
+    return row
 
 
 def log_webhook_request(sender: str, message_type: str, success: bool, error_reason: str = "") -> None:

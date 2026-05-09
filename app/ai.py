@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import mimetypes
 import re
@@ -214,6 +215,44 @@ class AIService:
         data = json.loads(raw_content)
         recommendations = data.get("recommendations") or []
         return [str(item).strip() for item in recommendations if str(item).strip()]
+
+    def extract_restock_from_image(self, image_bytes: bytes, content_type: str | None = None) -> dict[str, Any]:
+        if self.client is None or not image_bytes:
+            return {"items": [], "confidence": 0, "message": "Image AI is not configured."}
+        clean_content_type = (content_type or "image/jpeg").split(";")[0].strip()
+        encoded = base64.b64encode(image_bytes).decode("ascii")
+        data_url = f"data:{clean_content_type};base64,{encoded}"
+        completion = self.client.chat.completions.create(
+            model=self.settings.openai_parse_model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Extract pharmacy restock details from an invoice or medicine photo. "
+                        "Return JSON only with keys: items, confidence, message. "
+                        "Each item may include drug_name, strength, quantity, unit_type, expiry_date, supplier, "
+                        "invoice_number, batch_number, and cost. Do not guess missing values."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Extract visible restock details from this image."},
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                    ],
+                },
+            ],
+            response_format={"type": "json_object"},
+        )
+        try:
+            data = json.loads(completion.choices[0].message.content or "{}")
+        except json.JSONDecodeError:
+            return {"items": [], "confidence": 0, "message": "Image could not be read clearly."}
+        return {
+            "items": list(data.get("items") or []),
+            "confidence": float(data.get("confidence") or 0),
+            "message": str(data.get("message") or ""),
+        }
 
 
 def parse_simple_events(text: str, master_drug_names: list[str]) -> ParseResult | None:

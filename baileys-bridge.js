@@ -144,8 +144,18 @@ function audioMessageFrom(message) {
   return null;
 }
 
+function imageMessageFrom(message) {
+  const content = unwrapMessageContent(message.message || {});
+  if (content.imageMessage) return content.imageMessage;
+  return null;
+}
+
 function isAudioMessage(message) {
   return Boolean(audioMessageFrom(message));
+}
+
+function isImageMessage(message) {
+  return Boolean(imageMessageFrom(message));
 }
 
 function audioMimeType(message) {
@@ -153,7 +163,12 @@ function audioMimeType(message) {
   return (audio && audio.mimetype) || 'audio/ogg';
 }
 
-async function downloadAudioBase64(sock, msg) {
+function imageMimeType(message) {
+  const image = imageMessageFrom(message);
+  return (image && image.mimetype) || 'image/jpeg';
+}
+
+async function downloadMediaBase64(sock, msg) {
   const buffer = await downloadMediaMessage(
     msg,
     'buffer',
@@ -164,6 +179,14 @@ async function downloadAudioBase64(sock, msg) {
     }
   );
   return Buffer.from(buffer).toString('base64');
+}
+
+async function downloadAudioBase64(sock, msg) {
+  return downloadMediaBase64(sock, msg);
+}
+
+async function downloadImageBase64(sock, msg) {
+  return downloadMediaBase64(sock, msg);
 }
 
 async function sendToBackend(text, sender, messageId, extraPayload = {}) {
@@ -315,6 +338,29 @@ async function startBaileys(options = {}) {
       const text = extractText(msg).trim();
       const messageId = msg.key.id || '';
       console.log(`INCOMING_SENDER_JID ${maskSender(sender)} ${jidDebug(sender)}`);
+      if (isImageMessage(msg)) {
+        const mimeType = imageMimeType(msg);
+        console.log(`PHOTO_MESSAGE_RECEIVED from ${maskSender(sender)} ${jidDebug(sender)} mime_type=${mimeType} caption_length=${text.length}`);
+        try {
+          const mediaBase64 = await downloadImageBase64(sock, msg);
+          console.log(`PHOTO_MESSAGE_DOWNLOADED from ${maskSender(sender)} bytes_base64_length=${mediaBase64.length}`);
+          const data = await sendToBackend('', sender, messageId, {
+            media_base64: mediaBase64,
+            media_mime_type: mimeType,
+            media_caption: text
+          });
+          console.log(`BACKEND_REPLY_RECEIVED from ${maskSender(sender)} status=${data.status || 'unknown'} handler=${data.command_handler || 'unknown'} reason=${data.error_reason || 'none'}`);
+          const reply = extractBackendReply(data);
+          console.log(`EXTRACTED_REPLY_TEXT ${reply}`);
+          await safeSendReply(sock, sender, reply);
+        } catch (error) {
+          const status = error.response && error.response.status ? error.response.status : 'no-status';
+          console.error(`Photo bridge error for ${maskSender(sender)} status=${status}: ${error.stack || error.message}`);
+          await safeSendReply(sock, sender, 'I received the photo, but could not process it right now.');
+        }
+        continue;
+      }
+
       if (!text && isAudioMessage(msg)) {
         const mimeType = audioMimeType(msg);
         console.log(`VOICE_MESSAGE_RECEIVED from ${maskSender(sender)} ${jidDebug(sender)} mime_type=${mimeType}`);

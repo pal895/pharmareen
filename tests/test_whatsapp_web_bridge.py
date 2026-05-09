@@ -232,7 +232,7 @@ def test_whatsapp_web_bridge_transcribes_audio_payload(monkeypatch):
     monkeypatch.setattr(
         main,
         "get_settings",
-        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", OPENAI_API_KEY="test-key"),
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
     )
     monkeypatch.setattr(main, "get_transcription_service", lambda: FakeTranscriptionService())
 
@@ -250,6 +250,77 @@ def test_whatsapp_web_bridge_transcribes_audio_payload(monkeypatch):
     assert data["reply"] == "🎧 Voice received: Panadol sold two"
     assert data["message_type"] == "voice"
     assert data["command_handler"] == "voice_note_transcribed"
+
+
+def test_whatsapp_web_bridge_voice_quota_fallback(monkeypatch):
+    class FakeTranscriptionService:
+        is_available = True
+
+        def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
+            raise Exception("Error code: 429 - insufficient_quota")
+
+    main.last_openai_error.update({"feature": "", "message": "", "quota_missing": False, "timestamp": ""})
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_transcription_service", lambda: FakeTranscriptionService())
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"fake voice bytes").decode("ascii")
+    payload["media_mime_type"] = "audio/ogg"
+    payload["voice_transcribe_only"] = True
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=payload)
+        status = client.get("/debug/voice-ai")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["reply"] == "🎧 Voice received safely. AI transcription is ready but OpenAI credits are not active yet."
+    assert data["command_handler"] == "voice_note_quota_missing"
+    assert status.json()["voice_pipeline_installed"] is True
+    assert status.json()["openai_key_present"] is True
+    assert status.json()["quota_missing"] is True
+
+
+def test_whatsapp_web_bridge_photo_quota_fallback(monkeypatch, tmp_path):
+    class FakeAIService:
+        client = object()
+
+        def extract_restock_from_image(self, image_bytes: bytes, content_type: str | None = None):
+            assert image_bytes == b"fake image bytes"
+            assert content_type == "image/jpeg"
+            raise Exception("Error code: 429 - insufficient_quota")
+
+    main.last_openai_error.update({"feature": "", "message": "", "quota_missing": False, "timestamp": ""})
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_ai_service", lambda: FakeAIService())
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"fake image bytes").decode("ascii")
+    payload["media_mime_type"] = "image/jpeg"
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=payload)
+        status = client.get("/debug/voice-ai")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["reply"] == "📸 Photo received safely. Invoice/photo AI extraction is ready but OpenAI credits are not active yet."
+    assert data["message_type"] == "image"
+    assert data["command_handler"] == "photo_quota_missing"
+    assert (tmp_path / "data" / "photo_intake_log.jsonl").exists()
+    assert status.json()["photo_pipeline_installed"] is True
+    assert status.json()["quota_missing"] is True
 
 
 def test_whatsapp_web_bridge_payload_test_mode_still_blocks_group(monkeypatch):
@@ -352,6 +423,8 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "downloadMediaMessage" in source
     assert "VOICE_MESSAGE_RECEIVED" in source
     assert "VOICE_MESSAGE_DOWNLOADED" in source
+    assert "PHOTO_MESSAGE_RECEIVED" in source
+    assert "PHOTO_MESSAGE_DOWNLOADED" in source
     assert "voice_transcribe_only" in source
     assert "media_base64" in source
     assert "message_id=" in source
