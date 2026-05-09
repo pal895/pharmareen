@@ -231,7 +231,7 @@ class PharmacyOnboardingService:
             "yes" if diagnostics["credentials_scopes_include_drive"] else "no",
         )
         logger.info(
-            "Phase 3 live sheet creation attempted: %s",
+            "Phase 3 live admin workbook onboarding attempted: %s",
             "yes" if diagnostics["google_credentials_loaded"] else "no",
         )
 
@@ -242,7 +242,7 @@ class PharmacyOnboardingService:
             message = f"{pharmacy_name} database created successfully"
         except Exception as exc:
             google_error = f"{type(exc).__name__}: {exc}"
-            logger.warning("Phase 3 live sheet creation failed: %s", google_error)
+            logger.warning("Phase 3 live admin workbook onboarding failed: %s", google_error)
             result = {
                 "spreadsheet_id": f"local_{pharmacy_id}",
                 "spreadsheet_url": f"local://data/pharmacies_registry.json#{pharmacy_id}",
@@ -271,6 +271,7 @@ class PharmacyOnboardingService:
             "message": message,
             **record,
             "tabs": result.get("tabs", list(PHASE3_SHEETS)),
+            "registry_tab": result.get("registry_tab", ""),
             "google_diagnostics": diagnostics,
         }
         if google_error:
@@ -306,15 +307,19 @@ class PharmacyOnboardingService:
     def _create_google_sheet(self, pharmacy_id: str, payload: PharmacyPayload, created_at: str) -> dict[str, Any]:
         if not has_google_credentials(self.settings):
             raise RuntimeError("Google Sheets credentials are not configured")
+        if not admin_sheet_id(self.settings):
+            raise RuntimeError("PHARMAREEN_ADMIN_SHEET_ID is not configured")
 
-        logger.info("Phase 3 live sheet creation executing with Google API")
-        spreadsheet = self._create_live_spreadsheet(f"PharMareen - {payload.pharmacy_name.strip()}")
-        ensure_spreadsheet_schema(spreadsheet)
-        seed_pharmacy_sheet(spreadsheet, pharmacy_id, payload, created_at)
+        logger.info("Phase 3 live onboarding using existing admin workbook")
+        spreadsheet = self._admin_spreadsheet()
+        ensure_admin_registry(spreadsheet)
+        tab_names = ensure_pharmacy_tabs(spreadsheet, pharmacy_id)
+        seed_pharmacy_sheet(spreadsheet, pharmacy_id, payload, created_at, tab_names=tab_names, include_legacy=False)
         return {
             "spreadsheet_id": spreadsheet.id,
             "spreadsheet_url": spreadsheet.url,
-            "tabs": list(PHASE3_SHEETS),
+            "tabs": list(tab_names.values()),
+            "registry_tab": "Pharmacies",
             "local_fallback": False,
         }
 
@@ -348,41 +353,11 @@ class PharmacyOnboardingService:
         return [normalize_registry_record(record) for record in data if isinstance(record, dict)]
 
     def _admin_worksheet(self):
-        spreadsheet = self._gspread_client().open_by_key(admin_sheet_id(self.settings))
+        spreadsheet = self._admin_spreadsheet()
         return ensure_worksheet(spreadsheet, "Pharmacies", PHARMACIES_HEADERS)
 
-    def _create_live_spreadsheet(self, title: str):
-        credentials = self._google_credentials()
-        client = gspread.authorize(credentials)
-        logger.info(
-            "Phase 3 live sheet creation using scoped credentials: "
-            "spreadsheets=%s; drive=%s; drive.file=%s",
-            "yes" if SHEETS_SCOPE in (credentials.scopes or []) else "no",
-            "yes" if DRIVE_SCOPE in (credentials.scopes or []) else "no",
-            "yes" if DRIVE_FILE_SCOPE in (credentials.scopes or []) else "no",
-        )
-
-        if build_google_service is not None:
-            service = build_google_service(
-                "sheets",
-                "v4",
-                credentials=credentials,
-                cache_discovery=False,
-            )
-            response = (
-                service.spreadsheets()
-                .create(
-                    body={"properties": {"title": title}},
-                    fields="spreadsheetId,spreadsheetUrl",
-                )
-                .execute()
-            )
-            spreadsheet_id = response.get("spreadsheetId")
-            if not spreadsheet_id:
-                raise RuntimeError("Google Sheets API did not return a spreadsheet ID")
-            return client.open_by_key(spreadsheet_id)
-
-        return client.create(title)
+    def _admin_spreadsheet(self):
+        return self._gspread_client().open_by_key(admin_sheet_id(self.settings))
 
     def _gspread_client(self):
         return gspread.authorize(self._google_credentials())
@@ -443,6 +418,28 @@ def ensure_spreadsheet_schema(spreadsheet: Any) -> None:
         ensure_worksheet(spreadsheet, title, headers)
 
 
+def ensure_admin_registry(spreadsheet: Any):
+    return ensure_worksheet(spreadsheet, "Pharmacies", PHARMACIES_HEADERS)
+
+
+def pharmacy_tab_names(pharmacy_id: str) -> dict[str, str]:
+    return {
+        title: f"{pharmacy_id}_{tab_slug(title)}"
+        for title in PHASE3_SHEETS
+    }
+
+
+def ensure_pharmacy_tabs(spreadsheet: Any, pharmacy_id: str) -> dict[str, str]:
+    tab_names = pharmacy_tab_names(pharmacy_id)
+    for logical_title, tab_title in tab_names.items():
+        ensure_worksheet(spreadsheet, tab_title, PHASE3_SHEETS[logical_title])
+    return tab_names
+
+
+def tab_slug(title: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", title.lower()).strip("_")
+
+
 def ensure_worksheet(spreadsheet: Any, title: str, headers: list[str]):
     try:
         worksheet = spreadsheet.worksheet(title)
@@ -454,12 +451,19 @@ def ensure_worksheet(spreadsheet: Any, title: str, headers: list[str]):
     return worksheet
 
 
-def seed_pharmacy_sheet(spreadsheet: Any, pharmacy_id: str, payload: PharmacyPayload, created_at: str) -> None:
-    inventory = spreadsheet.worksheet("Inventory")
-    master_stock = spreadsheet.worksheet(MASTER_STOCK)
-    settings = spreadsheet.worksheet("Settings")
-    suppliers = spreadsheet.worksheet("Suppliers")
-    supplier_prices = spreadsheet.worksheet("Supplier_Prices")
+def seed_pharmacy_sheet(
+    spreadsheet: Any,
+    pharmacy_id: str,
+    payload: PharmacyPayload,
+    created_at: str,
+    tab_names: dict[str, str] | None = None,
+    include_legacy: bool = True,
+) -> None:
+    tab_names = tab_names or {}
+    inventory = spreadsheet.worksheet(tab_names.get("Inventory", "Inventory"))
+    settings = spreadsheet.worksheet(tab_names.get("Settings", "Settings"))
+    suppliers = spreadsheet.worksheet(tab_names.get("Suppliers", "Suppliers"))
+    supplier_prices = spreadsheet.worksheet(tab_names.get("Supplier_Prices", "Supplier_Prices"))
 
     timestamp = created_at.replace("T", " ")
     inventory_rows = [
@@ -467,10 +471,12 @@ def seed_pharmacy_sheet(spreadsheet: Any, pharmacy_id: str, payload: PharmacyPay
         for name, stock, cost, price, reorder, supplier in STARTER_INVENTORY
     ]
     inventory.append_rows(inventory_rows, value_input_option="USER_ENTERED")
-    master_stock.append_rows(
-        [[name, price, cost, stock, reorder] for name, stock, cost, price, reorder, _supplier in STARTER_INVENTORY],
-        value_input_option="USER_ENTERED",
-    )
+    if include_legacy:
+        master_stock = spreadsheet.worksheet(MASTER_STOCK)
+        master_stock.append_rows(
+            [[name, price, cost, stock, reorder] for name, stock, cost, price, reorder, _supplier in STARTER_INVENTORY],
+            value_input_option="USER_ENTERED",
+        )
     settings.append_rows(
         [
             ["pharmacy_id", pharmacy_id],

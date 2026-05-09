@@ -14,8 +14,11 @@ from app.services.pharmacy_onboarding import (
     PHASE3_SHEETS,
     PharmacyOnboardingService,
     PharmacyPayload,
+    ensure_admin_registry,
+    ensure_pharmacy_tabs,
     ensure_spreadsheet_schema,
     generate_pharmacy_id,
+    pharmacy_tab_names,
 )
 
 
@@ -44,6 +47,8 @@ class FakeWorksheet:
 
 class FakeSpreadsheet:
     def __init__(self):
+        self.id = "admin-sheet-123"
+        self.url = "https://docs.google.com/spreadsheets/d/admin-sheet-123"
         self.worksheets: dict[str, FakeWorksheet] = {}
 
     def worksheet(self, title: str) -> FakeWorksheet:
@@ -57,6 +62,16 @@ class FakeSpreadsheet:
         worksheet = FakeWorksheet(title)
         self.worksheets[title] = worksheet
         return worksheet
+
+
+class FakeGspreadClient:
+    def __init__(self, spreadsheet: FakeSpreadsheet):
+        self.spreadsheet = spreadsheet
+        self.opened_key = ""
+
+    def open_by_key(self, key: str) -> FakeSpreadsheet:
+        self.opened_key = key
+        return self.spreadsheet
 
 
 def test_pharmacy_id_generation_is_stable_shape():
@@ -77,6 +92,19 @@ def test_phase3_sheet_structure_creation():
     assert "Suppliers" in spreadsheet.worksheets
     assert "Supplier_Prices" in spreadsheet.worksheets
     assert "Master_Stock" in spreadsheet.worksheets
+
+
+def test_pharmacy_tabs_are_created_inside_admin_workbook():
+    spreadsheet = FakeSpreadsheet()
+
+    ensure_admin_registry(spreadsheet)
+    tab_names = ensure_pharmacy_tabs(spreadsheet, "abc_pharmacy")
+
+    assert "Pharmacies" in spreadsheet.worksheets
+    assert tab_names == pharmacy_tab_names("abc_pharmacy")
+    assert "abc_pharmacy_inventory" in spreadsheet.worksheets
+    assert "abc_pharmacy_supplier_prices" in spreadsheet.worksheets
+    assert spreadsheet.worksheets["abc_pharmacy_inventory"].rows[0] == PHASE3_SHEETS["Inventory"]
 
 
 def test_single_pharmacy_onboarding_uses_local_fallback(tmp_path, monkeypatch):
@@ -122,6 +150,36 @@ def test_single_pharmacy_onboarding_reports_google_live(monkeypatch):
     assert result["spreadsheet_id"] == "live-sheet-123"
     assert result["spreadsheet_url"].startswith("https://docs.google.com/spreadsheets/d/")
     assert saved[0]["status"] == "google_live"
+
+
+def test_google_live_onboarding_uses_admin_workbook_prefixed_tabs(monkeypatch):
+    spreadsheet = FakeSpreadsheet()
+    client = FakeGspreadClient(spreadsheet)
+    service = PharmacyOnboardingService(
+        Settings(
+            _env_file=None,
+            GOOGLE_SERVICE_ACCOUNT_JSON="{\"type\":\"service_account\",\"client_email\":\"test@example.com\",\"private_key\":\"key\"}",
+            PHARMAREEN_ADMIN_SHEET_ID="admin-sheet-123",
+        )
+    )
+    monkeypatch.setattr(service, "_gspread_client", lambda: client)
+
+    result = service.create_pharmacy(PharmacyPayload("ABC Pharmacy", "Mary", "0712345678", "Nairobi"))
+    pharmacy_id = result["pharmacy_id"]
+    tab_names = pharmacy_tab_names(pharmacy_id)
+
+    assert result["status"] == "google_live"
+    assert result["spreadsheet_id"] == "admin-sheet-123"
+    assert result["spreadsheet_url"] == "https://docs.google.com/spreadsheets/d/admin-sheet-123"
+    assert result["registry_tab"] == "Pharmacies"
+    assert result["tabs"] == list(tab_names.values())
+    assert client.opened_key == "admin-sheet-123"
+    assert "Pharmacies" in spreadsheet.worksheets
+    assert tab_names["Inventory"] in spreadsheet.worksheets
+    assert tab_names["Sales"] in spreadsheet.worksheets
+    assert tab_names["Supplier_Prices"] in spreadsheet.worksheets
+    assert len(spreadsheet.worksheets[tab_names["Inventory"]].rows) > 1
+    assert spreadsheet.worksheets["Pharmacies"].rows[-1][0] == pharmacy_id
 
 
 def test_bulk_pharmacy_onboarding(tmp_path, monkeypatch):

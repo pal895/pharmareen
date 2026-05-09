@@ -61,8 +61,12 @@ def main() -> int:
         print_fail("Open admin sheet", "PHARMAREEN_ADMIN_SHEET_ID is missing")
         print_fail("Write admin sheet row", "PHARMAREEN_ADMIN_SHEET_ID is missing")
 
-    test_create_spreadsheet_with_sheets_api(sheets)
-    test_create_spreadsheet_with_drive_api(drive)
+    if should_run_create_tests():
+        test_create_spreadsheet_with_sheets_api(sheets)
+        test_create_spreadsheet_with_drive_api(drive)
+    else:
+        print_skip("Create spreadsheet with Sheets API", "set RUN_GOOGLE_CREATE_TESTS=true to run")
+        print_skip("Create spreadsheet file with Drive API", "set RUN_GOOGLE_CREATE_TESTS=true to run")
     return 0
 
 
@@ -201,9 +205,18 @@ def timestamp_slug() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 
 
+def should_run_create_tests() -> bool:
+    return (os.environ.get("RUN_GOOGLE_CREATE_TESTS") or "").strip().lower() in {"1", "true", "yes"}
+
+
 def print_pass(step: str, detail: str = "") -> None:
     suffix = f" - {detail}" if detail else ""
     print(f"PASS: {step}{suffix}")
+
+
+def print_skip(step: str, detail: str = "") -> None:
+    suffix = f" - {detail}" if detail else ""
+    print(f"SKIP: {step}{suffix}")
 
 
 def print_fail(step: str, error: object) -> None:
