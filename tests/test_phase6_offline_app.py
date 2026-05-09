@@ -28,7 +28,9 @@ def test_offline_app_routes_return_html():
     assert root_response.status_code == 200
     assert root_response.headers["content-type"].startswith("text/html")
     assert "PharMareen Offline Mode" in root_response.text
+    assert "Save offline entry" in root_response.text
     assert compat_response.status_code == 200
+    assert compat_response.headers["content-type"].startswith("text/html")
     assert "PharMareen Offline Mode" in compat_response.text
     assert manifest_response.status_code == 200
     assert worker_response.status_code == 200
@@ -92,10 +94,12 @@ def test_debug_offline_app_reports_installed(monkeypatch, tmp_path):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["offline_app_installed"] is True
-    assert data["offline_routes_ready"] is True
-    assert data["sync_endpoint_ready"] is True
-    assert data["offline_log_exists"] is True
+    assert data == {
+        "offline_app_installed": True,
+        "offline_routes_ready": True,
+        "sync_endpoint_ready": True,
+        "offline_log_exists": True,
+    }
 
 
 def test_offline_pwa_assets_contain_auto_sync_and_retry_logic():

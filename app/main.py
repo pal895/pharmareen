@@ -115,18 +115,22 @@ def offline_html_test() -> str:
     return "<h1>PharMareen Offline Public Test OK</h1>"
 
 
-@app.get("/offline-app")
-def offline_app_index() -> FileResponse:
-    return FileResponse(OFFLINE_APP_DIR / "index.html", media_type="text/html")
+@app.get("/offline-app", response_class=HTMLResponse)
+def offline_app_index() -> HTMLResponse:
+    index_path = OFFLINE_APP_DIR / "index.html"
+    if not index_path.exists():
+        raise HTTPException(status_code=404, detail="Offline app is not installed.")
+    return HTMLResponse(index_path.read_text(encoding="utf-8"))
 
 
 @app.get("/debug/offline-app")
-def debug_offline_app() -> dict[str, Any]:
+def debug_offline_app() -> dict[str, bool]:
+    index_path = OFFLINE_APP_DIR / "index.html"
     log_path = PROJECT_ROOT / "data" / "offline_sync_log.jsonl"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.touch(exist_ok=True)
     return {
-        "offline_app_installed": (OFFLINE_APP_DIR / "index.html").exists(),
+        "offline_app_installed": index_path.exists(),
         "offline_routes_ready": True,
         "sync_endpoint_ready": True,
         "offline_log_exists": log_path.exists(),
