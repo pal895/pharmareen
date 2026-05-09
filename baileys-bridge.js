@@ -1,5 +1,5 @@
 ﻿const makeWASocket = require('@whiskeysockets/baileys').default;
-const { DisconnectReason, fetchLatestBaileysVersion, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const { DisconnectReason, downloadMediaMessage, fetchLatestBaileysVersion, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
 const P = require('pino');
@@ -105,7 +105,7 @@ async function safeSendReply(sock, jid, text) {
 }
 
 function extractText(message) {
-  const content = message.message || {};
+  const content = unwrapMessageContent(message.message || {});
   if (content.conversation) return content.conversation;
   if (content.extendedTextMessage && content.extendedTextMessage.text) return content.extendedTextMessage.text;
   if (content.imageMessage && content.imageMessage.caption) return content.imageMessage.caption;
@@ -113,7 +113,60 @@ function extractText(message) {
   return '';
 }
 
-async function sendToBackend(text, sender, messageId) {
+function unwrapMessageContent(content) {
+  let current = content || {};
+  for (let index = 0; index < 5; index += 1) {
+    if (current.ephemeralMessage && current.ephemeralMessage.message) {
+      current = current.ephemeralMessage.message;
+      continue;
+    }
+    if (current.viewOnceMessage && current.viewOnceMessage.message) {
+      current = current.viewOnceMessage.message;
+      continue;
+    }
+    if (current.viewOnceMessageV2 && current.viewOnceMessageV2.message) {
+      current = current.viewOnceMessageV2.message;
+      continue;
+    }
+    if (current.documentWithCaptionMessage && current.documentWithCaptionMessage.message) {
+      current = current.documentWithCaptionMessage.message;
+      continue;
+    }
+    return current;
+  }
+  return current;
+}
+
+function audioMessageFrom(message) {
+  const content = unwrapMessageContent(message.message || {});
+  if (content.audioMessage) return content.audioMessage;
+  if (content.pttMessage) return content.pttMessage;
+  return null;
+}
+
+function isAudioMessage(message) {
+  return Boolean(audioMessageFrom(message));
+}
+
+function audioMimeType(message) {
+  const audio = audioMessageFrom(message);
+  return (audio && audio.mimetype) || 'audio/ogg';
+}
+
+async function downloadAudioBase64(sock, msg) {
+  const buffer = await downloadMediaMessage(
+    msg,
+    'buffer',
+    {},
+    {
+      logger: P({ level: 'silent' }),
+      reuploadRequest: sock.updateMediaMessage
+    }
+  );
+  return Buffer.from(buffer).toString('base64');
+}
+
+async function sendToBackend(text, sender, messageId, extraPayload = {}) {
   const url = `${backendUrl}/bridge/whatsapp-web`;
   const payload = {
     message: text,
@@ -121,10 +174,15 @@ async function sendToBackend(text, sender, messageId) {
     message_id: messageId || '',
     is_group: isGroupJid(sender),
     is_broadcast: isBroadcastJid(sender),
-    allow_all_direct_chats_for_test: allowAllDirectChatsForTest
+    allow_all_direct_chats_for_test: allowAllDirectChatsForTest,
+    ...extraPayload
   };
   console.log(`BACKEND_REQUEST_URL ${url}`);
-  console.log(`BACKEND_REQUEST_PAYLOAD sender=${maskSender(sender)} ${jidDebug(sender)} message_length=${String(text || '').length} test_mode=${allowAllDirectChatsForTest}`);
+  console.log(
+    `BACKEND_REQUEST_PAYLOAD sender=${maskSender(sender)} ${jidDebug(sender)} ` +
+    `message_length=${String(text || '').length} has_media=${Boolean(extraPayload.media_base64)} ` +
+    `media_mime_type=${extraPayload.media_mime_type || ''} test_mode=${allowAllDirectChatsForTest}`
+  );
   const response = await axios.post(url, payload, { timeout: 60000 });
   console.log(`BACKEND_HTTP_STATUS ${response.status}`);
   console.log(`BACKEND_JSON_RESPONSE ${JSON.stringify(response.data || {})}`);
@@ -257,6 +315,29 @@ async function startBaileys(options = {}) {
       const text = extractText(msg).trim();
       const messageId = msg.key.id || '';
       console.log(`INCOMING_SENDER_JID ${maskSender(sender)} ${jidDebug(sender)}`);
+      if (!text && isAudioMessage(msg)) {
+        const mimeType = audioMimeType(msg);
+        console.log(`VOICE_MESSAGE_RECEIVED from ${maskSender(sender)} ${jidDebug(sender)} mime_type=${mimeType}`);
+        try {
+          const mediaBase64 = await downloadAudioBase64(sock, msg);
+          console.log(`VOICE_MESSAGE_DOWNLOADED from ${maskSender(sender)} bytes_base64_length=${mediaBase64.length}`);
+          const data = await sendToBackend('', sender, messageId, {
+            media_base64: mediaBase64,
+            media_mime_type: mimeType,
+            voice_transcribe_only: true
+          });
+          console.log(`BACKEND_REPLY_RECEIVED from ${maskSender(sender)} status=${data.status || 'unknown'} handler=${data.command_handler || 'unknown'} reason=${data.error_reason || 'none'}`);
+          const reply = extractBackendReply(data);
+          console.log(`EXTRACTED_REPLY_TEXT ${reply}`);
+          await safeSendReply(sock, sender, reply);
+        } catch (error) {
+          const status = error.response && error.response.status ? error.response.status : 'no-status';
+          console.error(`Voice bridge error for ${maskSender(sender)} status=${status}: ${error.stack || error.message}`);
+          await safeSendReply(sock, sender, 'I received the voice note, but could not transcribe it right now.');
+        }
+        continue;
+      }
+
       if (!text) {
         console.log(`Allowed direct message from ${maskSender(sender)} had no text.`);
         await safeSendReply(sock, sender, 'Please send text for now, like: Panadol 2');

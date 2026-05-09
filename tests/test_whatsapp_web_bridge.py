@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import logging
 from pathlib import Path
 from uuid import uuid4
@@ -219,6 +220,38 @@ def test_whatsapp_web_bridge_allows_lid_sender_when_payload_test_mode_is_string(
     assert data["command_handler"] == "help_start"
 
 
+def test_whatsapp_web_bridge_transcribes_audio_payload(monkeypatch):
+    class FakeTranscriptionService:
+        is_available = True
+
+        def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
+            assert audio_bytes == b"fake voice bytes"
+            assert content_type == "audio/ogg"
+            return "Panadol sold two"
+
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", OPENAI_API_KEY="test-key"),
+    )
+    monkeypatch.setattr(main, "get_transcription_service", lambda: FakeTranscriptionService())
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"fake voice bytes").decode("ascii")
+    payload["media_mime_type"] = "audio/ogg"
+    payload["voice_transcribe_only"] = True
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["reply"] == "🎧 Voice received: Panadol sold two"
+    assert data["message_type"] == "voice"
+    assert data["command_handler"] == "voice_note_transcribed"
+
+
 def test_whatsapp_web_bridge_payload_test_mode_still_blocks_group(monkeypatch):
     monkeypatch.setattr(main, "get_settings", lambda: Settings(_env_file=None))
 
@@ -316,6 +349,11 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "WHATSAPP_SEND_TARGET" in source
     assert "WHATSAPP_REPLY_SENT" in source
     assert "WHATSAPP_SEND_FAILED" in source
+    assert "downloadMediaMessage" in source
+    assert "VOICE_MESSAGE_RECEIVED" in source
+    assert "VOICE_MESSAGE_DOWNLOADED" in source
+    assert "voice_transcribe_only" in source
+    assert "media_base64" in source
     assert "message_id=" in source
     assert "extractBackendReply" in source
     assert "whatsapp_reply" in source

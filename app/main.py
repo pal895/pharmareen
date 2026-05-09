@@ -614,6 +614,10 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
     message_id = str(payload.get("message_id") or payload.get("id") or "").strip()
     media_base64 = str(payload.get("media_base64") or "").strip()
     media_mime_type = str(payload.get("media_mime_type") or payload.get("mimetype") or "").strip()
+    voice_transcribe_only = boolish(
+        payload.get("voice_transcribe_only")
+        or payload.get("transcribe_only")
+    )
     is_group = bool(payload.get("is_group"))
     is_broadcast = bool(payload.get("is_broadcast"))
     allow_all_direct_chats_for_test = boolish(
@@ -663,6 +667,7 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
         message_id=message_id,
         media_base64=media_base64,
         media_mime_type=media_mime_type,
+        voice_transcribe_only=voice_transcribe_only,
     )
     log_webhook_request(sender, "whatsapp_web", result.success, result.error_reason)
     logger.info("BACKEND_REPLY_TEXT sender=%s reply=%s", mask_phone(sender), result.reply)
@@ -682,6 +687,7 @@ async def process_whatsapp_web_payload(
     message_id: str = "",
     media_base64: str = "",
     media_mime_type: str = "",
+    voice_transcribe_only: bool = False,
 ) -> WhatsAppProcessResult:
     if message:
         return await process_whatsapp_form_values(
@@ -706,6 +712,16 @@ async def process_whatsapp_web_payload(
         try:
             audio_bytes = base64.b64decode(media_base64)
             transcript = transcription_service.transcribe_audio(audio_bytes, media_mime_type)
+            if voice_transcribe_only:
+                clean_transcript = transcript.strip()
+                if not clean_transcript:
+                    raise ValueError("OpenAI returned an empty transcription")
+                return WhatsAppProcessResult(
+                    reply=f"🎧 Voice received: {clean_transcript}",
+                    message_type="voice",
+                    success=True,
+                    command_handler="voice_note_transcribed",
+                )
             interpreted = normalize_spoken_command_text(transcript)
             reply = get_intake_service().process_text(interpreted)
             return WhatsAppProcessResult(
