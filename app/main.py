@@ -17,7 +17,7 @@ from typing import Any
 from urllib.parse import quote
 
 from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -67,6 +67,7 @@ PHOTO_QUOTA_REPLY = "\U0001F4F8 Photo received safely. Invoice AI is ready. Open
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print_startup_console_status()
+    print("PHASE6_ROUTES_LOADED /offline-app /debug/offline-app")
     try:
         get_sheet_store().ensure_schema()
     except SheetsUnavailableError:
@@ -81,6 +82,21 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+
+@app.get("/offline-app", include_in_schema=False)
+async def offline_app_redirect() -> RedirectResponse:
+    return RedirectResponse(url="/offline_app/index.html")
+
+
+@app.get("/debug/offline-app")
+async def debug_offline_app() -> dict[str, bool]:
+    return {
+        "offline_app_installed": True,
+        "offline_routes_ready": True,
+        "sync_endpoint_ready": True,
+        "offline_log_exists": Path("data/offline_sync_log.jsonl").exists(),
+    }
 
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
 app.mount(
@@ -113,28 +129,6 @@ def offline_test() -> dict[str, str]:
 @app.get("/offline-html-test", response_class=HTMLResponse)
 def offline_html_test() -> str:
     return "<h1>PharMareen Offline Public Test OK</h1>"
-
-
-@app.get("/offline-app", response_class=HTMLResponse)
-def offline_app_index() -> HTMLResponse:
-    index_path = OFFLINE_APP_DIR / "index.html"
-    if not index_path.exists():
-        raise HTTPException(status_code=404, detail="Offline app is not installed.")
-    return HTMLResponse(index_path.read_text(encoding="utf-8"))
-
-
-@app.get("/debug/offline-app")
-def debug_offline_app() -> dict[str, bool]:
-    index_path = OFFLINE_APP_DIR / "index.html"
-    log_path = PROJECT_ROOT / "data" / "offline_sync_log.jsonl"
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    log_path.touch(exist_ok=True)
-    return {
-        "offline_app_installed": index_path.exists(),
-        "offline_routes_ready": True,
-        "sync_endpoint_ready": True,
-        "offline_log_exists": log_path.exists(),
-    }
 
 
 @app.post("/offline/sync")
