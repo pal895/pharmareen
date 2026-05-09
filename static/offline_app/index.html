@@ -1,0 +1,56 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f6b46">
+  <title>PharMareen Offline Mode</title>
+  <link rel="manifest" href="/offline_app/manifest.json">
+  <link rel="stylesheet" href="/offline_app/styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">PharMareen</p>
+        <h1>Offline Mode</h1>
+      </div>
+      <div id="statusBanner" class="status online" role="status">Online</div>
+    </header>
+
+    <section class="panel quick-actions" aria-label="Quick actions">
+      <button type="button" data-action="sale">Sale</button>
+      <button type="button" data-action="restock">Restock</button>
+      <button type="button" data-action="bonus">Bonus Restock</button>
+      <button type="button" data-action="discount">Discount Restock</button>
+    </section>
+
+    <section class="panel">
+      <label for="commandText">Command</label>
+      <textarea id="commandText" rows="4" placeholder="Panadol sold 2"></textarea>
+      <input id="pharmacyId" type="text" placeholder="Pharmacy ID optional">
+      <button id="saveEntry" class="primary" type="button">Save offline entry</button>
+      <p class="hint">Works offline. Entries sync automatically when internet returns.</p>
+    </section>
+
+    <section class="panel queue-head">
+      <div>
+        <p class="eyebrow">Queue</p>
+        <h2><span id="queueCount">0</span> pending</h2>
+      </div>
+      <button id="syncNow" type="button">Sync now</button>
+    </section>
+
+    <section class="panel">
+      <h2>Recent offline entries</h2>
+      <ul id="recentEntries" class="entry-list"></ul>
+    </section>
+  </main>
+
+  <template id="emptyTemplate">
+    <li class="empty">No offline entries yet.</li>
+  </template>
+
+  <script src="/offline_app/app.js" defer></script>
+</body>
+</html>

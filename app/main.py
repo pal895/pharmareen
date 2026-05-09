@@ -49,6 +49,7 @@ from app.whatsapp import WhatsAppClient, xml_message_response
 
 logger = logging.getLogger(__name__)
 processed_message_sids: set[str] = set()
+offline_synced_entry_ids: set[str] = set()
 pending_voice_confirmations: dict[str, tuple[str, float]] = {}
 PENDING_VOICE_TTL_SECONDS = 600
 startup_status_printed = False
@@ -81,7 +82,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-OFFLINE_APP_DIR = PROJECT_ROOT / "local"
+OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
 app.mount(
     "/offline_app",
     StaticFiles(directory=str(OFFLINE_APP_DIR), html=True),
@@ -112,6 +113,68 @@ def offline_test() -> dict[str, str]:
 @app.get("/offline-html-test", response_class=HTMLResponse)
 def offline_html_test() -> str:
     return "<h1>PharMareen Offline Public Test OK</h1>"
+
+
+@app.get("/offline-app")
+def offline_app_index() -> FileResponse:
+    return FileResponse(OFFLINE_APP_DIR / "index.html", media_type="text/html")
+
+
+@app.get("/debug/offline-app")
+def debug_offline_app() -> dict[str, Any]:
+    log_path = PROJECT_ROOT / "data" / "offline_sync_log.jsonl"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.touch(exist_ok=True)
+    return {
+        "offline_app_installed": (OFFLINE_APP_DIR / "index.html").exists(),
+        "offline_routes_ready": True,
+        "sync_endpoint_ready": True,
+        "offline_log_exists": log_path.exists(),
+    }
+
+
+@app.post("/offline/sync")
+async def offline_sync_entries(request: Request) -> dict[str, Any]:
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    entries = payload.get("entries") if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        return {"status": "error", "synced": [], "failed": [{"id": "", "error": "Send entries as a list."}]}
+
+    synced: list[dict[str, Any]] = []
+    failed: list[dict[str, Any]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            failed.append({"id": "", "status": "failed", "error": "Entry must be an object."})
+            continue
+        entry_id = str(entry.get("id") or entry.get("action_id") or "").strip()
+        command_text = str(entry.get("command_text") or "").strip()
+        if not entry_id:
+            failed.append({"id": "", "status": "failed", "error": "Missing id."})
+            continue
+        if entry_id in offline_synced_entry_ids:
+            synced.append({"id": entry_id, "status": "already_synced", "reply": "Already synced."})
+            append_offline_sync_log(entry, "already_synced", "Already synced.", "")
+            continue
+        if not command_text:
+            error = "Missing command_text."
+            failed.append({"id": entry_id, "status": "failed", "error": error})
+            append_offline_sync_log(entry, "failed", "", error)
+            continue
+        try:
+            reply = get_intake_service().process_text(command_text)
+            if is_offline_sync_failure_reply(reply):
+                raise ValueError(reply)
+            offline_synced_entry_ids.add(entry_id)
+            synced.append({"id": entry_id, "status": "synced", "reply": reply})
+            append_offline_sync_log(entry, "synced", reply, "")
+        except Exception as exc:
+            error = sanitize_error_message(exc)
+            failed.append({"id": entry_id, "status": "failed", "error": error})
+            append_offline_sync_log(entry, "failed", "", error)
+    return {"status": "ok", "synced": synced, "failed": failed}
 
 
 @app.get("/status", response_class=HTMLResponse)
@@ -1305,6 +1368,38 @@ def save_photo_metadata(
     with metadata_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(row, ensure_ascii=True) + "\n")
     return row
+
+
+def append_offline_sync_log(entry: dict[str, Any], status: str, reply: str, error: str) -> None:
+    try:
+        log_dir = PROJECT_ROOT / "data"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        row = {
+            "timestamp": now_in_timezone(get_settings().timezone).isoformat(timespec="seconds"),
+            "id": str(entry.get("id") or entry.get("action_id") or ""),
+            "entry_timestamp": str(entry.get("timestamp") or ""),
+            "pharmacy_id": str(entry.get("pharmacy_id") or ""),
+            "command_text": str(entry.get("command_text") or ""),
+            "type": str(entry.get("type") or entry.get("action_type") or ""),
+            "sync_status": status,
+            "retry_count": entry.get("retry_count", 0),
+            "last_error": error,
+            "reply": reply[:500],
+            "source": "offline_pwa",
+        }
+        with (log_dir / "offline_sync_log.jsonl").open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(row, ensure_ascii=True) + "\n")
+    except Exception:
+        logger.debug("Offline sync log write skipped", exc_info=True)
+
+
+def is_offline_sync_failure_reply(reply: str) -> bool:
+    normalized = str(reply or "").lower()
+    return (
+        "i didn" in normalized and "understand" in normalized
+        or "could not save" in normalized
+        or "google sheets is not configured" in normalized
+    )
 
 
 def log_webhook_request(sender: str, message_type: str, success: bool, error_reason: str = "") -> None:
