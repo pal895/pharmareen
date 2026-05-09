@@ -33,6 +33,14 @@ from app.reports import LowStockWarning, ReportMetrics, ReportService
 from app.routes.admin import router as admin_router
 from app.routes.meta_webhook import meta_callback_router, router as meta_whatsapp_router
 from app.routes.offline_sync import router as offline_sync_router
+from app.services.photo_intake import (
+    append_photo_intake_log,
+    build_invoice_extraction_placeholder,
+    ensure_photo_intake_dirs,
+    google_sheets_preparation_helpers,
+    read_photo_intake_stats,
+    save_photo_upload,
+)
 from app.sheets import GoogleSheetsStore, SHEETS_UNAVAILABLE_MESSAGE, SheetsUnavailableError
 from app.transcription import TranscriptionService, TranscriptionUnavailableError
 from app.utils import now_in_timezone
@@ -52,7 +60,7 @@ last_openai_error: dict[str, Any] = {
     "timestamp": "",
 }
 VOICE_QUOTA_REPLY = "🎧 Voice received safely. AI transcription is ready but OpenAI credits are not active yet."
-PHOTO_QUOTA_REPLY = "📸 Photo received safely. Invoice/photo AI extraction is ready but OpenAI credits are not active yet."
+PHOTO_QUOTA_REPLY = "Photo received safely. AI invoice extraction is installed and waiting for OpenAI credits activation."
 
 
 @asynccontextmanager
@@ -513,6 +521,30 @@ def debug_voice_ai() -> dict[str, Any]:
     }
 
 
+@app.get("/debug/photo-ai")
+def debug_photo_ai() -> dict[str, Any]:
+    settings = get_settings()
+    paths = ensure_photo_intake_dirs(PROJECT_ROOT)
+    stats = read_photo_intake_stats(PROJECT_ROOT)
+    if bool(last_openai_error.get("quota_missing")):
+        quota_status = "quota_missing"
+    elif settings.openai_api_key.strip():
+        quota_status = "key_present_waiting_for_billing"
+    else:
+        quota_status = "openai_key_missing"
+    return {
+        "photo_pipeline_installed": True,
+        "upload_folder_exists": paths["upload_dir"].exists(),
+        "images_received_count": stats["images_received_count"],
+        "openai_key_present": bool(settings.openai_api_key.strip()),
+        "openai_quota_status": quota_status,
+        "extraction_pipeline_ready": True,
+        "last_uploaded_image": stats["last_uploaded_image"],
+        "google_sheets_helpers_ready": True,
+        "google_sheets_preparation": google_sheets_preparation_helpers(),
+    }
+
+
 @app.post("/debug/whatsapp-test")
 async def debug_whatsapp_test() -> JSONResponse:
     settings = get_settings()
@@ -777,77 +809,57 @@ async def process_whatsapp_web_payload(
             image_bytes = base64.b64decode(media_base64)
         except Exception as exc:
             return WhatsAppProcessResult(
-                reply="📸 Photo received, but I could not read the image file. Please resend a clearer photo.",
+                reply="Photo received, but I could not read the image file. Please resend a clearer photo.",
                 message_type="image",
                 success=False,
                 error_reason=str(exc),
                 command_handler="photo_decode_failed",
             )
 
-        metadata = save_photo_metadata(
+        settings = get_settings()
+        upload = save_photo_upload(
+            PROJECT_ROOT,
             sender=sender,
             message_id=message_id,
-            media_mime_type=media_mime_type,
-            byte_count=len(image_bytes),
+            media_type=media_mime_type,
+            image_bytes=image_bytes,
+            timestamp=now_in_timezone(settings.timezone).isoformat(timespec="seconds"),
         )
+        extraction_status = (
+            "waiting_for_openai_credits"
+            if settings.openai_api_key.strip() or bool(last_openai_error.get("quota_missing"))
+            else "waiting_for_openai_key"
+        )
+        extraction = build_invoice_extraction_placeholder(extraction_status=extraction_status)
+        intake_record = {
+            "sender": mask_phone(sender),
+            "timestamp": upload["timestamp"],
+            "media_type": media_mime_type,
+            "file_path": upload["relative_file_path"],
+            "message_id": message_id,
+            "processing_status": extraction_status,
+            "byte_count": len(image_bytes),
+            "source": "whatsapp_web_bridge",
+            "extraction": extraction,
+        }
+        append_photo_intake_log(PROJECT_ROOT, intake_record)
         logger.info(
-            "PHOTO_RECEIVED sender=%s message_id=%s mime=%s bytes=%s metadata_path=%s",
+            "PHOTO_RECEIVED sender=%s message_id=%s mime=%s bytes=%s file_path=%s status=%s",
             mask_phone(sender),
             message_id,
             media_mime_type,
             len(image_bytes),
-            metadata.get("metadata_path", ""),
+            upload["relative_file_path"],
+            extraction_status,
         )
 
-        ai_service = get_ai_service()
-        if ai_service.client is None:
-            return WhatsAppProcessResult(
-                reply="📸 Photo received safely. Invoice/photo AI extraction is ready but OpenAI key is not active yet.",
-                message_type="image",
-                success=True,
-                command_handler="photo_received_ai_unavailable",
-            )
-
-        if bool(last_openai_error.get("quota_missing")):
-            return WhatsAppProcessResult(
-                reply=PHOTO_QUOTA_REPLY,
-                message_type="image",
-                success=True,
-                error_reason="openai_insufficient_quota",
-                command_handler="photo_quota_missing",
-            )
-
-        try:
-            extraction = ai_service.extract_restock_from_image(image_bytes, media_mime_type)
-            clear_last_openai_error("photo")
-            message = str(extraction.get("message") or "").strip()
-            item_count = len(extraction.get("items") or [])
-            detail = f" I found {item_count} possible item(s)." if item_count else ""
-            if message:
-                detail = f" {message}"
-            return WhatsAppProcessResult(
-                reply=f"📸 Photo received safely.{detail}\nI have not changed stock yet. Confirmation will come in Phase 5.",
-                message_type="image",
-                success=True,
-                command_handler="photo_ai_extracted",
-            )
-        except Exception as exc:
-            record_openai_error("photo", exc)
-            if is_openai_quota_error(exc):
-                return WhatsAppProcessResult(
-                    reply=PHOTO_QUOTA_REPLY,
-                    message_type="image",
-                    success=True,
-                    error_reason="openai_insufficient_quota",
-                    command_handler="photo_quota_missing",
-                )
-            return WhatsAppProcessResult(
-                reply="📸 Photo received safely. I could not extract the invoice/photo yet, but the upload path is working.",
-                message_type="image",
-                success=True,
-                error_reason=str(exc),
-                command_handler="photo_ai_failed",
-            )
+        return WhatsAppProcessResult(
+            reply=PHOTO_QUOTA_REPLY,
+            message_type="image",
+            success=True,
+            error_reason="openai_insufficient_quota" if extraction_status == "waiting_for_openai_credits" else "openai_key_missing",
+            command_handler="photo_received_waiting_for_openai_credits",
+        )
 
     return WhatsAppProcessResult(
         reply="Please send text for now, like: Panadol 2",

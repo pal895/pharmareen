@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import logging
 from pathlib import Path
 from uuid import uuid4
@@ -310,17 +311,29 @@ def test_whatsapp_web_bridge_photo_quota_fallback(monkeypatch, tmp_path):
 
     with TestClient(main.app) as client:
         response = client.post("/bridge/whatsapp-web", json=payload)
-        status = client.get("/debug/voice-ai")
+        status = client.get("/debug/photo-ai")
 
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert data["reply"] == "📸 Photo received safely. Invoice/photo AI extraction is ready but OpenAI credits are not active yet."
+    assert data["reply"] == "Photo received safely. AI invoice extraction is installed and waiting for OpenAI credits activation."
     assert data["message_type"] == "image"
-    assert data["command_handler"] == "photo_quota_missing"
-    assert (tmp_path / "data" / "photo_intake_log.jsonl").exists()
-    assert status.json()["photo_pipeline_installed"] is True
-    assert status.json()["quota_missing"] is True
+    assert data["command_handler"] == "photo_received_waiting_for_openai_credits"
+    saved_images = list((tmp_path / "data" / "photo_uploads").glob("*.jpg"))
+    assert len(saved_images) == 1
+    assert saved_images[0].read_bytes() == b"fake image bytes"
+    log_path = tmp_path / "data" / "photo_intake_log.jsonl"
+    assert log_path.exists()
+    log_entry = json.loads(log_path.read_text(encoding="utf-8").strip())
+    assert log_entry["media_type"] == "image/jpeg"
+    assert log_entry["file_path"].startswith("data/photo_uploads/")
+    assert log_entry["processing_status"] == "waiting_for_openai_credits"
+    assert log_entry["extraction"]["extraction_status"] == "waiting_for_openai_credits"
+    status_data = status.json()
+    assert status_data["photo_pipeline_installed"] is True
+    assert status_data["upload_folder_exists"] is True
+    assert status_data["images_received_count"] == 1
+    assert status_data["last_uploaded_image"]["file_path"].startswith("data/photo_uploads/")
 
 
 def test_whatsapp_web_bridge_payload_test_mode_still_blocks_group(monkeypatch):

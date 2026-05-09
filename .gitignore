@@ -222,3 +222,5 @@ node_modules/
 .baileys_auth/
 npm-debug.log*
 data/pharmacies_registry.json
+data/photo_uploads/
+data/photo_intake_log.jsonl
