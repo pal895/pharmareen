@@ -14,8 +14,38 @@ from app.sheets import SHEETS_UNAVAILABLE_MESSAGE, SheetsUnavailableError
 from app.utils import format_ksh, normalize_key, now_in_timezone, parse_int, parse_money
 
 
-UNDERSTAND_ERROR = "I didn’t understand that yet.\n\nTry:\nPanadol 2\n+Panadol 20\nreport today"
+UNDERSTAND_ERROR = "\n".join(
+    [
+        "🤖 I’m not fully sure what you meant.",
+        "",
+        "Try:",
+        "• Panadol 2",
+        "• +Panadol 20",
+        "• report today",
+        "• stock Panadol",
+        "",
+        "Or type:",
+        "help",
+    ]
+)
 SAVE_ERROR = "I could not save this record right now. Please check the Google Sheets connection."
+GREETING_TEXT = "\n".join(
+    [
+        "👋 Welcome to PharMareen.",
+        "",
+        "You can manage your pharmacy through simple WhatsApp messages.",
+        "",
+        "Examples:",
+        "• Panadol 2",
+        "• +Panadol 20",
+        "• report today",
+        "",
+        "Type:",
+        "help",
+        "",
+        "for a quick guide.",
+    ]
+)
 HELP_TEXT = "\n".join(
     [
         "PHARMAREEN QUICK COMMANDS",
@@ -23,9 +53,11 @@ HELP_TEXT = "\n".join(
         "Sales:",
         "- Panadol sold 2",
         "- Insulin sold 1",
+        "- sell Panadol",
         "",
         "Stock:",
         "- Panadol stock",
+        "- stock Panadol",
         "",
         "Restock:",
         "- Panadol restock 20",
@@ -48,6 +80,9 @@ HELP_TEXT = "\n".join(
         "",
         "Voice:",
         "- Send voice note: Panadol sold two",
+        "",
+        "Offline mode:",
+        "- Save entries in the offline app, then sync",
         "",
         "Late sales:",
         "- later Panadol 5",
@@ -166,6 +201,12 @@ class OperatingCommand:
     error: str = ""
 
 
+@dataclass(frozen=True)
+class FollowUpPrompt:
+    command: OperatingCommand
+    question: str
+
+
 NUMBER_WORDS = {
     "zero": 0,
     "one": 1,
@@ -216,11 +257,28 @@ class IntakeService:
         self.pharmacy_name = pharmacy_name
         self.app_base_url = clean_app_base_url(app_base_url)
         self.whatsapp_number = clean_whatsapp_number(whatsapp_number)
+        self.pending_followups: dict[str, OperatingCommand] = {}
 
-    def process_text(self, text: str) -> str:
+    def process_text(self, text: str, conversation_id: str | None = None) -> str:
         text = text.strip()
         if not text:
             return "Please send a short text message or voice note."
+
+        conversation_key = conversation_id or "__default__"
+        pending_followup = self.pending_followups.get(conversation_key)
+        if pending_followup is not None:
+            completed = complete_followup_command(text, pending_followup)
+            if completed is not None:
+                self.pending_followups.pop(conversation_key, None)
+                return self._process_commands([completed])
+            if normalize_key(text) in {"cancel", "stop"}:
+                self.pending_followups.pop(conversation_key, None)
+                return "No problem. Nothing was saved."
+            if parse_operating_commands(text) is not None or is_help_command(text) or is_greeting_command(text):
+                self.pending_followups.pop(conversation_key, None)
+
+        if is_greeting_command(text):
+            return GREETING_TEXT
 
         if is_help_command(text):
             return HELP_TEXT
@@ -236,6 +294,11 @@ class IntakeService:
 
         if is_process_batch_command(text):
             return "No saved offline entries yet.\n\nSend sales together like:\nPanadol 2\nAmoxil 1"
+
+        followup_prompt = parse_followup_prompt(text)
+        if followup_prompt is not None:
+            self.pending_followups[conversation_key] = followup_prompt.command
+            return followup_prompt.question
 
         if is_profit_today_command(text):
             return self._profit_today_reply()
@@ -444,7 +507,7 @@ class IntakeService:
 
     def _process_commands(self, commands: list[OperatingCommand]) -> str:
         results = [self._process_command(command) for command in commands]
-        if len(results) == 1 and results[0].category != "errors":
+        if len(results) == 1:
             return results[0].reply
 
         groups = {
@@ -914,7 +977,33 @@ def merge_notes(existing: str, extra_notes: list[str]) -> str:
 
 
 def is_help_command(text: str) -> bool:
-    return text.strip().lower() in {"help", "start", "menu", "commands"}
+    normalized = normalize_key(text)
+    return normalized in {
+        "help",
+        "start",
+        "menu",
+        "commands",
+        "guide",
+        "tutorial",
+        "how do i use this",
+        "how do i use phar mareen",
+        "how do i use pharmareen",
+        "what can you do",
+    }
+
+
+def is_greeting_command(text: str) -> bool:
+    normalized = normalize_key(text)
+    return normalized in {
+        "hello",
+        "hi",
+        "hey",
+        "habari",
+        "morning",
+        "good morning",
+        "mambo",
+        "sasa",
+    }
 
 
 def is_share_command(text: str) -> bool:
@@ -958,6 +1047,11 @@ def parse_stock_check_command(text: str) -> str | None:
         return None
     if re.fullmatch(r"stock\s+.+?\s+\d+", normalized, flags=re.IGNORECASE):
         return None
+    if normalized in {"stock", "check stock", "remaining stock"}:
+        return None
+    natural = re.fullmatch(r"(?:remaining\s+stock|stock\s+remaining)\s+(?:for\s+)?(.+)\??", text.strip(), flags=re.IGNORECASE)
+    if natural:
+        return natural.group(1).strip() or None
     natural = re.fullmatch(r"(?:what\s+is|what's|check)\s+(.+?)\s+stock\??", text.strip(), flags=re.IGNORECASE)
     if natural:
         return natural.group(1).strip() or None
@@ -984,6 +1078,7 @@ def is_weekly_report_command(text: str) -> bool:
     return bool(
         re.fullmatch(r"(?:report\s+week|weekly\s+report)", normalized, flags=re.IGNORECASE)
         or re.fullmatch(r"show\s+me\s+(?:the\s+)?weekly\s+report", normalized, flags=re.IGNORECASE)
+        or re.fullmatch(r"week(?:ly)?\s+summary", normalized, flags=re.IGNORECASE)
     )
 
 
@@ -992,6 +1087,7 @@ def is_today_summary_command(text: str) -> bool:
     return bool(
         re.fullmatch(r"(?:show\s+)?report(?:\s+today)?|daily\s+report", normalized, flags=re.IGNORECASE)
         or re.fullmatch(r"give\s+me\s+(?:today|today\s+report|the\s+daily\s+report)", normalized, flags=re.IGNORECASE)
+        or re.fullmatch(r"(?:today\s+sales|today\s+report|summary\s+today|today\s+summary)", normalized, flags=re.IGNORECASE)
         or re.fullmatch(r"send\s+me\s+(?:the\s+)?daily\s+pdf", normalized, flags=re.IGNORECASE)
         or re.fullmatch(r"download\s+today\s+report", normalized, flags=re.IGNORECASE)
     )
@@ -1013,6 +1109,62 @@ def parse_report_command(text: str, timezone: str) -> str | None:
     if target == "yesterday":
         return (today - timedelta(days=1)).isoformat()
     return target
+
+
+def parse_followup_prompt(text: str) -> FollowUpPrompt | None:
+    clean = normalize_natural_text(replace_number_words(text.strip()))
+    clean = " ".join(clean.split())
+    if not clean or any(separator in clean for separator in [",", "\n"]):
+        return None
+    if any(character.isdigit() for character in clean):
+        return None
+
+    sale_match = re.fullmatch(r"(?:i\s+)?(?:sell|sold|sale)\s+(.+)", clean, flags=re.IGNORECASE)
+    if sale_match:
+        drug_name = title_drug_name(sale_match.group(1))
+        return FollowUpPrompt(
+            OperatingCommand(kind="sale", drug_name=drug_name, quantity=0, raw_text=text),
+            f"How many {drug_name} were sold?",
+        )
+
+    restock_match = re.fullmatch(r"(?:restock|restocked|add|received)\s+(.+)", clean, flags=re.IGNORECASE)
+    if not restock_match:
+        restock_match = re.fullmatch(r"(.+?)\s+(?:restock|restocked)", clean, flags=re.IGNORECASE)
+    if restock_match:
+        drug_name = title_drug_name(restock_match.group(1))
+        if normalize_key(drug_name) == "stock":
+            return FollowUpPrompt(
+                OperatingCommand(kind="restock", drug_name="", quantity=0, raw_text=text),
+                "Which medicine and how many units were added?\nExample: Panadol restock 20",
+            )
+        return FollowUpPrompt(
+            OperatingCommand(kind="restock", drug_name=drug_name, quantity=0, raw_text=text),
+            f"How many {drug_name} were added?",
+        )
+
+    if normalize_key(clean) in {"stock", "check stock", "remaining stock"}:
+        return FollowUpPrompt(
+            OperatingCommand(kind="stock_check", drug_name="", quantity=0, raw_text=text),
+            "Which medicine should I check?\nExample: Panadol stock",
+        )
+    return None
+
+
+def complete_followup_command(text: str, pending: OperatingCommand) -> OperatingCommand | None:
+    clean = normalize_natural_text(replace_number_words(text.strip()))
+    clean = " ".join(clean.split())
+    if not clean:
+        return None
+    if pending.kind in {"sale", "restock"}:
+        quantity = parse_int(clean, default=None)
+        if quantity is not None and quantity > 0 and pending.drug_name:
+            return replace(pending, quantity=quantity, raw_text=f"{pending.raw_text} {quantity}".strip())
+        if not pending.drug_name:
+            parsed = parse_single_operating_command(clean)
+            return parsed if parsed and parsed.kind == pending.kind else None
+    if pending.kind == "stock_check" and not any(character.isdigit() for character in clean):
+        return replace(pending, drug_name=title_drug_name(clean), raw_text=f"{clean} stock")
+    return None
 
 
 def parse_operating_commands(text: str) -> list[OperatingCommand] | None:
@@ -1514,6 +1666,15 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
             raw_text=text,
         )
 
+    match = re.fullmatch(r"(.+?)\s+sold", clean, flags=re.IGNORECASE)
+    if match:
+        return OperatingCommand(
+            kind="sale",
+            drug_name=title_drug_name(match.group(1)),
+            quantity=1,
+            raw_text=text,
+        )
+
     match = re.fullmatch(r"(?:i\s+)?(?:sold|sell|sale)\s+(\d+)\s+(.+)", clean, flags=re.IGNORECASE)
     if match:
         return OperatingCommand(
@@ -1552,6 +1713,8 @@ def positive_quantity(value: Any) -> int:
 def title_drug_name(value: str) -> str:
     text = " ".join(str(value or "").strip().split())
     if not text:
+        return text
+    if any(character.isupper() for character in text[1:]):
         return text
     return text.title()
 

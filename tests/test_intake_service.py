@@ -211,7 +211,7 @@ def test_help_command_returns_available_commands_without_parser():
     parser = FailingParser()
     service = IntakeService(parser, store)
 
-    for command in ["help", "menu", "commands"]:
+    for command in ["help", "menu", "commands", "how do I use this", "tutorial", "guide", "what can you do"]:
         reply = service.process_text(command)
 
         assert len(reply) < 1200
@@ -228,7 +228,84 @@ def test_help_command_returns_available_commands_without_parser():
         assert "Panadol restock 20 supplier DawaPlus expiry Dec 2026" in reply
         assert "Send invoice photo" in reply
         assert "Panadol sold two" in reply
+        assert "Offline mode" in reply
         assert parser.called is False
+
+
+def test_greeting_returns_warm_onboarding_without_parser():
+    store = FakeStore()
+    parser = FailingParser()
+    service = IntakeService(parser, store)
+
+    for command in ["hello", "hi", "habari", "good morning", "mambo"]:
+        reply = service.process_text(command)
+
+        assert "Welcome to PharMareen" in reply
+        assert "Panadol 2" in reply
+        assert "+Panadol 20" in reply
+        assert "report today" in reply
+        assert parser.called is False
+
+
+def test_unknown_message_returns_human_guidance():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    reply = service.process_text("please do the pharmacy thing")
+
+    assert "not fully sure" in reply
+    assert "Panadol 2" in reply
+    assert "+Panadol 20" in reply
+    assert "report today" in reply
+    assert "help" in reply
+
+
+def test_natural_sale_followup_records_after_quantity_reply():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    first = service.process_text("sell panadol", conversation_id="2547")
+    second = service.process_text("2", conversation_id="2547")
+
+    assert first == "How many Panadol were sold?"
+    assert "Panadol x2 recorded" in second
+    assert store.stocks["panadol"].current_stock == 18
+
+
+def test_natural_restock_followup_records_after_quantity_reply():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    first = service.process_text("restock panadol", conversation_id="2547")
+    second = service.process_text("20", conversation_id="2547")
+
+    assert first == "How many Panadol were added?"
+    assert "Panadol +20 added" in second
+    assert store.stocks["panadol"].current_stock == 40
+
+
+def test_stock_followup_checks_named_drug():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    first = service.process_text("check stock", conversation_id="2547")
+    second = service.process_text("Panadol", conversation_id="2547")
+
+    assert "Which medicine should I check" in first
+    assert "Panadol stock: 20" in second
+
+
+def test_more_natural_stock_and_report_phrases_work():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    stock_reply = service.process_text("remaining stock panadol")
+    report_reply = service.process_text("today sales")
+    summary_reply = service.process_text("summary today")
+
+    assert "Panadol stock: 20" in stock_reply
+    assert report_reply.startswith("📊 Daily Report")
+    assert summary_reply.startswith("📊 Daily Report")
 
 def test_stock_check_returns_current_stock_price_and_reorder_level():
     store = FakeStore()

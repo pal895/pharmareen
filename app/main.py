@@ -981,7 +981,7 @@ async def process_whatsapp_web_payload(
                     command_handler="voice_note_transcribed",
                 )
             interpreted = normalize_spoken_command_text(transcript)
-            reply = get_intake_service().process_text(interpreted)
+            reply = process_intake_text_for_sender(interpreted, sender)
             return WhatsAppProcessResult(
                 reply=voice_reply(transcript, interpreted, reply),
                 message_type="voice",
@@ -1070,6 +1070,16 @@ async def process_whatsapp_web_payload(
         error_reason="unsupported_media",
         command_handler="unsupported_media",
     )
+
+
+def process_intake_text_for_sender(text: str, sender: str) -> str:
+    intake_service = get_intake_service()
+    try:
+        return intake_service.process_text(text, conversation_id=sender)
+    except TypeError as exc:
+        if "conversation_id" not in str(exc):
+            raise
+        return intake_service.process_text(text)
 
 
 @app.post("/webhook/whatsapp")
@@ -1178,13 +1188,13 @@ async def process_whatsapp_form_values(form_values: dict[str, Any]) -> WhatsAppP
             command_handler = "voice_confirmation_yes"
             incoming = IncomingInput(text=pending, is_voice=False)
             clear_pending_voice(from_number)
-            reply = "âœ… Confirmed. Records updated.\n\n" + get_intake_service().process_text(incoming.text)
+            reply = "âœ… Confirmed. Records updated.\n\n" + process_intake_text_for_sender(incoming.text, from_number)
         elif body:
             if pending:
                 command_handler = "voice_correction_text"
                 clear_pending_voice(from_number)
             incoming = IncomingInput(text=body, is_voice=False)
-            reply = get_intake_service().process_text(incoming.text)
+            reply = process_intake_text_for_sender(incoming.text, from_number)
         else:
             whatsapp = get_whatsapp_client()
             incoming = await incoming_text_from_form(form_values, whatsapp, get_transcription_service())
@@ -1194,7 +1204,7 @@ async def process_whatsapp_form_values(form_values: dict[str, Any]) -> WhatsAppP
                 reply = voice_needs_correction_reply(incoming.original_text or incoming.text)
             else:
                 command_handler = "voice_note_processed" if incoming.is_voice else classify_command_handler(incoming.text)
-                reply = get_intake_service().process_text(incoming.text)
+                reply = process_intake_text_for_sender(incoming.text, from_number)
                 if incoming.is_voice:
                     reply = voice_reply(incoming.original_text or incoming.text, incoming.text, reply)
 
@@ -1234,8 +1244,10 @@ def classify_command_handler(body: str) -> str:
     text = str(body or "").strip().lower()
     if not text:
         return "empty"
-    if text in {"start", "help", "menu", "commands"}:
+    if text in {"start", "help", "menu", "commands", "guide", "tutorial", "how do i use this", "what can you do"}:
         return "help_start"
+    if text in {"hello", "hi", "hey", "habari", "morning", "good morning", "mambo", "sasa"}:
+        return "greeting"
     if text == "share":
         return "share"
     if "report" in text or "daily pdf" in text or "download today" in text:

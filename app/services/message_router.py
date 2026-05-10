@@ -74,7 +74,7 @@ class MessageRouter:
                 requires_confirmation=True,
                 action_type=risky_type,
             )
-        reply = self.intake_service.process_text(text)
+        reply = process_intake_text(self.intake_service, text, message.from_phone)
         return RouterResult(reply, saved=True, action_type="intake")
 
     def _handle_audio(self, message: NormalizedMessage, audio_bytes: bytes, content_type: str | None) -> RouterResult:
@@ -89,7 +89,7 @@ class MessageRouter:
         if risky_type:
             pending_actions.set(message.from_phone, risky_type, {"text": interpreted, "transcript": transcript})
             return RouterResult(f"Please confirm: did you mean {interpreted}?", requires_confirmation=True, action_type=risky_type)
-        reply = self.intake_service.process_text(interpreted)
+        reply = process_intake_text(self.intake_service, interpreted, message.from_phone)
         return RouterResult(f"I heard: {transcript}\nCommand: {interpreted}\n\n{reply}", saved=True, action_type="voice")
 
     def _handle_image(self, message: NormalizedMessage, media_bytes: bytes, content_type: str | None) -> RouterResult:
@@ -135,7 +135,7 @@ class MessageRouter:
             if pending.action_type in {"expiry_entry", "image_restock", "stock_correction", "batch_change"}:
                 return RouterResult("Confirmed. Saved for pharmacy review.", saved=True, action_type=pending.action_type)
         pending_actions.clear(phone)
-        reply = self.intake_service.process_text(text)
+        reply = process_intake_text(self.intake_service, text, phone)
         return RouterResult(reply, saved=True, action_type="correction")
 
     def _drug_card(self, drug_name: str) -> str:
@@ -166,9 +166,38 @@ def confirmation_reply(action_type: str, text: str) -> str:
     return f"This is a {label} action.\n\nI will not save it yet.\nReply YES to confirm, EDIT to correct, or CANCEL."
 
 
+def process_intake_text(intake_service: Any, text: str, conversation_id: str) -> str:
+    try:
+        return intake_service.process_text(text, conversation_id=conversation_id)
+    except TypeError as exc:
+        if "conversation_id" not in str(exc):
+            raise
+        return intake_service.process_text(text)
+
+
 def is_drug_name_only(text: str) -> bool:
+    normalized = " ".join(text.strip().lower().split())
+    if normalized in {
+        "hello",
+        "hi",
+        "hey",
+        "habari",
+        "morning",
+        "good morning",
+        "mambo",
+        "sasa",
+        "help",
+        "start",
+        "menu",
+        "commands",
+        "guide",
+        "tutorial",
+        "how do i use this",
+        "what can you do",
+    }:
+        return False
     return bool(re.fullmatch(r"[A-Za-z][A-Za-z0-9\s+./-]{1,60}", text.strip())) and not any(
-        word in text.lower().split()
+        word in normalized.split()
         for word in {
             "sold",
             "sell",
@@ -188,6 +217,8 @@ def is_drug_name_only(text: str) -> bool:
             "restock",
             "received",
             "add",
+            "summary",
+            "today",
         }
     )
 

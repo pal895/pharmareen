@@ -151,6 +151,47 @@ def test_whatsapp_web_bridge_processes_allowed_sender(monkeypatch):
     assert data["command_handler"] == "help_start"
 
 
+def test_whatsapp_web_bridge_greeting_and_how_to_use_are_human_friendly(monkeypatch):
+    main.get_sheet_store.cache_clear()
+    main.get_intake_service.cache_clear()
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, DEMO_MODE=True, ALLOWED_WHATSAPP_NUMBERS="254700000000"),
+    )
+
+    with TestClient(main.app) as client:
+        hello = client.post("/bridge/whatsapp-web", json=bridge_payload("hello"))
+        guide = client.post("/bridge/whatsapp-web", json=bridge_payload("how do I use this"))
+
+    assert hello.status_code == 200
+    assert "Welcome to PharMareen" in hello.json()["reply"]
+    assert "Panadol 2" in hello.json()["reply"]
+    assert guide.status_code == 200
+    assert "PHARMAREEN QUICK COMMANDS" in guide.json()["reply"]
+    assert "Offline mode" in guide.json()["reply"]
+
+
+def test_whatsapp_web_bridge_followup_sale_uses_sender_context(monkeypatch):
+    main.get_sheet_store.cache_clear()
+    main.get_intake_service.cache_clear()
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, DEMO_MODE=True, ALLOWED_WHATSAPP_NUMBERS="254700000000"),
+    )
+
+    with TestClient(main.app) as client:
+        first = client.post("/bridge/whatsapp-web", json=bridge_payload("sell panadol"))
+        second = client.post("/bridge/whatsapp-web", json=bridge_payload("2"))
+
+    assert first.status_code == 200
+    assert first.json()["reply"] == "How many Panadol were sold?"
+    assert second.status_code == 200
+    assert "Panadol x2 recorded" in second.json()["reply"]
+    assert "Stock left" in second.json()["reply"]
+
+
 def test_whatsapp_web_bridge_ignores_lid_sender_without_test_mode(monkeypatch):
     monkeypatch.setattr(
         main,
