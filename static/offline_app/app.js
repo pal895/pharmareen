@@ -37,6 +37,15 @@ function saveJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+
+function disableNativeRequiredValidation() {
+  document.querySelectorAll("[required]").forEach(element => {
+    element.required = false;
+    element.removeAttribute("required");
+  });
+  document.querySelectorAll("form").forEach(form => { form.noValidate = true; });
+}
+
 function supportsIndexedDb() {
   return typeof indexedDB !== "undefined";
 }
@@ -397,6 +406,7 @@ if ("serviceWorker" in navigator) {
 }
 
 async function boot() {
+  disableNativeRequiredValidation();
   await initializeStorage();
   updateConnectionStatus();
   await renderQueue();

@@ -48,13 +48,13 @@ def test_offline_app_routes_return_html():
     assert "PharMareen Offline Mode" in followed_response.text
     assert "Type or paste pharmacy command" in followed_response.text
     assert "Save Offline" in followed_response.text
-    assert "Phase 6 Media Fix v3" in followed_response.text
+    assert "PHASE 6 FINAL WORKING" in followed_response.text
     assert "Photo queue" in followed_response.text
     assert "Voice/audio queue" in followed_response.text
     assert compat_response.status_code == 200
     assert compat_response.headers["content-type"].startswith("text/html")
     assert "PharMareen Offline Mode" in compat_response.text
-    assert "Phase 6 Media Fix v3" in compat_response.text
+    assert "PHASE 6 FINAL WORKING" in compat_response.text
     assert "no-store" in compat_response.headers.get("cache-control", "")
     assert parser_response.status_code == 200
     assert manifest_response.status_code == 200
@@ -256,11 +256,29 @@ def test_legacy_local_offline_app_matches_phase6_frontend():
     legacy_app = (root / "local" / "app.js").read_text(encoding="utf-8")
     legacy_parser = root / "local" / "parser.js"
 
-    assert "Phase 6 Media Fix v3" in legacy_html
+    assert "PHASE 6 FINAL WORKING" in legacy_html
     assert "Choose invoice/photo files" in legacy_html
     assert "Choose voice/audio files" in legacy_html
     assert "queueMediaFiles" in legacy_app
     assert legacy_parser.exists()
+
+
+def test_legacy_offline_app_folder_matches_final_frontend():
+    root = Path(__file__).resolve().parents[1]
+    legacy_html = (root / "offline_app" / "index.html").read_text(encoding="utf-8")
+    legacy_app = (root / "offline_app" / "app.js").read_text(encoding="utf-8")
+    legacy_worker = (root / "offline_app" / "service-worker.js").read_text(encoding="utf-8")
+    legacy_parser = root / "offline_app" / "parser.js"
+
+    assert "PHASE 6 FINAL WORKING" in legacy_html
+    assert "Choose invoice/photo files" in legacy_html
+    assert "Choose voice/audio files" in legacy_html
+    assert " required" not in legacy_html
+    assert "disableNativeRequiredValidation" in legacy_app
+    assert "queueMediaFiles" in legacy_app
+    assert "pharmareen-offline-v7" in legacy_worker
+    assert legacy_parser.exists()
+
 
 def test_offline_media_inputs_allow_multiple_files_without_required_command():
     root = Path(__file__).resolve().parents[1]
@@ -273,6 +291,7 @@ def test_offline_media_inputs_allow_multiple_files_without_required_command():
     assert 'accept="image/*" multiple' in html
     assert 'accept="audio/*" multiple' in html
     assert 'id="commandText"' in html
+    assert " required" not in html
     assert 'id="commandText" required' not in html
     assert 'id="photoInput" type="file" accept="image/*" multiple required' not in html
     assert 'id="voiceInput" type="file" accept="audio/*" multiple required' not in html
@@ -351,10 +370,10 @@ def test_offline_pwa_assets_contain_auto_sync_media_and_retry_logic():
     assert "splitCommands" in parser
     assert "parseCommand" in parser
     assert "Save Offline" in html
-    assert "Phase 6 Media Fix v3" in html
+    assert "PHASE 6 FINAL WORKING" in html
     assert "Photo queue" in html
     assert "Voice/audio queue" in html
     assert '"start_url": "/offline-app"' in manifest
     assert "/offline_app/parser.js" in worker
-    assert "pharmareen-offline-v6" in worker
+    assert "pharmareen-offline-v7" in worker
     assert "caches.open" in worker
