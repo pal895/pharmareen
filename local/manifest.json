@@ -1,9 +1,17 @@
-{
-  "name": "PharMareen",
-  "short_name": "Pharma",
+﻿{
+  "name": "PharMareen Offline App",
+  "short_name": "PharMareen",
+  "start_url": "/offline-app",
+  "scope": "/",
   "display": "standalone",
-  "start_url": "/offline_app/index.html",
-  "background_color": "#f7fafc",
-  "theme_color": "#1f4e79",
-  "icons": []
+  "theme_color": "#0f6b46",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/offline_app/icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }

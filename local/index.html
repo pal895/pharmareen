@@ -1,50 +1,94 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f6b46">
+  <title>PharMareen Offline Mode</title>
   <link rel="manifest" href="/offline_app/manifest.json">
-  <title>PharMareen Offline</title>
-  <style>
-    body { margin:0; font-family: Arial, sans-serif; background:#f7fafc; color:#102033; }
-    main { max-width: 720px; margin: 0 auto; padding: 18px; }
-    h1 { margin: 12px 0; font-size: 26px; }
-    .banner { position: sticky; top: 0; padding: 10px 12px; border-radius: 6px; font-weight: bold; }
-    .offline { background:#fff3cd; }
-    .online { background:#d1fae5; }
-    .syncing { background:#dbeafe; }
-    .error { background:#fee2e2; }
-    form { display:grid; gap:10px; background:white; border:1px solid #dde7ef; border-radius:8px; padding:14px; }
-    input, select, textarea, button { font: inherit; padding: 10px; border-radius:6px; border:1px solid #cbd5e1; }
-    button { background:#1f4e79; color:white; border:0; font-weight:bold; }
-    ul { padding-left: 20px; }
-  </style>
+  <link rel="stylesheet" href="/offline_app/styles.css">
 </head>
 <body>
-  <main>
-    <div id="status" class="banner offline">Offline - saving safely</div>
-    <h1>PharMareen Offline</h1>
-    <form id="actionForm">
-      <select id="action_type">
-        <option value="sale">Sale</option>
-        <option value="restock">Restock</option>
-        <option value="stock_adjustment">Stock check</option>
-        <option value="issue">Bad/damaged drug</option>
-        <option value="return">Return</option>
-      </select>
-      <input id="drug_name" placeholder="Drug name" required>
-      <input id="quantity" type="number" min="1" value="1" placeholder="Quantity">
-      <input id="unit" placeholder="Unit, e.g. tablets or boxes">
-      <input id="expiry_date" placeholder="Optional expiry, e.g. 2027-01-31">
-      <textarea id="notes" placeholder="Optional notes"></textarea>
-      <input id="image" type="file" accept="image/*" capture="environment">
-      <input id="voice" type="file" accept="audio/*">
-      <button type="submit">Save Offline</button>
-      <button type="button" id="syncNow">Sync Now</button>
-    </form>
-    <h2>Pending Items</h2>
-    <ul id="pendingList"></ul>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">PharMareen</p>
+        <h1>Offline Mode</h1>
+        <p class="version-pill">Phase 6 Media Fix v3</p>
+      </div>
+      <div id="statusBanner" class="status online" role="status">Online</div>
+    </header>
+
+    <section class="panel intro-panel">
+      <h2>Type or paste pharmacy command</h2>
+      <p class="hint">Save sales and stock entries even when internet is weak. They sync automatically when the phone is online again.</p>
+    </section>
+
+    <section class="panel quick-actions" aria-label="Quick actions">
+      <button type="button" data-action="sale">Sale</button>
+      <button type="button" data-action="restock">Restock</button>
+      <button type="button" data-action="bonus">Bonus Restock</button>
+      <button type="button" data-action="discount">Discount Restock</button>
+    </section>
+
+    <section class="panel command-panel">
+      <label for="commandText">Command</label>
+      <textarea id="commandText" rows="6" placeholder="Panadol sold 2&#10;Amoxil sold 5&#10;Zinc restock 10"></textarea>
+      <div class="examples" aria-label="Examples">
+        <span>Panadol sold 2</span>
+        <span>Panadol +20</span>
+        <span>Panadol restock 20 bonus 5 cost 2000</span>
+      </div>
+      <input id="pharmacyId" type="text" placeholder="Pharmacy ID optional">
+      <button id="saveEntry" class="primary" type="button">Save Offline</button>
+    </section>
+
+    <section class="panel media-grid">
+      <div class="media-card">
+        <h2>Photo queue</h2>
+        <p class="hint">Save invoice or receipt photos. Keep this page open until synced if the file is large.</p>
+        <label for="photoInput">Choose invoice/photo files</label>
+        <select id="photoPurpose">
+          <option value="invoice_photo">Invoice photo</option>
+          <option value="supplier_receipt">Supplier receipt</option>
+          <option value="stock_photo">Stock photo</option>
+        </select>
+        <input id="photoInput" type="file" accept="image/*" multiple>
+        <button id="queuePhoto" type="button">Queue photo</button>
+      </div>
+      <div class="media-card">
+        <h2>Voice/audio queue</h2>
+        <p class="hint">Upload audio notes while offline. Backend voice AI handles them when synced.</p>
+        <label for="voiceInput">Choose voice/audio files</label>
+        <input id="voiceInput" type="file" accept="audio/*" multiple>
+        <button id="queueVoice" type="button">Queue audio</button>
+      </div>
+    </section>
+
+    <section class="panel queue-head">
+      <div>
+        <p class="eyebrow">Pending queue</p>
+        <h2><span id="queueCount">0</span> waiting</h2>
+      </div>
+      <button id="syncNow" type="button">Sync Now</button>
+    </section>
+
+    <section class="panel">
+      <h2>Pending queue</h2>
+      <ul id="pendingEntries" class="entry-list"></ul>
+    </section>
+
+    <section class="panel">
+      <h2>Synced history</h2>
+      <ul id="syncedEntries" class="entry-list"></ul>
+    </section>
   </main>
-  <script src="/offline_app/offline.js"></script>
+
+  <template id="emptyTemplate">
+    <li class="empty">Nothing here yet.</li>
+  </template>
+
+  <script src="/offline_app/parser.js" defer></script>
+  <script src="/offline_app/app.js" defer></script>
 </body>
 </html>

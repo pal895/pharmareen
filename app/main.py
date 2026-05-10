@@ -157,6 +157,28 @@ async def offline_styles_file() -> FileResponse:
     )
 
 
+@app.get("/offline_app/{asset_path:path}", include_in_schema=False)
+async def offline_app_asset_file(asset_path: str) -> FileResponse:
+    safe_path = Path(asset_path)
+    if safe_path.is_absolute() or ".." in safe_path.parts:
+        raise HTTPException(status_code=404, detail="Offline app asset not found.")
+    file_path = OFFLINE_APP_DIR / safe_path
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="Offline app asset not found.")
+    media_types = {
+        ".html": "text/html",
+        ".js": "application/javascript",
+        ".css": "text/css",
+        ".json": "application/json",
+        ".svg": "image/svg+xml",
+    }
+    return FileResponse(
+        file_path,
+        media_type=media_types.get(file_path.suffix.lower(), "application/octet-stream"),
+        headers=OFFLINE_NO_CACHE_HEADERS,
+    )
+
+
 app.mount(
     "/offline_app",
     StaticFiles(directory=str(OFFLINE_APP_DIR), html=True),
