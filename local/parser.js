@@ -62,8 +62,9 @@
   function titleCaseDrugName(value) {
     return normalizeSpaces(value)
       .replace(/^\+/, "")
-      .replace(/\b(sold|sale|sell|restock|received|bought|add|stock|cost|paid|discount|bonus|supplier|expiry)\b.*$/i, "")
+      .replace(/\b(sold|sale|sell|restock|received|bought|add|stock|cost|paid|discount|bonus|supplier|expiry|cash|mpesa|m-pesa|card|credit)\b.*$/i, "")
       .replace(/\s+\d+(?:\.\d+)?\s*$/i, "")
+      .replace(/\b(tablets?|tabs?|strips?|boxes?|box|bottles?|pieces?|units?)\b/gi, "")
       .trim()
       .split(" ")
       .filter(Boolean)
@@ -96,6 +97,37 @@
     return null;
   }
 
+  function canonicalUnit(value) {
+    const unit = String(value || "").toLowerCase();
+    if (/^tabs?$|^tablets?$/.test(unit)) return "tablet";
+    if (/^strips?$/.test(unit)) return "strip";
+    if (unit === "box" || unit === "boxes") return "box";
+    if (/^bottles?$/.test(unit)) return "bottle";
+    if (/^pieces?$/.test(unit)) return "piece";
+    if (/^units?$/.test(unit)) return "unit";
+    return "";
+  }
+
+  function unitFactor(unit) {
+    const canonical = canonicalUnit(unit);
+    if (canonical === "box") return 100;
+    if (canonical === "strip") return 10;
+    return 1;
+  }
+
+  function extractUnit(text) {
+    const match = String(text || "").match(/\b(tablets?|tabs?|strips?|boxes?|box|bottles?|pieces?|units?)\b/i);
+    return match ? canonicalUnit(match[1]) : "";
+  }
+
+  function extractPayment(text) {
+    const match = String(text || "").match(/\b(cash|mpesa|m-pesa|card|credit)\b/i);
+    if (!match) return "";
+    const value = match[1].toLowerCase();
+    if (value === "mpesa" || value === "m-pesa") return "M-Pesa";
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  }
+
   function parseCommand(rawText) {
     const original = normalizeSpaces(rawText);
     const text = normalizeNumberWords(original);
@@ -118,6 +150,12 @@
       actual_paid_amount: null,
       supplier: "",
       expiry_date: "",
+      unit: extractUnit(original),
+      base_quantity: 0,
+      payment_method: extractPayment(original),
+      invoice_number: "",
+      batch_number: "",
+      barcode: "",
       sync_status: "pending",
       retry_count: 0,
       last_error: ""
@@ -152,6 +190,7 @@
       const drugName = match ? titleCaseDrugName(match[1]) : titleCaseDrugName(original);
       const quantity = match ? Number(match[2]) : numberFrom(original) || 0;
       const totalReceived = quantity + bonusQuantity;
+      const baseQuantity = totalReceived * unitFactor(base.unit);
       return {
         ...base,
         action: "restock",
@@ -160,6 +199,7 @@
         quantity,
         bonus_quantity: bonusQuantity,
         total_received_quantity: totalReceived,
+        base_quantity: baseQuantity,
         buying_price: actualPaidAmount !== null && totalReceived > 0 ? Number((actualPaidAmount / totalReceived).toFixed(2)) : null,
         expected_total_cost: expectedTotalCost,
         discount_amount: discountAmount || 0,
@@ -191,7 +231,8 @@
           action: "sale",
           type: "sale",
           drug_name: drugName,
-          quantity
+          quantity,
+          base_quantity: quantity * unitFactor(base.unit)
         };
       }
     }

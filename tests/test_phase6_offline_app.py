@@ -46,6 +46,11 @@ def test_offline_app_routes_return_html():
     assert followed_response.status_code == 200
     assert followed_response.headers["content-type"].startswith("text/html")
     assert "PharMareen Offline Mode" in followed_response.text
+    assert "PharMareen Pharmacy Assistant" in followed_response.text
+    assert "Scan Barcode" in followed_response.text
+    assert "Scan Invoice" in followed_response.text
+    assert "Voice Entry" in followed_response.text
+    assert "Manual Entry" in followed_response.text
     assert "Type or paste pharmacy command" in followed_response.text
     assert "Save Offline" in followed_response.text
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in followed_response.text
@@ -125,7 +130,7 @@ def test_offline_sync_accepts_bonus_and_discount_restock(monkeypatch, tmp_path):
     assert len(data["synced"]) == 2
     assert fake.messages == [
         "Panadol restock 20 bonus 5 cost 2000",
-        "Amoxicillin restock 30 cost 2500",
+        "Amoxicillin restock 30 cost 2500 discount 300",
     ]
 
 
@@ -230,6 +235,8 @@ const cases = {
   plusRestock: parser.parseCommand('Panadol +20'),
   bonus: parser.parseCommand('Panadol restock 20 bonus 5 cost 2000'),
   discount: parser.parseCommand('Amoxicillin received 30 paid 2500 discount 300'),
+  unitSale: parser.parseCommand('Panadol 1 strip mpesa'),
+  unitRestock: parser.parseCommand('Panadol +1 box'),
   comma: parser.splitCommands('Panadol sold 2, Amoxil sold 5, Zinc restock 10'),
   newline: parser.splitCommands('Panadol sold 2\nAmoxil sold 5\nZinc restock 10')
 };
@@ -247,6 +254,11 @@ console.log(JSON.stringify(cases));
     assert data["bonus"]["actual_paid_amount"] == 2000
     assert data["discount"]["discount_amount"] == 300
     assert data["discount"]["actual_paid_amount"] == 2500
+    assert data["unitSale"]["unit"] == "strip"
+    assert data["unitSale"]["payment_method"] == "M-Pesa"
+    assert data["unitSale"]["base_quantity"] == 10
+    assert data["unitRestock"]["unit"] == "box"
+    assert data["unitRestock"]["base_quantity"] == 100
     assert len(data["comma"]) == 3
     assert len(data["newline"]) == 3
 
@@ -279,7 +291,7 @@ def test_legacy_offline_app_folder_matches_final_frontend():
     assert " required" not in legacy_html
     assert "disableNativeRequiredValidation" in legacy_app
     assert "queueMediaFiles" in legacy_app
-    assert "pharmareen-offline-v8" in legacy_worker
+    assert "pharmareen-offline-v9" in legacy_worker
     assert legacy_parser.exists()
 
 
@@ -295,6 +307,12 @@ def test_offline_media_inputs_allow_multiple_files_without_required_command():
     assert 'accept="audio/*" multiple' in html
     assert 'id="commandText"' in html
     assert " required" not in html
+    assert "Scan Barcode" in html
+    assert "Scan Invoice" in html
+    assert "Voice Entry" in html
+    assert "Manual Entry" in html
+    assert 'id="barcodeInput"' in html
+    assert 'id="saveBarcodeMapping"' in html
     assert 'id="commandText" required' not in html
     assert 'id="photoInput" type="file" accept="image/*" multiple required' not in html
     assert 'id="voiceInput" type="file" accept="audio/*" multiple required' not in html
@@ -378,5 +396,5 @@ def test_offline_pwa_assets_contain_auto_sync_media_and_retry_logic():
     assert "Voice/audio queue" in html
     assert '"start_url": "/offline-app"' in manifest
     assert "/offline_app/parser.js" in worker
-    assert "pharmareen-offline-v8" in worker
+    assert "pharmareen-offline-v9" in worker
     assert "caches.open" in worker

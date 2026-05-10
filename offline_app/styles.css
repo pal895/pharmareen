@@ -96,6 +96,21 @@ h2 { font-size: 18px; }
   gap: 8px;
 }
 
+.dashboard-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dashboard-actions button {
+  min-height: 64px;
+  font-size: 15px;
+}
+
+.barcode-panel {
+  background: #fbfdfc;
+}
+
 button, input, textarea, select {
   font: inherit;
 }
@@ -200,5 +215,6 @@ textarea {
 
 @media (min-width: 680px) {
   .quick-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .dashboard-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .media-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

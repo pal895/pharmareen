@@ -233,21 +233,46 @@ def offline_entry_to_command(entry: dict[str, Any]) -> str:
     if not drug_name or not quantity:
         return ""
     if action == "sale":
-        return f"{drug_name} sold {quantity}".strip()
+        parts = [drug_name, "sold", str(quantity)]
+        unit = str(entry.get("unit") or "").strip()
+        if unit:
+            parts.append(unit)
+        payment = str(entry.get("payment_method") or "").strip()
+        if payment:
+            parts.append(payment)
+        discount = entry.get("discount")
+        if discount not in (None, "", 0):
+            parts.extend(["discount", str(discount)])
+        return " ".join(parts).strip()
     if action in {"restock", "bonus_restock", "discount_restock"}:
         parts = [drug_name, "restock", str(quantity)]
+        unit = str(entry.get("unit") or "").strip()
+        if unit:
+            parts.append(unit)
         bonus_quantity = entry.get("bonus_quantity") or 0
         if bonus_quantity:
             parts.extend(["bonus", str(bonus_quantity)])
         actual_paid = entry.get("actual_paid_amount")
         if actual_paid not in (None, ""):
             parts.extend(["cost", str(actual_paid)])
+        discount = entry.get("discount_amount")
+        if discount not in (None, "", 0):
+            parts.extend(["discount", str(discount)])
         supplier = str(entry.get("supplier") or "").strip()
         if supplier:
             parts.extend(["supplier", supplier])
+        invoice = str(entry.get("invoice_number") or "").strip()
+        if invoice:
+            parts.extend(["invoice", invoice])
+        batch = str(entry.get("batch_number") or "").strip()
+        if batch:
+            parts.extend(["batch", batch])
         expiry = str(entry.get("expiry_date") or "").strip()
         if expiry:
             parts.extend(["expiry", expiry])
+        barcode = str(entry.get("barcode") or "").strip()
+        if barcode:
+            parts.extend(["barcode", barcode])
         return " ".join(parts).strip()
     return ""
 

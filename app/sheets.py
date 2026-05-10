@@ -23,6 +23,14 @@ DAILY_REPORTS = "Daily_Reports"
 INVENTORY = "Inventory"
 TRANSACTIONS = "Transactions"
 REQUEST_LOG = "Request_Log"
+BATCHES = "Batches"
+SALES_LOG = "Sales_Log"
+RESTOCK_LOG = "Restock_Log"
+ISSUE_LOG = "Issue_Log"
+RETURNS_LOG = "Returns_Log"
+SUPPLIERS = "Suppliers"
+IMPORT_REVIEW_QUEUE = "Import_Review_Queue"
+OFFLINE_SYNC_LOG = "Offline_Sync_Log"
 
 SHEETS_UNAVAILABLE_MESSAGE = (
     "Google Sheets is not configured. Add a valid service-account.json to enable logging."
@@ -101,6 +109,132 @@ REQUEST_LOG_HEADERS = [
     "Error Reason",
 ]
 
+BATCH_HEADERS = [
+    "batch_id",
+    "drug_id",
+    "drug_name",
+    "generic_name",
+    "brand_name",
+    "category",
+    "strength",
+    "form",
+    "pack_type",
+    "units_per_pack",
+    "units_per_strip",
+    "quantity_received",
+    "unit_received",
+    "converted_total_units",
+    "current_remaining_units",
+    "minimum_stock_level",
+    "expiry_date",
+    "days_to_expiry",
+    "expiry_status",
+    "supplier_name",
+    "invoice_number",
+    "purchase_date",
+    "delivery_date",
+    "purchase_cost",
+    "selling_price",
+    "payment_status",
+    "manufacturer_batch_number",
+    "received_by",
+    "entered_by",
+    "recorded_at",
+    "stock_location",
+    "return_status",
+    "return_quantity",
+    "return_reason",
+    "bad_drug_flag",
+    "damaged_flag",
+    "expired_flag",
+    "supplier_contacted",
+    "return_date",
+    "refund_or_replacement_status",
+]
+
+SALES_LOG_HEADERS = [
+    "sale_id",
+    "drug_name",
+    "quantity_sold",
+    "unit_sold",
+    "batch_id",
+    "sold_by",
+    "sold_at",
+    "stock_before",
+    "stock_after",
+    "sale_amount",
+]
+
+RESTOCK_LOG_HEADERS = [
+    "restock_id",
+    "drug_name",
+    "quantity_received",
+    "unit_received",
+    "expiry_date",
+    "supplier_name",
+    "invoice_number",
+    "purchase_cost",
+    "batch_id",
+    "recorded_at",
+    "note",
+]
+
+ISSUE_LOG_HEADERS = [
+    "issue_id",
+    "drug_name",
+    "batch_id",
+    "issue_type",
+    "quantity",
+    "supplier_name",
+    "invoice_number",
+    "reported_by",
+    "reported_at",
+    "status",
+    "note",
+]
+
+RETURNS_LOG_HEADERS = [
+    "return_id",
+    "drug_name",
+    "batch_id",
+    "quantity",
+    "return_reason",
+    "supplier_name",
+    "return_date",
+    "refund_or_replacement_status",
+    "note",
+]
+
+SUPPLIER_HEADERS = [
+    "supplier_name",
+    "contact",
+    "supplier_reliability_score",
+    "return_frequency",
+    "last_updated",
+]
+
+IMPORT_REVIEW_HEADERS = [
+    "Timestamp",
+    "Sender",
+    "Status",
+    "Extracted Items",
+    "Confidence",
+    "Raw",
+]
+
+OFFLINE_SYNC_HEADERS = [
+    "action_id",
+    "action_type",
+    "drug_name",
+    "quantity",
+    "created_by",
+    "created_at",
+    "sync_status",
+    "retry_count",
+    "last_error",
+    "source",
+]
+
 
 class GoogleSheetsStore:
     def __init__(self, settings: Settings):
@@ -130,6 +264,14 @@ class GoogleSheetsStore:
         self._ensure_worksheet(INVENTORY, INVENTORY_HEADERS, rows=2000)
         self._ensure_worksheet(TRANSACTIONS, TRANSACTION_HEADERS, rows=10000)
         self._ensure_worksheet(REQUEST_LOG, REQUEST_LOG_HEADERS, rows=10000)
+        self._ensure_worksheet(BATCHES, BATCH_HEADERS, rows=10000)
+        self._ensure_worksheet(SALES_LOG, SALES_LOG_HEADERS, rows=10000)
+        self._ensure_worksheet(RESTOCK_LOG, RESTOCK_LOG_HEADERS, rows=10000)
+        self._ensure_worksheet(ISSUE_LOG, ISSUE_LOG_HEADERS, rows=10000)
+        self._ensure_worksheet(RETURNS_LOG, RETURNS_LOG_HEADERS, rows=10000)
+        self._ensure_worksheet(SUPPLIERS, SUPPLIER_HEADERS, rows=1000)
+        self._ensure_worksheet(IMPORT_REVIEW_QUEUE, IMPORT_REVIEW_HEADERS, rows=10000)
+        self._ensure_worksheet(OFFLINE_SYNC_LOG, OFFLINE_SYNC_HEADERS, rows=10000)
 
     def list_master_drug_names(self) -> list[str]:
         return [
@@ -308,6 +450,89 @@ class GoogleSheetsStore:
             value_input_option="USER_ENTERED",
         )
 
+    def append_batch(self, batch: Any) -> None:
+        row = {
+            "batch_id": batch.batch_id,
+            "drug_name": batch.drug_name,
+            "quantity_received": batch.quantity_received,
+            "converted_total_units": batch.quantity_received,
+            "current_remaining_units": batch.current_remaining_units,
+            "expiry_date": batch.expiry_date,
+            "expiry_status": "safe",
+            "supplier_name": batch.supplier_name,
+            "invoice_number": batch.invoice_number,
+            "purchase_cost": "" if batch.purchase_cost is None else batch.purchase_cost,
+            "selling_price": "" if batch.selling_price is None else batch.selling_price,
+            "manufacturer_batch_number": batch.manufacturer_batch_number,
+            "recorded_at": batch.recorded_at,
+            "stock_location": "shelf",
+            "return_status": "none",
+        }
+        self._worksheet(BATCHES).append_row(
+            [serialize_cell(row.get(header, "")) for header in BATCH_HEADERS],
+            value_input_option="USER_ENTERED",
+        )
+
+    def list_batches(self, drug_name: str | None = None) -> list[Any]:
+        from app.services.batch_service import BatchRecord
+
+        wanted = normalize_key(drug_name)
+        batches: list[BatchRecord] = []
+        for record in self._records(BATCHES, BATCH_HEADERS):
+            name = str(record.get("drug_name") or "").strip()
+            if wanted and normalize_key(name) != wanted:
+                continue
+            batches.append(
+                BatchRecord(
+                    batch_id=str(record.get("batch_id") or "").strip(),
+                    drug_name=name,
+                    quantity_received=parse_int(record.get("quantity_received"), default=0) or 0,
+                    current_remaining_units=parse_int(record.get("current_remaining_units"), default=0) or 0,
+                    expiry_date=str(record.get("expiry_date") or "").strip(),
+                    supplier_name=str(record.get("supplier_name") or "").strip(),
+                    invoice_number=str(record.get("invoice_number") or "").strip(),
+                    purchase_cost=parse_money(record.get("purchase_cost")),
+                    selling_price=parse_money(record.get("selling_price")),
+                    manufacturer_batch_number=str(record.get("manufacturer_batch_number") or "").strip(),
+                    recorded_at=str(record.get("recorded_at") or "").strip(),
+                )
+            )
+        return batches
+
+    def update_batch_remaining(self, batch_id: str, remaining_units: int) -> None:
+        for record, row_number in self._records_with_rows(BATCHES, BATCH_HEADERS):
+            if str(record.get("batch_id") or "").strip() != batch_id:
+                continue
+            column = BATCH_HEADERS.index("current_remaining_units") + 1
+            self._worksheet(BATCHES).update_cell(row_number, column, max(remaining_units, 0))
+            return
+
+    def append_issue_log(self, row: dict[str, Any]) -> None:
+        self._worksheet(ISSUE_LOG).append_row(
+            [serialize_cell(row.get(header, "")) for header in ISSUE_LOG_HEADERS],
+            value_input_option="USER_ENTERED",
+        )
+
+    def append_return_log(self, row: dict[str, Any]) -> None:
+        self._worksheet(RETURNS_LOG).append_row(
+            [serialize_cell(row.get(header, "")) for header in RETURNS_LOG_HEADERS],
+            value_input_option="USER_ENTERED",
+        )
+
+    def append_import_review(self, row: dict[str, Any]) -> None:
+        created_at = now_in_timezone(self.settings.timezone)
+        full_row = {"Timestamp": created_at.strftime("%Y-%m-%d %H:%M:%S"), **row}
+        self._worksheet(IMPORT_REVIEW_QUEUE).append_row(
+            [serialize_cell(full_row.get(header, "")) for header in IMPORT_REVIEW_HEADERS],
+            value_input_option="USER_ENTERED",
+        )
+
+    def append_offline_sync_log(self, row: dict[str, Any]) -> None:
+        self._worksheet(OFFLINE_SYNC_LOG).append_row(
+            [serialize_cell(row.get(header, "")) for header in OFFLINE_SYNC_HEADERS],
+            value_input_option="USER_ENTERED",
+        )
+
     def get_daily_report_text(self, report_date: str) -> str | None:
         records = self._records(DAILY_REPORTS, DAILY_REPORT_HEADERS)
         for record in reversed(records):
@@ -439,3 +664,9 @@ def write_service_account_file(path: Path, info: dict[str, Any]) -> None:
         fallback.write_text(json.dumps(info), encoding="utf-8")
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(fallback)
         logger.info("Google Sheets credentials file prepared: %s", fallback.name)
+
+
+def serialize_cell(value: Any) -> Any:
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=True)
+    return value

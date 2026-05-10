@@ -232,6 +232,86 @@ def test_help_command_returns_available_commands_without_parser():
         assert parser.called is False
 
 
+def test_sale_with_strip_unit_payment_and_discount_records_engine_metadata():
+    store = FakeStore()
+    service = IntakeService(FakeParser([]), store)
+
+    reply = service.process_text("Panadol 1 strip mpesa discount 50", conversation_id="staff-phone")
+
+    assert "Panadol x1 strip recorded" in reply
+    assert "Equivalent: 10 tablets" in reply
+    assert "Stock left: 10 tablets" in reply
+    assert "Payment: M-Pesa" in reply
+    assert "Discount: KES 50" in reply
+    assert store.stocks["panadol"].current_stock == 10
+    transaction = store.transactions[-1]
+    assert transaction["Quantity"] == 10
+    assert transaction["Total Sales"] == 2150
+    assert transaction["Profit"] == 750
+    assert "unit=strip" in transaction["Note"]
+    assert "base_quantity=10" in transaction["Note"]
+    assert "payment=M-Pesa" in transaction["Note"]
+    assert "discount=50.0" in transaction["Note"]
+    assert "trace_id=SALE-" in transaction["Note"]
+
+
+def test_restock_box_unit_converts_to_tablets():
+    store = FakeStore()
+    service = IntakeService(FakeParser([]), store)
+
+    reply = service.process_text("+Panadol 1 box")
+
+    assert "Restock recorded: Panadol +1 box" in reply
+    assert "Equivalent: +100 tablets" in reply
+    assert "New stock: 120 tablets" in reply
+    assert store.stocks["panadol"].current_stock == 120
+    transaction = store.transactions[-1]
+    assert transaction["Quantity"] == 100
+    assert "unit=box" in transaction["Note"]
+    assert "base_quantity=100" in transaction["Note"]
+
+
+def test_restock_supplier_invoice_batch_and_expiry_are_traced():
+    store = FakeStore()
+    service = IntakeService(FakeParser([]), store)
+
+    reply = service.process_text("received Panadol 1 box supplier Beta invoice INV123 batch B001 expiry Jan 2027")
+
+    assert "Supplier: Beta" in reply
+    assert "Invoice: INV123" in reply
+    assert "Batch: B001" in reply
+    note = store.transactions[-1]["Note"]
+    assert "supplier=Beta" in note
+    assert "invoice=INV123" in note
+    assert "batch=B001" in note
+    assert "expiry=Jan 2027" in note
+
+
+def test_staff_session_payment_summary_and_void_flow():
+    store = FakeStore()
+    service = IntakeService(FakeParser([]), store)
+
+    assert "Staff set: Mary" in service.process_text("set staff Mary", conversation_id="phone-1")
+    sale_reply = service.process_text("Panadol 2 mpesa discount 20", conversation_id="phone-1")
+
+    assert "Payment: M-Pesa" in sale_reply
+    assert store.stocks["panadol"].current_stock == 18
+    sale_note = store.transactions[-1]["Note"]
+    assert "staff=Mary" in sale_note
+    assert "payment=M-Pesa" in sale_note
+    assert "discount=20.0" in sale_note
+
+    summary = service.process_text("cash summary")
+    assert "Daily Cash Summary" in summary
+    assert "M-Pesa: KES 420" in summary
+    assert "Discounts: KES 20" in summary
+
+    assert "Why are you voiding this sale?" in service.process_text("void last", conversation_id="phone-1")
+    void_reply = service.process_text("wrong item", conversation_id="phone-1")
+    assert "Sale voided" in void_reply
+    assert store.stocks["panadol"].current_stock == 20
+    assert store.transactions[-1]["Type"] == "void"
+    assert "original_trace_id=SALE-" in store.transactions[-1]["Note"]
 def test_greeting_returns_warm_onboarding_without_parser():
     store = FakeStore()
     parser = FailingParser()

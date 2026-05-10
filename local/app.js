@@ -6,7 +6,7 @@ const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
-const SERVICE_WORKER_VERSION = "phase6-final-media-save-working-v8";
+const SERVICE_WORKER_VERSION = "phase6-final-pharmacy-engine-v9";
 
 const examples = {
   sale: "Panadol sold 2",
@@ -25,6 +25,9 @@ const emptyTemplate = document.getElementById("emptyTemplate");
 const photoInput = document.getElementById("photoInput");
 const photoPurpose = document.getElementById("photoPurpose");
 const voiceInput = document.getElementById("voiceInput");
+const barcodeInput = document.getElementById("barcodeInput");
+const barcodeMedicineName = document.getElementById("barcodeMedicineName");
+const barcodeResult = document.getElementById("barcodeResult");
 
 let dbPromise = null;
 let persistentStorageReady = false;
@@ -36,6 +39,51 @@ function loadJson(key, fallback) {
 
 function saveJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
+}
+
+function barcodeMap() {
+  return loadJson("pharmareen_barcode_map", {});
+}
+
+function saveBarcodeMap(map) {
+  saveJson("pharmareen_barcode_map", map);
+}
+
+function lookupBarcode(code) {
+  const clean = String(code || "").trim();
+  if (!clean) return null;
+  return barcodeMap()[clean] || null;
+}
+
+function updateBarcodeResult() {
+  if (!barcodeInput || !barcodeResult) return;
+  const code = barcodeInput.value.trim();
+  if (!code) {
+    barcodeResult.textContent = "Barcode not scanned yet.";
+    return;
+  }
+  const medicine = lookupBarcode(code);
+  if (medicine) {
+    barcodeResult.textContent = `${medicine} found. Choose Sell, Restock, or Check Stock.`;
+    commandText.value = `${medicine} stock`;
+    return;
+  }
+  barcodeResult.textContent = "Barcode not found. What is the medicine name?";
+}
+
+function saveBarcodeMapping() {
+  if (!barcodeInput || !barcodeMedicineName || !barcodeResult) return;
+  const code = barcodeInput.value.trim();
+  const medicine = barcodeMedicineName.value.trim();
+  if (!code || !medicine) {
+    barcodeResult.textContent = "Enter barcode and medicine name first.";
+    return;
+  }
+  const map = barcodeMap();
+  map[code] = medicine;
+  saveBarcodeMap(map);
+  barcodeResult.textContent = `${medicine} saved for barcode ${code}.`;
+  commandText.value = `${medicine} stock`;
 }
 
 
@@ -394,6 +442,15 @@ document.querySelectorAll("[data-action]").forEach(button => {
   });
 });
 
+document.getElementById("scanBarcode").addEventListener("click", () => {
+  barcodeInput.focus();
+  updateBarcodeResult();
+});
+document.getElementById("scanInvoice").addEventListener("click", () => photoInput.click());
+document.getElementById("voiceEntry").addEventListener("click", () => voiceInput.click());
+document.getElementById("manualEntry").addEventListener("click", () => commandText.focus());
+document.getElementById("saveBarcodeMapping").addEventListener("click", saveBarcodeMapping);
+barcodeInput.addEventListener("input", updateBarcodeResult);
 document.getElementById("saveEntry").addEventListener("click", () => saveOfflineEntries());
 document.getElementById("syncNow").addEventListener("click", () => syncQueue());
 document.getElementById("queuePhoto").addEventListener("click", () => queuePhotoInputIfPresent());

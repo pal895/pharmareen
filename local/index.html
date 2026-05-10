@@ -13,15 +13,31 @@
     <header class="topbar">
       <div>
         <p class="eyebrow">PharMareen</p>
-        <h1>Offline Mode</h1>
+        <h1>PharMareen Pharmacy Assistant</h1>
         <p class="version-pill">PHASE 6 FINAL MEDIA SAVE WORKING</p>
       </div>
       <div id="statusBanner" class="status online" role="status">Online</div>
     </header>
 
     <section class="panel intro-panel">
-      <h2>Type or paste pharmacy command</h2>
-      <p class="hint">Save sales and stock entries even when internet is weak. They sync automatically when the phone is online again.</p>
+      <h2>Offline Mode</h2>
+      <p class="hint">Queue safely saved. Record sales, stock, photos, and voice notes when internet is weak. They sync automatically when the phone is online again.</p>
+    </section>
+
+    <section class="panel dashboard-actions" aria-label="Pharmacy dashboard actions">
+      <button id="scanBarcode" type="button">📷 Scan Barcode</button>
+      <button id="scanInvoice" type="button">🧾 Scan Invoice</button>
+      <button id="voiceEntry" type="button">🎤 Voice Entry</button>
+      <button id="manualEntry" type="button">✍️ Manual Entry</button>
+    </section>
+
+    <section id="barcodePanel" class="panel barcode-panel" aria-label="Barcode lookup">
+      <h2>Barcode lookup</h2>
+      <p class="hint">Use phone camera later, or type/scan the barcode here. External scanners work like a keyboard.</p>
+      <input id="barcodeInput" type="text" inputmode="numeric" placeholder="Scan or type barcode">
+      <input id="barcodeMedicineName" type="text" placeholder="Medicine name if barcode is new">
+      <button id="saveBarcodeMapping" type="button">Save barcode mapping</button>
+      <p id="barcodeResult" class="hint">Barcode not scanned yet.</p>
     </section>
 
     <section class="panel quick-actions" aria-label="Quick actions">
@@ -32,12 +48,14 @@
     </section>
 
     <section class="panel command-panel">
+      <h2>Type or paste pharmacy command</h2>
       <label for="commandText">Command</label>
-      <textarea id="commandText" rows="6" placeholder="Panadol sold 2&#10;Amoxil sold 5&#10;Zinc restock 10"></textarea>
+      <textarea id="commandText" rows="6" placeholder="Type sale, restock, report, stock check...&#10;Panadol 2&#10;+Panadol 20&#10;Panadol 1 strip mpesa&#10;report today"></textarea>
       <div class="examples" aria-label="Examples">
         <span>Panadol sold 2</span>
         <span>Panadol +20</span>
         <span>Panadol restock 20 bonus 5 cost 2000</span>
+        <span>Panadol 1 strip mpesa</span>
       </div>
       <input id="pharmacyId" type="text" placeholder="Pharmacy ID optional">
       <button id="saveEntry" class="primary" type="button">Save Offline</button>
