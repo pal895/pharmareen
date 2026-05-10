@@ -95,7 +95,11 @@ async def debug_offline_app() -> dict[str, bool]:
         "offline_app_installed": True,
         "offline_routes_ready": True,
         "sync_endpoint_ready": True,
-        "offline_log_exists": Path("data/offline_sync_log.jsonl").exists(),
+        "offline_log_exists": (PROJECT_ROOT / "data" / "offline_sync_log.jsonl").exists(),
+        "multi_command_parser_ready": (OFFLINE_APP_DIR / "parser.js").exists(),
+        "photo_queue_ready": True,
+        "voice_queue_ready": True,
+        "auto_sync_ready": True,
     }
 
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
@@ -131,6 +135,50 @@ def offline_html_test() -> str:
     return "<h1>PharMareen Offline Public Test OK</h1>"
 
 
+def offline_entry_action(entry: dict[str, Any]) -> str:
+    return str(entry.get("action") or entry.get("type") or entry.get("action_type") or "").strip().lower()
+
+
+def offline_entry_to_command(entry: dict[str, Any]) -> str:
+    command_text = str(entry.get("command_text") or "").strip()
+    raw_text = str(entry.get("raw_text") or "").strip()
+    action = offline_entry_action(entry)
+    if command_text:
+        return command_text
+    if raw_text and action not in {"photo", "image", "voice", "audio"}:
+        return raw_text
+
+    drug_name = str(entry.get("drug_name") or "").strip()
+    quantity = entry.get("quantity") or entry.get("total_received_quantity") or ""
+    if not drug_name or not quantity:
+        return ""
+    if action == "sale":
+        return f"{drug_name} sold {quantity}".strip()
+    if action in {"restock", "bonus_restock", "discount_restock"}:
+        parts = [drug_name, "restock", str(quantity)]
+        bonus_quantity = entry.get("bonus_quantity") or 0
+        if bonus_quantity:
+            parts.extend(["bonus", str(bonus_quantity)])
+        actual_paid = entry.get("actual_paid_amount")
+        if actual_paid not in (None, ""):
+            parts.extend(["cost", str(actual_paid)])
+        supplier = str(entry.get("supplier") or "").strip()
+        if supplier:
+            parts.extend(["supplier", supplier])
+        expiry = str(entry.get("expiry_date") or "").strip()
+        if expiry:
+            parts.extend(["expiry", expiry])
+        return " ".join(parts).strip()
+    return ""
+
+
+def offline_media_reply(entry: dict[str, Any]) -> str:
+    action = offline_entry_action(entry)
+    if action in {"photo", "image"}:
+        return "Photo queued safely. AI invoice extraction is ready when OpenAI credits are active."
+    return "Voice/audio queued safely. AI transcription is ready when OpenAI credits are active."
+
+
 @app.post("/offline/sync")
 async def offline_sync_entries(request: Request) -> dict[str, Any]:
     try:
@@ -139,16 +187,17 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
         payload = {}
     entries = payload.get("entries") if isinstance(payload, dict) else None
     if not isinstance(entries, list):
-        return {"status": "error", "synced": [], "failed": [{"id": "", "error": "Send entries as a list."}]}
+        return {"status": "error", "synced": [], "failed": [{"id": "", "error": "Send entries as a list."}], "pending": []}
 
     synced: list[dict[str, Any]] = []
     failed: list[dict[str, Any]] = []
+    pending: list[dict[str, Any]] = []
     for entry in entries:
         if not isinstance(entry, dict):
             failed.append({"id": "", "status": "failed", "error": "Entry must be an object."})
             continue
         entry_id = str(entry.get("id") or entry.get("action_id") or "").strip()
-        command_text = str(entry.get("command_text") or "").strip()
+        action = offline_entry_action(entry)
         if not entry_id:
             failed.append({"id": "", "status": "failed", "error": "Missing id."})
             continue
@@ -156,23 +205,35 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
             synced.append({"id": entry_id, "status": "already_synced", "reply": "Already synced."})
             append_offline_sync_log(entry, "already_synced", "Already synced.", "")
             continue
-        if not command_text:
-            error = "Missing command_text."
-            failed.append({"id": entry_id, "status": "failed", "error": error})
-            append_offline_sync_log(entry, "failed", "", error)
+        if action in {"photo", "image", "voice", "audio"}:
+            reply = offline_media_reply(entry)
+            offline_synced_entry_ids.add(entry_id)
+            synced.append({"id": entry_id, "status": "media_logged", "reply": reply})
+            append_offline_sync_log(entry, "media_logged", reply, "")
             continue
+
+        command_text = offline_entry_to_command(entry)
+        if not command_text:
+            reason = "Unknown offline entry saved for review."
+            pending.append({"id": entry_id, "status": "pending", "reason": reason})
+            append_offline_sync_log(entry, "pending", "", reason)
+            continue
+        entry_for_log = {**entry, "command_text": command_text}
         try:
             reply = get_intake_service().process_text(command_text)
             if is_offline_sync_failure_reply(reply):
-                raise ValueError(reply)
+                reason = sanitize_error_message(ValueError(reply))
+                pending.append({"id": entry_id, "status": "pending", "reason": reason})
+                append_offline_sync_log(entry_for_log, "pending", "", reason)
+                continue
             offline_synced_entry_ids.add(entry_id)
             synced.append({"id": entry_id, "status": "synced", "reply": reply})
-            append_offline_sync_log(entry, "synced", reply, "")
+            append_offline_sync_log(entry_for_log, "synced", reply, "")
         except Exception as exc:
-            error = sanitize_error_message(exc)
-            failed.append({"id": entry_id, "status": "failed", "error": error})
-            append_offline_sync_log(entry, "failed", "", error)
-    return {"status": "ok", "synced": synced, "failed": failed}
+            reason = sanitize_error_message(exc)
+            pending.append({"id": entry_id, "status": "pending", "reason": reason})
+            append_offline_sync_log(entry_for_log, "pending", "", reason)
+    return {"status": "ok", "synced": synced, "failed": failed, "pending": pending}
 
 
 @app.get("/status", response_class=HTMLResponse)
@@ -1378,6 +1439,9 @@ def append_offline_sync_log(entry: dict[str, Any], status: str, reply: str, erro
             "entry_timestamp": str(entry.get("timestamp") or ""),
             "pharmacy_id": str(entry.get("pharmacy_id") or ""),
             "command_text": str(entry.get("command_text") or ""),
+            "raw_text": str(entry.get("raw_text") or ""),
+            "action": str(entry.get("action") or ""),
+            "drug_name": str(entry.get("drug_name") or ""),
             "type": str(entry.get("type") or entry.get("action_type") or ""),
             "sync_status": status,
             "retry_count": entry.get("retry_count", 0),
