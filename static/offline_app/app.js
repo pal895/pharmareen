@@ -222,16 +222,26 @@ async function queueMedia(file, kind, purpose, options = {}) {
     await addEntries([fallback]);
   }
   if (!options.skipRender) await renderQueue();
-  if (!options.skipSync && navigator.onLine) await syncQueue();
   return entry;
 }
 
+async function queueMediaFiles(fileList, kind, purpose, options = {}) {
+  const files = Array.from(fileList || []);
+  const queued = [];
+  for (const file of files) {
+    const entry = await queueMedia(file, kind, purpose, { ...options, skipRender: true });
+    if (entry) queued.push(entry);
+  }
+  if (!options.skipRender) await renderQueue();
+  return queued;
+}
+
 async function queuePhotoInputIfPresent(options = {}) {
-  return queueMedia(photoInput.files && photoInput.files[0], "photo", photoPurpose.value, options);
+  return queueMediaFiles(photoInput.files, "photo", photoPurpose.value, options);
 }
 
 async function queueAudioInputIfPresent(options = {}) {
-  return queueMedia(voiceInput.files && voiceInput.files[0], "audio", "offline_voice_note", options);
+  return queueMediaFiles(voiceInput.files, "audio", "offline_voice_note", options);
 }
 
 async function saveOfflineEntries() {
@@ -241,23 +251,27 @@ async function saveOfflineEntries() {
     await addEntries(textEntries);
     savedCount += textEntries.length;
   }
-  const photoEntry = await queuePhotoInputIfPresent({ skipRender: true, skipSync: true });
-  const audioEntry = await queueAudioInputIfPresent({ skipRender: true, skipSync: true });
-  if (photoEntry) savedCount += 1;
-  if (audioEntry) savedCount += 1;
+  const photoEntries = await queuePhotoInputIfPresent({ skipRender: true });
+  const audioEntries = await queueAudioInputIfPresent({ skipRender: true });
+  savedCount += photoEntries.length;
+  savedCount += audioEntries.length;
   if (!savedCount) return;
 
   commandText.value = "";
   photoInput.value = "";
   voiceInput.value = "";
   await renderQueue();
-  if (navigator.onLine) await syncQueue();
+  if (navigator.onLine) setStatus("online", "Online - saved safely");
   else setStatus("offline", "Offline - saved safely");
 }
 
+function mediaStatusLabel(item) {
+  return item.sync_status || "pending";
+}
+
 function entryLabel(item) {
-  if (item.type === "photo") return `Photo: ${item.file_name || "invoice"}`;
-  if (item.type === "voice" || item.type === "audio") return `Voice/audio: ${item.file_name || "audio"}`;
+  if (item.type === "photo") return `photo: ${item.file_name || "invoice"} - ${mediaStatusLabel(item)}`;
+  if (item.type === "voice" || item.type === "audio") return `audio: ${item.file_name || "audio"} - ${mediaStatusLabel(item)}`;
   if (item.action === "restock") {
     const bonus = Number(item.bonus_quantity || 0) > 0 ? ` + bonus ${item.bonus_quantity}` : "";
     return `${item.drug_name || item.command_text} restock ${item.quantity || ""}${bonus}`.trim();
@@ -386,7 +400,6 @@ async function boot() {
   await initializeStorage();
   updateConnectionStatus();
   await renderQueue();
-  if (navigator.onLine) await syncQueue();
 }
 
 window.PharMareenOffline = {
@@ -398,6 +411,7 @@ window.PharMareenOffline = {
   loadQueue,
   persistentStorageReady: () => persistentStorageReady,
   queueMedia,
+  queueMediaFiles,
   saveOfflineEntries,
   syncQueue
 };

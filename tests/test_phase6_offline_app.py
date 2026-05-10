@@ -245,6 +245,71 @@ console.log(JSON.stringify(cases));
     assert len(data["newline"]) == 3
 
 
+
+def test_offline_media_inputs_allow_multiple_files_without_required_command():
+    root = Path(__file__).resolve().parents[1]
+    html = (root / "static" / "offline_app" / "index.html").read_text(encoding="utf-8")
+
+    assert "Choose invoice/photo files" in html
+    assert "Choose voice/audio files" in html
+    assert 'id="photoInput"' in html
+    assert 'id="voiceInput"' in html
+    assert 'accept="image/*" multiple' in html
+    assert 'accept="audio/*" multiple' in html
+    assert 'id="commandText"' in html
+    assert 'id="commandText" required' not in html
+    assert 'id="photoInput" type="file" accept="image/*" multiple required' not in html
+    assert 'id="voiceInput" type="file" accept="audio/*" multiple required' not in html
+
+
+def test_offline_save_offline_queues_photo_and_audio_without_command_text():
+    root = Path(__file__).resolve().parents[1]
+    script = (root / "static" / "offline_app" / "app.js").read_text(encoding="utf-8")
+
+    assert "async function saveOfflineEntries" in script
+    assert "createCommandEntries(commandText.value)" in script
+    assert "const photoEntries = await queuePhotoInputIfPresent" in script
+    assert "const audioEntries = await queueAudioInputIfPresent" in script
+    assert "savedCount += photoEntries.length" in script
+    assert "savedCount += audioEntries.length" in script
+    assert "if (!savedCount) return" in script
+    assert "if (!commandText.value" not in script
+
+
+def test_offline_media_queue_supports_multiple_photos_and_audio_files():
+    root = Path(__file__).resolve().parents[1]
+    script = (root / "static" / "offline_app" / "app.js").read_text(encoding="utf-8")
+
+    assert "async function queueMediaFiles" in script
+    assert "Array.from(fileList || [])" in script
+    assert "for (const file of files)" in script
+    assert 'queueMediaFiles(photoInput.files, "photo"' in script
+    assert 'queueMediaFiles(voiceInput.files, "audio"' in script
+
+
+def test_offline_media_items_render_pending_and_synced_labels():
+    root = Path(__file__).resolve().parents[1]
+    script = (root / "static" / "offline_app" / "app.js").read_text(encoding="utf-8")
+
+    assert "mediaStatusLabel" in script
+    assert 'return `photo: ${item.file_name || "invoice"} - ${mediaStatusLabel(item)}`' in script
+    assert 'return `audio: ${item.file_name || "audio"} - ${mediaStatusLabel(item)}`' in script
+    assert 'sync_status: "synced"' in script
+    assert "addHistoryEntry" in script
+
+
+def test_offline_media_queue_persists_after_refresh_with_indexeddb():
+    root = Path(__file__).resolve().parents[1]
+    script = (root / "static" / "offline_app" / "app.js").read_text(encoding="utf-8")
+
+    assert "indexedDB.open" in script
+    assert "QUEUE_STORE" in script
+    assert "HISTORY_STORE" in script
+    assert "entry.blob = file" in script
+    assert "await idbPut(QUEUE_STORE, entry)" in script
+    assert "async function loadQueue" in script
+    assert "persistentStorageReady" in script
+
 def test_offline_pwa_assets_contain_auto_sync_media_and_retry_logic():
     root = Path(__file__).resolve().parents[1]
     script = (root / "static" / "offline_app" / "app.js").read_text(encoding="utf-8")

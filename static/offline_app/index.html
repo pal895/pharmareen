@@ -46,18 +46,20 @@
       <div class="media-card">
         <h2>Photo queue</h2>
         <p class="hint">Save invoice or receipt photos. Keep this page open until synced if the file is large.</p>
+        <label for="photoInput">Choose invoice/photo files</label>
         <select id="photoPurpose">
           <option value="invoice_photo">Invoice photo</option>
           <option value="supplier_receipt">Supplier receipt</option>
           <option value="stock_photo">Stock photo</option>
         </select>
-        <input id="photoInput" type="file" accept="image/*">
+        <input id="photoInput" type="file" accept="image/*" multiple>
         <button id="queuePhoto" type="button">Queue photo</button>
       </div>
       <div class="media-card">
         <h2>Voice/audio queue</h2>
-        <p class="hint">Upload an audio note while offline. Backend voice AI handles it when synced.</p>
-        <input id="voiceInput" type="file" accept="audio/*">
+        <p class="hint">Upload audio notes while offline. Backend voice AI handles them when synced.</p>
+        <label for="voiceInput">Choose voice/audio files</label>
+        <input id="voiceInput" type="file" accept="audio/*" multiple>
         <button id="queueVoice" type="button">Queue audio</button>
       </div>
     </section>
