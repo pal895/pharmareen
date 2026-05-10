@@ -6,6 +6,7 @@ const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
+const SERVICE_WORKER_VERSION = "phase6-final-media-save-working-v8";
 
 const examples = {
   sale: "Panadol sold 2",
@@ -401,8 +402,21 @@ window.addEventListener("online", () => syncQueue());
 window.addEventListener("offline", updateConnectionStatus);
 setInterval(syncQueue, 30000);
 
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/offline_app/service-worker.js").catch(() => {});
+async function registerFreshServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    for (const registration of registrations) {
+      const urls = [registration.active, registration.waiting, registration.installing]
+        .filter(Boolean)
+        .map(worker => worker.scriptURL || "");
+      const hasOldOfflineWorker = urls.some(url => url.includes("/offline_app/service-worker.js") && !url.includes(SERVICE_WORKER_VERSION));
+      if (hasOldOfflineWorker) await registration.unregister();
+    }
+    await navigator.serviceWorker.register(`/offline_app/service-worker.js?v=${SERVICE_WORKER_VERSION}`);
+  } catch {
+    // The app still works online if service worker refresh is unavailable.
+  }
 }
 
 async function boot() {
@@ -410,6 +424,7 @@ async function boot() {
   await initializeStorage();
   updateConnectionStatus();
   await renderQueue();
+  await registerFreshServiceWorker();
 }
 
 window.PharMareenOffline = {

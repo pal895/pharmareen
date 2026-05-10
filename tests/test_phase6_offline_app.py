@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import subprocess
@@ -48,14 +48,15 @@ def test_offline_app_routes_return_html():
     assert "PharMareen Offline Mode" in followed_response.text
     assert "Type or paste pharmacy command" in followed_response.text
     assert "Save Offline" in followed_response.text
-    assert "PHASE 6 FINAL WORKING" in followed_response.text
+    assert "PHASE 6 FINAL MEDIA SAVE WORKING" in followed_response.text
     assert "Photo queue" in followed_response.text
     assert "Voice/audio queue" in followed_response.text
     assert compat_response.status_code == 200
     assert compat_response.headers["content-type"].startswith("text/html")
     assert "PharMareen Offline Mode" in compat_response.text
-    assert "PHASE 6 FINAL WORKING" in compat_response.text
+    assert "PHASE 6 FINAL MEDIA SAVE WORKING" in compat_response.text
     assert "no-store" in compat_response.headers.get("cache-control", "")
+    assert compat_response.headers.get("x-pharmareen-offline-version") == "phase6-final-media-save-working"
     assert parser_response.status_code == 200
     assert manifest_response.status_code == 200
     assert worker_response.status_code == 200
@@ -215,6 +216,8 @@ def test_debug_offline_app_reports_all_phase6_features(monkeypatch, tmp_path):
     assert data["voice_queue_ready"] is True
     assert data["persistent_storage_ready"] is True
     assert data["auto_sync_ready"] is True
+    assert data["frontend_marker"] == "PHASE 6 FINAL MEDIA SAVE WORKING"
+    assert data["served_index_path"].endswith("static/offline_app/index.html") or data["served_index_path"].endswith("static\\offline_app\\index.html")
     assert "offline_log_exists" in data
 
 
@@ -256,7 +259,7 @@ def test_legacy_local_offline_app_matches_phase6_frontend():
     legacy_app = (root / "local" / "app.js").read_text(encoding="utf-8")
     legacy_parser = root / "local" / "parser.js"
 
-    assert "PHASE 6 FINAL WORKING" in legacy_html
+    assert "PHASE 6 FINAL MEDIA SAVE WORKING" in legacy_html
     assert "Choose invoice/photo files" in legacy_html
     assert "Choose voice/audio files" in legacy_html
     assert "queueMediaFiles" in legacy_app
@@ -270,13 +273,13 @@ def test_legacy_offline_app_folder_matches_final_frontend():
     legacy_worker = (root / "offline_app" / "service-worker.js").read_text(encoding="utf-8")
     legacy_parser = root / "offline_app" / "parser.js"
 
-    assert "PHASE 6 FINAL WORKING" in legacy_html
+    assert "PHASE 6 FINAL MEDIA SAVE WORKING" in legacy_html
     assert "Choose invoice/photo files" in legacy_html
     assert "Choose voice/audio files" in legacy_html
     assert " required" not in legacy_html
     assert "disableNativeRequiredValidation" in legacy_app
     assert "queueMediaFiles" in legacy_app
-    assert "pharmareen-offline-v7" in legacy_worker
+    assert "pharmareen-offline-v8" in legacy_worker
     assert legacy_parser.exists()
 
 
@@ -370,10 +373,10 @@ def test_offline_pwa_assets_contain_auto_sync_media_and_retry_logic():
     assert "splitCommands" in parser
     assert "parseCommand" in parser
     assert "Save Offline" in html
-    assert "PHASE 6 FINAL WORKING" in html
+    assert "PHASE 6 FINAL MEDIA SAVE WORKING" in html
     assert "Photo queue" in html
     assert "Voice/audio queue" in html
     assert '"start_url": "/offline-app"' in manifest
     assert "/offline_app/parser.js" in worker
-    assert "pharmareen-offline-v7" in worker
+    assert "pharmareen-offline-v8" in worker
     assert "caches.open" in worker

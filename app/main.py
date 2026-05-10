@@ -90,7 +90,7 @@ async def offline_app_redirect() -> RedirectResponse:
 
 
 @app.get("/debug/offline-app")
-async def debug_offline_app() -> dict[str, bool]:
+async def debug_offline_app() -> dict[str, Any]:
     return {
         "offline_app_installed": True,
         "offline_routes_ready": True,
@@ -102,13 +102,17 @@ async def debug_offline_app() -> dict[str, bool]:
         "voice_queue_ready": True,
         "persistent_storage_ready": True,
         "auto_sync_ready": True,
+        "frontend_marker": OFFLINE_FRONTEND_MARKER,
+        "served_index_path": str(OFFLINE_APP_DIR / "index.html"),
     }
 
+OFFLINE_FRONTEND_MARKER = "PHASE 6 FINAL MEDIA SAVE WORKING"
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
 OFFLINE_NO_CACHE_HEADERS = {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
     "Pragma": "no-cache",
     "Expires": "0",
+    "X-PharMareen-Offline-Version": "phase6-final-media-save-working",
 }
 
 
