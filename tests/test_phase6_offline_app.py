@@ -47,6 +47,7 @@ def test_offline_app_routes_return_html():
     assert followed_response.headers["content-type"].startswith("text/html")
     assert "PharMareen Offline Mode" in followed_response.text
     assert "Type or paste pharmacy command" in followed_response.text
+    assert "Save Offline" in followed_response.text
     assert "Photo queue" in followed_response.text
     assert "Voice/audio queue" in followed_response.text
     assert compat_response.status_code == 200
@@ -160,7 +161,7 @@ def test_offline_sync_logs_photo_and_voice_placeholders(monkeypatch, tmp_path):
     payload = {
         "entries": [
             {"id": "photo-1", "action": "photo", "file_name": "invoice.jpg", "sync_status": "pending"},
-            {"id": "voice-1", "action": "voice", "file_name": "voice.ogg", "sync_status": "pending"},
+            {"id": "audio-1", "action": "audio", "file_name": "voice.ogg", "sync_status": "pending"},
         ]
     }
     with TestClient(main.app) as client:
@@ -207,7 +208,9 @@ def test_debug_offline_app_reports_all_phase6_features(monkeypatch, tmp_path):
     assert data["sync_endpoint_ready"] is True
     assert data["multi_command_parser_ready"] is True
     assert data["photo_queue_ready"] is True
+    assert data["audio_queue_ready"] is True
     assert data["voice_queue_ready"] is True
+    assert data["persistent_storage_ready"] is True
     assert data["auto_sync_ready"] is True
     assert "offline_log_exists" in data
 
@@ -256,10 +259,17 @@ def test_offline_pwa_assets_contain_auto_sync_media_and_retry_logic():
     assert "retry_count" in script
     assert "last_error" in script
     assert "MAX_RETRIES = 3" in script
-    assert "fileToDataUrl" in script
+    assert "indexedDB" in script
+    assert "DB_NAME" in script
+    assert "QUEUE_STORE" in script
+    assert "persistentStorageReady" in script
+    assert "blobToDataUrl" in script
     assert "queueMedia" in script
+    assert "queuePhotoInputIfPresent" in script
+    assert "queueAudioInputIfPresent" in script
     assert "splitCommands" in parser
     assert "parseCommand" in parser
+    assert "Save Offline" in html
     assert "Photo queue" in html
     assert "Voice/audio queue" in html
     assert '"start_url": "/offline-app"' in manifest

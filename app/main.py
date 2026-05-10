@@ -98,7 +98,9 @@ async def debug_offline_app() -> dict[str, bool]:
         "offline_log_exists": (PROJECT_ROOT / "data" / "offline_sync_log.jsonl").exists(),
         "multi_command_parser_ready": (OFFLINE_APP_DIR / "parser.js").exists(),
         "photo_queue_ready": True,
+        "audio_queue_ready": True,
         "voice_queue_ready": True,
+        "persistent_storage_ready": True,
         "auto_sync_ready": True,
     }
 
