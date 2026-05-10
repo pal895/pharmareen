@@ -59,6 +59,17 @@ h2 { font-size: 18px; }
 
 .intro-panel { background: var(--mint); }
 
+.version-pill {
+  display: inline-block;
+  margin-top: 7px;
+  border-radius: 999px;
+  background: var(--mint);
+  color: var(--green-dark);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .hint {
   color: var(--muted);
   font-size: 14px;

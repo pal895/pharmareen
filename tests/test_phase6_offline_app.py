@@ -48,11 +48,14 @@ def test_offline_app_routes_return_html():
     assert "PharMareen Offline Mode" in followed_response.text
     assert "Type or paste pharmacy command" in followed_response.text
     assert "Save Offline" in followed_response.text
+    assert "Phase 6 Media Fix v2" in followed_response.text
     assert "Photo queue" in followed_response.text
     assert "Voice/audio queue" in followed_response.text
     assert compat_response.status_code == 200
     assert compat_response.headers["content-type"].startswith("text/html")
     assert "PharMareen Offline Mode" in compat_response.text
+    assert "Phase 6 Media Fix v2" in compat_response.text
+    assert "no-store" in compat_response.headers.get("cache-control", "")
     assert parser_response.status_code == 200
     assert manifest_response.status_code == 200
     assert worker_response.status_code == 200
@@ -335,8 +338,10 @@ def test_offline_pwa_assets_contain_auto_sync_media_and_retry_logic():
     assert "splitCommands" in parser
     assert "parseCommand" in parser
     assert "Save Offline" in html
+    assert "Phase 6 Media Fix v2" in html
     assert "Photo queue" in html
     assert "Voice/audio queue" in html
     assert '"start_url": "/offline-app"' in manifest
     assert "/offline_app/parser.js" in worker
+    assert "pharmareen-offline-v5" in worker
     assert "caches.open" in worker

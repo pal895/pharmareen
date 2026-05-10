@@ -105,6 +105,58 @@ async def debug_offline_app() -> dict[str, bool]:
     }
 
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
+OFFLINE_NO_CACHE_HEADERS = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
+
+@app.get("/offline_app/index.html", include_in_schema=False)
+async def offline_app_index_file() -> FileResponse:
+    return FileResponse(
+        OFFLINE_APP_DIR / "index.html",
+        media_type="text/html",
+        headers=OFFLINE_NO_CACHE_HEADERS,
+    )
+
+
+@app.get("/offline_app/app.js", include_in_schema=False)
+async def offline_app_js_file() -> FileResponse:
+    return FileResponse(
+        OFFLINE_APP_DIR / "app.js",
+        media_type="application/javascript",
+        headers=OFFLINE_NO_CACHE_HEADERS,
+    )
+
+
+@app.get("/offline_app/parser.js", include_in_schema=False)
+async def offline_parser_js_file() -> FileResponse:
+    return FileResponse(
+        OFFLINE_APP_DIR / "parser.js",
+        media_type="application/javascript",
+        headers=OFFLINE_NO_CACHE_HEADERS,
+    )
+
+
+@app.get("/offline_app/service-worker.js", include_in_schema=False)
+async def offline_service_worker_file() -> FileResponse:
+    return FileResponse(
+        OFFLINE_APP_DIR / "service-worker.js",
+        media_type="application/javascript",
+        headers=OFFLINE_NO_CACHE_HEADERS,
+    )
+
+
+@app.get("/offline_app/styles.css", include_in_schema=False)
+async def offline_styles_file() -> FileResponse:
+    return FileResponse(
+        OFFLINE_APP_DIR / "styles.css",
+        media_type="text/css",
+        headers=OFFLINE_NO_CACHE_HEADERS,
+    )
+
+
 app.mount(
     "/offline_app",
     StaticFiles(directory=str(OFFLINE_APP_DIR), html=True),
