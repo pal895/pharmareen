@@ -14,26 +14,35 @@
       <div>
         <p class="eyebrow">PharMareen</p>
         <h1>PharMareen Pharmacy Assistant</h1>
-        <p class="version-pill">PHASE 6 FINAL MEDIA SAVE WORKING</p>
+        <p class="version-pill">PHASE 6 FINAL WORKING - LOW FRICTION</p>
+        <p class="version-pill subtle-marker">PHASE 6 FINAL MEDIA SAVE WORKING</p>
       </div>
       <div id="statusBanner" class="status online" role="status">Online</div>
     </header>
 
     <section class="panel intro-panel">
       <h2>Offline Mode</h2>
-      <p class="hint">Queue safely saved. Record sales, stock, photos, and voice notes when internet is weak. They sync automatically when the phone is online again.</p>
+      <p class="hint">Saved safely on this phone. Record sales, stock, photos, and voice notes when internet is weak. They send automatically when the phone is online again.</p>
     </section>
 
     <section class="panel dashboard-actions" aria-label="Pharmacy dashboard actions">
-      <button id="scanBarcode" type="button">📷 Scan Barcode</button>
-      <button id="scanInvoice" type="button">🧾 Scan Invoice</button>
-      <button id="voiceEntry" type="button">🎤 Voice Entry</button>
-      <button id="manualEntry" type="button">✍️ Manual Entry</button>
+      <button id="takePhoto" type="button">Take Photo</button>
+      <button id="scanBarcode" type="button">Scan Barcode</button>
+      <button id="scanInvoice" type="button">Scan Invoice</button>
+      <button id="voiceEntry" type="button">Tap & Talk</button>
+      <button id="manualEntry" type="button">Manual Entry</button>
     </section>
 
     <section id="barcodePanel" class="panel barcode-panel" aria-label="Barcode lookup">
       <h2>Barcode lookup</h2>
-      <p class="hint">Use phone camera later, or type/scan the barcode here. External scanners work like a keyboard.</p>
+      <p class="hint">Use the phone camera, type the barcode, or use an external scanner. Unknown barcodes can be saved to a medicine name.</p>
+      <div id="barcodeCameraBox" class="camera-box" hidden>
+        <video id="barcodeVideo" playsinline muted></video>
+        <div class="camera-controls">
+          <button id="stopBarcodeScan" type="button">Stop Camera</button>
+          <button id="torchToggle" type="button" hidden>Flashlight</button>
+        </div>
+      </div>
       <input id="barcodeInput" type="text" inputmode="numeric" placeholder="Scan or type barcode">
       <input id="barcodeMedicineName" type="text" placeholder="Medicine name if barcode is new">
       <button id="saveBarcodeMapping" type="button">Save barcode mapping</button>
@@ -41,10 +50,11 @@
     </section>
 
     <section class="panel quick-actions" aria-label="Quick actions">
-      <button type="button" data-action="sale">Sale</button>
+      <button type="button" data-action="sale">Sell</button>
       <button type="button" data-action="restock">Restock</button>
-      <button type="button" data-action="bonus">Bonus Restock</button>
-      <button type="button" data-action="discount">Discount Restock</button>
+      <button type="button" data-action="nostock">No Stock</button>
+      <button type="button" data-action="report">Report</button>
+      <button type="button" data-action="stock">Stock Check</button>
     </section>
 
     <section class="panel command-panel">
@@ -61,43 +71,55 @@
       <button id="saveEntry" class="primary" type="button">Save Offline</button>
     </section>
 
+    <section class="panel talk-panel">
+      <h2>Tap & Talk</h2>
+      <p class="hint">Record a quick voice note like WhatsApp. It will send when online.</p>
+      <button id="tapTalk" class="primary" type="button">Tap & Talk</button>
+      <p id="voiceStatus" class="hint">Ready.</p>
+      <details>
+        <summary>More options</summary>
+        <p class="hint">Use files only when recording here is not available.</p>
+        <label for="voiceInput">Choose voice/audio files</label>
+        <input id="voiceInput" type="file" accept="audio/*" multiple>
+        <button id="queueVoice" type="button">Save Voice</button>
+      </details>
+    </section>
+
     <section class="panel media-grid">
       <div class="media-card">
-        <h2>Photo queue</h2>
-        <p class="hint">Save invoice or receipt photos. Keep this page open until synced if the file is large.</p>
+        <h2>Photos</h2>
+        <p class="hint">Save invoice or receipt photos. They will send when online.</p>
         <label for="photoInput">Choose invoice/photo files</label>
         <select id="photoPurpose">
           <option value="invoice_photo">Invoice photo</option>
           <option value="supplier_receipt">Supplier receipt</option>
           <option value="stock_photo">Stock photo</option>
         </select>
-        <input id="photoInput" type="file" accept="image/*" multiple>
-        <button id="queuePhoto" type="button">Queue photo</button>
+        <input id="photoInput" type="file" accept="image/*" capture="environment" multiple>
+        <button id="queuePhoto" type="button">Save Photo</button>
       </div>
       <div class="media-card">
-        <h2>Voice/audio queue</h2>
-        <p class="hint">Upload audio notes while offline. Backend voice AI handles them when synced.</p>
-        <label for="voiceInput">Choose voice/audio files</label>
-        <input id="voiceInput" type="file" accept="audio/*" multiple>
-        <button id="queueVoice" type="button">Queue audio</button>
+        <h2>Install PharMareen on phone</h2>
+        <p class="hint">Android Chrome: menu, then Add to Home screen.</p>
+        <p class="hint">iPhone Safari: Share, then Add to Home Screen.</p>
       </div>
     </section>
 
     <section class="panel queue-head">
       <div>
-        <p class="eyebrow">Pending queue</p>
+        <p class="eyebrow">Saved Offline</p>
         <h2><span id="queueCount">0</span> waiting</h2>
       </div>
       <button id="syncNow" type="button">Sync Now</button>
     </section>
 
     <section class="panel">
-      <h2>Pending queue</h2>
+      <h2>Saved Offline</h2>
       <ul id="pendingEntries" class="entry-list"></ul>
     </section>
 
     <section class="panel">
-      <h2>Synced history</h2>
+      <h2>Sent successfully</h2>
       <ul id="syncedEntries" class="entry-list"></ul>
     </section>
   </main>

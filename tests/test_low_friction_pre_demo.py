@@ -1,0 +1,57 @@
+from __future__ import annotations
+
+from app.config import Settings
+from app.intake import parse_operating_commands
+from app.main import DEFAULT_PUBLIC_BASE_URL, report_public_base_url
+
+
+def test_shortcuts_and_mixed_commands_parse_without_failing_whole_message():
+    commands = parse_operating_commands("Panadol 2, ORS 1, Antacid 3, later Panadol 1, Panadol stock")
+
+    assert commands is not None
+    assert [command.kind for command in commands] == ["sale", "sale", "sale", "late_sale", "stock_check"]
+    assert [command.drug_name for command in commands] == ["Panadol", "ORS", "Antacid", "Panadol", "Panadol"]
+
+
+def test_low_typing_shortcuts_parse_to_panadol_actions():
+    sale = parse_operating_commands("p2")
+    restock = parse_operating_commands("p +20")
+    stock = parse_operating_commands("stock p")
+
+    assert sale and sale[0].kind == "sale"
+    assert sale[0].drug_name == "Panadol"
+    assert sale[0].quantity == 2
+    assert restock and restock[0].kind == "restock"
+    assert restock[0].drug_name == "Panadol"
+    assert restock[0].quantity == 20
+    assert stock and stock[0].kind == "stock_check"
+    assert stock[0].drug_name == "Panadol"
+
+
+def test_report_links_use_stable_public_replit_domain_for_temporary_runtime_urls(monkeypatch):
+    monkeypatch.delenv("PUBLIC_BASE_URL", raising=False)
+    settings = Settings(_env_file=None, public_base_url="https://temporary.riker.replit.dev")
+
+    assert report_public_base_url(settings) == DEFAULT_PUBLIC_BASE_URL
+
+
+def test_report_links_honor_explicit_public_base_url(monkeypatch):
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://pharmareen.example.com")
+    settings = Settings(_env_file=None, public_base_url="http://localhost:5000")
+
+    assert report_public_base_url(settings) == "https://pharmareen.example.com"
+
+
+def test_supervisor_scripts_are_present_and_bridge_is_optional():
+    start_script = open("start.sh", encoding="utf-8").read()
+    start_all = open("scripts/start_all.sh", encoding="utf-8").read()
+    check_all = open("scripts/check_all.sh", encoding="utf-8").read()
+    stop_all = open("scripts/stop_all.sh", encoding="utf-8").read()
+
+    assert "WHATSAPP_BRIDGE_ENABLED" in start_script
+    assert "bridge.log" in start_script
+    assert "bridge.pid" in start_script
+    assert "local_whatsapp_bridge.js" in start_script
+    assert "WHATSAPP_BRIDGE_ENABLED" in start_all
+    assert "/debug/system-status" in check_all
+    assert "local_whatsapp_bridge.js" in stop_all

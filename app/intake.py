@@ -263,6 +263,17 @@ NUMBER_WORDS = {
     "thousand": 1000,
 }
 
+SHORTCUT_DRUGS = {
+    "p": "Panadol",
+    "pan": "Panadol",
+    "para": "Paracetamol",
+    "ors": "ORS",
+    "a": "Antacid",
+    "ant": "Antacid",
+    "i": "Insulin",
+    "ins": "Insulin",
+}
+
 
 class IntakeService:
     def __init__(
@@ -1881,10 +1892,40 @@ def extract_labeled_money(text: str, labels: list[str]) -> float | None:
     return None
 
 
+def parse_shortcut_command(clean: str, raw_text: str) -> OperatingCommand | None:
+    normalized = normalize_key(clean)
+    match = re.fullmatch(r"stock\s+([a-z]+)", normalized, flags=re.IGNORECASE)
+    if match and match.group(1) in SHORTCUT_DRUGS:
+        return OperatingCommand(kind="stock_check", drug_name=SHORTCUT_DRUGS[match.group(1)], raw_text=raw_text)
+
+    match = re.fullmatch(r"([a-z]+)\s*\+\s*(\d+)", normalized, flags=re.IGNORECASE)
+    if match and match.group(1) in SHORTCUT_DRUGS:
+        return OperatingCommand(
+            kind="restock",
+            drug_name=SHORTCUT_DRUGS[match.group(1)],
+            quantity=positive_quantity(match.group(2)),
+            raw_text=raw_text,
+        )
+
+    match = re.fullmatch(r"([a-z]+)\s*x?\s*(\d+)", normalized, flags=re.IGNORECASE)
+    if match and match.group(1) in SHORTCUT_DRUGS:
+        return OperatingCommand(
+            kind="sale",
+            drug_name=SHORTCUT_DRUGS[match.group(1)],
+            quantity=positive_quantity(match.group(2)),
+            raw_text=raw_text,
+        )
+    return None
+
+
 def parse_single_operating_command(text: str) -> OperatingCommand | None:
     clean = " ".join(text.strip().split())
     if not clean:
         return None
+
+    shortcut = parse_shortcut_command(clean, text)
+    if shortcut is not None:
+        return shortcut
 
     staff_name = parse_staff_name(clean)
     if staff_name:

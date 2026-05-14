@@ -70,6 +70,12 @@ h2 { font-size: 18px; }
   font-weight: 700;
 }
 
+.subtle-marker {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
 .hint {
   color: var(--muted);
   font-size: 14px;
@@ -109,6 +115,26 @@ h2 { font-size: 18px; }
 
 .barcode-panel {
   background: #fbfdfc;
+}
+
+.camera-box {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.camera-box video {
+  width: 100%;
+  min-height: 220px;
+  border-radius: 8px;
+  background: #10231b;
+  object-fit: cover;
+}
+
+.camera-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 button, input, textarea, select {
@@ -183,6 +209,16 @@ textarea {
 
 .media-card button { width: 100%; }
 
+details {
+  margin-top: 12px;
+}
+
+summary {
+  cursor: pointer;
+  color: var(--green-dark);
+  font-weight: 700;
+}
+
 .queue-head {
   display: flex;
   align-items: center;
@@ -214,7 +250,7 @@ textarea {
 .empty { color: var(--muted); }
 
 @media (min-width: 680px) {
-  .quick-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .dashboard-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .quick-actions { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .dashboard-actions { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .media-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

@@ -49,19 +49,23 @@ def test_offline_app_routes_return_html():
     assert "PharMareen Pharmacy Assistant" in followed_response.text
     assert "Scan Barcode" in followed_response.text
     assert "Scan Invoice" in followed_response.text
-    assert "Voice Entry" in followed_response.text
+    assert "Tap & Talk" in followed_response.text
     assert "Manual Entry" in followed_response.text
+    assert "Take Photo" in followed_response.text
+    assert "Save Photo" in followed_response.text
+    assert "Save Voice" in followed_response.text
     assert "Type or paste pharmacy command" in followed_response.text
     assert "Save Offline" in followed_response.text
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in followed_response.text
-    assert "Photo queue" in followed_response.text
-    assert "Voice/audio queue" in followed_response.text
+    assert "Saved Offline" in followed_response.text
+    assert "Queue audio" not in followed_response.text
+    assert "Queue photo" not in followed_response.text
     assert compat_response.status_code == 200
     assert compat_response.headers["content-type"].startswith("text/html")
     assert "PharMareen Offline Mode" in compat_response.text
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in compat_response.text
     assert "no-store" in compat_response.headers.get("cache-control", "")
-    assert compat_response.headers.get("x-pharmareen-offline-version") == "phase6-final-media-save-working"
+    assert compat_response.headers.get("x-pharmareen-offline-version") == "phase6-low-friction-v10"
     assert parser_response.status_code == 200
     assert manifest_response.status_code == 200
     assert worker_response.status_code == 200
@@ -180,6 +184,9 @@ def test_offline_sync_logs_photo_and_voice_placeholders(monkeypatch, tmp_path):
     data = response.json()
     assert data["status"] == "ok"
     assert [item["status"] for item in data["synced"]] == ["media_logged", "media_logged"]
+    assert data["message"].startswith("✅ Offline records sent successfully")
+    assert "Photos: 1" in data["message"]
+    assert "Voice notes: 1" in data["message"]
     assert fake.messages == []
     assert (tmp_path / "data" / "offline_sync_log.jsonl").exists()
 
@@ -221,7 +228,7 @@ def test_debug_offline_app_reports_all_phase6_features(monkeypatch, tmp_path):
     assert data["voice_queue_ready"] is True
     assert data["persistent_storage_ready"] is True
     assert data["auto_sync_ready"] is True
-    assert data["frontend_marker"] == "PHASE 6 FINAL MEDIA SAVE WORKING"
+    assert data["frontend_marker"] == "PHASE 6 FINAL WORKING - LOW FRICTION"
     assert data["served_index_path"].endswith("static/offline_app/index.html") or data["served_index_path"].endswith("static\\offline_app\\index.html")
     assert "offline_log_exists" in data
 
@@ -237,6 +244,9 @@ const cases = {
   discount: parser.parseCommand('Amoxicillin received 30 paid 2500 discount 300'),
   unitSale: parser.parseCommand('Panadol 1 strip mpesa'),
   unitRestock: parser.parseCommand('Panadol +1 box'),
+  shortcutSale: parser.parseCommand('p2'),
+  shortcutRestock: parser.parseCommand('p +20'),
+  shortcutStock: parser.parseCommand('stock p'),
   comma: parser.splitCommands('Panadol sold 2, Amoxil sold 5, Zinc restock 10'),
   newline: parser.splitCommands('Panadol sold 2\nAmoxil sold 5\nZinc restock 10')
 };
@@ -259,6 +269,12 @@ console.log(JSON.stringify(cases));
     assert data["unitSale"]["base_quantity"] == 10
     assert data["unitRestock"]["unit"] == "box"
     assert data["unitRestock"]["base_quantity"] == 100
+    assert data["shortcutSale"]["action"] == "sale"
+    assert data["shortcutSale"]["drug_name"] == "Panadol"
+    assert data["shortcutSale"]["quantity"] == 2
+    assert data["shortcutRestock"]["action"] == "restock"
+    assert data["shortcutRestock"]["quantity"] == 20
+    assert data["shortcutStock"]["action"] == "stock_check"
     assert len(data["comma"]) == 3
     assert len(data["newline"]) == 3
 
@@ -274,6 +290,8 @@ def test_legacy_local_offline_app_matches_phase6_frontend():
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in legacy_html
     assert "Choose invoice/photo files" in legacy_html
     assert "Choose voice/audio files" in legacy_html
+    assert "Tap & Talk" in legacy_html
+    assert "Save Voice" in legacy_html
     assert "queueMediaFiles" in legacy_app
     assert legacy_parser.exists()
 
@@ -288,10 +306,12 @@ def test_legacy_offline_app_folder_matches_final_frontend():
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in legacy_html
     assert "Choose invoice/photo files" in legacy_html
     assert "Choose voice/audio files" in legacy_html
+    assert "Tap & Talk" in legacy_html
+    assert "Save Photo" in legacy_html
     assert " required" not in legacy_html
     assert "disableNativeRequiredValidation" in legacy_app
     assert "queueMediaFiles" in legacy_app
-    assert "pharmareen-offline-v9" in legacy_worker
+    assert "pharmareen-offline-v10" in legacy_worker
     assert legacy_parser.exists()
 
 
@@ -303,19 +323,42 @@ def test_offline_media_inputs_allow_multiple_files_without_required_command():
     assert "Choose voice/audio files" in html
     assert 'id="photoInput"' in html
     assert 'id="voiceInput"' in html
-    assert 'accept="image/*" multiple' in html
+    assert 'accept="image/*"' in html
+    assert 'id="photoInput" type="file" accept="image/*" capture="environment" multiple' in html
     assert 'accept="audio/*" multiple' in html
     assert 'id="commandText"' in html
     assert " required" not in html
     assert "Scan Barcode" in html
     assert "Scan Invoice" in html
-    assert "Voice Entry" in html
+    assert "Tap & Talk" in html
+    assert "Take Photo" in html
+    assert "Save Photo" in html
+    assert "Save Voice" in html
     assert "Manual Entry" in html
     assert 'id="barcodeInput"' in html
     assert 'id="saveBarcodeMapping"' in html
     assert 'id="commandText" required' not in html
     assert 'id="photoInput" type="file" accept="image/*" multiple required' not in html
     assert 'id="voiceInput" type="file" accept="audio/*" multiple required' not in html
+
+
+def test_offline_app_uses_pharmacy_owner_language_not_technical_queue_terms():
+    root = Path(__file__).resolve().parents[1]
+    html = (root / "static" / "offline_app" / "index.html").read_text(encoding="utf-8")
+    script = (root / "static" / "offline_app" / "app.js").read_text(encoding="utf-8")
+
+    assert "Saved Offline" in html
+    assert "Sent successfully" in html
+    assert "Tap & Talk" in html
+    assert "Save Voice" in html
+    assert "Save Photo" in html
+    assert "Install PharMareen on phone" in html
+    assert "Waiting to send" in script
+    assert "Queue audio" not in html
+    assert "Queue photo" not in html
+    assert "Pending queue" not in html
+    assert "indexeddb" not in html.lower()
+    assert "retries" not in html.lower()
 
 
 def test_offline_save_offline_queues_photo_and_audio_without_command_text():
@@ -350,6 +393,8 @@ def test_offline_media_items_render_pending_and_synced_labels():
     assert "mediaStatusLabel" in script
     assert 'return `photo: ${item.file_name || "invoice"} - ${mediaStatusLabel(item)}`' in script
     assert 'return `audio: ${item.file_name || "audio"} - ${mediaStatusLabel(item)}`' in script
+    assert "Waiting to send" in script
+    assert "Sent successfully" in script
     assert 'sync_status: "synced"' in script
     assert "addHistoryEntry" in script
 
@@ -392,9 +437,10 @@ def test_offline_pwa_assets_contain_auto_sync_media_and_retry_logic():
     assert "parseCommand" in parser
     assert "Save Offline" in html
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in html
-    assert "Photo queue" in html
-    assert "Voice/audio queue" in html
+    assert "Save Photo" in html
+    assert "Save Voice" in html
+    assert "Tap & Talk" in html
     assert '"start_url": "/offline-app"' in manifest
     assert "/offline_app/parser.js" in worker
-    assert "pharmareen-offline-v9" in worker
+    assert "pharmareen-offline-v10" in worker
     assert "caches.open" in worker

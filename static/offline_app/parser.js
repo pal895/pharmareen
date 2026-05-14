@@ -31,6 +31,17 @@
     hundred: 100
   };
 
+  const SHORTCUT_DRUGS = {
+    p: "Panadol",
+    pan: "Panadol",
+    para: "Paracetamol",
+    ors: "ORS",
+    a: "Antacid",
+    ant: "Antacid",
+    i: "Insulin",
+    ins: "Insulin"
+  };
+
   function normalizeSpaces(value) {
     return String(value || "").replace(/\s+/g, " ").trim();
   }
@@ -175,6 +186,43 @@
     }
     const supplierMatch = original.match(/\bsupplier\s+(.+?)(?:\s+expiry\b|$)/i);
     const expiryMatch = original.match(/\bexpiry\s+(.+)$/i);
+
+    const shortcutStock = lower.match(/^stock\s+([a-z]+)$/i);
+    if (shortcutStock && SHORTCUT_DRUGS[shortcutStock[1]]) {
+      return {
+        ...base,
+        action: "stock_check",
+        type: "stock_check",
+        drug_name: SHORTCUT_DRUGS[shortcutStock[1]]
+      };
+    }
+
+    const shortcutRestock = lower.match(/^([a-z]+)\s*\+\s*(\d+(?:\.\d+)?)$/i);
+    if (shortcutRestock && SHORTCUT_DRUGS[shortcutRestock[1]]) {
+      const quantity = Number(shortcutRestock[2]);
+      return {
+        ...base,
+        action: "restock",
+        type: "restock",
+        drug_name: SHORTCUT_DRUGS[shortcutRestock[1]],
+        quantity,
+        total_received_quantity: quantity,
+        base_quantity: quantity * unitFactor(base.unit)
+      };
+    }
+
+    const shortcutSale = lower.match(/^([a-z]+)\s*(?:x|\s)?\s*(\d+(?:\.\d+)?)$/i);
+    if (shortcutSale && SHORTCUT_DRUGS[shortcutSale[1]]) {
+      const quantity = Number(shortcutSale[2]);
+      return {
+        ...base,
+        action: "sale",
+        type: "sale",
+        drug_name: SHORTCUT_DRUGS[shortcutSale[1]],
+        quantity,
+        base_quantity: quantity * unitFactor(base.unit)
+      };
+    }
 
     const plusRestock = matchFirst(text, [
       /^\+(.+?)\s+(\d+(?:\.\d+)?)(?:\s|$)/i,

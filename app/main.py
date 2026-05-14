@@ -62,6 +62,7 @@ last_openai_error: dict[str, Any] = {
 }
 VOICE_QUOTA_REPLY = "🎧 Voice received safely. AI transcription is ready but OpenAI credits are not active yet."
 PHOTO_QUOTA_REPLY = "\U0001F4F8 Photo received safely. Invoice AI is ready. OpenAI credits are not active yet."
+DEFAULT_PUBLIC_BASE_URL = "https://pharmareen-1--pal895.replit.app"
 
 
 @asynccontextmanager
@@ -106,13 +107,13 @@ async def debug_offline_app() -> dict[str, Any]:
         "served_index_path": str(OFFLINE_APP_DIR / "index.html"),
     }
 
-OFFLINE_FRONTEND_MARKER = "PHASE 6 FINAL MEDIA SAVE WORKING"
+OFFLINE_FRONTEND_MARKER = "PHASE 6 FINAL WORKING - LOW FRICTION"
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
 OFFLINE_NO_CACHE_HEADERS = {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
     "Pragma": "no-cache",
     "Expires": "0",
-    "X-PharMareen-Offline-Version": "phase6-final-media-save-working",
+    "X-PharMareen-Offline-Version": "phase6-low-friction-v10",
 }
 
 
@@ -280,8 +281,35 @@ def offline_entry_to_command(entry: dict[str, Any]) -> str:
 def offline_media_reply(entry: dict[str, Any]) -> str:
     action = offline_entry_action(entry)
     if action in {"photo", "image"}:
-        return "Photo queued safely. AI invoice extraction is ready when OpenAI credits are active."
-    return "Voice/audio queued safely. AI transcription is ready when OpenAI credits are active."
+        return "Photo saved. AI reading needs credits. Text commands still work."
+    return "Voice/photo saved. AI reading needs credits. Text commands still work."
+
+
+def offline_sync_success_message(entries: list[dict[str, Any]], synced: list[dict[str, Any]]) -> str:
+    synced_ids = {str(item.get("id") or "") for item in synced}
+    counts = {"sales": 0, "restocks": 0, "photos": 0, "voice_notes": 0}
+    for entry in entries:
+        entry_id = str(entry.get("id") or entry.get("action_id") or "").strip()
+        if entry_id not in synced_ids:
+            continue
+        action = offline_entry_action(entry)
+        if action == "sale":
+            counts["sales"] += 1
+        elif action in {"restock", "bonus_restock", "discount_restock"}:
+            counts["restocks"] += 1
+        elif action in {"photo", "image"}:
+            counts["photos"] += 1
+        elif action in {"voice", "audio"}:
+            counts["voice_notes"] += 1
+    return "\n".join(
+        [
+            "✅ Offline records sent successfully",
+            f"Sales: {counts['sales']}",
+            f"Restocks: {counts['restocks']}",
+            f"Photos: {counts['photos']}",
+            f"Voice notes: {counts['voice_notes']}",
+        ]
+    )
 
 
 @app.post("/offline/sync")
@@ -316,6 +344,12 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
             synced.append({"id": entry_id, "status": "media_logged", "reply": reply})
             append_offline_sync_log(entry, "media_logged", reply, "")
             continue
+        if action == "barcode_mapping":
+            reply = "Barcode saved for this medicine."
+            offline_synced_entry_ids.add(entry_id)
+            synced.append({"id": entry_id, "status": "synced", "reply": reply})
+            append_offline_sync_log(entry, "synced", reply, "")
+            continue
 
         command_text = offline_entry_to_command(entry)
         if not command_text:
@@ -338,7 +372,8 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
             reason = sanitize_error_message(exc)
             pending.append({"id": entry_id, "status": "pending", "reason": reason})
             append_offline_sync_log(entry_for_log, "pending", "", reason)
-    return {"status": "ok", "synced": synced, "failed": failed, "pending": pending}
+    message = offline_sync_success_message(entries, synced) if synced else ""
+    return {"status": "ok", "message": message, "synced": synced, "failed": failed, "pending": pending}
 
 
 @app.get("/status", response_class=HTMLResponse)
@@ -532,6 +567,22 @@ def status_class(value: bool) -> str:
 
 def effective_app_base_url(settings: Settings) -> str:
     return (settings.public_base_url or "http://localhost:5000").rstrip("/")
+
+
+def report_public_base_url(settings: Settings) -> str:
+    explicit_public = (os.getenv("PUBLIC_BASE_URL") or "").strip().rstrip("/")
+    if explicit_public.startswith("https://") and not is_placeholder_base_url(explicit_public):
+        return explicit_public
+    configured = (settings.public_base_url or "").strip().rstrip("/")
+    if (
+        configured.startswith("https://")
+        and not is_local_base_url(configured)
+        and not is_placeholder_base_url(configured)
+        and "riker.replit.dev" not in configured.lower()
+        and "zriker.replit.dev" not in configured.lower()
+    ):
+        return configured
+    return DEFAULT_PUBLIC_BASE_URL
 
 
 def whatsapp_bridge_url_for(settings: Settings) -> str:
@@ -734,6 +785,54 @@ def debug_config() -> dict[str, Any]:
     }
 
 
+def pid_file_running(path: Path) -> bool:
+    try:
+        pid = int(path.read_text(encoding="utf-8").strip())
+    except Exception:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except Exception:
+        return False
+
+
+@app.get("/debug/system-status")
+def debug_system_status() -> dict[str, Any]:
+    settings = get_settings()
+    backend_pid = os.getpid()
+    bridge_pid_file = PROJECT_ROOT / "bridge.pid"
+    backend_pid_file = PROJECT_ROOT / "server.pid"
+    bridge_log = PROJECT_ROOT / "bridge.log"
+    return {
+        "backend": {
+            "running": True,
+            "pid": backend_pid,
+            "health": "ok",
+        },
+        "bridge": {
+            "enabled": boolish(os.getenv("WHATSAPP_BRIDGE_ENABLED")),
+            "pid_file_exists": bridge_pid_file.exists(),
+            "running": pid_file_running(bridge_pid_file),
+            "log_exists": bridge_log.exists(),
+            "safe_allowlist_configured": bool(parse_allowed_whatsapp_numbers(settings)),
+            "test_mode": settings.allow_all_direct_chats_for_test,
+            "endpoint": whatsapp_bridge_url_for(settings),
+        },
+        "reports": {
+            "public_base_url": report_public_base_url(settings),
+            "uses_stable_replit_domain": report_public_base_url(settings).startswith(DEFAULT_PUBLIC_BASE_URL),
+        },
+        "startup": {
+            "backend_pid_file_exists": backend_pid_file.exists(),
+            "backend_log_exists": (PROJECT_ROOT / "server.log").exists(),
+            "start_all_script": (PROJECT_ROOT / "scripts" / "start_all.sh").exists(),
+            "check_all_script": (PROJECT_ROOT / "scripts" / "check_all.sh").exists(),
+            "stop_all_script": (PROJECT_ROOT / "scripts" / "stop_all.sh").exists(),
+        },
+    }
+
+
 @app.get("/debug/voice-ai")
 def debug_voice_ai() -> dict[str, Any]:
     settings = get_settings()
@@ -840,7 +939,7 @@ def debug_report_test() -> JSONResponse:
             pharmacy_name=settings.pharmacy_name,
             report_time=now_in_timezone(settings.timezone).strftime("%H:%M"),
         )
-        public_pdf_url = f"{effective_app_base_url(settings)}/reports/download/{pdf_path.name}"
+        public_pdf_url = f"{report_public_base_url(settings)}/reports/download/{pdf_path.name}"
         return JSONResponse(
             {
                 "status": "ok",
@@ -1641,7 +1740,7 @@ def get_intake_service() -> IntakeService:
         get_sheet_store(),
         timezone=settings.timezone,
         pharmacy_name=settings.pharmacy_name,
-        app_base_url=settings.public_base_url,
+        app_base_url=report_public_base_url(settings),
         whatsapp_number=settings.whatsapp_number,
     )
 
