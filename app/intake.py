@@ -66,16 +66,20 @@ HELP_TEXT = "\n".join(
         "",
         "Sales:",
         "- Panadol sold 2",
+        "- p2",
         "- Insulin sold 1",
         "- sell Panadol",
         "",
         "Stock:",
         "- Panadol stock",
-        "- stock Panadol",
+        "- stock p",
+        "- low stock",
+        "- stock value",
         "",
         "Restock:",
         "- Panadol restock 20",
         "- Panadol +20",
+        "- p+20",
         "- Panadol restock 20 cost 2000",
         "",
         "Bonus:",
@@ -87,6 +91,13 @@ HELP_TEXT = "\n".join(
         "",
         "Supplier/Expiry:",
         "- Panadol restock 20 supplier DawaPlus expiry Dec 2026",
+        "- expiry",
+        "- trace Panadol",
+        "",
+        "Cashier:",
+        "- set staff Mary",
+        "- cash summary",
+        "- staff summary",
         "",
         "Photos:",
         "- Send invoice photo",
@@ -295,6 +306,7 @@ class IntakeService:
         self.staff_by_conversation: dict[str, str] = {}
         self.last_sale_by_conversation: dict[str, dict[str, Any]] = {}
         self.pending_void_reason: dict[str, dict[str, Any]] = {}
+        self.conversions_by_drug: dict[str, dict[str, int]] = {}
 
     def process_text(self, text: str, conversation_id: str | None = None) -> str:
         text = text.strip()
@@ -340,6 +352,25 @@ class IntakeService:
         if is_process_batch_command(text):
             return "No saved offline entries yet.\n\nSend sales together like:\nPanadol 2\nAmoxil 1"
 
+        conversion = parse_conversion_command(text)
+        if conversion is not None:
+            drug_name, strips_per_box, tablets_per_strip = conversion
+            self.conversions_by_drug[normalize_key(drug_name)] = {
+                "box": strips_per_box * tablets_per_strip,
+                "strip": tablets_per_strip,
+                "tablet": 1,
+                "unit": 1,
+                "piece": 1,
+                "bottle": 1,
+            }
+            return "\n".join(
+                [
+                    f"Conversion saved for {title_drug_name(drug_name)}",
+                    f"1 box = {strips_per_box} strips",
+                    f"1 strip = {tablets_per_strip} tablets",
+                ]
+            )
+
         followup_prompt = parse_followup_prompt(text)
         if followup_prompt is not None:
             self.pending_followups[conversation_key] = followup_prompt.command
@@ -350,6 +381,23 @@ class IntakeService:
 
         if is_cash_summary_command(text):
             return self._cash_summary_reply()
+
+        if is_staff_summary_command(text):
+            return self._staff_summary_reply()
+
+        if is_low_stock_command(text):
+            return self._low_stock_reply()
+
+        if is_stock_value_command(text):
+            return self._stock_value_reply()
+
+        trace_drug_name = parse_trace_command(text)
+        if trace_drug_name:
+            return self._trace_reply(trace_drug_name)
+
+        expiry_drug_name = parse_expiry_command(text)
+        if expiry_drug_name is not None:
+            return self._expiry_reply(expiry_drug_name)
 
         if is_weekly_report_command(text):
             return self._weekly_report_reply()
@@ -449,6 +497,115 @@ class IntakeService:
             lines.append(f"Price: {format_kes(stock.selling_price)}")
         if stock.reorder_level is not None:
             lines.append(f"Reorder level: {stock.reorder_level}")
+        return "\n".join(lines)
+
+    def _low_stock_reply(self) -> str:
+        try:
+            items = self.store.list_low_stock_items()
+        except SheetsUnavailableError:
+            return SHEETS_UNAVAILABLE_MESSAGE
+        except Exception:
+            return "I could not check low stock right now. Please check the Google Sheets connection."
+        if not items:
+            return "Low Stock\n\nNo low stock items right now."
+        lines = ["Low Stock", ""]
+        for item in items[:20]:
+            stock_text = item.current_stock if item.current_stock is not None else "not set"
+            reorder_text = item.reorder_level if item.reorder_level is not None else "not set"
+            lines.append(f"- {item.drug_name}: {stock_text} left, reorder at {reorder_text}")
+        return "\n".join(lines)
+
+    def _stock_value_reply(self) -> str:
+        try:
+            items = self._all_stock_items()
+        except SheetsUnavailableError:
+            return SHEETS_UNAVAILABLE_MESSAGE
+        except Exception:
+            return "I could not calculate stock value right now. Please check the Google Sheets connection."
+        cost_value = 0.0
+        sales_value = 0.0
+        counted = 0
+        missing = 0
+        for item in items:
+            stock_count = item.current_stock
+            if stock_count is None:
+                missing += 1
+                continue
+            if item.cost_price is None or item.selling_price is None:
+                missing += 1
+            if item.cost_price is not None:
+                cost_value += stock_count * item.cost_price
+            if item.selling_price is not None:
+                sales_value += stock_count * item.selling_price
+            counted += 1
+        lines = [
+            "Stock Value",
+            "",
+            f"Cost value: {format_kes(cost_value)}",
+            f"Selling value: {format_kes(sales_value)}",
+            f"Potential profit: {format_kes(sales_value - cost_value)}",
+            f"Items counted: {counted}",
+        ]
+        if missing:
+            lines.append(f"Missing price/stock data: {missing}")
+        return "\n".join(lines)
+
+    def _expiry_reply(self, drug_name: str = "") -> str:
+        try:
+            list_batches = getattr(self.store, "list_batches", None)
+            batches = list_batches(drug_name or None) if list_batches else []
+        except SheetsUnavailableError:
+            return SHEETS_UNAVAILABLE_MESSAGE
+        except Exception:
+            return "I could not check expiry records right now. Please check the Google Sheets connection."
+        if not batches:
+            target = f" for {drug_name}" if drug_name else ""
+            return f"Expiry\n\nNo batch expiry records found{target}."
+        try:
+            from app.services.batch_service import expiry_status
+        except Exception:
+            expiry_status = lambda value: "safe"  # noqa: E731
+        sorted_batches = sorted(batches, key=lambda batch: getattr(batch, "expiry_sort_key", getattr(batch, "expiry_date", "")))
+        lines = ["Expiry", ""]
+        for batch in sorted_batches[:20]:
+            expiry = getattr(batch, "expiry_date", "") or "not set"
+            status = expiry_status(expiry)
+            warning = " expired" if status == "expired" else (" near expiry" if status == "near_expiry" else "")
+            lines.append(
+                f"- {getattr(batch, 'drug_name', drug_name)}: {getattr(batch, 'current_remaining_units', 0)} units exp {expiry}{warning}"
+            )
+        return "\n".join(lines)
+
+    def _trace_reply(self, drug_name: str) -> str:
+        try:
+            stock = self._resolve_stock(drug_name)
+            list_batches = getattr(self.store, "list_batches", None)
+            batches = list_batches(drug_name) if list_batches else []
+        except SheetsUnavailableError:
+            return SHEETS_UNAVAILABLE_MESSAGE
+        except Exception:
+            return "I could not trace that medicine right now. Please check the Google Sheets connection."
+        if stock is None and not batches:
+            return f"{drug_name} was not found in inventory. Please add or restock it first."
+        name = stock.drug_name if stock else title_drug_name(drug_name)
+        lines = [f"Trace {name}", ""]
+        if stock:
+            stock_text = stock.current_stock if stock.current_stock is not None else "not set"
+            lines.append(f"Stock: {stock_text}")
+            if stock.selling_price is not None:
+                lines.append(f"Price: {format_kes(stock.selling_price)}")
+        if batches:
+            lines.append("Batches:")
+            for batch in sorted(batches, key=lambda batch: getattr(batch, "expiry_sort_key", getattr(batch, "expiry_date", "")))[:10]:
+                batch_id = getattr(batch, "batch_id", "") or getattr(batch, "manufacturer_batch_number", "") or "batch"
+                expiry = getattr(batch, "expiry_date", "") or "not set"
+                supplier = getattr(batch, "supplier_name", "") or "not set"
+                invoice = getattr(batch, "invoice_number", "") or "not set"
+                remaining = getattr(batch, "current_remaining_units", 0)
+                lines.append(f"- {batch_id}: {remaining} units, exp {expiry}, supplier {supplier}, invoice {invoice}")
+            lines.append("Use earliest expiry first.")
+        else:
+            lines.append("Batches: none recorded yet.")
         return "\n".join(lines)
 
     def _today_summary_reply(self) -> str:
@@ -745,7 +902,7 @@ class IntakeService:
         action = Action.LATE_SALE if is_late else Action.SOLD
         unit = canonical_unit(unit)
         display_quantity = quantity
-        base_quantity = base_quantity or to_base_quantity(quantity, unit)
+        base_quantity = self._to_base_quantity(stock.drug_name, quantity, unit) if unit else (base_quantity or to_base_quantity(quantity, unit))
         payment_method = payment_method or "Cash"
         discount = float(discount or 0)
         sale_trace_id = trace_id_value or trace_id("SALE")
@@ -903,7 +1060,7 @@ class IntakeService:
         current_stock = stock.current_stock or 0
         unit = canonical_unit(command.unit)
         display_quantity = command.quantity
-        quantity_to_add = command.base_quantity or to_base_quantity(command.quantity, unit)
+        quantity_to_add = self._to_base_quantity(stock.drug_name, command.quantity, unit) if unit else (command.base_quantity or to_base_quantity(command.quantity, unit))
         restock_trace_id = command.trace_id or trace_id("RESTOCK")
         bonus_quantity = max(command.bonus_quantity or 0, 0)
         if command.restock_type == "bonus" and bonus_quantity == 0 and command.total_cost == 0:
@@ -1145,6 +1302,60 @@ class IntakeService:
             ]
         )
 
+    def _staff_summary_reply(self) -> str:
+        report_date = now_in_timezone(self.timezone).date().isoformat()
+        try:
+            transactions = self.store.read_transactions(report_date)
+        except SheetsUnavailableError:
+            return SHEETS_UNAVAILABLE_MESSAGE
+        except Exception:
+            return "I could not prepare the staff summary right now. Please check the Google Sheets connection."
+
+        staff_totals: dict[str, dict[str, float]] = {}
+        for row in transactions:
+            if normalize_key(row.get("Type")) not in {"sale", "late sale", "late_sale"}:
+                continue
+            note_meta = parse_note_metadata(str(row.get("Note") or ""))
+            staff = note_meta.get("staff") or "Default"
+            bucket = staff_totals.setdefault(staff, {"sales": 0.0, "profit": 0.0, "items": 0.0, "transactions": 0.0})
+            bucket["sales"] += parse_money(row.get("Total Sales")) or 0
+            bucket["profit"] += parse_money(row.get("Profit")) or 0
+            bucket["items"] += parse_int(row.get("Quantity"), default=0) or 0
+            bucket["transactions"] += 1
+        if not staff_totals:
+            return "Staff Summary\n\nNo sales recorded today yet."
+
+        lines = ["Staff Summary", ""]
+        for staff, totals in sorted(staff_totals.items()):
+            lines.append(
+                f"- {staff}: {format_kes(totals['sales'])}, profit {format_kes(totals['profit'])}, "
+                f"{int(totals['items'])} items, {int(totals['transactions'])} transactions"
+            )
+        return "\n".join(lines)
+
+    def _all_stock_items(self) -> list[StockItem]:
+        items: list[StockItem] = []
+        seen: set[str] = set()
+        for name in self.store.list_master_drug_names():
+            stock = self.store.find_stock(name)
+            if stock is None:
+                continue
+            key = normalize_key(stock.drug_name)
+            if key in seen:
+                continue
+            seen.add(key)
+            items.append(stock)
+        return items
+
+    def _to_base_quantity(self, drug_name: str, quantity: int, unit: str) -> int:
+        canonical = canonical_unit(unit)
+        if not canonical:
+            return to_base_quantity(quantity, unit)
+        conversion = self.conversions_by_drug.get(normalize_key(drug_name))
+        if not conversion:
+            return to_base_quantity(quantity, unit)
+        return max(int(quantity), 1) * conversion.get(canonical, 1)
+
     def _process_void_command(self, command: OperatingCommand, conversation_key: str) -> EntryResult:
         sale = self.last_sale_by_conversation.get(conversation_key)
         if sale is None:
@@ -1377,6 +1588,17 @@ def is_process_batch_command(text: str) -> bool:
     return normalize_key(text) == "process batch"
 
 
+def parse_conversion_command(text: str) -> tuple[str, int, int] | None:
+    match = re.fullmatch(
+        r"(.+?)\s+conversion\s+1\s+box\s+(\d+)\s+strips?\s+1\s+strip\s+(\d+)\s+tablets?",
+        text.strip(),
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return None
+    return title_drug_name(match.group(1)), positive_quantity(match.group(2)), positive_quantity(match.group(3))
+
+
 def parse_stock_check_command(text: str) -> str | None:
     normalized = " ".join(text.strip().lower().split())
     if "no stock" in normalized or "out of stock" in normalized:
@@ -1417,6 +1639,44 @@ def is_cash_summary_command(text: str) -> bool:
     return bool(
         re.fullmatch(r"(?:cash\s+summary|daily\s+cash|payments\s+today|reconciliation\s+today)", normalized, flags=re.IGNORECASE)
     )
+
+
+def is_staff_summary_command(text: str) -> bool:
+    normalized = normalize_key(text)
+    return bool(re.fullmatch(r"(?:staff\s+summary|cashier\s+summary|staff\s+today|cashiers?\s+today)", normalized, flags=re.IGNORECASE))
+
+
+def is_low_stock_command(text: str) -> bool:
+    normalized = normalize_key(text)
+    return bool(re.fullmatch(r"(?:low\s+stock|show\s+low\s+stock|low\s+stock\s+items|what\s+is\s+low)", normalized, flags=re.IGNORECASE))
+
+
+def is_stock_value_command(text: str) -> bool:
+    normalized = normalize_key(text)
+    return bool(re.fullmatch(r"(?:stock\s+value|inventory\s+value|value\s+of\s+stock|stock\s+valuation)", normalized, flags=re.IGNORECASE))
+
+
+def parse_expiry_command(text: str) -> str | None:
+    normalized = normalize_key(text)
+    if re.fullmatch(r"(?:expiry|expiring|expiry\s+alerts?|expiring\s+soon)", normalized, flags=re.IGNORECASE):
+        return ""
+    match = re.fullmatch(r"(?:expiry|expiring|expiring\s+soon)\s+(.+)", text.strip(), flags=re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    match = re.fullmatch(r"(.+?)\s+(?:expiry|expiring|expiry\s+status)", text.strip(), flags=re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return None
+
+
+def parse_trace_command(text: str) -> str | None:
+    match = re.fullmatch(r"(?:trace|history)\s+(.+)", text.strip(), flags=re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    match = re.fullmatch(r"(.+?)\s+(?:trace|history)", text.strip(), flags=re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return None
 
 
 def is_weekly_report_command(text: str) -> bool:

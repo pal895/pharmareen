@@ -3,6 +3,8 @@ from __future__ import annotations
 from app.config import Settings
 from app.intake import parse_operating_commands
 from app.main import DEFAULT_PUBLIC_BASE_URL, report_public_base_url
+from fastapi.testclient import TestClient
+import app.main as main
 
 
 def test_shortcuts_and_mixed_commands_parse_without_failing_whole_message():
@@ -52,6 +54,22 @@ def test_supervisor_scripts_are_present_and_bridge_is_optional():
     assert "bridge.log" in start_script
     assert "bridge.pid" in start_script
     assert "local_whatsapp_bridge.js" in start_script
+    assert "npm install" in start_script
+    assert "BRIDGE_SCRIPT" in start_script
     assert "WHATSAPP_BRIDGE_ENABLED" in start_all
     assert "/debug/system-status" in check_all
     assert "local_whatsapp_bridge.js" in stop_all
+
+
+def test_system_status_reports_bridge_runtime_readiness():
+    with TestClient(main.app) as client:
+        response = client.get("/debug/system-status")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["backend"]["running"] is True
+    assert "node_available" in data["bridge"]
+    assert "npm_available" in data["bridge"]
+    assert data["bridge"]["bridge_script"] == "local_whatsapp_bridge.js"
+    assert data["bridge"]["bridge_script_exists"] is True
+    assert data["bridge"]["endpoint"].endswith("/bridge/whatsapp-web")

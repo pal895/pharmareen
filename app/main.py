@@ -4,6 +4,7 @@ import base64
 import json
 import logging
 import os
+import shutil
 import sys
 import time
 import traceback
@@ -804,6 +805,7 @@ def debug_system_status() -> dict[str, Any]:
     bridge_pid_file = PROJECT_ROOT / "bridge.pid"
     backend_pid_file = PROJECT_ROOT / "server.pid"
     bridge_log = PROJECT_ROOT / "bridge.log"
+    bridge_script_name = os.getenv("BRIDGE_SCRIPT") or "local_whatsapp_bridge.js"
     return {
         "backend": {
             "running": True,
@@ -815,6 +817,11 @@ def debug_system_status() -> dict[str, Any]:
             "pid_file_exists": bridge_pid_file.exists(),
             "running": pid_file_running(bridge_pid_file),
             "log_exists": bridge_log.exists(),
+            "node_available": shutil.which("node") is not None,
+            "npm_available": shutil.which("npm") is not None,
+            "bridge_script": bridge_script_name,
+            "bridge_script_exists": (PROJECT_ROOT / bridge_script_name).exists(),
+            "node_modules_exists": (PROJECT_ROOT / "node_modules").exists(),
             "safe_allowlist_configured": bool(parse_allowed_whatsapp_numbers(settings)),
             "test_mode": settings.allow_all_direct_chats_for_test,
             "endpoint": whatsapp_bridge_url_for(settings),

@@ -21,6 +21,7 @@ class DemoPharmacyStore:
         self._transactions: list[dict[str, Any]] = []
         self._daily_reports: dict[str, str] = {}
         self._request_log: list[dict[str, Any]] = []
+        self._batches: list[Any] = []
         self._seed_stock()
 
     def _seed_stock(self) -> None:
@@ -181,13 +182,19 @@ class DemoPharmacyStore:
 
     # Extra no-op methods used by Day 2/3 services in demo mode.
     def append_batch(self, batch: Any) -> None:
-        return None
+        self._batches.append(deepcopy(batch))
 
     def list_batches(self, drug_name: str | None = None) -> list[Any]:
-        return []
+        if not drug_name:
+            return deepcopy(self._batches)
+        wanted = normalize_key(drug_name)
+        return [deepcopy(batch) for batch in self._batches if normalize_key(getattr(batch, "drug_name", "")) == wanted]
 
     def update_batch_remaining(self, batch_id: str, remaining_units: int) -> None:
-        return None
+        for batch in self._batches:
+            if getattr(batch, "batch_id", "") == batch_id:
+                batch.current_remaining_units = max(int(remaining_units), 0)
+                return
 
     def append_issue(self, payload: dict[str, Any]) -> None:
         return None

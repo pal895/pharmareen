@@ -93,6 +93,7 @@ class FakeStore:
         self.logged = []
         self.transactions = []
         self.reports = {}
+        self.batches = []
         self.daily_log_rows = [
             {
                 "Date": "today",
@@ -205,6 +206,21 @@ class FakeStore:
             and stock.current_stock <= stock.reorder_level
         ]
 
+    def append_batch(self, batch):
+        self.batches.append(batch)
+
+    def list_batches(self, drug_name=None):
+        if not drug_name:
+            return list(self.batches)
+        wanted = str(drug_name).strip().lower()
+        return [batch for batch in self.batches if str(getattr(batch, "drug_name", "")).strip().lower() == wanted]
+
+    def update_batch_remaining(self, batch_id, remaining_units):
+        for batch in self.batches:
+            if getattr(batch, "batch_id", "") == batch_id:
+                batch.current_remaining_units = max(int(remaining_units), 0)
+                return
+
 
 def test_help_command_returns_available_commands_without_parser():
     store = FakeStore()
@@ -287,6 +303,56 @@ def test_restock_supplier_invoice_batch_and_expiry_are_traced():
     assert "expiry=Jan 2027" in note
 
 
+def test_trace_and_expiry_commands_show_batch_details():
+    store = FakeStore()
+    service = IntakeService(FakeParser([]), store)
+    service.process_text("received Panadol 1 box supplier Beta invoice INV123 batch B001 expiry Jan 2027")
+
+    trace_reply = service.process_text("trace Panadol")
+    expiry_reply = service.process_text("expiry")
+
+    assert "Trace Panadol" in trace_reply
+    assert "B001" in trace_reply
+    assert "supplier Beta" in trace_reply
+    assert "invoice INV123" in trace_reply
+    assert "Use earliest expiry first" in trace_reply
+    assert "Expiry" in expiry_reply
+    assert "Panadol" in expiry_reply
+    assert "2027-01-01" in expiry_reply
+
+
+def test_low_stock_and_stock_value_commands_are_available():
+    store = FakeStore()
+    service = IntakeService(FakeParser([]), store)
+    service.process_text("Cough Syrup 2")
+
+    low_stock_reply = service.process_text("low stock")
+    stock_value_reply = service.process_text("stock value")
+
+    assert "Low Stock" in low_stock_reply
+    assert "Cough Syrup: 2 left, reorder at 2" in low_stock_reply
+    assert "Stock Value" in stock_value_reply
+    assert "Cost value:" in stock_value_reply
+    assert "Selling value:" in stock_value_reply
+    assert "Potential profit:" in stock_value_reply
+
+
+def test_custom_conversion_command_affects_unit_sales_and_restocks():
+    store = FakeStore()
+    service = IntakeService(FakeParser([]), store)
+
+    conversion_reply = service.process_text("Panadol conversion 1 box 12 strips 1 strip 10 tablets")
+    restock_reply = service.process_text("+Panadol 1 box")
+    assert store.stocks["panadol"].current_stock == 140
+    sale_reply = service.process_text("Panadol sold 1 strip")
+
+    assert "Conversion saved for Panadol" in conversion_reply
+    assert "1 box = 12 strips" in conversion_reply
+    assert "Equivalent: +120 tablets" in restock_reply
+    assert "Equivalent: 10 tablets" in sale_reply
+    assert store.stocks["panadol"].current_stock == 130
+
+
 def test_staff_session_payment_summary_and_void_flow():
     store = FakeStore()
     service = IntakeService(FakeParser([]), store)
@@ -305,6 +371,9 @@ def test_staff_session_payment_summary_and_void_flow():
     assert "Daily Cash Summary" in summary
     assert "M-Pesa: KES 420" in summary
     assert "Discounts: KES 20" in summary
+    staff_summary = service.process_text("staff summary")
+    assert "Staff Summary" in staff_summary
+    assert "Mary: KES 420" in staff_summary
 
     assert "Why are you voiding this sale?" in service.process_text("void last", conversation_id="phone-1")
     void_reply = service.process_text("wrong item", conversation_id="phone-1")

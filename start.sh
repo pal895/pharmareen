@@ -9,6 +9,7 @@ PYTHON_BIN="${PYTHON_BIN:-./.pythonlibs/bin/python}"
 BACKEND_LOG="${BACKEND_LOG:-server.log}"
 BRIDGE_LOG="${BRIDGE_LOG:-bridge.log}"
 WHATSAPP_BRIDGE_ENABLED="${WHATSAPP_BRIDGE_ENABLED:-false}"
+BRIDGE_SCRIPT="${BRIDGE_SCRIPT:-local_whatsapp_bridge.js}"
 
 if [ ! -x "$PYTHON_BIN" ]; then
   PYTHON_BIN="python"
@@ -50,14 +51,31 @@ fi
 
 if [ "$WHATSAPP_BRIDGE_ENABLED" = "true" ]; then
   echo "WhatsApp bridge requested."
-  if command -v node >/dev/null 2>&1 && [ -f local_whatsapp_bridge.js ]; then
+  if ! command -v node >/dev/null 2>&1; then
+    echo "WhatsApp bridge not started: Node.js is missing."
+    echo "Backend stays running. Install/enable Node.js, then restart with WHATSAPP_BRIDGE_ENABLED=true."
+  elif [ ! -f "$BRIDGE_SCRIPT" ]; then
+    echo "WhatsApp bridge script $BRIDGE_SCRIPT not found."
+    if [ -f local_whatsapp_bridge.js ]; then
+      BRIDGE_SCRIPT="local_whatsapp_bridge.js"
+    elif [ -f baileys-bridge.js ]; then
+      BRIDGE_SCRIPT="baileys-bridge.js"
+    fi
+  fi
+  if command -v node >/dev/null 2>&1 && [ -f "$BRIDGE_SCRIPT" ]; then
+    if [ -f package.json ] && [ ! -d node_modules ]; then
+      if command -v npm >/dev/null 2>&1; then
+        echo "Installing WhatsApp bridge dependencies..."
+        npm install >> "$BRIDGE_LOG" 2>&1 || echo "npm install failed. Backend stays running; check $BRIDGE_LOG."
+      else
+        echo "npm is missing, so bridge dependencies could not be installed."
+      fi
+    fi
     export PHARMAREEN_BACKEND_URL="${PHARMAREEN_BACKEND_URL:-http://127.0.0.1:${PORT}}"
-    echo "Starting WhatsApp bridge. Logs: $BRIDGE_LOG"
-    node local_whatsapp_bridge.js > "$BRIDGE_LOG" 2>&1 &
+    echo "Starting WhatsApp bridge with $BRIDGE_SCRIPT. Logs: $BRIDGE_LOG"
+    node "$BRIDGE_SCRIPT" > "$BRIDGE_LOG" 2>&1 &
     BRIDGE_PID=$!
     echo "$BRIDGE_PID" > bridge.pid
-  else
-    echo "WhatsApp bridge not started: Node.js or local_whatsapp_bridge.js is missing."
   fi
 else
   echo "WhatsApp bridge disabled. Set WHATSAPP_BRIDGE_ENABLED=true to start it with the backend."
