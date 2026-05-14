@@ -49,6 +49,8 @@ def test_supervisor_scripts_are_present_and_bridge_is_optional():
     start_all = open("scripts/start_all.sh", encoding="utf-8").read()
     check_all = open("scripts/check_all.sh", encoding="utf-8").read()
     stop_all = open("scripts/stop_all.sh", encoding="utf-8").read()
+    replit_config = open(".replit", encoding="utf-8").read()
+    replit_nix = open("replit.nix", encoding="utf-8").read()
 
     assert "WHATSAPP_BRIDGE_ENABLED" in start_script
     assert "bridge.log" in start_script
@@ -56,9 +58,14 @@ def test_supervisor_scripts_are_present_and_bridge_is_optional():
     assert "local_whatsapp_bridge.js" in start_script
     assert "npm install" in start_script
     assert "BRIDGE_SCRIPT" in start_script
+    assert "Backend stays running" in start_script
     assert "WHATSAPP_BRIDGE_ENABLED" in start_all
     assert "/debug/system-status" in check_all
     assert "local_whatsapp_bridge.js" in stop_all
+    assert 'run = "bash start.sh"' in replit_config
+    assert "nodejs-20" in replit_config
+    assert "pkgs.nodejs-20_x" in replit_nix
+    assert "pkgs.nodePackages.npm" in replit_nix
 
 
 def test_system_status_reports_bridge_runtime_readiness():
@@ -67,9 +74,13 @@ def test_system_status_reports_bridge_runtime_readiness():
 
     assert response.status_code == 200
     data = response.json()
-    assert data["backend"]["running"] is True
-    assert "node_available" in data["bridge"]
-    assert "npm_available" in data["bridge"]
-    assert data["bridge"]["bridge_script"] == "local_whatsapp_bridge.js"
-    assert data["bridge"]["bridge_script_exists"] is True
-    assert data["bridge"]["endpoint"].endswith("/bridge/whatsapp-web")
+    assert data["backend"] == "ok"
+    assert data["offline_app"] == "ok"
+    assert data["bridge"] in {"running", "missing"}
+    assert data["node"] in {"installed", "missing"}
+    assert data["details"]["backend"]["running"] is True
+    assert "node_available" in data["details"]["bridge"]
+    assert "npm_available" in data["details"]["bridge"]
+    assert data["details"]["bridge"]["bridge_script"] == "local_whatsapp_bridge.js"
+    assert data["details"]["bridge"]["bridge_script_exists"] is True
+    assert data["details"]["bridge"]["endpoint"].endswith("/bridge/whatsapp-web")

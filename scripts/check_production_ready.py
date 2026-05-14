@@ -136,7 +136,16 @@ def file_exists(name: str) -> bool:
 
 def replit_run_command_is_safe() -> bool:
     text = (ROOT / ".replit").read_text(encoding="utf-8")
-    return 'run = "bash start.sh"' in text and not (ROOT / "replit.nix").exists()
+    nix_path = ROOT / "replit.nix"
+    if not nix_path.exists():
+        return 'run = "bash start.sh"' in text
+    nix_text = nix_path.read_text(encoding="utf-8")
+    return (
+        'run = "bash start.sh"' in text
+        and "nodejs-20" in text
+        and "pkgs.nodejs-20_x" in nix_text
+        and "pkgs.nodePackages.npm" in nix_text
+    )
 
 
 def start_command_documented() -> bool:

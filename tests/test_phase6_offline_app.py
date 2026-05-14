@@ -65,7 +65,7 @@ def test_offline_app_routes_return_html():
     assert "PharMareen Offline Mode" in compat_response.text
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in compat_response.text
     assert "no-store" in compat_response.headers.get("cache-control", "")
-    assert compat_response.headers.get("x-pharmareen-offline-version") == "phase6-low-friction-v10"
+    assert compat_response.headers.get("x-pharmareen-offline-version") == "phase6-deployment-stable-v11"
     assert parser_response.status_code == 200
     assert manifest_response.status_code == 200
     assert worker_response.status_code == 200
@@ -228,7 +228,7 @@ def test_debug_offline_app_reports_all_phase6_features(monkeypatch, tmp_path):
     assert data["voice_queue_ready"] is True
     assert data["persistent_storage_ready"] is True
     assert data["auto_sync_ready"] is True
-    assert data["frontend_marker"] == "PHASE 6 FINAL WORKING - LOW FRICTION"
+    assert data["frontend_marker"] == "PHASE 6 FINAL WORKING - DEPLOYMENT STABLE"
     assert data["served_index_path"].endswith("static/offline_app/index.html") or data["served_index_path"].endswith("static\\offline_app\\index.html")
     assert "offline_log_exists" in data
 
@@ -311,7 +311,7 @@ def test_legacy_offline_app_folder_matches_final_frontend():
     assert " required" not in legacy_html
     assert "disableNativeRequiredValidation" in legacy_app
     assert "queueMediaFiles" in legacy_app
-    assert "pharmareen-offline-v10" in legacy_worker
+    assert "pharmareen-offline-v11" in legacy_worker
     assert legacy_parser.exists()
 
 
@@ -442,5 +442,5 @@ def test_offline_pwa_assets_contain_auto_sync_media_and_retry_logic():
     assert "Tap & Talk" in html
     assert '"start_url": "/offline-app"' in manifest
     assert "/offline_app/parser.js" in worker
-    assert "pharmareen-offline-v10" in worker
+    assert "pharmareen-offline-v11" in worker
     assert "caches.open" in worker

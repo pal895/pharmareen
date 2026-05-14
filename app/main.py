@@ -108,13 +108,13 @@ async def debug_offline_app() -> dict[str, Any]:
         "served_index_path": str(OFFLINE_APP_DIR / "index.html"),
     }
 
-OFFLINE_FRONTEND_MARKER = "PHASE 6 FINAL WORKING - LOW FRICTION"
+OFFLINE_FRONTEND_MARKER = "PHASE 6 FINAL WORKING - DEPLOYMENT STABLE"
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
 OFFLINE_NO_CACHE_HEADERS = {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
     "Pragma": "no-cache",
     "Expires": "0",
-    "X-PharMareen-Offline-Version": "phase6-low-friction-v10",
+    "X-PharMareen-Offline-Version": "phase6-deployment-stable-v11",
 }
 
 
@@ -806,36 +806,47 @@ def debug_system_status() -> dict[str, Any]:
     backend_pid_file = PROJECT_ROOT / "server.pid"
     bridge_log = PROJECT_ROOT / "bridge.log"
     bridge_script_name = os.getenv("BRIDGE_SCRIPT") or "local_whatsapp_bridge.js"
+    node_available = shutil.which("node") is not None
+    npm_available = shutil.which("npm") is not None
+    bridge_running = pid_file_running(bridge_pid_file)
+    offline_index = OFFLINE_APP_DIR / "index.html"
     return {
-        "backend": {
-            "running": True,
-            "pid": backend_pid,
-            "health": "ok",
-        },
-        "bridge": {
-            "enabled": boolish(os.getenv("WHATSAPP_BRIDGE_ENABLED")),
-            "pid_file_exists": bridge_pid_file.exists(),
-            "running": pid_file_running(bridge_pid_file),
-            "log_exists": bridge_log.exists(),
-            "node_available": shutil.which("node") is not None,
-            "npm_available": shutil.which("npm") is not None,
-            "bridge_script": bridge_script_name,
-            "bridge_script_exists": (PROJECT_ROOT / bridge_script_name).exists(),
-            "node_modules_exists": (PROJECT_ROOT / "node_modules").exists(),
-            "safe_allowlist_configured": bool(parse_allowed_whatsapp_numbers(settings)),
-            "test_mode": settings.allow_all_direct_chats_for_test,
-            "endpoint": whatsapp_bridge_url_for(settings),
-        },
-        "reports": {
-            "public_base_url": report_public_base_url(settings),
-            "uses_stable_replit_domain": report_public_base_url(settings).startswith(DEFAULT_PUBLIC_BASE_URL),
-        },
-        "startup": {
-            "backend_pid_file_exists": backend_pid_file.exists(),
-            "backend_log_exists": (PROJECT_ROOT / "server.log").exists(),
-            "start_all_script": (PROJECT_ROOT / "scripts" / "start_all.sh").exists(),
-            "check_all_script": (PROJECT_ROOT / "scripts" / "check_all.sh").exists(),
-            "stop_all_script": (PROJECT_ROOT / "scripts" / "stop_all.sh").exists(),
+        "backend": "ok",
+        "offline_app": "ok" if offline_index.exists() else "missing",
+        "bridge": "running" if bridge_running else "missing",
+        "node": "installed" if node_available else "missing",
+        "npm": "installed" if npm_available else "missing",
+        "details": {
+            "backend": {
+                "running": True,
+                "pid": backend_pid,
+                "health": "ok",
+            },
+            "bridge": {
+                "enabled": boolish(os.getenv("WHATSAPP_BRIDGE_ENABLED")),
+                "pid_file_exists": bridge_pid_file.exists(),
+                "running": bridge_running,
+                "log_exists": bridge_log.exists(),
+                "node_available": node_available,
+                "npm_available": npm_available,
+                "bridge_script": bridge_script_name,
+                "bridge_script_exists": (PROJECT_ROOT / bridge_script_name).exists(),
+                "node_modules_exists": (PROJECT_ROOT / "node_modules").exists(),
+                "safe_allowlist_configured": bool(parse_allowed_whatsapp_numbers(settings)),
+                "test_mode": settings.allow_all_direct_chats_for_test,
+                "endpoint": whatsapp_bridge_url_for(settings),
+            },
+            "reports": {
+                "public_base_url": report_public_base_url(settings),
+                "uses_stable_replit_domain": report_public_base_url(settings).startswith(DEFAULT_PUBLIC_BASE_URL),
+            },
+            "startup": {
+                "backend_pid_file_exists": backend_pid_file.exists(),
+                "backend_log_exists": (PROJECT_ROOT / "server.log").exists(),
+                "start_all_script": (PROJECT_ROOT / "scripts" / "start_all.sh").exists(),
+                "check_all_script": (PROJECT_ROOT / "scripts" / "check_all.sh").exists(),
+                "stop_all_script": (PROJECT_ROOT / "scripts" / "stop_all.sh").exists(),
+            },
         },
     }
 
