@@ -46,7 +46,13 @@
       <input id="barcodeInput" type="text" inputmode="numeric" placeholder="Scan or type barcode">
       <input id="barcodeMedicineName" type="text" placeholder="Medicine name if barcode is new">
       <button id="saveBarcodeMapping" type="button">Save barcode mapping</button>
+      <div class="barcode-actions">
+        <button id="barcodeSell" type="button">Sell</button>
+        <button id="barcodeRestock" type="button">Restock</button>
+        <button id="barcodeCheck" type="button">Check Stock</button>
+      </div>
       <p id="barcodeResult" class="hint">Barcode not scanned yet.</p>
+      <p id="lastScanned" class="hint">Last scanned: none</p>
     </section>
 
     <section class="panel quick-actions" aria-label="Quick actions">
@@ -89,13 +95,14 @@
       <div class="media-card">
         <h2>Photos</h2>
         <p class="hint">Save invoice or receipt photos. They will send when online.</p>
-        <label for="photoInput">Choose invoice/photo files</label>
+        <label for="photoInput">Choose From Files/Gallery</label>
         <select id="photoPurpose">
           <option value="invoice_photo">Invoice photo</option>
           <option value="supplier_receipt">Supplier receipt</option>
           <option value="stock_photo">Stock photo</option>
         </select>
-        <input id="photoInput" type="file" accept="image/*" capture="environment" multiple>
+        <input id="cameraPhotoInput" type="file" accept="image/*" capture="environment" multiple hidden>
+        <input id="photoInput" type="file" accept="image/*" multiple>
         <button id="queuePhoto" type="button">Save Photo</button>
       </div>
       <div class="media-card">

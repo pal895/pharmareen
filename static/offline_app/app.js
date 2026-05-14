@@ -6,7 +6,7 @@ const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
-const SERVICE_WORKER_VERSION = "phase6-low-friction-v10";
+const SERVICE_WORKER_VERSION = "phase6-sync-trust-v12";
 
 const examples = {
   sale: "Panadol sold 2",
@@ -24,11 +24,13 @@ const pendingEntries = document.getElementById("pendingEntries");
 const syncedEntries = document.getElementById("syncedEntries");
 const emptyTemplate = document.getElementById("emptyTemplate");
 const photoInput = document.getElementById("photoInput");
+const cameraPhotoInput = document.getElementById("cameraPhotoInput");
 const photoPurpose = document.getElementById("photoPurpose");
 const voiceInput = document.getElementById("voiceInput");
 const barcodeInput = document.getElementById("barcodeInput");
 const barcodeMedicineName = document.getElementById("barcodeMedicineName");
 const barcodeResult = document.getElementById("barcodeResult");
+const lastScanned = document.getElementById("lastScanned");
 const barcodeCameraBox = document.getElementById("barcodeCameraBox");
 const barcodeVideo = document.getElementById("barcodeVideo");
 const torchToggle = document.getElementById("torchToggle");
@@ -39,6 +41,7 @@ let persistentStorageReady = false;
 let barcodeStream = null;
 let barcodeScanTimer = null;
 let barcodeTorchEnabled = false;
+let currentBarcodeMedicine = "";
 let mediaRecorder = null;
 let recordedChunks = [];
 
@@ -74,10 +77,12 @@ function updateBarcodeResult() {
   }
   const medicine = lookupBarcode(code);
   if (medicine) {
-    barcodeResult.textContent = `${medicine} found. Choose Sell, Restock, or Check Stock.`;
-    commandText.value = `${medicine} stock`;
+    currentBarcodeMedicine = medicine;
+    barcodeResult.textContent = `✅ ${medicine} detected`;
+    if (lastScanned) lastScanned.textContent = `Last scanned: ${medicine}`;
     return;
   }
+  currentBarcodeMedicine = "";
   barcodeResult.textContent = "Barcode not found. What is the medicine name?";
 }
 
@@ -92,8 +97,9 @@ async function saveBarcodeMapping() {
   const map = barcodeMap();
   map[code] = medicine;
   saveBarcodeMap(map);
-  barcodeResult.textContent = `${medicine} saved for barcode ${code}.`;
-  commandText.value = `${medicine} stock`;
+  currentBarcodeMedicine = medicine;
+  barcodeResult.textContent = `✅ ${medicine} saved for this barcode`;
+  if (lastScanned) lastScanned.textContent = `Last scanned: ${medicine}`;
   await addEntries([{
     id: `barcode-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     timestamp: new Date().toISOString(),
@@ -145,7 +151,12 @@ async function startBarcodeScanner() {
   await stopBarcodeScanner();
   try {
     barcodeStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: "environment" } },
+      video: {
+        facingMode: { ideal: "environment" },
+        focusMode: { ideal: "continuous" },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
       audio: false
     });
     barcodeVideo.srcObject = barcodeStream;
@@ -154,6 +165,9 @@ async function startBarcodeScanner() {
     const track = barcodeStream.getVideoTracks()[0];
     const capabilities = track && track.getCapabilities ? track.getCapabilities() : {};
     if (capabilities.torch) torchToggle.hidden = false;
+    if (track && track.applyConstraints) {
+      try { await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }); } catch {}
+    }
     const detector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "code_128", "upc_a", "upc_e"] });
     barcodeScanTimer = setInterval(async () => {
       try {
@@ -161,6 +175,7 @@ async function startBarcodeScanner() {
         if (!codes.length) return;
         barcodeInput.value = codes[0].rawValue || "";
         updateBarcodeResult();
+        gentleFeedback();
         await stopBarcodeScanner();
       } catch {
         // Keep camera open while scanning is available.
@@ -170,6 +185,23 @@ async function startBarcodeScanner() {
     barcodeResult.textContent = "Camera could not open. Type or scan the barcode below.";
     barcodeInput.focus();
   }
+}
+
+function barcodeAction(action) {
+  const medicine = currentBarcodeMedicine || lookupBarcode(barcodeInput.value);
+  if (!medicine) {
+    barcodeResult.textContent = "Scan or save the barcode first.";
+    return;
+  }
+  if (action === "stock") {
+    commandText.value = `${medicine} stock`;
+    commandText.focus();
+    return;
+  }
+  const quantity = prompt(action === "sale" ? `How many ${medicine} were sold?` : `How many ${medicine} came in?`);
+  if (!quantity) return;
+  commandText.value = action === "sale" ? `${medicine} ${quantity}` : `${medicine} restock ${quantity}`;
+  commandText.focus();
 }
 
 
@@ -301,7 +333,8 @@ async function deleteQueueEntry(id) {
 }
 
 async function addHistoryEntry(entry) {
-  const historyEntry = { ...entry, synced_at: new Date().toISOString() };
+  const { blob, data_url, ...safeEntry } = entry;
+  const historyEntry = { ...safeEntry, synced_at: new Date().toISOString() };
   if (persistentStorageReady) {
     await idbPut(HISTORY_STORE, historyEntry);
     return;
@@ -317,8 +350,30 @@ function setStatus(state, text) {
 }
 
 function updateConnectionStatus() {
-  if (navigator.onLine) setStatus("online", "Online");
-  else setStatus("offline", "Offline - saved safely");
+  const syncButton = document.getElementById("syncNow");
+  if (navigator.onLine) {
+    setStatus("online", "Online");
+    if (syncButton) {
+      syncButton.disabled = false;
+      syncButton.title = "";
+    }
+  } else {
+    setStatus("offline", "Offline - saved safely");
+    if (syncButton) {
+      syncButton.disabled = true;
+      syncButton.title = "Records are saved safely and will send when internet returns.";
+    }
+  }
+}
+
+function gentleFeedback() {
+  if (navigator.vibrate) navigator.vibrate(80);
+}
+
+function formatEntryTime(value) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
 function blobToDataUrl(blob) {
@@ -330,6 +385,39 @@ function blobToDataUrl(blob) {
   });
 }
 
+async function storageHasRoom(file) {
+  if (!navigator.storage || !navigator.storage.estimate) return true;
+  try {
+    const estimate = await navigator.storage.estimate();
+    const free = Number(estimate.quota || 0) - Number(estimate.usage || 0);
+    return free <= 0 || free > file.size * 2;
+  } catch {
+    return true;
+  }
+}
+
+async function compressPhoto(file) {
+  if (!file || !String(file.type || "").startsWith("image/")) return file;
+  if (file.size < 700000) return file;
+  try {
+    const image = await createImageBitmap(file);
+    const maxSide = 1400;
+    const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    const context = canvas.getContext("2d");
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.72));
+    if (!blob) return file;
+    return typeof File !== "undefined"
+      ? new File([blob], (file.name || "photo").replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" })
+      : Object.assign(blob, { name: "photo.jpg", type: "image/jpeg" });
+  } catch {
+    return file;
+  }
+}
+
 function createCommandEntries(rawText) {
   return Parser.splitCommands(rawText).map(command => ({
     ...Parser.parseCommand(command),
@@ -339,30 +427,36 @@ function createCommandEntries(rawText) {
 
 async function queueMedia(file, kind, purpose, options = {}) {
   if (!file) return null;
+  let storedFile = file;
+  if (kind === "photo") storedFile = await compressPhoto(file);
+  if (!(await storageHasRoom(storedFile))) {
+    setStatus("error", "Phone storage is low. Please sync or free space.");
+    return null;
+  }
   const entry = {
     id: `${kind}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     timestamp: new Date().toISOString(),
     pharmacy_id: pharmacyId.value.trim(),
     action: kind,
     type: kind,
-    raw_text: `${kind}: ${file.name}`,
+    raw_text: kind === "photo" ? "photo saved offline" : "voice note saved offline",
     command_text: "",
-    file_name: file.name,
-    file_type: file.type || (kind === "photo" ? "image/*" : "audio/*"),
-    size: file.size,
+    file_name: storedFile.name || (kind === "photo" ? "photo" : "voice note"),
+    file_type: storedFile.type || (kind === "photo" ? "image/*" : "audio/*"),
+    size: storedFile.size,
     purpose,
     sync_status: "pending",
     retry_count: 0,
     last_error: "",
     storage: persistentStorageReady ? "indexeddb" : "localstorage"
   };
-  if (persistentStorageReady) entry.blob = file;
-  else entry.data_url = await blobToDataUrl(file);
+  if (persistentStorageReady) entry.blob = storedFile;
+  else entry.data_url = await blobToDataUrl(storedFile);
 
   try {
     await addEntries([entry]);
   } catch (error) {
-    const fallback = { ...entry, blob: undefined, data_url: await blobToDataUrl(file), storage: "localstorage", session_note: "Photo saved for this session. Please keep this page open until synced." };
+    const fallback = { ...entry, blob: undefined, data_url: await blobToDataUrl(storedFile), storage: "localstorage", session_note: "Saved for this session. Please keep this page open until synced." };
     await addEntries([fallback]);
   }
   if (!options.skipRender) await renderQueue();
@@ -381,7 +475,10 @@ async function queueMediaFiles(fileList, kind, purpose, options = {}) {
 }
 
 async function queuePhotoInputIfPresent(options = {}) {
-  return queueMediaFiles(photoInput.files, "photo", photoPurpose.value, options);
+  const chosen = await queueMediaFiles(photoInput.files, "photo", photoPurpose.value, { ...options, skipRender: true });
+  const captured = await queueMediaFiles(cameraPhotoInput ? cameraPhotoInput.files : [], "photo", photoPurpose.value, { ...options, skipRender: true });
+  if (!options.skipRender) await renderQueue();
+  return [...chosen, ...captured];
 }
 
 async function queueAudioInputIfPresent(options = {}) {
@@ -447,6 +544,7 @@ async function saveOfflineEntries() {
 
   commandText.value = "";
   photoInput.value = "";
+  if (cameraPhotoInput) cameraPhotoInput.value = "";
   voiceInput.value = "";
   await renderQueue();
   if (audioEntries.length) voiceStatus.textContent = "Voice saved. It will send when online.";
@@ -456,14 +554,15 @@ async function saveOfflineEntries() {
 
 function mediaStatusLabel(item) {
   const status = item.sync_status || "pending";
-  if (status === "synced") return "Sent successfully";
-  if (status === "failed") return "Needs attention";
-  return "Waiting to send";
+  if (status === "syncing") return "🔄 Syncing";
+  if (status === "synced") return "✅ Synced";
+  if (status === "failed") return "❌ Failed";
+  return "⏳ Waiting";
 }
 
 function entryLabel(item) {
-  if (item.type === "photo") return `photo: ${item.file_name || "invoice"} - ${mediaStatusLabel(item)}`;
-  if (item.type === "voice" || item.type === "audio") return `audio: ${item.file_name || "audio"} - ${mediaStatusLabel(item)}`;
+  if (item.type === "photo") return `${item.sync_status === "synced" ? "✅ Photo synced" : "📷 Photo"}\n${mediaStatusLabel(item)}`;
+  if (item.type === "voice" || item.type === "audio") return `${item.sync_status === "synced" ? "✅ Voice synced" : "🎤 Voice note"}\n${mediaStatusLabel(item)}`;
   if (item.action === "restock") {
     const bonus = Number(item.bonus_quantity || 0) > 0 ? ` + bonus ${item.bonus_quantity}` : "";
     return `${item.drug_name || item.command_text} restock ${item.quantity || ""}${bonus}`.trim();
@@ -487,7 +586,8 @@ function renderList(target, items, emptyText) {
     const meta = document.createElement("div");
     meta.className = "entry-meta";
     const kind = item.type === "photo" ? "Photo" : (item.type === "audio" || item.type === "voice" ? "Voice" : "Entry");
-    meta.textContent = `${kind} - ${mediaStatusLabel(item)}`;
+    const time = formatEntryTime(item.synced_at || item.timestamp);
+    meta.textContent = `${kind}${time ? ` - ${time}` : ""}`;
     if (item.last_error) meta.textContent += ` - ${item.last_error}`;
     li.append(title, meta);
     target.appendChild(li);
@@ -542,13 +642,17 @@ async function syncQueue() {
   const queue = await loadQueue();
   const toSync = queue.filter(item => item.sync_status !== "synced" && (item.retry_count || 0) < MAX_RETRIES);
   if (!toSync.length) {
-    setStatus("synced", "Sent successfully");
+    setStatus("synced", "✅ Synced");
     return;
   }
-  setStatus("syncing", "Syncing...");
+  setStatus("syncing", "🔄 Syncing");
   try {
     const entries = [];
-    for (const item of toSync) entries.push(await entryForSync(item));
+    for (const item of toSync) {
+      await updateQueueEntry({ ...item, sync_status: "syncing" });
+      entries.push(await entryForSync(item));
+    }
+    await renderQueue();
     const response = await fetch("/offline/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -558,7 +662,8 @@ async function syncQueue() {
     await mergeResults(toSync, data);
     await renderQueue();
     const failedCount = (data.failed || []).length + (data.pending || []).length;
-    setStatus(failedCount ? "error" : "synced", failedCount ? "Needs attention" : "Sent successfully");
+    setStatus(failedCount ? "error" : "synced", failedCount ? "❌ Needs attention" : "✅ Synced");
+    if (!failedCount) gentleFeedback();
   } catch (error) {
     for (const item of toSync) {
       await updateQueueEntry({ ...item, sync_status: "failed", retry_count: (item.retry_count || 0) + 1, last_error: String(error) });
@@ -575,13 +680,16 @@ document.querySelectorAll("[data-action]").forEach(button => {
   });
 });
 
-document.getElementById("takePhoto").addEventListener("click", () => photoInput.click());
+document.getElementById("takePhoto").addEventListener("click", () => (cameraPhotoInput || photoInput).click());
 document.getElementById("scanBarcode").addEventListener("click", () => startBarcodeScanner());
 document.getElementById("scanInvoice").addEventListener("click", () => photoInput.click());
 document.getElementById("voiceEntry").addEventListener("click", () => startVoiceRecording());
 document.getElementById("tapTalk").addEventListener("click", () => startVoiceRecording());
 document.getElementById("manualEntry").addEventListener("click", () => commandText.focus());
 document.getElementById("saveBarcodeMapping").addEventListener("click", saveBarcodeMapping);
+document.getElementById("barcodeSell").addEventListener("click", () => barcodeAction("sale"));
+document.getElementById("barcodeRestock").addEventListener("click", () => barcodeAction("restock"));
+document.getElementById("barcodeCheck").addEventListener("click", () => barcodeAction("stock"));
 document.getElementById("stopBarcodeScan").addEventListener("click", () => stopBarcodeScanner());
 document.getElementById("torchToggle").addEventListener("click", () => toggleTorch());
 barcodeInput.addEventListener("input", updateBarcodeResult);

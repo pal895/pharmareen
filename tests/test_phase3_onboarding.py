@@ -242,7 +242,7 @@ def test_existing_commands_update_inventory_sales_restocks_and_report(monkeypatc
     report = service.process_text("report today")
 
     assert "Panadol" in stock_before
-    assert "Panadol" in sale and "Stock left" in sale
+    assert "Panadol" in sale and "Stock:" in sale
     assert "28" in stock_after
     assert "added" in restock.lower() or "Restock" in restock
     assert "Batch processed" in batch

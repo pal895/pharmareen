@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import os
 import re
 from collections import Counter
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
-from difflib import get_close_matches
+from difflib import SequenceMatcher, get_close_matches
 from typing import Any, Protocol
 
 from app.domain import Action, ParsedEvent, ParseResult, StockItem
@@ -241,6 +242,12 @@ class FollowUpPrompt:
     question: str
 
 
+@dataclass(frozen=True)
+class DrugResolution:
+    drug_name: str = ""
+    question: str = ""
+
+
 NUMBER_WORDS = {
     "zero": 0,
     "one": 1,
@@ -285,6 +292,34 @@ SHORTCUT_DRUGS = {
     "ins": "Insulin",
 }
 
+PAYMENT_SPLIT_NOTE_KEYS = {
+    "payment_cash": "Cash",
+    "payment_mpesa": "M-Pesa",
+    "payment_card": "Card",
+    "payment_credit": "Credit",
+}
+
+
+def medicine_choice_question(typed: str, choices: list[str]) -> str:
+    clean_choices = []
+    seen = set()
+    for choice in choices:
+        key = normalize_key(choice)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        clean_choices.append(title_drug_name(choice))
+    if not clean_choices:
+        return f'I’m not sure which medicine "{typed}" means.\nPlease type the full medicine name.'
+    return "\n".join(
+        [
+            f'I’m not sure which medicine "{typed}" means.',
+            "",
+            "Did you mean:",
+            *[f"{index}. {choice}" for index, choice in enumerate(clean_choices, start=1)],
+        ]
+    )
+
 
 class IntakeService:
     def __init__(
@@ -307,6 +342,8 @@ class IntakeService:
         self.last_sale_by_conversation: dict[str, dict[str, Any]] = {}
         self.pending_void_reason: dict[str, dict[str, Any]] = {}
         self.conversions_by_drug: dict[str, dict[str, int]] = {}
+        self.aliases_by_key = self._load_pharmacy_aliases()
+        self.receipt_printing_enabled = False
 
     def process_text(self, text: str, conversation_id: str | None = None) -> str:
         text = text.strip()
@@ -351,6 +388,17 @@ class IntakeService:
 
         if is_process_batch_command(text):
             return "No saved offline entries yet.\n\nSend sales together like:\nPanadol 2\nAmoxil 1"
+
+        if is_details_last_command(text):
+            return self._details_last_reply(conversation_key)
+
+        receipt_setting = parse_receipt_setting_command(text)
+        if receipt_setting is not None:
+            self.receipt_printing_enabled = receipt_setting
+            return f"Receipt printing is now {'ON' if receipt_setting else 'OFF'}."
+
+        if is_print_receipt_last_command(text):
+            return self._receipt_last_reply(conversation_key)
 
         conversion = parse_conversion_command(text)
         if conversion is not None:
@@ -716,11 +764,19 @@ class IntakeService:
             if normalize_key(row.get("Type")) not in {"sale", "late sale", "late_sale"}:
                 continue
             note_meta = parse_note_metadata(str(row.get("Note") or ""))
+            split_used = False
+            for key, label in PAYMENT_SPLIT_NOTE_KEYS.items():
+                amount = parse_money(note_meta.get(key))
+                if amount:
+                    payment_totals[label] = payment_totals.get(label, 0) + amount
+                    split_used = True
+            discounts += parse_money(note_meta.get("discount")) or 0
+            if split_used:
+                continue
             payment = note_meta.get("payment", "Cash")
             payment = "M-Pesa" if normalize_key(payment) in {"mpesa", "m pesa", "m-pesa"} else payment.title()
             payment_totals.setdefault(payment, 0.0)
             payment_totals[payment] += parse_money(row.get("Total Sales")) or 0
-            discounts += parse_money(note_meta.get("discount")) or 0
         if not any(payment_totals.values()) and not discounts:
             return ""
         return "\n".join(
@@ -759,22 +815,23 @@ class IntakeService:
                 groups[result.category].append(result.summary_line or result.reply)
 
         lines = ["✅ Batch processed", ""]
-        section_titles = [
+        section_candidates = [
             ("Sales", "sales"),
             ("Late Sales", "late_sales"),
             ("Restocks", "restocks"),
             ("No Stock", "no_stock"),
         ]
+        section_titles = [(title, key) for title, key in section_candidates if groups[key]]
         if groups["stock_checks"]:
             section_titles.append(("Stock Checks", "stock_checks"))
-        section_titles.append(("Errors", "errors"))
+        if groups["errors"]:
+            section_titles.append(("Errors", "errors"))
+        if not section_titles:
+            return "No records were processed."
 
         for title, key in section_titles:
             lines.append(f"{title}:")
-            if groups[key]:
-                lines.extend(f"- {item}" for item in groups[key])
-            else:
-                lines.append("- None")
+            lines.extend(f"- {item}" for item in groups[key])
             if title != section_titles[-1][0]:
                 lines.append("")
         return "\n".join(lines)
@@ -787,6 +844,17 @@ class IntakeService:
             summary_line=f'"{command.raw_text}" could not be understood',
                 category="errors",
             )
+        if command.drug_name and command.kind in {"sale", "late_sale", "restock", "stock_check", "no_stock"}:
+            resolution = self._resolve_drug_name(command.drug_name)
+            if resolution.question:
+                return EntryResult(
+                    logged=False,
+                    reply=resolution.question,
+                    summary_line=resolution.question,
+                    category="errors",
+                )
+            if resolution.drug_name:
+                command = replace(command, drug_name=resolution.drug_name)
         if command.kind == "sale":
             return self._process_sale_command(command, is_late=False, conversation_key=conversation_key)
         if command.kind == "late_sale":
@@ -848,6 +916,18 @@ class IntakeService:
 
     def _process_sale_command(self, command: OperatingCommand, is_late: bool, conversation_key: str = "__default__") -> EntryResult:
         note = "Entered later" if is_late else ""
+        payment_breakdown = parse_payment_breakdown(command.raw_text)
+        if payment_breakdown:
+            note = merge_notes(
+                note,
+                build_note(
+                    "",
+                    payment_cash=payment_breakdown.get("Cash", ""),
+                    payment_mpesa=payment_breakdown.get("M-Pesa", ""),
+                    payment_card=payment_breakdown.get("Card", ""),
+                    payment_credit=payment_breakdown.get("Credit", ""),
+                ),
+            )
         staff_name = command.staff_name or self.staff_by_conversation.get(conversation_key, "")
         return self._record_sale(
             command.drug_name,
@@ -856,7 +936,7 @@ class IntakeService:
             note=note,
             unit=command.unit,
             base_quantity=command.base_quantity,
-            payment_method=command.payment_method,
+            payment_method="Mixed" if payment_breakdown else command.payment_method,
             discount=command.discount,
             staff_name=staff_name,
             trace_id_value=command.trace_id,
@@ -984,34 +1064,19 @@ class IntakeService:
             ]
         elif missing_profit_data:
             reply_parts = [
-                "⚠️ Sale recorded, but profit not calculated because price data is missing.",
-                f"{event.drug_name} x{display_quantity}{unit_suffix(unit, display_quantity)}",
+                f"✅ {event.drug_name} x{display_quantity}{unit_suffix(unit, display_quantity)} recorded",
             ]
         else:
             reply_parts = [
-                f"✅ {event.drug_name} x{quantity} recorded",
+                f"✅ {event.drug_name} x{display_quantity}{unit_suffix(unit, display_quantity)} recorded",
             ]
-        if not is_late and not missing_profit_data:
-            reply_parts[0] = f"\u2705 {event.drug_name} x{display_quantity}{unit_suffix(unit, display_quantity)} recorded"
         if unit and base_quantity != display_quantity:
             reply_parts.append(f"Equivalent: {base_quantity} tablets")
         if stock_plan.new_current_stock is not None:
             suffix = " tablets" if unit else ""
-            reply_parts.append(f"Stock left: {stock_plan.new_current_stock}{suffix}")
+            reply_parts.append(f"Stock: {stock_plan.new_current_stock}{suffix}")
         else:
-            reply_parts.append("Stock left: not set.")
-        if fefo_reply:
-            reply_parts.append(fefo_reply)
-        if payment_method and payment_method != "Cash":
-            reply_parts.append(f"Payment: {payment_method}")
-        if discount:
-            reply_parts.append(f"Discount: {format_kes(discount)}")
-        if not is_late and not missing_profit_data:
-            reply_parts.append(f"Profit: {format_kes(profit)}")
-        reply_parts.append(f"Trace: {sale_trace_id}")
-        today_profit_line = self._today_profit_line()
-        if today_profit_line:
-            reply_parts.append(today_profit_line)
+            reply_parts.append("Stock: not set")
         if stock_plan.reply_warnings:
             reply_parts.extend(stock_plan.reply_warnings)
         reply = "\n".join(reply_parts)
@@ -1023,6 +1088,11 @@ class IntakeService:
             "trace_id": sale_trace_id,
             "payment_method": payment_method,
             "discount": discount,
+            "profit": profit,
+            "total_sales": total_sales,
+            "total_cost": total_cost,
+            "fefo": fefo_reply,
+            "missing_profit_data": missing_profit_data,
         }
 
         return EntryResult(
@@ -1277,13 +1347,20 @@ class IntakeService:
             if normalize_key(row.get("Type")) not in {"sale", "late sale", "late_sale"}:
                 continue
             note_meta = parse_note_metadata(str(row.get("Note") or ""))
-            payment = note_meta.get("payment", "Cash")
-            payment = "M-Pesa" if normalize_key(payment) in {"mpesa", "m pesa", "m-pesa"} else payment.title()
-            payment_totals.setdefault(payment, 0.0)
             row_sales = parse_money(row.get("Total Sales")) or 0
             row_profit = parse_money(row.get("Profit")) or 0
             row_discount = parse_money(note_meta.get("discount")) or 0
-            payment_totals[payment] += row_sales
+            split_used = False
+            for key, label in PAYMENT_SPLIT_NOTE_KEYS.items():
+                amount = parse_money(note_meta.get(key))
+                if amount:
+                    payment_totals[label] = payment_totals.get(label, 0) + amount
+                    split_used = True
+            if not split_used:
+                payment = note_meta.get("payment", "Cash")
+                payment = "M-Pesa" if normalize_key(payment) in {"mpesa", "m pesa", "m-pesa"} else payment.title()
+                payment_totals.setdefault(payment, 0.0)
+                payment_totals[payment] += row_sales
             discount_total += row_discount
             total_sales += row_sales
             profit += row_profit
@@ -1449,10 +1526,106 @@ class IntakeService:
 
         names = self.store.list_master_drug_names()
         normalized_to_name = {normalize_key(name): name for name in names if name.strip()}
-        match = get_close_matches(normalize_key(drug_name), list(normalized_to_name.keys()), n=1, cutoff=0.72)
+        match = get_close_matches(normalize_key(drug_name), list(normalized_to_name.keys()), n=1, cutoff=0.82)
         if not match:
             return None
         return self.store.find_stock(normalized_to_name[match[0]])
+
+    def _load_pharmacy_aliases(self) -> dict[str, str]:
+        aliases = {normalize_key(key): value for key, value in SHORTCUT_DRUGS.items()}
+        raw_aliases = os.getenv("PHARMAREEN_DRUG_ALIASES", "")
+        for pair in raw_aliases.split(","):
+            if "=" not in pair:
+                continue
+            alias, drug_name = pair.split("=", 1)
+            alias_key = normalize_key(alias)
+            drug_name = title_drug_name(drug_name)
+            if alias_key and drug_name:
+                aliases[alias_key] = drug_name
+        return aliases
+
+    def _resolve_drug_name(self, drug_name: str) -> DrugResolution:
+        text_key = normalize_key(drug_name)
+        if not text_key:
+            return DrugResolution()
+        stock = self.store.find_stock(drug_name)
+        if stock is not None:
+            return DrugResolution(stock.drug_name)
+        alias = self.aliases_by_key.get(text_key)
+        if alias:
+            alias_stock = self.store.find_stock(alias)
+            return DrugResolution(alias_stock.drug_name if alias_stock else alias)
+        try:
+            names = [name for name in self.store.list_master_drug_names() if str(name).strip()]
+        except Exception:
+            names = []
+        normalized_to_name = {normalize_key(name): name for name in names}
+        if text_key in normalized_to_name:
+            return DrugResolution(normalized_to_name[text_key])
+        prefix_matches = [
+            name
+            for key, name in normalized_to_name.items()
+            if key.startswith(text_key) or text_key.startswith(key)
+        ]
+        if len(prefix_matches) == 1 and len(text_key) >= 4:
+            return DrugResolution(prefix_matches[0])
+        if len(prefix_matches) > 1:
+            return DrugResolution(question=medicine_choice_question(drug_name, prefix_matches[:3]))
+        scored = sorted(
+            (
+                (SequenceMatcher(None, text_key, key).ratio(), name)
+                for key, name in normalized_to_name.items()
+            ),
+            reverse=True,
+        )
+        if scored and scored[0][0] >= 0.82 and (len(scored) == 1 or scored[0][0] - scored[1][0] >= 0.08):
+            return DrugResolution(scored[0][1])
+        if scored and scored[0][0] >= 0.62:
+            return DrugResolution(question=medicine_choice_question(drug_name, [name for _, name in scored[:3]]))
+        if len(text_key) <= 3:
+            return DrugResolution(
+                question=(
+                    f'I’m not sure what "{drug_name}" means.\n'
+                    "Please type the full medicine name, or ask Samuel to add it as a shortcut."
+                )
+            )
+        return DrugResolution()
+
+    def _details_last_reply(self, conversation_key: str) -> str:
+        sale = self.last_sale_by_conversation.get(conversation_key)
+        if not sale:
+            return "No recent sale details yet."
+        lines = [
+            "Last Sale Details",
+            f"{sale['drug_name']} x{sale['display_quantity']}{unit_suffix(sale.get('unit', ''), sale['display_quantity'])}",
+            f"Trace: {sale.get('trace_id') or 'not set'}",
+        ]
+        if sale.get("payment_method"):
+            lines.append(f"Payment: {sale['payment_method']}")
+        if sale.get("discount"):
+            lines.append(f"Discount: {format_kes(sale['discount'])}")
+        if sale.get("profit") is not None:
+            lines.append(f"Profit: {format_kes(sale['profit'])}")
+        if sale.get("fefo"):
+            lines.append(str(sale["fefo"]))
+        if sale.get("missing_profit_data"):
+            lines.append("Profit details need price data.")
+        return "\n".join(lines)
+
+    def _receipt_last_reply(self, conversation_key: str) -> str:
+        sale = self.last_sale_by_conversation.get(conversation_key)
+        if not sale:
+            return "No recent sale to print yet."
+        return "\n".join(
+            [
+                "PHARMAREEN RECEIPT",
+                f"Medicine: {sale['drug_name']}",
+                f"Quantity: {sale['display_quantity']}{unit_suffix(sale.get('unit', ''), sale['display_quantity'])}",
+                f"Payment: {sale.get('payment_method') or 'Cash'}",
+                f"Trace: {sale.get('trace_id') or 'not set'}",
+                "Thank you.",
+            ]
+        )
 
     def _append_transaction(
         self,
@@ -1491,19 +1664,19 @@ def build_stock_update_plan(stock: StockItem, quantity: int) -> StockUpdatePlan:
     reply_warnings: list[str] = []
 
     if stock.current_stock is None:
-        warning = "Stock level not updated because Current Stock is empty."
+        warning = "Current stock is blank. Please review stock when you have a moment."
         warning_notes.append(warning)
         reply_warnings.append(warning)
         return StockUpdatePlan(None, warning_notes, reply_warnings)
 
     new_stock = max(stock.current_stock - quantity, 0)
     if stock.current_stock < quantity:
-        warning = "Stock may be inaccurate. Sold quantity exceeded recorded stock."
+        warning = "Sold more than the recorded stock. Please review stock after rush hour."
         warning_notes.append(warning)
-        reply_warnings.append(warning)
+        reply_warnings.append("Stock reached 0. Please review after rush hour.")
 
     if stock.reorder_level is not None and new_stock <= stock.reorder_level:
-        reply_warnings.append(f"⚠️ LOW STOCK: {stock.drug_name} is at or below reorder level.")
+        warning_notes.append(f"Low stock: {stock.drug_name} is at or below reorder level.")
 
     return StockUpdatePlan(new_stock, warning_notes, reply_warnings)
 
@@ -1586,6 +1759,21 @@ def is_customer_ordering_question(text: str) -> bool:
 
 def is_process_batch_command(text: str) -> bool:
     return normalize_key(text) == "process batch"
+
+
+def is_details_last_command(text: str) -> bool:
+    return re.fullmatch(r"(?:details\s+last|last\s+details|details\s+sale|sale\s+details)", text.strip(), flags=re.IGNORECASE) is not None
+
+
+def parse_receipt_setting_command(text: str) -> bool | None:
+    match = re.fullmatch(r"(?:receipt|receipts|receipt\s+printing)\s+(on|off)", text.strip(), flags=re.IGNORECASE)
+    if not match:
+        return None
+    return normalize_key(match.group(1)) == "on"
+
+
+def is_print_receipt_last_command(text: str) -> bool:
+    return re.fullmatch(r"(?:print\s+receipt(?:\s+last)?|receipt\s+last)", text.strip(), flags=re.IGNORECASE) is not None
 
 
 def parse_conversion_command(text: str) -> tuple[str, int, int] | None:
@@ -1805,6 +1993,10 @@ def parse_operating_commands(text: str) -> list[OperatingCommand] | None:
             )
         return commands if commands else None
 
+    spaced_sales = parse_space_separated_sale_commands(clean_text)
+    if spaced_sales is not None:
+        return spaced_sales
+
     command = parse_single_operating_command(clean_text)
     return [command] if command is not None else None
 
@@ -1853,6 +2045,35 @@ def parse_drug_quantity_list(text: str, kind: str) -> list[OperatingCommand]:
                 drug_name=title_drug_name(match.group(1)),
                 quantity=positive_quantity(match.group(2)),
                 raw_text=part,
+            )
+        )
+    return commands
+
+
+def parse_space_separated_sale_commands(text: str) -> list[OperatingCommand] | None:
+    if re.search(
+        rf"\b(?:restock|restocked|received|bought|bonus|cost|paid|discount|supplier|expiry|invoice|batch|{payment_pattern()})\b",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        return None
+    matches = list(re.finditer(r"([A-Za-z][A-Za-z\s'-]*?)\s+x?(\d+)(?=\s+[A-Za-z]|$)", text.strip()))
+    if len(matches) < 2:
+        return None
+    covered = " ".join(match.group(0).strip() for match in matches)
+    if normalize_key(covered) != normalize_key(text):
+        return None
+    commands: list[OperatingCommand] = []
+    for match in matches:
+        drug_name = title_drug_name(match.group(1))
+        if not drug_name:
+            return None
+        commands.append(
+            OperatingCommand(
+                kind="sale",
+                drug_name=drug_name,
+                quantity=positive_quantity(match.group(2)),
+                raw_text=match.group(0).strip(),
             )
         )
     return commands
@@ -2511,6 +2732,18 @@ def parse_number_phrase(phrase: str) -> int | None:
     if not found:
         return None
     return total + current
+
+
+def parse_payment_breakdown(text: str) -> dict[str, float]:
+    payments: dict[str, float] = {}
+    for method, amount in re.findall(
+        rf"\b({payment_pattern()})\s+(\d+(?:\.\d+)?)\b",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        label = "M-Pesa" if normalize_key(method) in {"mpesa", "m pesa", "m-pesa"} else title_drug_name(method)
+        payments[label] = payments.get(label, 0) + (parse_money(amount) or 0)
+    return payments if len(payments) >= 2 else {}
 
 
 def normalize_spoken_command_text(text: str) -> str:

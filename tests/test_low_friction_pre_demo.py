@@ -49,6 +49,7 @@ def test_supervisor_scripts_are_present_and_bridge_is_optional():
     start_all = open("scripts/start_all.sh", encoding="utf-8").read()
     check_all = open("scripts/check_all.sh", encoding="utf-8").read()
     stop_all = open("scripts/stop_all.sh", encoding="utf-8").read()
+    deploy_start = open("scripts/replit_deploy_start.sh", encoding="utf-8").read()
     replit_config = open(".replit", encoding="utf-8").read()
     replit_nix = open("replit.nix", encoding="utf-8").read()
 
@@ -62,6 +63,12 @@ def test_supervisor_scripts_are_present_and_bridge_is_optional():
     assert "WHATSAPP_BRIDGE_ENABLED" in start_all
     assert "/debug/system-status" in check_all
     assert "local_whatsapp_bridge.js" in stop_all
+    assert "git pull origin main" in deploy_start
+    assert "npm install" in deploy_start
+    assert "pkill -f \"uvicorn app.main:app\"" in deploy_start
+    assert "WHATSAPP_BRIDGE_ENABLED" in deploy_start
+    assert "/debug/offline-app" in deploy_start
+    assert "/debug/system-status" in deploy_start
     assert 'run = "bash start.sh"' in replit_config
     assert "nodejs-20" in replit_config
     assert "pkgs.nodejs-20_x" in replit_nix

@@ -137,6 +137,12 @@ h2 { font-size: 18px; }
   gap: 8px;
 }
 
+.barcode-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
 button, input, textarea, select {
   font: inherit;
 }
@@ -237,8 +243,11 @@ summary {
 .entry-list li {
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 12px;
+  padding: 14px;
   background: #fbfdfc;
+  font-size: 15px;
+  line-height: 1.35;
+  white-space: pre-line;
 }
 
 .entry-meta {

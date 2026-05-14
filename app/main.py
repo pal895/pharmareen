@@ -114,7 +114,7 @@ OFFLINE_NO_CACHE_HEADERS = {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
     "Pragma": "no-cache",
     "Expires": "0",
-    "X-PharMareen-Offline-Version": "phase6-deployment-stable-v11",
+    "X-PharMareen-Offline-Version": "phase6-sync-trust-v12",
 }
 
 
@@ -288,29 +288,27 @@ def offline_media_reply(entry: dict[str, Any]) -> str:
 
 def offline_sync_success_message(entries: list[dict[str, Any]], synced: list[dict[str, Any]]) -> str:
     synced_ids = {str(item.get("id") or "") for item in synced}
-    counts = {"sales": 0, "restocks": 0, "photos": 0, "voice_notes": 0}
+    lines = ["✅ Offline records synced"]
     for entry in entries:
         entry_id = str(entry.get("id") or entry.get("action_id") or "").strip()
         if entry_id not in synced_ids:
             continue
         action = offline_entry_action(entry)
         if action == "sale":
-            counts["sales"] += 1
+            drug = str(entry.get("drug_name") or "Sale").strip()
+            quantity = entry.get("quantity") or ""
+            lines.append(f"• {drug} x{quantity}".rstrip())
         elif action in {"restock", "bonus_restock", "discount_restock"}:
-            counts["restocks"] += 1
+            drug = str(entry.get("drug_name") or "Restock").strip()
+            quantity = entry.get("total_received_quantity") or entry.get("quantity") or ""
+            lines.append(f"• {drug} +{quantity}".rstrip())
         elif action in {"photo", "image"}:
-            counts["photos"] += 1
+            lines.append("• Photo saved")
         elif action in {"voice", "audio"}:
-            counts["voice_notes"] += 1
-    return "\n".join(
-        [
-            "✅ Offline records sent successfully",
-            f"Sales: {counts['sales']}",
-            f"Restocks: {counts['restocks']}",
-            f"Photos: {counts['photos']}",
-            f"Voice notes: {counts['voice_notes']}",
-        ]
-    )
+            lines.append("• Voice note saved")
+    time_format = "%#I:%M %p" if os.name == "nt" else "%-I:%M %p"
+    lines.append(f"Saved safely at {now_in_timezone(get_settings().timezone).strftime(time_format)}")
+    return "\n".join(lines)
 
 
 @app.post("/offline/sync")

@@ -150,7 +150,7 @@ def parse_trace_modifiers(text: str) -> ParsedModifiers:
 
 def strip_modifier_phrases(text: str) -> str:
     clean = f" {text.strip()} "
-    clean = re.sub(rf"\s+\b{payment_pattern()}\b\s*", " ", clean, flags=re.IGNORECASE)
+    clean = re.sub(rf"\s+\b{payment_pattern()}\b(?:\s+\d+(?:\.\d+)?)?", " ", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\s+\bdiscount\s+\d+(?:\.\d+)?\b", " ", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\s+\b(?:supplier|invoice|inv|batch|barcode|code|expiry|expires|exp)\s+.+?(?=\s+\b(?:supplier|invoice|inv|batch|barcode|code|expiry|expires|exp|payment|discount)\b|$)", " ", clean, flags=re.IGNORECASE)
     return " ".join(clean.split())

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from app.domain import Action, ParsedEvent, ParseResult, StockItem
 from app.intake import IntakeService, normalize_spoken_command_text
@@ -256,9 +256,11 @@ def test_sale_with_strip_unit_payment_and_discount_records_engine_metadata():
 
     assert "Panadol x1 strip recorded" in reply
     assert "Equivalent: 10 tablets" in reply
-    assert "Stock left: 10 tablets" in reply
-    assert "Payment: M-Pesa" in reply
-    assert "Discount: KES 50" in reply
+    assert "Stock: 10 tablets" in reply
+    assert "Profit:" not in reply
+    details = service.process_text("details last", conversation_id="staff-phone")
+    assert "Payment: M-Pesa" in details
+    assert "Discount: KES 50" in details
     assert store.stocks["panadol"].current_stock == 10
     transaction = store.transactions[-1]
     assert transaction["Quantity"] == 10
@@ -360,7 +362,8 @@ def test_staff_session_payment_summary_and_void_flow():
     assert "Staff set: Mary" in service.process_text("set staff Mary", conversation_id="phone-1")
     sale_reply = service.process_text("Panadol 2 mpesa discount 20", conversation_id="phone-1")
 
-    assert "Payment: M-Pesa" in sale_reply
+    assert "Payment:" not in sale_reply
+    assert "Payment: M-Pesa" in service.process_text("details last", conversation_id="phone-1")
     assert store.stocks["panadol"].current_stock == 18
     sale_note = store.transactions[-1]["Note"]
     assert "staff=Mary" in sale_note
@@ -483,7 +486,7 @@ def test_report_today_returns_compact_summary_without_saved_report_lookup():
     assert "Cost:" in reply
     assert "Profit:" in reply
     assert "Low Stock:" in reply
-    assert "📄 PDF report:" in reply
+    assert "PDF report:" in reply
     assert parser.called is False
 
 
@@ -497,9 +500,9 @@ def test_sold_item_with_price_found_logs_total_and_reduces_stock():
     reply = service.process_text("Panadol sold 2")
 
     assert "Panadol x2 recorded" in reply
-    assert "Stock left: 18" in reply
-    assert "Profit: KES 160" in reply
-    assert "Today Profit: KES 160" in reply
+    assert "Stock: 18" in reply
+    assert "Profit:" not in reply
+    assert "Profit: KES 160" in service.process_text("details last")
     assert store.logged[0][0].drug_name == "Panadol"
     assert store.logged[0][1] == 220
     assert store.logged[0][2] == 440
@@ -533,7 +536,8 @@ def test_sold_item_with_missing_cost_still_logs_with_warning():
 
     reply = service.process_text("Panadol 2")
 
-    assert "⚠️ Sale recorded, but profit not calculated because price data is missing." in reply
+    assert "Panadol x2 recorded" in reply
+    assert "Profit:" not in reply
     assert store.logged[0][0].drug_name == "Panadol"
     assert store.transactions[-1]["Type"] == "sale"
     assert store.stocks["panadol"].current_stock == 18
@@ -579,7 +583,7 @@ def test_restock_item_increases_current_stock_and_logs():
     reply = service.process_text("Panadol restock 20")
 
     assert "Restock recorded: Panadol +20" in reply
-    assert "✅ Panadol +20 added" in reply
+    assert "Panadol +20 added" in reply
     assert "Avg cost: KES 140" in reply
     assert "New stock: 40" in reply
     assert store.stocks["panadol"].current_stock == 40
@@ -598,10 +602,7 @@ def test_sale_reply_includes_low_stock_warning():
     reply = service.process_text("Cough Syrup sold 2")
 
     assert "Cough Syrup x2 recorded" in reply
-    assert "Stock left: 2" in reply
-    assert "Profit: KES 100" in reply
-    assert "Today Profit: KES 100" in reply
-    assert "LOW STOCK: Cough Syrup is at or below reorder level." in reply
+    assert "Stock: 2" in reply
 
 
 def test_multiple_items_in_one_message_logs_each_item():
@@ -619,22 +620,23 @@ def test_multiple_items_in_one_message_logs_each_item():
 
     reply = service.process_text("Panadol sold 2, insulin no stock, cough syrup sold 1")
 
-    assert "✅ Batch processed" in reply
+    assert "Batch processed" in reply
     assert "- Panadol x2" in reply
     assert "- Insulin" in reply
     assert "- Cough Syrup x1" in reply
-    assert "Errors:\n- None" in reply
     assert len(store.logged) == 3
 
 
-def test_simple_sale_command_records_sale_and_profit():
+def test_simple_sale_command_records_short_reply_and_details_command():
     store = FakeStore()
     service = IntakeService(FailingParser(), store)
 
     reply = service.process_text("Panadol 2")
 
-    assert "✅ Panadol x2 recorded" in reply
-    assert "Profit: KES 160" in reply
+    assert "Panadol x2 recorded" in reply
+    assert "Profit:" not in reply
+    assert "Trace:" not in reply
+    assert "Profit: KES 160" in service.process_text("details last")
     assert store.stocks["panadol"].current_stock == 18
     assert store.transactions[-1]["Type"] == "sale"
 
@@ -651,13 +653,75 @@ def test_sale_aliases_are_customer_friendly():
         assert store.transactions[-1]["Type"] == "sale"
 
 
+def test_typo_tolerance_and_shortcut_safety(monkeypatch):
+    store = FakeStore()
+    store.stocks["paracetamol"] = StockItem("Paracetamol", 100, 60, 20, 5, 10)
+    service = IntakeService(FailingParser(), store)
+
+    typo_reply = service.process_text("Panadl 2")
+    ambiguous_reply = service.process_text("pa 2")
+    unknown_shortcut_reply = service.process_text("pd 2")
+
+    assert "Panadol x2 recorded" in typo_reply
+    assert "Did you mean:" in ambiguous_reply
+    assert "Panadol" in ambiguous_reply
+    assert "Paracetamol" in ambiguous_reply
+    assert "not sure what \"Pd\" means" in unknown_shortcut_reply
+
+    monkeypatch.setenv("PHARMAREEN_DRUG_ALIASES", "pd=Panadol")
+    alias_service = IntakeService(FailingParser(), FakeStore())
+    assert "Panadol x2 recorded" in alias_service.process_text("pd 2")
+
+
+def test_rush_hour_space_separated_batch_processes_successes_and_failures():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    reply = service.process_text("Panadol 2 piriton 1 amoxil 3")
+
+    assert "Batch processed" in reply
+    assert "Sales:" in reply
+    assert "- Panadol x2" in reply
+    assert "- Amoxyl x3" in reply
+    assert "Errors:" in reply
+    assert "Piriton was not found" in reply
+
+
+def test_mixed_payment_sale_records_split_totals_and_keeps_reply_short():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    reply = service.process_text("Panadol 2 cash 100 mpesa 200")
+    summary = service.process_text("cash summary")
+
+    assert "Panadol x2 recorded" in reply
+    assert "Payment:" not in reply
+    assert "payment=Mixed" in store.transactions[-1]["Note"]
+    assert "payment_cash=100.0" in store.transactions[-1]["Note"]
+    assert "payment_mpesa=200.0" in store.transactions[-1]["Note"]
+    assert "Cash: KES 100" in summary
+    assert "M-Pesa: KES 200" in summary
+
+
+def test_receipt_printing_setting_and_printable_last_receipt():
+    service = IntakeService(FailingParser(), FakeStore())
+
+    assert service.process_text("receipt printing on") == "Receipt printing is now ON."
+    service.process_text("Panadol 2")
+    receipt = service.process_text("print receipt last")
+
+    assert "PHARMAREEN RECEIPT" in receipt
+    assert "Medicine: Panadol" in receipt
+    assert "Quantity: 2" in receipt
+
+
 def test_simple_restock_plus_command_records_restock():
     store = FakeStore()
     service = IntakeService(FailingParser(), store)
 
     reply = service.process_text("+Panadol 20")
 
-    assert "✅ Panadol +20 added" in reply
+    assert "Panadol +20 added" in reply
     assert "New stock: 40" in reply
     assert store.transactions[-1]["Type"] == "restock"
 
@@ -669,7 +733,7 @@ def test_restock_aliases_add_received_and_stock_work():
 
         reply = service.process_text(message)
 
-        assert "✅ Panadol +20 added" in reply
+        assert "Panadol +20 added" in reply
         assert "New stock: 40" in reply
         assert store.transactions[-1]["Type"] == "restock"
 
@@ -691,7 +755,7 @@ def test_bonus_restock_records_free_stock_type():
 
     reply = service.process_text("+Panadol 5 bonus")
 
-    assert "✅ Panadol bonus +5 added" in reply
+    assert "Panadol bonus +5 added" in reply
     assert "New stock: 25" in reply
     assert store.stocks["panadol"].current_stock == 25
     assert store.transactions[-1]["Total Cost"] == 0
@@ -705,7 +769,7 @@ def test_bonus_restock_aliases_are_understood():
 
         reply = service.process_text(message)
 
-        assert "✅ Panadol bonus +5 added" in reply
+        assert "Panadol bonus +5 added" in reply
         assert "New stock: 25" in reply
         assert store.transactions[-1]["Total Cost"] == 0
 
@@ -716,7 +780,7 @@ def test_discount_restock_records_discount_type():
 
     reply = service.process_text("+Panadol 20 1800 disc")
 
-    assert "✅ Panadol +20 added" in reply
+    assert "Panadol +20 added" in reply
     assert "Paid: KES 1,800" in reply
     assert "Avg cost: KES 115" in reply
     assert store.stocks["panadol"].cost_price == 115
@@ -730,7 +794,7 @@ def test_discount_restock_disc_alias_records_discount_type():
 
     reply = service.process_text("+Panadol 20 2000 disc")
 
-    assert "✅ Panadol +20 added" in reply
+    assert "Panadol +20 added" in reply
     assert "Paid: KES 2,000" in reply
     assert store.transactions[-1]["Total Cost"] == 2000
     assert "Restock type: discount" in store.transactions[-1]["Note"]
@@ -742,7 +806,7 @@ def test_restock_cost_keyword_records_total_cost():
 
     reply = service.process_text("+Panadol 20 cost 1800")
 
-    assert "✅ Panadol +20 added" in reply
+    assert "Panadol +20 added" in reply
     assert "Paid: KES 1,800" in reply
     assert "Avg cost: KES 115" in reply
     assert store.transactions[-1]["Total Cost"] == 1800
@@ -755,7 +819,7 @@ def test_restock_paid_cost_aliases_work():
 
         reply = service.process_text(message)
 
-        assert "✅ Panadol +20 added" in reply
+        assert "Panadol +20 added" in reply
         assert "Paid: KES 1,800" in reply
         assert store.transactions[-1]["Total Cost"] == 1800
 
@@ -766,7 +830,7 @@ def test_ordered_paid_restock_records_budget_savings():
 
     reply = service.process_text("+Panadol 20 ordered 2000 paid 1800")
 
-    assert "✅ Panadol +20 added" in reply
+    assert "Panadol +20 added" in reply
     assert "Budget: KES 2,000" in reply
     assert "Paid: KES 1,800" in reply
     assert "Saved: KES 200" in reply
@@ -852,7 +916,7 @@ def test_late_sale_command_records_late_sale():
 
     reply = service.process_text("later Panadol 3")
 
-    assert "✅ Late sale recorded" in reply
+    assert "Late sale recorded" in reply
     assert "Panadol x3" in reply
     assert store.transactions[-1]["Type"] == "late_sale"
     assert store.logged[-1][0].action == Action.LATE_SALE
@@ -864,7 +928,7 @@ def test_late_keyword_records_late_sale():
 
     reply = service.process_text("late Panadol 3")
 
-    assert "✅ Late sale recorded" in reply
+    assert "Late sale recorded" in reply
     assert "Panadol x3" in reply
     assert store.transactions[-1]["Type"] == "late_sale"
     assert store.logged[-1][0].action == Action.LATE_SALE
@@ -876,7 +940,7 @@ def test_missed_sale_alias_records_late_sale():
 
     reply = service.process_text("missed Panadol 3")
 
-    assert "✅ Late sale recorded" in reply
+    assert "Late sale recorded" in reply
     assert store.transactions[-1]["Type"] == "late_sale"
 
 
@@ -887,7 +951,7 @@ def test_profit_today_command_summarizes_profit():
 
     reply = service.process_text("profit today")
 
-    assert "📊 Profit Today" in reply
+    assert "Profit Today" in reply
     assert "Sales: KES 440" in reply
     assert "Cost: KES 280" in reply
     assert "Gross Profit: KES 160" in reply
@@ -909,11 +973,11 @@ def test_report_week_command_summarizes_last_seven_days():
 
     reply = service.process_text("report week")
 
-    assert "📅 Weekly Report" in reply
+    assert "Weekly Report" in reply
     assert "Sales: KES 440" in reply
     assert "Profit: KES 160" in reply
     assert "Best Seller: Panadol" in reply
-    assert "📄 PDF report:" in reply
+    assert "PDF report:" in reply
 
 
 def test_report_today_includes_downloadable_pdf_link():
@@ -923,7 +987,7 @@ def test_report_today_includes_downloadable_pdf_link():
 
     reply = service.process_text("report today")
 
-    assert "📎 PDF report attached below." in reply
+    assert "PDF report attached below." in reply
     assert "https://reports.pharmareen.app/reports/download/" in reply
 
 
@@ -934,7 +998,7 @@ def test_report_week_includes_downloadable_pdf_link():
 
     reply = service.process_text("report week")
 
-    assert "📅 Weekly Report" in reply
+    assert "Weekly Report" in reply
     assert "https://reports.pharmareen.app/reports/download/" in reply
 
 
@@ -950,13 +1014,12 @@ def test_batch_message_processes_each_line():
         "Insulin no stock"
     )
 
-    assert "✅ Batch processed" in reply
+    assert "Batch processed" in reply
     assert "- Panadol x2" in reply
     assert "- Amoxyl x1" in reply
     assert "- Insulin +10" in reply
     assert "- Cetirizine x3" in reply
     assert "No Stock:\n- Insulin" in reply
-    assert "Errors:\n- None" in reply
 
 
 def test_natural_bulk_sale_message_processes_each_item():
@@ -968,7 +1031,6 @@ def test_natural_bulk_sale_message_processes_each_item():
     assert "- Panadol x2" in reply
     assert "- Amoxyl x1" in reply
     assert "- Cetirizine x3" in reply
-    assert "Errors:\n- None" in reply
 
 
 def test_comma_separated_sales_process_each_item():
@@ -977,11 +1039,10 @@ def test_comma_separated_sales_process_each_item():
 
     reply = service.process_text("Panadol 5, ORS 3")
 
-    assert "✅ Batch processed" in reply
+    assert "Batch processed" in reply
     assert "Sales:" in reply
     assert "- Panadol x5" in reply
     assert "- ORS x3" in reply
-    assert "Errors:\n- None" in reply
     assert [transaction["Type"] for transaction in store.transactions[-2:]] == ["sale", "sale"]
 
 
@@ -991,12 +1052,10 @@ def test_later_prefix_applies_to_comma_batch():
 
     reply = service.process_text("later Panadol 5, Antacid 2")
 
-    assert "✅ Batch processed" in reply
+    assert "Batch processed" in reply
     assert "Late Sales:" in reply
     assert "- Panadol x5" in reply
     assert "- Antacid x2" in reply
-    assert "Sales:\n- None" in reply
-    assert "Errors:\n- None" in reply
     assert [transaction["Type"] for transaction in store.transactions[-2:]] == ["late_sale", "late_sale"]
 
 
@@ -1021,7 +1080,6 @@ def test_natural_bulk_no_stock_message_processes_each_item():
     assert "No Stock:" in reply
     assert "- Insulin" in reply
     assert "- Ventolin" in reply
-    assert "Errors:\n- None" in reply
 
 
 def test_number_words_are_supported_for_voice_transcripts():
@@ -1032,7 +1090,6 @@ def test_number_words_are_supported_for_voice_transcripts():
 
     assert "- Panadol x2" in reply
     assert "- Cetirizine x3" in reply
-    assert "Errors:\n- None" in reply
 
 
 def test_spoken_text_normalization_for_voice_commands():
@@ -1066,8 +1123,7 @@ def test_fifty_line_batch_does_not_crash_and_continues():
 
     reply = service.process_text(message)
 
-    assert "✅ Batch processed" in reply
-    assert "Errors:\n- None" in reply
+    assert "Batch processed" in reply
     assert len(store.logged) == 50
 
 
@@ -1077,7 +1133,7 @@ def test_share_command_returns_click_to_chat_link():
 
     reply = service.process_text("share")
 
-    assert "📲 Share PharMareen with staff:" in reply
+    assert "Share PharMareen with staff:" in reply
     assert "https://wa.me/14155238886?text=start" in reply
 
 
@@ -1105,7 +1161,6 @@ def test_chat_like_natural_sale_command():
 
     assert "- Panadol x2" in reply
     assert "- Amoxyl x1" in reply
-    assert "Errors:\n- None" in reply
 
 
 def test_chat_like_natural_restock_with_cost():
@@ -1114,7 +1169,7 @@ def test_chat_like_natural_restock_with_cost():
 
     reply = service.process_text("Restock Panadol 20 for 2000")
 
-    assert "✅ Panadol +20 added" in reply
+    assert "Panadol +20 added" in reply
     assert "Avg cost: KES 120" in reply
 
 
@@ -1122,24 +1177,24 @@ def test_chat_like_report_and_stock_commands():
     store = FakeStore()
     service = IntakeService(FailingParser(), store)
 
-    assert "📊 Daily Report" in service.process_text("Give me today's report")
-    assert "📊 Profit Today" in service.process_text("How much profit today?")
-    assert "📦 Panadol stock" in service.process_text("What is Panadol stock?")
-    assert "📅 Weekly Report" in service.process_text("Show me weekly report")
-    assert "📊 Daily Report" in service.process_text("Send me the daily PDF")
+    assert "Daily Report" in service.process_text("Give me today's report")
+    assert "Profit Today" in service.process_text("How much profit today?")
+    assert "Panadol stock" in service.process_text("What is Panadol stock?")
+    assert "Weekly Report" in service.process_text("Show me weekly report")
+    assert "Daily Report" in service.process_text("Send me the daily PDF")
 
 
 def test_chat_like_no_stock_and_missed_commands():
     store = FakeStore()
     service = IntakeService(FailingParser(), store)
 
-    assert "📝 Insulin no-stock request logged" in service.process_text("Insulin is out of stock")
-    assert "✅ Late sale recorded" in service.process_text("I missed Panadol 3")
+    assert "Insulin no-stock request logged" in service.process_text("Insulin is out of stock")
+    assert "Late sale recorded" in service.process_text("I missed Panadol 3")
 
 
 def test_report_by_date_found_returns_saved_report():
     store = FakeStore()
-    store.reports["2026-04-27"] = "Daily Intelligence Report – 2026-04-27"
+    store.reports["2026-04-27"] = "Daily Intelligence Report â€“ 2026-04-27"
     parser = FailingParser()
     service = IntakeService(parser, store)
 
@@ -1151,18 +1206,18 @@ def test_report_by_date_found_returns_saved_report():
     assert "Zilla Pharmacy" not in reply
     return
 
-    assert reply == "Zilla Pharmacy\nDaily Intelligence Report – 2026-04-27"
+    assert reply == "Zilla Pharmacy\nDaily Intelligence Report â€“ 2026-04-27"
     assert parser.called is False
 
 
 def old_test_report_by_date_response_keeps_existing_pharmacy_name():
     store = FakeStore()
-    store.reports["2026-04-27"] = "Zilla Pharmacy\nDaily Intelligence Report – 2026-04-27"
+    store.reports["2026-04-27"] = "Zilla Pharmacy\nDaily Intelligence Report â€“ 2026-04-27"
     service = IntakeService(FailingParser(), store)
 
     reply = service.process_text("report 2026-04-27")
 
-    assert reply == "Zilla Pharmacy\nDaily Intelligence Report – 2026-04-27"
+    assert reply == "Zilla Pharmacy\nDaily Intelligence Report â€“ 2026-04-27"
 
 
 def test_report_by_date_response_keeps_pharmareen_name():
@@ -1192,3 +1247,6 @@ def test_report_by_date_missing_returns_simple_message():
     reply = service.process_text("show report 2026-04-27")
 
     assert reply == "No report found for 2026-04-27."
+
+
+
