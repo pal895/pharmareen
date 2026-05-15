@@ -397,7 +397,7 @@ class IntakeService:
         if receipt_setting is not None:
             self.receipt_printing_enabled = receipt_setting
             if receipt_setting and not receipt_printer_available():
-                return "Receipt printing is now ON.\n📄 Digital receipt ready — printer not detected."
+                return "Receipt printing is now ON.\n🧾 Digital receipt ready — printer not detected."
             return f"Receipt printing is now {'ON' if receipt_setting else 'OFF'}."
 
         if is_print_receipt_last_command(text):
@@ -1085,7 +1085,7 @@ class IntakeService:
             if receipt_printer_available():
                 reply_parts.append("🧾 Receipt printed")
             else:
-                reply_parts.append("📄 Digital receipt ready — printer not detected.")
+                reply_parts.append("🧾 Digital receipt ready — printer not detected.")
         reply = "\n".join(reply_parts)
         self.last_sale_by_conversation[conversation_key] = {
             "drug_name": stock.drug_name,

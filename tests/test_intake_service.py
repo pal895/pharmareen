@@ -707,7 +707,7 @@ def test_receipt_printing_setting_and_printable_last_receipt():
 
     assert "Receipt printing is now ON." in service.process_text("receipt printing on")
     sale_reply = service.process_text("Panadol 2")
-    assert "📄 Digital receipt ready — printer not detected" in sale_reply
+    assert "🧾 Digital receipt ready — printer not detected" in sale_reply
     receipt = service.process_text("print receipt last")
 
     assert "PHARMAREEN RECEIPT" in receipt

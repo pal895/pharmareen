@@ -57,10 +57,8 @@ def test_offline_app_routes_return_html():
     assert "PHARMAREEN SMOOTH TEST v2026-05-15" in followed_response.text
     assert "🟢 Cash mode active" in followed_response.text
     assert "Common medicines" in followed_response.text
-    assert "Panadol" in followed_response.text
-    assert "Amox" in followed_response.text
-    assert "Piriton" in followed_response.text
-    assert "ORS" in followed_response.text
+    assert "medicineGrid" in followed_response.text
+    assert "Edit these to match the medicines your pharmacy sells most." in followed_response.text
     assert "Type or paste pharmacy command" in followed_response.text
     assert "Save Offline" in followed_response.text
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in followed_response.text
@@ -72,7 +70,7 @@ def test_offline_app_routes_return_html():
     assert "PharMareen Offline Mode" in compat_response.text
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in compat_response.text
     assert "no-store" in compat_response.headers.get("cache-control", "")
-    assert compat_response.headers.get("x-pharmareen-offline-version") == "phase6-smooth-test-v13"
+    assert compat_response.headers.get("x-pharmareen-offline-version") == "phase6-smooth-test-v14"
     assert parser_response.status_code == 200
     assert manifest_response.status_code == 200
     assert worker_response.status_code == 200
@@ -331,7 +329,7 @@ def test_legacy_offline_app_folder_matches_final_frontend():
     assert " required" not in legacy_html
     assert "disableNativeRequiredValidation" in legacy_app
     assert "queueMediaFiles" in legacy_app
-    assert "pharmareen-offline-v13" in legacy_worker
+    assert "pharmareen-offline-v14" in legacy_worker
     assert legacy_parser.exists()
 
 
@@ -348,10 +346,8 @@ def test_offline_media_inputs_allow_multiple_files_without_required_command():
     assert ">Credit<" in html
     assert ">Mixed<" in html
     assert "Common medicines" in html
-    assert 'data-medicine="Panadol"' in html
-    assert 'data-medicine="Amox"' in html
-    assert 'data-medicine="Piriton"' in html
-    assert 'data-medicine="ORS"' in html
+    assert 'id="medicineGrid"' in html
+    assert "Edit these to match the medicines your pharmacy sells most." in html
     assert "Choose From Files/Gallery" in html
     assert "Choose voice/audio files" in html
     assert 'id="photoInput"' in html
@@ -452,6 +448,11 @@ def test_offline_payment_mode_defaults_are_applied_without_typing_payment():
     script = (root / "static" / "offline_app" / "app.js").read_text(encoding="utf-8")
 
     assert "PAYMENT_MODE_KEY" in script
+    assert "SHORTCUTS_KEY" in script
+    assert "DEFAULT_MEDICINE_SHORTCUTS" in script
+    assert "renderMedicineShortcuts" in script
+    assert "editMedicineShortcut" in script
+    assert "recordMedicineUse" in script
     assert "currentPaymentMode" in script
     assert "function applyPaymentMode" in script
     assert "🟢 ${currentPaymentMode} mode active" in script
@@ -533,6 +534,6 @@ def test_offline_pwa_assets_contain_auto_sync_media_and_retry_logic():
     assert "Tap & Talk" in html
     assert '"start_url": "/offline-app"' in manifest
     assert "/offline_app/parser.js" in worker
-    assert "pharmareen-offline-v13" in worker
+    assert "pharmareen-offline-v14" in worker
     assert "caches.open" in worker
 

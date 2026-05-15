@@ -115,7 +115,7 @@ OFFLINE_NO_CACHE_HEADERS = {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
     "Pragma": "no-cache",
     "Expires": "0",
-    "X-PharMareen-Offline-Version": "phase6-smooth-test-v13",
+    "X-PharMareen-Offline-Version": "phase6-smooth-test-v14",
 }
 
 

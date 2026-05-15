@@ -1,13 +1,16 @@
 ﻿const LEGACY_QUEUE_KEY = "pharmareen_phase6_offline_queue";
 const LEGACY_HISTORY_KEY = "pharmareen_phase6_synced_history";
 const PAYMENT_MODE_KEY = "pharmareen_payment_mode";
+const SHORTCUTS_KEY = "pharmareen_medicine_shortcuts";
+const SHORTCUT_USAGE_KEY = "pharmareen_medicine_shortcut_usage";
 const DB_NAME = "pharmareen_phase6_offline_db";
 const DB_VERSION = 1;
 const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
-const SERVICE_WORKER_VERSION = "phase6-smooth-test-v13";
+const SERVICE_WORKER_VERSION = "phase6-smooth-test-v14";
+const DEFAULT_MEDICINE_SHORTCUTS = ["Panadol", "Amox", "Piriton", "ORS"];
 
 const examples = {
   sale: "Panadol sold 2",
@@ -40,6 +43,7 @@ const barcodeVideo = document.getElementById("barcodeVideo");
 const torchToggle = document.getElementById("torchToggle");
 const voiceStatus = document.getElementById("voiceStatus");
 const paymentModeLabel = document.getElementById("paymentModeLabel");
+const medicineGrid = document.getElementById("medicineGrid");
 
 let dbPromise = null;
 let persistentStorageReady = false;
@@ -59,6 +63,67 @@ function loadJson(key, fallback) {
 
 function saveJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
+}
+
+function loadMedicineShortcuts() {
+  const saved = loadJson(SHORTCUTS_KEY, DEFAULT_MEDICINE_SHORTCUTS);
+  const list = Array.isArray(saved) && saved.length ? saved : DEFAULT_MEDICINE_SHORTCUTS;
+  const usage = loadJson(SHORTCUT_USAGE_KEY, {});
+  return list
+    .map(name => String(name || "").trim())
+    .filter(Boolean)
+    .slice(0, 6)
+    .sort((a, b) => Number(usage[b] || 0) - Number(usage[a] || 0));
+}
+
+function saveMedicineShortcuts(list) {
+  saveJson(SHORTCUTS_KEY, list.map(name => String(name || "").trim()).filter(Boolean).slice(0, 6));
+}
+
+function recordMedicineUse(name) {
+  const clean = String(name || "").trim();
+  if (!clean) return;
+  const usage = loadJson(SHORTCUT_USAGE_KEY, {});
+  usage[clean] = Number(usage[clean] || 0) + 1;
+  saveJson(SHORTCUT_USAGE_KEY, usage);
+}
+
+function editMedicineShortcut(index) {
+  const shortcuts = loadMedicineShortcuts();
+  const current = shortcuts[index] || "";
+  const next = prompt("Which medicine should appear here?", current);
+  if (next === null) return;
+  shortcuts[index] = next.trim();
+  saveMedicineShortcuts(shortcuts);
+  renderMedicineShortcuts();
+}
+
+function renderMedicineShortcuts() {
+  if (!medicineGrid) return;
+  medicineGrid.innerHTML = "";
+  loadMedicineShortcuts().forEach((medicine, index) => {
+    const card = document.createElement("article");
+    card.className = "medicine-card";
+    card.dataset.medicine = medicine;
+    const title = document.createElement("strong");
+    title.textContent = medicine;
+    const actions = document.createElement("div");
+    for (const [label, action] of [["+1", "+1"], ["+2", "+2"], ["Stock", "stock"]]) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.medicine = medicine;
+      button.dataset.medicineAction = action;
+      button.textContent = label;
+      actions.appendChild(button);
+    }
+    const edit = document.createElement("button");
+    edit.className = "edit-shortcut";
+    edit.type = "button";
+    edit.dataset.shortcutIndex = String(index);
+    edit.textContent = "Edit";
+    card.append(title, actions, edit);
+    medicineGrid.appendChild(card);
+  });
 }
 
 function barcodeMap() {
@@ -430,10 +495,14 @@ async function compressPhoto(file) {
 }
 
 function createCommandEntries(rawText) {
-  return Parser.splitCommands(rawText).map(command => ({
-    ...applyPaymentMode(Parser.parseCommand(command)),
-    pharmacy_id: pharmacyId.value.trim()
-  }));
+  return Parser.splitCommands(rawText).map(command => {
+    const entry = {
+      ...applyPaymentMode(Parser.parseCommand(command)),
+      pharmacy_id: pharmacyId.value.trim()
+    };
+    if (entry.drug_name) recordMedicineUse(entry.drug_name);
+    return entry;
+  });
 }
 
 function applyPaymentMode(entry) {
@@ -460,8 +529,10 @@ function appendCommandLine(line) {
 
 function quickMedicineAction(medicine, action) {
   if (!medicine) return;
+  recordMedicineUse(medicine);
   if (action === "stock") appendCommandLine(`${medicine} stock`);
   else appendCommandLine(`${medicine} ${action.replace("+", "")}`);
+  renderMedicineShortcuts();
 }
 
 function mediaDisplayPrefix(kind, purpose) {
@@ -617,6 +688,7 @@ async function saveOfflineEntries() {
   photoInput.value = "";
   if (cameraPhotoInput) cameraPhotoInput.value = "";
   voiceInput.value = "";
+  renderMedicineShortcuts();
   await renderQueue();
   if (audioEntries.length) voiceStatus.textContent = "🎤 Voice note saved safely";
   if (photoEntries.length && !textEntries.length && !audioEntries.length) {
@@ -777,9 +849,23 @@ document.querySelectorAll("[data-payment-mode]").forEach(button => {
   button.addEventListener("click", () => setPaymentMode(button.dataset.paymentMode));
 });
 
-document.querySelectorAll("[data-medicine-action]").forEach(button => {
-  button.addEventListener("click", () => quickMedicineAction(button.dataset.medicine, button.dataset.medicineAction));
-});
+if (medicineGrid) {
+  medicineGrid.addEventListener("click", event => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (target.dataset.shortcutIndex !== undefined) {
+      editMedicineShortcut(Number(target.dataset.shortcutIndex));
+      return;
+    }
+    if (target.dataset.medicineAction) quickMedicineAction(target.dataset.medicine, target.dataset.medicineAction);
+  });
+  medicineGrid.addEventListener("contextmenu", event => {
+    const card = event.target instanceof HTMLElement ? event.target.closest(".medicine-card") : null;
+    if (!card) return;
+    event.preventDefault();
+    editMedicineShortcut(Array.from(medicineGrid.querySelectorAll(".medicine-card")).indexOf(card));
+  });
+}
 
 function disableBriefly(button, replacementText) {
   if (!button) return;
@@ -867,6 +953,7 @@ async function registerFreshServiceWorker() {
 async function boot() {
   disableNativeRequiredValidation();
   setPaymentMode(currentPaymentMode);
+  renderMedicineShortcuts();
   await initializeStorage();
   updateConnectionStatus();
   await renderQueue();
