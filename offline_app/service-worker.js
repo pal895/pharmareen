@@ -1,4 +1,4 @@
-const CACHE_NAME = "pharmareen-offline-v12";
+const CACHE_NAME = "pharmareen-offline-v13";
 const APP_SHELL = [
   "/offline-app",
   "/offline_app/index.html",

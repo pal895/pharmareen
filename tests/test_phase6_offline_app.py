@@ -54,6 +54,13 @@ def test_offline_app_routes_return_html():
     assert "Take Photo" in followed_response.text
     assert "Save Photo" in followed_response.text
     assert "Save Voice" in followed_response.text
+    assert "PHARMAREEN SMOOTH TEST v2026-05-15" in followed_response.text
+    assert "🟢 Cash mode active" in followed_response.text
+    assert "Common medicines" in followed_response.text
+    assert "Panadol" in followed_response.text
+    assert "Amox" in followed_response.text
+    assert "Piriton" in followed_response.text
+    assert "ORS" in followed_response.text
     assert "Type or paste pharmacy command" in followed_response.text
     assert "Save Offline" in followed_response.text
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in followed_response.text
@@ -65,7 +72,7 @@ def test_offline_app_routes_return_html():
     assert "PharMareen Offline Mode" in compat_response.text
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in compat_response.text
     assert "no-store" in compat_response.headers.get("cache-control", "")
-    assert compat_response.headers.get("x-pharmareen-offline-version") == "phase6-sync-trust-v12"
+    assert compat_response.headers.get("x-pharmareen-offline-version") == "phase6-smooth-test-v13"
     assert parser_response.status_code == 200
     assert manifest_response.status_code == 200
     assert worker_response.status_code == 200
@@ -232,7 +239,7 @@ def test_debug_offline_app_reports_all_phase6_features(monkeypatch, tmp_path):
     assert data["voice_queue_ready"] is True
     assert data["persistent_storage_ready"] is True
     assert data["auto_sync_ready"] is True
-    assert data["frontend_marker"] == "PHASE 6 FINAL WORKING - DEPLOYMENT STABLE"
+    assert data["frontend_marker"] == "PHASE 6 FINAL WORKING - SMOOTH TEST v2026-05-15"
     assert data["served_index_path"].endswith("static/offline_app/index.html") or data["served_index_path"].endswith("static\\offline_app\\index.html")
     assert "offline_log_exists" in data
 
@@ -299,6 +306,7 @@ def test_legacy_local_offline_app_matches_phase6_frontend():
     legacy_parser = root / "local" / "parser.js"
 
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in legacy_html
+    assert "PHARMAREEN SMOOTH TEST v2026-05-15" in legacy_html
     assert "Choose From Files/Gallery" in legacy_html
     assert "Choose voice/audio files" in legacy_html
     assert "Tap & Talk" in legacy_html
@@ -315,6 +323,7 @@ def test_legacy_offline_app_folder_matches_final_frontend():
     legacy_parser = root / "offline_app" / "parser.js"
 
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in legacy_html
+    assert "PHARMAREEN SMOOTH TEST v2026-05-15" in legacy_html
     assert "Choose From Files/Gallery" in legacy_html
     assert "Choose voice/audio files" in legacy_html
     assert "Tap & Talk" in legacy_html
@@ -322,7 +331,7 @@ def test_legacy_offline_app_folder_matches_final_frontend():
     assert " required" not in legacy_html
     assert "disableNativeRequiredValidation" in legacy_app
     assert "queueMediaFiles" in legacy_app
-    assert "pharmareen-offline-v12" in legacy_worker
+    assert "pharmareen-offline-v13" in legacy_worker
     assert legacy_parser.exists()
 
 
@@ -333,10 +342,16 @@ def test_offline_media_inputs_allow_multiple_files_without_required_command():
     assert "Cash Sale" in html
     assert "M-Pesa Sale" in html
     assert "Credit Sale" in html
-    assert "Cash mode" in html
-    assert "M-Pesa mode" in html
-    assert "Credit mode" in html
-    assert "Mixed mode" in html
+    assert "🟢 Cash mode active" in html
+    assert ">Cash<" in html
+    assert ">M-Pesa<" in html
+    assert ">Credit<" in html
+    assert ">Mixed<" in html
+    assert "Common medicines" in html
+    assert 'data-medicine="Panadol"' in html
+    assert 'data-medicine="Amox"' in html
+    assert 'data-medicine="Piriton"' in html
+    assert 'data-medicine="ORS"' in html
     assert "Choose From Files/Gallery" in html
     assert "Choose voice/audio files" in html
     assert 'id="photoInput"' in html
@@ -372,7 +387,12 @@ def test_offline_app_uses_pharmacy_owner_language_not_technical_queue_terms():
     assert "Save Voice" in html
     assert "Save Photo" in html
     assert "Install PharMareen on phone" in html
+    assert "Saved successfully" not in html
     assert "Waiting" in script
+    assert "📡 Offline mode active — saving safely" in script
+    assert "✅ Everything synced safely" in script
+    assert "🔄 Syncing ${index + 1} of ${toSync.length}" in script
+    assert "records synced safely" in script
     assert "Queue audio" not in html
     assert "Queue photo" not in html
     assert "Pending queue" not in html
@@ -416,7 +436,10 @@ def test_offline_media_items_render_pending_and_synced_labels():
     assert "mediaStatusLabel" in script
     assert "friendlySyncError" in script
     assert "Photo" in script
-    assert "Voice note" in script
+    assert "display_label" in script
+    assert "Invoice photo" in script
+    assert "Shelf photo" in script
+    assert "Voice note saved safely" in script
     assert "Voice synced" in script
     assert "Waiting" in script
     assert "Synced" in script
@@ -431,6 +454,7 @@ def test_offline_payment_mode_defaults_are_applied_without_typing_payment():
     assert "PAYMENT_MODE_KEY" in script
     assert "currentPaymentMode" in script
     assert "function applyPaymentMode" in script
+    assert "🟢 ${currentPaymentMode} mode active" in script
     assert 'entry.action !== "sale"' in script
     assert '["Cash", "M-Pesa", "Credit"].includes(currentPaymentMode)' in script
     assert "data-payment-mode" in (root / "static" / "offline_app" / "index.html").read_text(encoding="utf-8")
@@ -471,6 +495,7 @@ def test_offline_barcode_flow_has_safe_actions_and_success_feedback():
     assert 'id="barcodeCheck"' in html
     assert "Last scanned:" in html
     assert "✅ ${medicine} detected" in script
+    assert "lastBarcodeScan" in script
     assert "focusMode" in script
     assert "gentleFeedback" in script
     assert "await stopBarcodeScanner()" in script
@@ -502,11 +527,12 @@ def test_offline_pwa_assets_contain_auto_sync_media_and_retry_logic():
     assert "parseCommand" in parser
     assert "Save Offline" in html
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in html
+    assert "PHARMAREEN SMOOTH TEST v2026-05-15" in html
     assert "Save Photo" in html
     assert "Save Voice" in html
     assert "Tap & Talk" in html
     assert '"start_url": "/offline-app"' in manifest
     assert "/offline_app/parser.js" in worker
-    assert "pharmareen-offline-v12" in worker
+    assert "pharmareen-offline-v13" in worker
     assert "caches.open" in worker
 

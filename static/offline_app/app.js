@@ -7,7 +7,7 @@ const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
-const SERVICE_WORKER_VERSION = "phase6-sync-trust-v12";
+const SERVICE_WORKER_VERSION = "phase6-smooth-test-v13";
 
 const examples = {
   sale: "Panadol sold 2",
@@ -50,6 +50,7 @@ let currentBarcodeMedicine = "";
 let mediaRecorder = null;
 let recordedChunks = [];
 let currentPaymentMode = localStorage.getItem(PAYMENT_MODE_KEY) || "Cash";
+let lastBarcodeScan = { code: "", at: 0 };
 
 function loadJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
@@ -179,7 +180,11 @@ async function startBarcodeScanner() {
       try {
         const codes = await detector.detect(barcodeVideo);
         if (!codes.length) return;
-        barcodeInput.value = codes[0].rawValue || "";
+        const rawValue = codes[0].rawValue || "";
+        const now = Date.now();
+        if (rawValue && rawValue === lastBarcodeScan.code && now - lastBarcodeScan.at < 2500) return;
+        lastBarcodeScan = { code: rawValue, at: now };
+        barcodeInput.value = rawValue;
         updateBarcodeResult();
         gentleFeedback();
         await stopBarcodeScanner();
@@ -364,7 +369,7 @@ function updateConnectionStatus() {
       syncButton.title = "";
     }
   } else {
-    setStatus("offline", "Offline - saved safely");
+    setStatus("offline", "📡 Offline mode active — saving safely");
     if (syncButton) {
       syncButton.disabled = true;
       syncButton.title = "Records are saved safely and will send when internet returns.";
@@ -441,10 +446,28 @@ function applyPaymentMode(entry) {
 function setPaymentMode(mode) {
   currentPaymentMode = mode || "Cash";
   localStorage.setItem(PAYMENT_MODE_KEY, currentPaymentMode);
-  if (paymentModeLabel) paymentModeLabel.textContent = `${currentPaymentMode} mode`;
+  if (paymentModeLabel) paymentModeLabel.textContent = `🟢 ${currentPaymentMode} mode active`;
   document.querySelectorAll("[data-payment-mode]").forEach(button => {
     button.classList.toggle("active-mode", button.dataset.paymentMode === currentPaymentMode);
   });
+}
+
+function appendCommandLine(line) {
+  const current = commandText.value.trim();
+  commandText.value = current ? `${current}\n${line}` : line;
+  commandText.focus();
+}
+
+function quickMedicineAction(medicine, action) {
+  if (!medicine) return;
+  if (action === "stock") appendCommandLine(`${medicine} stock`);
+  else appendCommandLine(`${medicine} ${action.replace("+", "")}`);
+}
+
+function mediaDisplayPrefix(kind, purpose) {
+  if (kind === "audio" || kind === "voice") return "Voice note";
+  if (purpose === "stock_photo") return "Shelf photo";
+  return "Invoice photo";
 }
 
 async function queueMedia(file, kind, purpose, options = {}) {
@@ -462,7 +485,7 @@ async function queueMedia(file, kind, purpose, options = {}) {
     pharmacy_id: pharmacyId.value.trim(),
     action: kind,
     type: kind,
-    raw_text: kind === "photo" ? "photo saved offline" : "voice note saved offline",
+    raw_text: kind === "photo" ? "photo saved safely" : "voice note saved safely",
     command_text: "",
     file_name: storedFile.name || (kind === "photo" ? "photo" : "voice note"),
     file_type: storedFile.type || (kind === "photo" ? "image/*" : "audio/*"),
@@ -472,7 +495,8 @@ async function queueMedia(file, kind, purpose, options = {}) {
     retry_count: 0,
     last_error: "",
     storage: persistentStorageReady ? "indexeddb" : "localstorage",
-    file_signature: originalSignature
+    file_signature: originalSignature,
+    display_label: options.displayLabel || mediaDisplayPrefix(kind, purpose)
   };
   if (persistentStorageReady) entry.blob = storedFile;
   else entry.data_url = await blobToDataUrl(storedFile);
@@ -502,11 +526,13 @@ async function queueMediaFiles(fileList, kind, purpose, options = {}) {
   const queued = [];
   const existing = await loadQueue();
   const seen = new Set(existing.map(item => item.file_signature).filter(Boolean));
+  let nextNumber = existing.filter(item => item.type === kind || item.action === kind).length + 1;
   for (const file of files) {
     const signature = mediaSignature(file, kind);
     if (seen.has(signature)) continue;
     seen.add(signature);
-    const entry = await queueMedia(file, kind, purpose, { ...options, skipRender: true });
+    const displayLabel = `${mediaDisplayPrefix(kind, purpose)} ${nextNumber++}`;
+    const entry = await queueMedia(file, kind, purpose, { ...options, displayLabel, skipRender: true });
     if (entry) queued.push(entry);
   }
   if (!options.skipRender) await renderQueue();
@@ -560,7 +586,7 @@ async function startVoiceRecording() {
       const fileName = `voice-note-${Date.now()}.webm`;
       const file = typeof File !== "undefined" ? new File([blob], fileName, { type }) : Object.assign(blob, { name: fileName });
       await queueMedia(file, "audio", "tap_talk_voice");
-      voiceStatus.textContent = "Voice saved. It will send when online.";
+      voiceStatus.textContent = "🎤 Voice note saved safely";
       const button = document.getElementById("tapTalk");
       if (button) button.textContent = "Tap & Talk";
     };
@@ -569,7 +595,7 @@ async function startVoiceRecording() {
     const button = document.getElementById("tapTalk");
     if (button) button.textContent = "Save Voice";
   } catch {
-    voiceStatus.textContent = "Recording could not start. Use More options to choose an audio file.";
+    voiceStatus.textContent = "Please allow microphone to use Tap & Talk.";
     voiceInput.click();
   }
 }
@@ -592,22 +618,29 @@ async function saveOfflineEntries() {
   if (cameraPhotoInput) cameraPhotoInput.value = "";
   voiceInput.value = "";
   await renderQueue();
-  if (audioEntries.length) voiceStatus.textContent = "Voice saved. It will send when online.";
-  if (navigator.onLine) setStatus("online", "Saved safely");
-  else setStatus("offline", "Offline - saved safely");
+  if (audioEntries.length) voiceStatus.textContent = "🎤 Voice note saved safely";
+  if (photoEntries.length && !textEntries.length && !audioEntries.length) {
+    setStatus(navigator.onLine ? "online" : "offline", `📷 ${photoEntries.length} photos saved safely`);
+  } else if (navigator.onLine) setStatus("online", "✅ Saved safely");
+  else setStatus("offline", "📡 Offline mode active — saving safely");
 }
 
 function mediaStatusLabel(item) {
   const status = item.sync_status || "pending";
   if (status === "syncing") return "🔄 Syncing";
   if (status === "synced") return "✅ Synced";
-  if (status === "failed") return "❌ Failed";
+  if (status === "failed") return "⚠️ Needs attention";
   return "⏳ Waiting";
 }
 
 function entryLabel(item) {
-  if (item.type === "photo") return `${item.sync_status === "synced" ? "✅ Photo synced" : "📷 Photo"}\n${mediaStatusLabel(item)}`;
-  if (item.type === "voice" || item.type === "audio") return `${item.sync_status === "synced" ? "✅ Voice synced" : "🎤 Voice note"}\n${mediaStatusLabel(item)}`;
+  if (item.type === "photo") {
+    const label = item.display_label || mediaDisplayPrefix("photo", item.purpose);
+    return `${item.sync_status === "synced" ? "✅" : "📷"} ${label}\n${mediaStatusLabel(item)}`;
+  }
+  if (item.type === "voice" || item.type === "audio") {
+    return `${item.sync_status === "synced" ? "✅ Voice synced" : "🎤 Voice note saved safely"}\n${mediaStatusLabel(item)}`;
+  }
   if (item.action === "restock") {
     const bonus = Number(item.bonus_quantity || 0) > 0 ? ` + bonus ${item.bonus_quantity}` : "";
     return `${item.drug_name || item.command_text} restock ${item.quantity || ""}${bonus}`.trim();
@@ -692,19 +725,20 @@ async function mergeResults(queue, data) {
 
 async function syncQueue() {
   if (!navigator.onLine) {
-    setStatus("offline", "Offline - saved safely");
+    setStatus("offline", "📡 Offline mode active — saving safely");
     return;
   }
   const queue = await loadQueue();
   const toSync = queue.filter(item => item.sync_status !== "synced" && (item.retry_count || 0) < MAX_RETRIES);
   if (!toSync.length) {
-    setStatus("synced", "✅ Synced");
+    setStatus("synced", "✅ Everything synced safely");
     return;
   }
-  setStatus("syncing", "🔄 Syncing");
+  setStatus("syncing", `🔄 Syncing 1 of ${toSync.length}`);
   try {
     const entries = [];
-    for (const item of toSync) {
+    for (const [index, item] of toSync.entries()) {
+      setStatus("syncing", `🔄 Syncing ${index + 1} of ${toSync.length}`);
       await updateQueueEntry({ ...item, sync_status: "syncing" });
       entries.push(await entryForSync(item));
     }
@@ -718,14 +752,14 @@ async function syncQueue() {
     await mergeResults(toSync, data);
     await renderQueue();
     const failedCount = (data.failed || []).length + (data.pending || []).length;
-    setStatus(failedCount ? "error" : "synced", failedCount ? "❌ Needs attention" : (data.message || "✅ Synced"));
+    setStatus(failedCount ? "error" : "synced", failedCount ? "⚠️ Needs attention" : `✅ ${toSync.length} records synced safely`);
     if (!failedCount) gentleFeedback();
   } catch (error) {
     for (const item of toSync) {
       await updateQueueEntry({ ...item, sync_status: "failed", retry_count: (item.retry_count || 0) + 1, last_error: String(error) });
     }
     await renderQueue();
-    setStatus("error", "Needs attention");
+    setStatus("error", "⚠️ Needs attention");
   }
 }
 
@@ -743,6 +777,21 @@ document.querySelectorAll("[data-payment-mode]").forEach(button => {
   button.addEventListener("click", () => setPaymentMode(button.dataset.paymentMode));
 });
 
+document.querySelectorAll("[data-medicine-action]").forEach(button => {
+  button.addEventListener("click", () => quickMedicineAction(button.dataset.medicine, button.dataset.medicineAction));
+});
+
+function disableBriefly(button, replacementText) {
+  if (!button) return;
+  const originalText = button.textContent;
+  button.disabled = true;
+  if (replacementText) button.textContent = replacementText;
+  setTimeout(() => {
+    button.disabled = false;
+    button.textContent = originalText;
+  }, 1200);
+}
+
 document.getElementById("takePhoto").addEventListener("click", () => (cameraPhotoInput || photoInput).click());
 document.getElementById("scanBarcode").addEventListener("click", () => startBarcodeScanner());
 document.getElementById("scanInvoice").addEventListener("click", () => photoInput.click());
@@ -758,8 +807,42 @@ document.getElementById("torchToggle").addEventListener("click", () => toggleTor
 barcodeInput.addEventListener("input", updateBarcodeResult);
 document.getElementById("saveEntry").addEventListener("click", () => saveOfflineEntries());
 document.getElementById("syncNow").addEventListener("click", () => syncQueue());
-document.getElementById("queuePhoto").addEventListener("click", () => queuePhotoInputIfPresent());
-document.getElementById("queueVoice").addEventListener("click", () => queueAudioInputIfPresent());
+document.getElementById("queuePhoto").addEventListener("click", async event => {
+  const button = event.currentTarget;
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "Saving...";
+  try {
+    const queued = await queuePhotoInputIfPresent();
+    if (queued.length) setStatus(navigator.onLine ? "online" : "offline", `📷 ${queued.length} photos saved safely`);
+    else setStatus(navigator.onLine ? "online" : "offline", "✅ Already saved safely");
+  } finally {
+    setTimeout(() => {
+      button.disabled = false;
+      button.textContent = originalText;
+    }, 1200);
+  }
+});
+document.getElementById("queueVoice").addEventListener("click", async event => {
+  const button = event.currentTarget;
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "Saving...";
+  try {
+    const queued = await queueAudioInputIfPresent();
+    if (queued.length) {
+      voiceStatus.textContent = "🎤 Voice note saved safely";
+      setStatus(navigator.onLine ? "online" : "offline", `🎤 ${queued.length} voice notes saved safely`);
+    } else {
+      setStatus(navigator.onLine ? "online" : "offline", "✅ Already saved safely");
+    }
+  } finally {
+    setTimeout(() => {
+      button.disabled = false;
+      button.textContent = originalText;
+    }, 1200);
+  }
+});
 window.addEventListener("online", () => syncQueue());
 window.addEventListener("offline", updateConnectionStatus);
 setInterval(syncQueue, 30000);

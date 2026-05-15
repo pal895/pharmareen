@@ -14,7 +14,8 @@
       <div>
         <p class="eyebrow">PharMareen</p>
         <h1>PharMareen Pharmacy Assistant</h1>
-        <p class="version-pill">PHASE 6 FINAL WORKING - DEPLOYMENT STABLE</p>
+        <p class="version-pill">PHASE 6 FINAL WORKING - SMOOTH TEST v2026-05-15</p>
+        <p class="version-pill">PHARMAREEN SMOOTH TEST v2026-05-15</p>
         <p class="version-pill subtle-marker">PHASE 6 FINAL MEDIA SAVE WORKING</p>
       </div>
       <div id="statusBanner" class="status online" role="status">Online</div>
@@ -39,13 +40,52 @@
 
     <section class="panel payment-panel" aria-label="Payment mode">
       <p class="eyebrow">Payment mode</p>
-      <h2 id="paymentModeLabel">Cash mode</h2>
+      <h2 id="paymentModeLabel">🟢 Cash mode active</h2>
       <p class="hint">Choose once, then type sales normally. Example: Panadol 2.</p>
       <div class="payment-modes">
-        <button type="button" data-payment-mode="Cash">Cash mode</button>
-        <button type="button" data-payment-mode="M-Pesa">M-Pesa mode</button>
-        <button type="button" data-payment-mode="Credit">Credit mode</button>
-        <button type="button" data-payment-mode="Mixed">Mixed mode</button>
+        <button type="button" data-payment-mode="Cash">Cash</button>
+        <button type="button" data-payment-mode="M-Pesa">M-Pesa</button>
+        <button type="button" data-payment-mode="Credit">Credit</button>
+        <button type="button" data-payment-mode="Mixed">Mixed</button>
+      </div>
+    </section>
+
+    <section class="panel medicine-shortcuts" aria-label="Quick medicine shortcuts">
+      <p class="eyebrow">Common medicines</p>
+      <h2>Tap during rush hour</h2>
+      <div class="medicine-grid">
+        <article class="medicine-card" data-medicine="Panadol">
+          <strong>Panadol</strong>
+          <div>
+            <button type="button" data-medicine="Panadol" data-medicine-action="+1">+1</button>
+            <button type="button" data-medicine="Panadol" data-medicine-action="+2">+2</button>
+            <button type="button" data-medicine="Panadol" data-medicine-action="stock">Stock</button>
+          </div>
+        </article>
+        <article class="medicine-card" data-medicine="Amox">
+          <strong>Amox</strong>
+          <div>
+            <button type="button" data-medicine="Amox" data-medicine-action="+1">+1</button>
+            <button type="button" data-medicine="Amox" data-medicine-action="+2">+2</button>
+            <button type="button" data-medicine="Amox" data-medicine-action="stock">Stock</button>
+          </div>
+        </article>
+        <article class="medicine-card" data-medicine="Piriton">
+          <strong>Piriton</strong>
+          <div>
+            <button type="button" data-medicine="Piriton" data-medicine-action="+1">+1</button>
+            <button type="button" data-medicine="Piriton" data-medicine-action="+2">+2</button>
+            <button type="button" data-medicine="Piriton" data-medicine-action="stock">Stock</button>
+          </div>
+        </article>
+        <article class="medicine-card" data-medicine="ORS">
+          <strong>ORS</strong>
+          <div>
+            <button type="button" data-medicine="ORS" data-medicine-action="+1">+1</button>
+            <button type="button" data-medicine="ORS" data-medicine-action="+2">+2</button>
+            <button type="button" data-medicine="ORS" data-medicine-action="stock">Stock</button>
+          </div>
+        </article>
       </div>
     </section>
 
@@ -100,7 +140,7 @@
       <button id="tapTalk" class="primary" type="button">Tap & Talk</button>
       <p id="voiceStatus" class="hint">Ready.</p>
       <details>
-        <summary>More options</summary>
+        <summary>More options: Save Voice</summary>
         <p class="hint">Use files only when recording here is not available.</p>
         <label for="voiceInput">Choose voice/audio files</label>
         <input id="voiceInput" type="file" accept="audio/*" multiple>

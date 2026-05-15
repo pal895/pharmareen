@@ -109,13 +109,13 @@ async def debug_offline_app() -> dict[str, Any]:
         "served_index_path": str(OFFLINE_APP_DIR / "index.html"),
     }
 
-OFFLINE_FRONTEND_MARKER = "PHASE 6 FINAL WORKING - DEPLOYMENT STABLE"
+OFFLINE_FRONTEND_MARKER = "PHASE 6 FINAL WORKING - SMOOTH TEST v2026-05-15"
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
 OFFLINE_NO_CACHE_HEADERS = {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
     "Pragma": "no-cache",
     "Expires": "0",
-    "X-PharMareen-Offline-Version": "phase6-sync-trust-v12",
+    "X-PharMareen-Offline-Version": "phase6-smooth-test-v13",
 }
 
 

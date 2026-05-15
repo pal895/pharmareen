@@ -7,6 +7,11 @@ cd "$ROOT_DIR"
 echo "Updating PharMareen..."
 git pull origin main
 
+echo "Refreshing offline app static copies..."
+mkdir -p offline_app local
+cp -f static/offline_app/* offline_app/
+cp -f static/offline_app/* local/
+
 echo "Installing Python dependencies..."
 PYTHON_BIN="${PYTHON_BIN:-./.pythonlibs/bin/python}"
 if [ ! -x "$PYTHON_BIN" ]; then
@@ -44,7 +49,8 @@ echo "Local checks:"
 curl -fsS "http://127.0.0.1:5000/health"
 echo
 curl -fsS "http://127.0.0.1:5000/debug/offline-app" >/dev/null && echo "offline app: ok"
-curl -fsS "http://127.0.0.1:5000/offline_app/index.html" | grep -E "Tap & Talk|Save Voice|Save Photo|Scan Barcode|Manual Entry" >/dev/null && echo "frontend: ok"
+curl -fsS "http://127.0.0.1:5000/debug/system-status" >/dev/null && echo "system status: ok"
+curl -fsS "http://127.0.0.1:5000/offline_app/index.html" | grep -E "PHARMAREEN SMOOTH TEST|Tap & Talk|Save Voice|Save Photo|Scan Barcode|Manual Entry|Cash|M-Pesa" >/dev/null && echo "frontend: ok"
 
 PUBLIC_URL="${PUBLIC_BASE_URL:-https://pharmareen-1--pal895.replit.app}"
 echo

@@ -130,6 +130,36 @@ button.active-mode {
   box-shadow: 0 0 0 2px rgba(15, 107, 70, 0.12);
 }
 
+.medicine-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.medicine-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfdfc;
+}
+
+.medicine-card strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.medicine-card div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.medicine-card button {
+  padding: 9px 8px;
+  font-size: 13px;
+}
+
 .barcode-panel {
   background: #fbfdfc;
 }

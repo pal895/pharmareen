@@ -64,6 +64,8 @@ def test_supervisor_scripts_are_present_and_bridge_is_optional():
     assert "/debug/system-status" in check_all
     assert "local_whatsapp_bridge.js" in stop_all
     assert "git pull origin main" in deploy_start
+    assert "Refreshing offline app static copies" in deploy_start
+    assert "cp -f static/offline_app/* offline_app/" in deploy_start
     assert "npm install" in deploy_start
     assert "pkill -f \"uvicorn app.main:app\"" in deploy_start
     assert "WHATSAPP_BRIDGE_ENABLED" in deploy_start
