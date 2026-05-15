@@ -235,6 +235,23 @@ def test_pdf_download_route_serves_pdf(tmp_path, monkeypatch):
     assert response.headers["content-type"] == "application/pdf"
 
 
+def test_pdf_download_route_searches_configured_report_folder(tmp_path, monkeypatch):
+    generated_dir = tmp_path / "generated"
+    fallback_dir = tmp_path / "fallback"
+    generated_dir.mkdir()
+    fallback_dir.mkdir()
+    report = generated_dir / "live-report.pdf"
+    report.write_bytes(b"%PDF-1.4 live")
+    monkeypatch.setenv("PHARMAREEN_REPORTS_DIR", str(generated_dir))
+    monkeypatch.setattr(main, "reports_pdf_dir", lambda: fallback_dir)
+
+    with TestClient(main.app) as client:
+        response = client.get("/reports/download/live-report.pdf")
+
+    assert response.status_code == 200
+    assert response.content.startswith(b"%PDF-1.4")
+
+
 def test_voice_note_uses_mocked_transcription(monkeypatch):
     fake_intake = FakeIntake()
     monkeypatch.setattr(main, "get_whatsapp_client", lambda: FakeWhatsApp())

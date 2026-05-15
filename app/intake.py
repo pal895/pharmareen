@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from difflib import SequenceMatcher, get_close_matches
 from typing import Any, Protocol
+from urllib.parse import quote
 
 from app.domain import Action, ParsedEvent, ParseResult, StockItem
 from app.pdf_reports import generate_daily_report_pdf, generate_weekly_report_pdf
@@ -791,7 +792,7 @@ class IntakeService:
         )
 
     def _public_pdf_link(self, pdf_path) -> str:
-        return f"{self.app_base_url}/reports/download/{pdf_path.name}"
+        return f"{self.app_base_url}/reports/download/{quote(pdf_path.name)}"
 
     def can_attach_pdf(self) -> bool:
         lower = self.app_base_url.lower()
@@ -1073,8 +1074,7 @@ class IntakeService:
         if unit and base_quantity != display_quantity:
             reply_parts.append(f"Equivalent: {base_quantity} tablets")
         if stock_plan.new_current_stock is not None:
-            suffix = " tablets" if unit else ""
-            reply_parts.append(f"Stock: {stock_plan.new_current_stock}{suffix}")
+            reply_parts.append(f"Stock: {self._format_stock_level(stock.drug_name, stock_plan.new_current_stock, unit)}")
         else:
             reply_parts.append("Stock: not set")
         if stock_plan.reply_warnings:
@@ -1224,45 +1224,24 @@ class IntakeService:
         has_bonus = bonus_quantity > 0
         has_discount = bool(discount_amount) or command.restock_type in {"discount", "bonus_discount"}
         display_text = f"{display_quantity}{unit_suffix(unit, display_quantity)}"
-        if has_bonus and ordered_quantity:
-            reply_parts = [
-                f"\u2705 Restock recorded: {event.drug_name} +{display_text} total. Bought {ordered_quantity} + bonus {bonus_quantity}.",
-            ]
-        elif has_bonus:
-            reply_parts = [f"\u2705 Restock recorded: {event.drug_name} +{display_text} total. Bonus {bonus_quantity}."]
-        else:
-            reply_parts = [f"\u2705 Restock recorded: {event.drug_name} +{display_text}."]
-
-        if command.restock_type == "bonus" and not ordered_quantity:
-            reply_parts.append(f"\u2705 {event.drug_name} bonus +{display_text} added")
-        else:
-            reply_parts.append(f"\u2705 {event.drug_name} +{display_text} added")
+        reply_parts = [f"\u2705 {event.drug_name} +{display_text} added"]
         if unit and quantity_to_add != display_quantity:
             reply_parts.append(f"Equivalent: +{quantity_to_add} tablets")
+        if has_bonus and ordered_quantity:
+            reply_parts.append(f"Bought {ordered_quantity} + bonus {bonus_quantity}")
+        elif has_bonus:
+            reply_parts.append(f"Bonus: {bonus_quantity}")
         if total_added_cost is not None and total_added_cost != 0:
             reply_parts.append(f"Paid: {format_kes(total_added_cost)}")
-        if expected_total_cost is not None:
-            reply_parts.insert(1, f"Budget: {format_kes(expected_total_cost)}")
         if has_discount and discount_amount:
-            if has_bonus:
-                reply_parts.append(f"Discount: {format_kes(discount_amount)}.")
-            else:
-                reply_parts.append(f"Discount noted: {format_kes(discount_amount)}")
+            reply_parts.append(f"Discount: {format_kes(discount_amount)}")
         if saved_amount is not None and expected_total_cost is not None:
             reply_parts.append(f"Saved: {format_kes(saved_amount)}")
-        if new_average_cost is not None and total_added_cost != 0:
-            reply_parts.append(f"Avg cost: {format_kes(new_average_cost)}")
         if command.supplier:
             reply_parts.append(f"Supplier: {command.supplier}")
         if command.expiry_date:
             reply_parts.append(f"Expiry: {command.expiry_date}")
-        if command.invoice_number:
-            reply_parts.append(f"Invoice: {command.invoice_number}")
-        if command.batch_number:
-            reply_parts.append(f"Batch: {command.batch_number}")
-        reply_parts.append(f"Trace: {restock_trace_id}")
-        stock_suffix = " tablets" if unit else ""
-        reply_parts.append(f"New stock: {new_current_stock}{stock_suffix}")
+        reply_parts.append(f"New stock: {self._format_stock_level(stock.drug_name, new_current_stock, unit)}")
         return EntryResult(
             logged=True,
             reply="\n".join(reply_parts),
@@ -1432,6 +1411,30 @@ class IntakeService:
         if not conversion:
             return to_base_quantity(quantity, unit)
         return max(int(quantity), 1) * conversion.get(canonical, 1)
+
+    def _format_stock_level(self, drug_name: str, quantity: int | None, unit_context: str = "") -> str:
+        if quantity is None:
+            return "not set"
+        total = parse_int(quantity, default=0) or 0
+        canonical = canonical_unit(unit_context)
+        conversion = self.conversions_by_drug.get(normalize_key(drug_name), {})
+        strip_size = max(int(conversion.get("strip") or 10), 1)
+        box_size = max(int(conversion.get("box") or strip_size * 10), strip_size)
+        if not canonical and normalize_key(drug_name) not in self.conversions_by_drug:
+            return str(total)
+        if total < strip_size:
+            return f"{total} tablets"
+        boxes, after_boxes = divmod(total, box_size)
+        strips, tablets = divmod(after_boxes, strip_size)
+        parts: list[str] = []
+        if boxes:
+            parts.append(f"{boxes} {plural_unit('box', boxes)}")
+        if strips:
+            parts.append(f"{strips} {plural_unit('strip', strips)}")
+        if tablets:
+            parts.append(f"{tablets} {plural_unit('tablet', tablets)}")
+        friendly = " + ".join(parts) if parts else "0 tablets"
+        return f"{total} tablets ({friendly})"
 
     def _process_void_command(self, command: OperatingCommand, conversation_key: str) -> EntryResult:
         sale = self.last_sale_by_conversation.get(conversation_key)
@@ -2107,6 +2110,7 @@ def make_restock_command(
     *,
     drug_name: str,
     ordered_quantity: int,
+    unit: str = "",
     bonus_quantity: int = 0,
     actual_paid_amount: float | None = None,
     expected_total_cost: float | None = None,
@@ -2139,6 +2143,7 @@ def make_restock_command(
         kind="restock",
         drug_name=title_drug_name(drug_name),
         quantity=total_received,
+        unit=canonical_unit(unit),
         total_cost=total_cost,
         budgeted_cost=expected_value,
         restock_type=restock_type,
@@ -2192,17 +2197,18 @@ def parse_complex_restock_command(clean: str, raw_text: str) -> OperatingCommand
         )
 
     match = re.fullmatch(
-        r"(.+?)\s+(?:restock|restocked|received|bought)\s+(\d+)\s+(?:plus\s+)?bonus\s+(\d+)(?:\s+(?:cost|paid)\s+(\d+(?:\.\d+)?))?(?:\s+discount\s+(\d+(?:\.\d+)?))?",
+        rf"(.+?)\s+(?:restock|restocked|received|bought)\s+(\d+)(?:\s+({unit_pattern()}))?\s+(?:plus\s+)?bonus\s+(\d+)(?:\s+(?:cost|paid)\s+(\d+(?:\.\d+)?))?(?:\s+discount\s+(\d+(?:\.\d+)?))?",
         detail_clean,
         flags=re.IGNORECASE,
     )
     if match:
-        paid_value = parse_money(match.group(4))
-        discount_value = parse_money(match.group(5)) or 0
+        paid_value = parse_money(match.group(5))
+        discount_value = parse_money(match.group(6)) or 0
         return make_restock_command(
             drug_name=match.group(1),
             ordered_quantity=positive_quantity(match.group(2)),
-            bonus_quantity=positive_quantity(match.group(3)),
+            unit=match.group(3) or "",
+            bonus_quantity=positive_quantity(match.group(4)),
             actual_paid_amount=paid_value,
             discount_amount=discount_value,
             supplier=supplier,
@@ -2299,12 +2305,31 @@ def parse_engine_restock_command(clean: str, raw_text: str) -> OperatingCommand 
         unit = canonical_unit(match.group(3))
         modifiers = parse_trace_modifiers(clean)
         total_cost = extract_labeled_money(clean, ["cost", "paid", "for"])
+        discount_amount = extract_labeled_money(clean, ["discount", "saved"]) or 0
+        bonus_match = re.search(r"\b(?:bonus|free|extra)\s+(\d+)\b|\bplus\s+(\d+)\s+(?:bonus|free|extra)\b", clean, flags=re.IGNORECASE)
+        bonus_quantity = positive_quantity(bonus_match.group(1) or bonus_match.group(2)) if bonus_match else 0
+        ordered_quantity = quantity
+        total_received = quantity + bonus_quantity
+        restock_type = (
+            "bonus_discount"
+            if bonus_quantity and discount_amount
+            else "bonus"
+            if bonus_quantity
+            else "discount"
+            if discount_amount
+            else "normal"
+        )
         command = OperatingCommand(
             kind="restock",
             drug_name=drug_name,
-            quantity=quantity,
-            base_quantity=to_base_quantity(quantity, unit),
+            quantity=total_received,
+            base_quantity=to_base_quantity(total_received, unit),
             total_cost=total_cost,
+            restock_type=restock_type,
+            ordered_quantity=ordered_quantity,
+            bonus_quantity=bonus_quantity,
+            discount_amount=discount_amount,
+            actual_paid_amount=total_cost,
             unit=unit,
             supplier=modifiers.supplier,
             expiry_date=modifiers.expiry_date,

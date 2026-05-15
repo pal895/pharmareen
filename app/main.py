@@ -6,6 +6,7 @@ import logging
 import os
 import shutil
 import sys
+import tempfile
 import time
 import traceback
 from html import escape
@@ -297,7 +298,9 @@ def offline_sync_success_message(entries: list[dict[str, Any]], synced: list[dic
         if action == "sale":
             drug = str(entry.get("drug_name") or "Sale").strip()
             quantity = entry.get("quantity") or ""
-            lines.append(f"• {drug} x{quantity}".rstrip())
+            payment = str(entry.get("payment_method") or "").strip()
+            payment_text = f" {payment}" if payment else ""
+            lines.append(f"• {drug} x{quantity}{payment_text}".rstrip())
         elif action in {"restock", "bonus_restock", "discount_restock"}:
             drug = str(entry.get("drug_name") or "Restock").strip()
             quantity = entry.get("total_received_quantity") or entry.get("quantity") or ""
@@ -372,7 +375,15 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
             pending.append({"id": entry_id, "status": "pending", "reason": reason})
             append_offline_sync_log(entry_for_log, "pending", "", reason)
     message = offline_sync_success_message(entries, synced) if synced else ""
-    return {"status": "ok", "message": message, "synced": synced, "failed": failed, "pending": pending}
+    return {
+        "status": "ok",
+        "message": message,
+        "whatsapp_reply": message,
+        "admin_message": message,
+        "synced": synced,
+        "failed": failed,
+        "pending": pending,
+    }
 
 
 @app.get("/status", response_class=HTMLResponse)
@@ -545,10 +556,46 @@ def icon() -> Response:
 @app.get("/reports/download/{filename}")
 def download_report(filename: str) -> FileResponse:
     safe_name = Path(filename).name
-    report_path = reports_pdf_dir() / safe_name
+    report_path = find_report_pdf(safe_name)
     if not report_path.exists() or report_path.suffix.lower() != ".pdf":
         raise HTTPException(status_code=404, detail="Report not found.")
     return FileResponse(report_path, media_type="application/pdf", filename=safe_name)
+
+
+def report_pdf_search_dirs() -> list[Path]:
+    candidates: list[Path] = []
+    configured_reports = os.environ.get("PHARMAREEN_REPORTS_DIR")
+    if configured_reports:
+        candidates.append(Path(configured_reports).expanduser())
+    report_public_dir = os.environ.get("REPORT_PUBLIC_DIR")
+    if report_public_dir:
+        candidates.append(PROJECT_ROOT / report_public_dir)
+        candidates.append(Path.cwd() / report_public_dir)
+    candidates.extend(
+        [
+            reports_pdf_dir(),
+            PROJECT_ROOT / "reports_pdf",
+            Path.cwd() / "reports_pdf",
+            Path.home() / "Documents" / "reports_pdf",
+            Path(tempfile.gettempdir()) / "reports_pdf",
+        ]
+    )
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = str(candidate.resolve() if candidate.exists() else candidate)
+        if key not in seen:
+            seen.add(key)
+            unique.append(candidate)
+    return unique
+
+
+def find_report_pdf(safe_name: str) -> Path:
+    for folder in report_pdf_search_dirs():
+        candidate = folder / safe_name
+        if candidate.exists() and candidate.suffix.lower() == ".pdf":
+            return candidate
+    return reports_pdf_dir() / safe_name
 
 
 def whatsapp_click_link(value: str) -> str:
@@ -1571,6 +1618,16 @@ def media_url_from_reply(reply: str) -> str | None:
 
 
 def reply_for_pdf_media(reply: str) -> str:
+    cleaned_lines: list[str] = []
+    for line in str(reply or "").splitlines():
+        lowered = line.lower()
+        if ".pdf" in lowered and "http" in lowered:
+            continue
+        if "pdf report" in lowered or "attached below" in lowered or "tap here to download" in lowered:
+            continue
+        cleaned_lines.append(line)
+    cleaned = "\n".join(cleaned_lines).strip()
+    return f"{cleaned}\n\n📎 PDF report attached below."
     import re
 
     without_link = re.sub(r"\n*ðŸ“„ PDF report:\nTap here to download:\s*https?://\S+?\.pdf", "", reply).strip()

@@ -427,6 +427,7 @@ function createCommandEntries(rawText) {
 
 async function queueMedia(file, kind, purpose, options = {}) {
   if (!file) return null;
+  const originalSignature = mediaSignature(file, kind);
   let storedFile = file;
   if (kind === "photo") storedFile = await compressPhoto(file);
   if (!(await storageHasRoom(storedFile))) {
@@ -448,7 +449,8 @@ async function queueMedia(file, kind, purpose, options = {}) {
     sync_status: "pending",
     retry_count: 0,
     last_error: "",
-    storage: persistentStorageReady ? "indexeddb" : "localstorage"
+    storage: persistentStorageReady ? "indexeddb" : "localstorage",
+    file_signature: originalSignature
   };
   if (persistentStorageReady) entry.blob = storedFile;
   else entry.data_url = await blobToDataUrl(storedFile);
@@ -463,10 +465,25 @@ async function queueMedia(file, kind, purpose, options = {}) {
   return entry;
 }
 
+function mediaSignature(file, kind) {
+  return [
+    kind,
+    file && file.name ? file.name : "unnamed",
+    file && file.size ? file.size : 0,
+    file && file.lastModified ? file.lastModified : 0,
+    file && file.type ? file.type : ""
+  ].join("|");
+}
+
 async function queueMediaFiles(fileList, kind, purpose, options = {}) {
   const files = Array.from(fileList || []);
   const queued = [];
+  const existing = await loadQueue();
+  const seen = new Set(existing.map(item => item.file_signature).filter(Boolean));
   for (const file of files) {
+    const signature = mediaSignature(file, kind);
+    if (seen.has(signature)) continue;
+    seen.add(signature);
     const entry = await queueMedia(file, kind, purpose, { ...options, skipRender: true });
     if (entry) queued.push(entry);
   }
@@ -477,12 +494,18 @@ async function queueMediaFiles(fileList, kind, purpose, options = {}) {
 async function queuePhotoInputIfPresent(options = {}) {
   const chosen = await queueMediaFiles(photoInput.files, "photo", photoPurpose.value, { ...options, skipRender: true });
   const captured = await queueMediaFiles(cameraPhotoInput ? cameraPhotoInput.files : [], "photo", photoPurpose.value, { ...options, skipRender: true });
+  if (!options.skipRender) {
+    photoInput.value = "";
+    if (cameraPhotoInput) cameraPhotoInput.value = "";
+  }
   if (!options.skipRender) await renderQueue();
   return [...chosen, ...captured];
 }
 
 async function queueAudioInputIfPresent(options = {}) {
-  return queueMediaFiles(voiceInput.files, "audio", "offline_voice_note", options);
+  const queued = await queueMediaFiles(voiceInput.files, "audio", "offline_voice_note", options);
+  if (!options.skipRender) voiceInput.value = "";
+  return queued;
 }
 
 async function stopVoiceRecording() {
@@ -588,10 +611,18 @@ function renderList(target, items, emptyText) {
     const kind = item.type === "photo" ? "Photo" : (item.type === "audio" || item.type === "voice" ? "Voice" : "Entry");
     const time = formatEntryTime(item.synced_at || item.timestamp);
     meta.textContent = `${kind}${time ? ` - ${time}` : ""}`;
-    if (item.last_error) meta.textContent += ` - ${item.last_error}`;
+    const friendlyError = friendlySyncError(item.last_error);
+    if (friendlyError) meta.textContent += ` - ${friendlyError}`;
     li.append(title, meta);
     target.appendChild(li);
   }
+}
+
+function friendlySyncError(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (/indexeddb|retry|blob|base64|payload|typeerror/i.test(text)) return "Needs attention";
+  return text.length > 80 ? "Needs attention" : text;
 }
 
 async function renderQueue() {
@@ -662,7 +693,7 @@ async function syncQueue() {
     await mergeResults(toSync, data);
     await renderQueue();
     const failedCount = (data.failed || []).length + (data.pending || []).length;
-    setStatus(failedCount ? "error" : "synced", failedCount ? "❌ Needs attention" : "✅ Synced");
+    setStatus(failedCount ? "error" : "synced", failedCount ? "❌ Needs attention" : (data.message || "✅ Synced"));
     if (!failedCount) gentleFeedback();
   } catch (error) {
     for (const item of toSync) {

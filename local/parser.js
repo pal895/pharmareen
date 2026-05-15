@@ -84,11 +84,27 @@
   }
 
   function splitCommands(rawText) {
-    return String(rawText || "")
-      .split(/\n+/)
+    const pieces = String(rawText || "")
+      .split(/[\n;]+/)
       .flatMap(line => line.split(/,(?!\s*(?:bonus|discount|paid|cost|supplier|expiry|budget)\b)/i))
       .map(normalizeSpaces)
       .filter(Boolean);
+    return pieces.flatMap(splitFastSaleLine);
+  }
+
+  function splitFastSaleLine(line) {
+    const text = normalizeSpaces(line);
+    if (!text) return [];
+    if (/\b(restock|received|bought|bonus|discount|cost|supplier|expiry|invoice|batch|barcode|no stock|report|summary|stock)\b/i.test(text)) {
+      return [text];
+    }
+    const pattern = /([A-Za-z][A-Za-z' -]*?)\s+(?:x\s*)?(\d+(?:\.\d+)?)(?:\s+(tablets?|tabs?|strips?|boxes?|box|bottles?|pieces?|units?))?(?:\s+(cash|mpesa|m-pesa|card|credit))?(?=\s+[A-Za-z][A-Za-z' -]*?\s+(?:x\s*)?\d|$)/gi;
+    const matches = Array.from(text.matchAll(pattern));
+    if (matches.length <= 1) return [text];
+    const commands = matches
+      .map(match => normalizeSpaces(match[0]))
+      .filter(Boolean);
+    return commands.length ? commands : [text];
   }
 
   function matchFirst(text, patterns) {

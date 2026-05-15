@@ -79,7 +79,7 @@ def test_offline_sync_accepts_sale_and_restock_entries(monkeypatch, tmp_path):
 
     payload = {
         "entries": [
-            {"id": "sale-1", "action": "sale", "drug_name": "Panadol", "quantity": 2, "sync_status": "pending"},
+            {"id": "sale-1", "action": "sale", "drug_name": "Panadol", "quantity": 2, "payment_method": "Cash", "sync_status": "pending"},
             {"id": "restock-1", "action": "restock", "drug_name": "Panadol", "quantity": 20, "sync_status": "pending"},
         ]
     }
@@ -92,7 +92,11 @@ def test_offline_sync_accepts_sale_and_restock_entries(monkeypatch, tmp_path):
     assert [item["id"] for item in data["synced"]] == ["sale-1", "restock-1"]
     assert data["failed"] == []
     assert data["pending"] == []
-    assert fake.messages == ["Panadol sold 2", "Panadol restock 20"]
+    assert "Offline records synced" in data["message"]
+    assert "Panadol x2 Cash" in data["message"]
+    assert data["whatsapp_reply"] == data["message"]
+    assert data["admin_message"] == data["message"]
+    assert fake.messages == ["Panadol sold 2 Cash", "Panadol restock 20"]
     log_path = tmp_path / "data" / "offline_sync_log.jsonl"
     assert log_path.exists()
 
@@ -248,7 +252,10 @@ const cases = {
   shortcutRestock: parser.parseCommand('p +20'),
   shortcutStock: parser.parseCommand('stock p'),
   comma: parser.splitCommands('Panadol sold 2, Amoxil sold 5, Zinc restock 10'),
-  newline: parser.splitCommands('Panadol sold 2\nAmoxil sold 5\nZinc restock 10')
+  newline: parser.splitCommands('Panadol sold 2\nAmoxil sold 5\nZinc restock 10'),
+  semicolon: parser.splitCommands('Panadol sold 2; Amoxil sold 5'),
+  fast: parser.splitCommands('Panadol 1 cash Amox 2 mpesa'),
+  fastParsed: parser.splitCommands('Panadol 1 cash Amox 2 mpesa').map(value => parser.parseCommand(value))
 };
 console.log(JSON.stringify(cases));
 '''
@@ -277,6 +284,10 @@ console.log(JSON.stringify(cases));
     assert data["shortcutStock"]["action"] == "stock_check"
     assert len(data["comma"]) == 3
     assert len(data["newline"]) == 3
+    assert len(data["semicolon"]) == 2
+    assert data["fast"] == ["Panadol 1 cash", "Amox 2 mpesa"]
+    assert data["fastParsed"][0]["payment_method"] == "Cash"
+    assert data["fastParsed"][1]["payment_method"] == "M-Pesa"
 
 
 
@@ -383,8 +394,12 @@ def test_offline_media_queue_supports_multiple_photos_and_audio_files():
     assert "async function queueMediaFiles" in script
     assert "Array.from(fileList || [])" in script
     assert "for (const file of files)" in script
+    assert "mediaSignature(file, kind)" in script
+    assert "seen.has(signature)" in script
     assert 'queueMediaFiles(photoInput.files, "photo"' in script
     assert 'queueMediaFiles(voiceInput.files, "audio"' in script
+    assert "photoInput.value = \"\"" in script
+    assert "voiceInput.value = \"\"" in script
 
 
 def test_offline_media_items_render_pending_and_synced_labels():
@@ -392,6 +407,7 @@ def test_offline_media_items_render_pending_and_synced_labels():
     script = (root / "static" / "offline_app" / "app.js").read_text(encoding="utf-8")
 
     assert "mediaStatusLabel" in script
+    assert "friendlySyncError" in script
     assert "Photo" in script
     assert "Voice note" in script
     assert "Voice synced" in script

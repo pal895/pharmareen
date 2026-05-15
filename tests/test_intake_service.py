@@ -279,7 +279,7 @@ def test_restock_box_unit_converts_to_tablets():
 
     reply = service.process_text("+Panadol 1 box")
 
-    assert "Restock recorded: Panadol +1 box" in reply
+    assert "Panadol +1 box added" in reply
     assert "Equivalent: +100 tablets" in reply
     assert "New stock: 120 tablets" in reply
     assert store.stocks["panadol"].current_stock == 120
@@ -296,8 +296,8 @@ def test_restock_supplier_invoice_batch_and_expiry_are_traced():
     reply = service.process_text("received Panadol 1 box supplier Beta invoice INV123 batch B001 expiry Jan 2027")
 
     assert "Supplier: Beta" in reply
-    assert "Invoice: INV123" in reply
-    assert "Batch: B001" in reply
+    assert "Invoice: INV123" not in reply
+    assert "Batch: B001" not in reply
     note = store.transactions[-1]["Note"]
     assert "supplier=Beta" in note
     assert "invoice=INV123" in note
@@ -582,9 +582,8 @@ def test_restock_item_increases_current_stock_and_logs():
 
     reply = service.process_text("Panadol restock 20")
 
-    assert "Restock recorded: Panadol +20" in reply
     assert "Panadol +20 added" in reply
-    assert "Avg cost: KES 140" in reply
+    assert "Avg cost:" not in reply
     assert "New stock: 40" in reply
     assert store.stocks["panadol"].current_stock == 40
     assert store.logged[0][0].action == Action.RESTOCKED
@@ -744,7 +743,7 @@ def test_restock_with_total_cost_updates_average_cost():
 
     reply = service.process_text("+Panadol 20 2000")
 
-    assert "Avg cost: KES 120" in reply
+    assert "Avg cost:" not in reply
     assert store.stocks["panadol"].cost_price == 120
     assert store.stocks["panadol"].current_stock == 40
 
@@ -755,7 +754,8 @@ def test_bonus_restock_records_free_stock_type():
 
     reply = service.process_text("+Panadol 5 bonus")
 
-    assert "Panadol bonus +5 added" in reply
+    assert "Panadol +5 added" in reply
+    assert "Bonus: 5" in reply
     assert "New stock: 25" in reply
     assert store.stocks["panadol"].current_stock == 25
     assert store.transactions[-1]["Total Cost"] == 0
@@ -769,7 +769,8 @@ def test_bonus_restock_aliases_are_understood():
 
         reply = service.process_text(message)
 
-        assert "Panadol bonus +5 added" in reply
+        assert "Panadol +5 added" in reply
+        assert "Bonus: 5" in reply
         assert "New stock: 25" in reply
         assert store.transactions[-1]["Total Cost"] == 0
 
@@ -782,7 +783,7 @@ def test_discount_restock_records_discount_type():
 
     assert "Panadol +20 added" in reply
     assert "Paid: KES 1,800" in reply
-    assert "Avg cost: KES 115" in reply
+    assert "Avg cost:" not in reply
     assert store.stocks["panadol"].cost_price == 115
     assert store.transactions[-1]["Total Cost"] == 1800
     assert "Restock type: discount" in store.transactions[-1]["Note"]
@@ -808,7 +809,7 @@ def test_restock_cost_keyword_records_total_cost():
 
     assert "Panadol +20 added" in reply
     assert "Paid: KES 1,800" in reply
-    assert "Avg cost: KES 115" in reply
+    assert "Avg cost:" not in reply
     assert store.transactions[-1]["Total Cost"] == 1800
 
 
@@ -831,10 +832,10 @@ def test_ordered_paid_restock_records_budget_savings():
     reply = service.process_text("+Panadol 20 ordered 2000 paid 1800")
 
     assert "Panadol +20 added" in reply
-    assert "Budget: KES 2,000" in reply
+    assert "Budget:" not in reply
     assert "Paid: KES 1,800" in reply
     assert "Saved: KES 200" in reply
-    assert "Avg cost: KES 115" in reply
+    assert "Avg cost:" not in reply
     assert store.transactions[-1]["Total Cost"] == 1800
     assert "Budgeted KES 2,000" in store.transactions[-1]["Note"]
 
@@ -845,7 +846,7 @@ def test_natural_restock_cost_phrase_records_cost():
 
     reply = service.process_text("Panadol restock 20 cost 2000")
 
-    assert "Restock recorded: Panadol +20" in reply
+    assert "Panadol +20 added" in reply
     assert "Paid: KES 2,000" in reply
     assert "New stock: 40" in reply
     assert store.transactions[-1]["Total Cost"] == 2000
@@ -857,7 +858,7 @@ def test_bonus_restock_with_cost_records_total_received():
 
     reply = service.process_text("Panadol restock 20 bonus 5 cost 2000")
 
-    assert "Restock recorded: Panadol +25 total" in reply
+    assert "Panadol +25 added" in reply
     assert "Bought 20 + bonus 5" in reply
     assert "Paid: KES 2,000" in reply
     assert "New stock: 45" in reply
@@ -872,9 +873,9 @@ def test_discount_restock_natural_phrase_records_discount():
 
     reply = service.process_text("Amoxicillin received 30 paid 2500 discount 300")
 
-    assert "Restock recorded: Amoxicillin +30" in reply
+    assert "Amoxicillin +30 added" in reply
     assert "Paid: KES 2,500" in reply
-    assert "Discount noted: KES 300" in reply
+    assert "Discount: KES 300" in reply
     assert store.stocks["amoxicillin"].current_stock == 40
     assert store.transactions[-1]["Total Cost"] == 2500
     assert "Discount KES 300" in store.transactions[-1]["Note"]
@@ -886,12 +887,26 @@ def test_bonus_and_supplier_expiry_restock_phrase_records_metadata():
 
     reply = service.process_text("Panadol restock 20 bonus 5 cost 2000 supplier DawaPlus expiry Dec 2026")
 
-    assert "Restock recorded: Panadol +25 total" in reply
+    assert "Panadol +25 added" in reply
     assert "Supplier: DawaPlus" in reply
     assert "Expiry: Dec 2026" in reply
     assert store.transactions[-1]["Quantity"] == 25
     assert "Supplier: DawaPlus" in store.transactions[-1]["Note"]
     assert "Expiry: Dec 2026" in store.transactions[-1]["Note"]
+
+
+def test_bonus_discount_restock_with_box_unit_is_easy_to_record():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    reply = service.process_text("Panadol restock 5 boxes bonus 1 discount 200")
+
+    assert "Panadol +6 boxes added" in reply
+    assert "Equivalent: +600 tablets" in reply
+    assert "Bonus: 1" in reply or "Bought 5 + bonus 1" in reply
+    assert "Discount: KES 200" in reply
+    assert store.stocks["panadol"].current_stock == 620
+    assert store.transactions[-1]["Quantity"] == 600
 
 
 def test_natural_supplier_gave_bonus_and_paid_for_bonus_phrases():
@@ -904,7 +919,7 @@ def test_natural_supplier_gave_bonus_and_paid_for_bonus_phrases():
 
         reply = service.process_text(message)
 
-        assert "Restock recorded" in reply
+        assert "added" in reply
         assert "bonus 5" in reply
         assert store.stocks[drug_key].current_stock == expected_stock
         assert store.transactions[-1]["Quantity"] in {25, 55}
@@ -1170,7 +1185,7 @@ def test_chat_like_natural_restock_with_cost():
     reply = service.process_text("Restock Panadol 20 for 2000")
 
     assert "Panadol +20 added" in reply
-    assert "Avg cost: KES 120" in reply
+    assert "Avg cost:" not in reply
 
 
 def test_chat_like_report_and_stock_commands():
