@@ -705,8 +705,9 @@ def test_mixed_payment_sale_records_split_totals_and_keeps_reply_short():
 def test_receipt_printing_setting_and_printable_last_receipt():
     service = IntakeService(FailingParser(), FakeStore())
 
-    assert service.process_text("receipt printing on") == "Receipt printing is now ON."
-    service.process_text("Panadol 2")
+    assert "Receipt printing is now ON." in service.process_text("receipt printing on")
+    sale_reply = service.process_text("Panadol 2")
+    assert "Digital receipt only" in sale_reply
     receipt = service.process_text("print receipt last")
 
     assert "PHARMAREEN RECEIPT" in receipt

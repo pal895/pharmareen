@@ -396,6 +396,8 @@ class IntakeService:
         receipt_setting = parse_receipt_setting_command(text)
         if receipt_setting is not None:
             self.receipt_printing_enabled = receipt_setting
+            if receipt_setting and not receipt_printer_available():
+                return "Receipt printing is now ON.\nDigital receipt only — no printer found."
             return f"Receipt printing is now {'ON' if receipt_setting else 'OFF'}."
 
         if is_print_receipt_last_command(text):
@@ -1079,6 +1081,11 @@ class IntakeService:
             reply_parts.append("Stock: not set")
         if stock_plan.reply_warnings:
             reply_parts.extend(stock_plan.reply_warnings)
+        if self.receipt_printing_enabled:
+            if receipt_printer_available():
+                reply_parts.append("Receipt printed")
+            else:
+                reply_parts.append("Digital receipt only — no printer found.")
         reply = "\n".join(reply_parts)
         self.last_sale_by_conversation[conversation_key] = {
             "drug_name": stock.drug_name,
@@ -1773,6 +1780,16 @@ def parse_receipt_setting_command(text: str) -> bool | None:
     if not match:
         return None
     return normalize_key(match.group(1)) == "on"
+
+
+def receipt_printer_available() -> bool:
+    return str(os.environ.get("PHARMAREEN_RECEIPT_PRINTER") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+        "available",
+    }
 
 
 def is_print_receipt_last_command(text: str) -> bool:

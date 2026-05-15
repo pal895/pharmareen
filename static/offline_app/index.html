@@ -26,11 +26,27 @@
     </section>
 
     <section class="panel dashboard-actions" aria-label="Pharmacy dashboard actions">
-      <button id="takePhoto" type="button">Take Photo</button>
+      <button type="button" data-action="cash-sale">Cash Sale</button>
+      <button type="button" data-action="mpesa-sale">M-Pesa Sale</button>
+      <button type="button" data-action="credit-sale">Credit Sale</button>
+      <button type="button" data-action="stock">Stock</button>
+      <button type="button" data-action="restock">Restock</button>
       <button id="scanBarcode" type="button">Scan Barcode</button>
-      <button id="scanInvoice" type="button">Scan Invoice</button>
-      <button id="voiceEntry" type="button">Tap & Talk</button>
+      <button id="voiceEntry" type="button">Voice</button>
+      <button type="button" data-action="report">Report</button>
       <button id="manualEntry" type="button">Manual Entry</button>
+    </section>
+
+    <section class="panel payment-panel" aria-label="Payment mode">
+      <p class="eyebrow">Payment mode</p>
+      <h2 id="paymentModeLabel">Cash mode</h2>
+      <p class="hint">Choose once, then type sales normally. Example: Panadol 2.</p>
+      <div class="payment-modes">
+        <button type="button" data-payment-mode="Cash">Cash mode</button>
+        <button type="button" data-payment-mode="M-Pesa">M-Pesa mode</button>
+        <button type="button" data-payment-mode="Credit">Credit mode</button>
+        <button type="button" data-payment-mode="Mixed">Mixed mode</button>
+      </div>
     </section>
 
     <section id="barcodePanel" class="panel barcode-panel" aria-label="Barcode lookup">
@@ -56,10 +72,11 @@
     </section>
 
     <section class="panel quick-actions" aria-label="Quick actions">
+      <button id="takePhoto" type="button">Take Photo</button>
+      <button id="scanInvoice" type="button">Scan Invoice</button>
       <button type="button" data-action="sale">Sell</button>
       <button type="button" data-action="restock">Restock</button>
       <button type="button" data-action="nostock">No Stock</button>
-      <button type="button" data-action="report">Report</button>
       <button type="button" data-action="stock">Stock Check</button>
     </section>
 

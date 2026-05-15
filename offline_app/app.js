@@ -1,5 +1,6 @@
 ﻿const LEGACY_QUEUE_KEY = "pharmareen_phase6_offline_queue";
 const LEGACY_HISTORY_KEY = "pharmareen_phase6_synced_history";
+const PAYMENT_MODE_KEY = "pharmareen_payment_mode";
 const DB_NAME = "pharmareen_phase6_offline_db";
 const DB_VERSION = 1;
 const QUEUE_STORE = "queue";
@@ -10,6 +11,9 @@ const SERVICE_WORKER_VERSION = "phase6-sync-trust-v12";
 
 const examples = {
   sale: "Panadol sold 2",
+  "cash-sale": "Panadol 2",
+  "mpesa-sale": "Panadol 2",
+  "credit-sale": "Panadol 2",
   restock: "Panadol +20",
   nostock: "Insulin no stock",
   report: "report today",
@@ -35,6 +39,7 @@ const barcodeCameraBox = document.getElementById("barcodeCameraBox");
 const barcodeVideo = document.getElementById("barcodeVideo");
 const torchToggle = document.getElementById("torchToggle");
 const voiceStatus = document.getElementById("voiceStatus");
+const paymentModeLabel = document.getElementById("paymentModeLabel");
 
 let dbPromise = null;
 let persistentStorageReady = false;
@@ -44,6 +49,7 @@ let barcodeTorchEnabled = false;
 let currentBarcodeMedicine = "";
 let mediaRecorder = null;
 let recordedChunks = [];
+let currentPaymentMode = localStorage.getItem(PAYMENT_MODE_KEY) || "Cash";
 
 function loadJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
@@ -420,9 +426,25 @@ async function compressPhoto(file) {
 
 function createCommandEntries(rawText) {
   return Parser.splitCommands(rawText).map(command => ({
-    ...Parser.parseCommand(command),
+    ...applyPaymentMode(Parser.parseCommand(command)),
     pharmacy_id: pharmacyId.value.trim()
   }));
+}
+
+function applyPaymentMode(entry) {
+  if (!entry || entry.action !== "sale") return entry;
+  if (entry.payment_method) return entry;
+  if (!["Cash", "M-Pesa", "Credit"].includes(currentPaymentMode)) return entry;
+  return { ...entry, payment_method: currentPaymentMode };
+}
+
+function setPaymentMode(mode) {
+  currentPaymentMode = mode || "Cash";
+  localStorage.setItem(PAYMENT_MODE_KEY, currentPaymentMode);
+  if (paymentModeLabel) paymentModeLabel.textContent = `${currentPaymentMode} mode`;
+  document.querySelectorAll("[data-payment-mode]").forEach(button => {
+    button.classList.toggle("active-mode", button.dataset.paymentMode === currentPaymentMode);
+  });
 }
 
 async function queueMedia(file, kind, purpose, options = {}) {
@@ -590,7 +612,10 @@ function entryLabel(item) {
     const bonus = Number(item.bonus_quantity || 0) > 0 ? ` + bonus ${item.bonus_quantity}` : "";
     return `${item.drug_name || item.command_text} restock ${item.quantity || ""}${bonus}`.trim();
   }
-  if (item.action === "sale") return `${item.drug_name || item.command_text} sold ${item.quantity || ""}`.trim();
+  if (item.action === "sale") {
+    const payment = item.payment_method ? ` ${item.payment_method}` : "";
+    return `${item.drug_name || item.command_text} sold ${item.quantity || ""}${payment}`.trim();
+  }
   return item.command_text || item.raw_text || "Unknown entry";
 }
 
@@ -706,9 +731,16 @@ async function syncQueue() {
 
 document.querySelectorAll("[data-action]").forEach(button => {
   button.addEventListener("click", () => {
+    if (button.dataset.action === "cash-sale") setPaymentMode("Cash");
+    if (button.dataset.action === "mpesa-sale") setPaymentMode("M-Pesa");
+    if (button.dataset.action === "credit-sale") setPaymentMode("Credit");
     commandText.value = examples[button.dataset.action] || "Panadol sold 2";
     commandText.focus();
   });
+});
+
+document.querySelectorAll("[data-payment-mode]").forEach(button => {
+  button.addEventListener("click", () => setPaymentMode(button.dataset.paymentMode));
 });
 
 document.getElementById("takePhoto").addEventListener("click", () => (cameraPhotoInput || photoInput).click());
@@ -751,6 +783,7 @@ async function registerFreshServiceWorker() {
 
 async function boot() {
   disableNativeRequiredValidation();
+  setPaymentMode(currentPaymentMode);
   await initializeStorage();
   updateConnectionStatus();
   await renderQueue();

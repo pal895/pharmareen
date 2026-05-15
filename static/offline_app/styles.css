@@ -113,6 +113,23 @@ h2 { font-size: 18px; }
   font-size: 15px;
 }
 
+.payment-panel {
+  background: #fbfdfc;
+}
+
+.payment-modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+button.active-mode {
+  background: var(--green);
+  color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(15, 107, 70, 0.12);
+}
+
 .barcode-panel {
   background: #fbfdfc;
 }

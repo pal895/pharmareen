@@ -330,6 +330,13 @@ def test_offline_media_inputs_allow_multiple_files_without_required_command():
     root = Path(__file__).resolve().parents[1]
     html = (root / "static" / "offline_app" / "index.html").read_text(encoding="utf-8")
 
+    assert "Cash Sale" in html
+    assert "M-Pesa Sale" in html
+    assert "Credit Sale" in html
+    assert "Cash mode" in html
+    assert "M-Pesa mode" in html
+    assert "Credit mode" in html
+    assert "Mixed mode" in html
     assert "Choose From Files/Gallery" in html
     assert "Choose voice/audio files" in html
     assert 'id="photoInput"' in html
@@ -415,6 +422,18 @@ def test_offline_media_items_render_pending_and_synced_labels():
     assert "Synced" in script
     assert 'sync_status: "synced"' in script
     assert "addHistoryEntry" in script
+
+
+def test_offline_payment_mode_defaults_are_applied_without_typing_payment():
+    root = Path(__file__).resolve().parents[1]
+    script = (root / "static" / "offline_app" / "app.js").read_text(encoding="utf-8")
+
+    assert "PAYMENT_MODE_KEY" in script
+    assert "currentPaymentMode" in script
+    assert "function applyPaymentMode" in script
+    assert 'entry.action !== "sale"' in script
+    assert '["Cash", "M-Pesa", "Credit"].includes(currentPaymentMode)' in script
+    assert "data-payment-mode" in (root / "static" / "offline_app" / "index.html").read_text(encoding="utf-8")
 
 
 def test_offline_media_queue_persists_after_refresh_with_indexeddb():
