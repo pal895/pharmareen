@@ -384,8 +384,8 @@ def deterministic_recommendations(metrics: ReportMetrics) -> list[str]:
     if metrics.low_stock_warnings:
         item = metrics.low_stock_warnings[0]
         recommendations.append(
-            f"Restock {item.drug_name} urgently. It is at {item.current_stock}, "
-            f"with reorder level {item.reorder_level}."
+            f"Restock {item.drug_name} soon. It has {item.current_stock} left; "
+            f"restock when left with {item.reorder_level}."
         )
     if metrics.missed_sales:
         top_missed = metrics.missed_sales[0][0]
@@ -425,7 +425,7 @@ def summarize_pairs(items: list[tuple[str, int]]) -> str:
 
 def summarize_low_stock(items: list[LowStockWarning]) -> str:
     return "; ".join(
-        f"{item.drug_name} - {item.current_stock} left, reorder at {item.reorder_level}"
+        f"{item.drug_name} - {item.current_stock} left; restock when left with {item.reorder_level}"
         for item in items
     )
 
@@ -452,7 +452,7 @@ def low_stock_lines(items: list[LowStockWarning]) -> str:
     if not items:
         return "None."
     return "\n".join(
-        f"- {item.drug_name}: {item.current_stock} left. Reorder level: {item.reorder_level}."
+        f"- {item.drug_name}: {item.current_stock} left. Restock when left with {item.reorder_level}."
         for item in items
     )
 

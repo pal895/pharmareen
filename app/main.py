@@ -28,7 +28,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.ai import AIService
+from app.ai import AIService, ai_usage_snapshot
 from app.config import Settings, get_settings
 from app.demo_store import DemoPharmacyStore
 from app.intake import IntakeService, normalize_spoken_command_text
@@ -915,6 +915,35 @@ def pid_file_running(path: Path) -> bool:
         return False
 
 
+def bridge_process_running(script_name: str) -> bool:
+    script = str(script_name or "local_whatsapp_bridge.js")
+    try:
+        if os.name == "nt":
+            command = (
+                "Get-CimInstance Win32_Process | "
+                f"Where-Object {{ $_.CommandLine -match '{script.replace("'", "''")}' }} | "
+                "Select-Object -First 1 -ExpandProperty ProcessId"
+            )
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-Command", command],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            return bool(result.stdout.strip())
+        result = subprocess.run(
+            ["pgrep", "-f", script],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        return bool(result.stdout.strip())
+    except Exception:
+        return False
+
+
 @app.get("/debug/system-status")
 def debug_system_status() -> dict[str, Any]:
     settings = get_settings()
@@ -925,7 +954,7 @@ def debug_system_status() -> dict[str, Any]:
     bridge_script_name = os.getenv("BRIDGE_SCRIPT") or "local_whatsapp_bridge.js"
     node_available = shutil.which("node") is not None
     npm_available = shutil.which("npm") is not None
-    bridge_running = pid_file_running(bridge_pid_file)
+    bridge_running = pid_file_running(bridge_pid_file) or bridge_process_running(bridge_script_name)
     offline_index = OFFLINE_APP_DIR / "index.html"
     return {
         "backend": "ok",
@@ -963,6 +992,7 @@ def debug_system_status() -> dict[str, Any]:
                 "invoice_ai_enabled": boolish(os.getenv("ENABLE_INVOICE_AI")) or boolish(os.getenv("ENABLE_VISION_AI")),
                 "vision_ai_enabled": boolish(os.getenv("ENABLE_VISION_AI")),
                 "voice_ai_enabled": boolish(os.getenv("ENABLE_VOICE_INPUT")) or bool(settings.openai_api_key.strip()),
+                "usage": ai_usage_snapshot(),
             },
             "app": {
                 "app_base_url": effective_app_base_url(settings),

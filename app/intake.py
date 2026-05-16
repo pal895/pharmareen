@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import re
@@ -456,6 +456,12 @@ class IntakeService:
             self.pending_followups[conversation_key] = followup_prompt.command
             return followup_prompt.question
 
+        analytics_intent = parse_analytics_command(text)
+        if analytics_intent is not None:
+            if analytics_intent.get("type") == "low_stock":
+                return self._low_stock_reply()
+            return self._analytics_reply(analytics_intent)
+
         if is_profit_today_command(text):
             return self._profit_today_reply()
 
@@ -579,7 +585,7 @@ class IntakeService:
         if stock.selling_price is not None:
             lines.append(f"Price: {format_kes(stock.selling_price)}")
         if stock.reorder_level is not None:
-            lines.append(f"Reorder level: {stock.reorder_level}")
+            lines.append(f"Restock when left with {stock.reorder_level}")
         return "\n".join(lines)
 
     def _low_stock_reply(self) -> str:
@@ -591,11 +597,15 @@ class IntakeService:
             return "I could not check low stock right now. Please check the Google Sheets connection."
         if not items:
             return "Low Stock\n\nNo low stock items right now."
-        lines = ["Low Stock", ""]
+        lines = ["⚠ Running low:"]
         for item in items[:20]:
-            stock_text = item.current_stock if item.current_stock is not None else "not set"
-            reorder_text = item.reorder_level if item.reorder_level is not None else "not set"
-            lines.append(f"- {item.drug_name}: {stock_text} left, reorder at {reorder_text}")
+            stock_text = low_stock_status_text(item.current_stock)
+            reorder_text = (
+                f"; restock when left with {item.reorder_level}"
+                if item.reorder_level is not None
+                else ""
+            )
+            lines.append(f"- {item.drug_name} — {stock_text}{reorder_text}")
         return "\n".join(lines)
 
     def _stock_value_reply(self) -> str:
@@ -1263,7 +1273,11 @@ class IntakeService:
         has_bonus = bonus_quantity > 0
         has_discount = bool(discount_amount) or command.restock_type in {"discount", "bonus_discount"}
         display_text = f"{display_quantity}{unit_suffix(unit, display_quantity)}"
-        reply_parts = [f"\u2705 {event.drug_name} +{display_text} added"]
+        if has_bonus and ordered_quantity:
+            reply_parts = [f"✅ {event.drug_name} restocked: {ordered_quantity} + {bonus_quantity} bonus = {display_quantity} added"]
+            reply_parts.append(f"{event.drug_name} +{display_text} added")
+        else:
+            reply_parts = [f"✅ {event.drug_name} +{display_text} added"]
         if unit and quantity_to_add != display_quantity:
             reply_parts.append(f"Equivalent: +{quantity_to_add} tablets")
         if has_bonus and ordered_quantity:
@@ -1357,32 +1371,8 @@ class IntakeService:
         except Exception:
             return "I could not prepare the cash summary right now. Please check the Google Sheets connection."
 
-        payment_totals = {"Cash": 0.0, "M-Pesa": 0.0, "Card": 0.0, "Credit": 0.0}
-        discount_total = 0.0
-        total_sales = 0.0
-        profit = 0.0
-        for row in transactions:
-            if normalize_key(row.get("Type")) not in {"sale", "late sale", "late_sale"}:
-                continue
-            note_meta = parse_note_metadata(str(row.get("Note") or ""))
-            row_sales = parse_money(row.get("Total Sales")) or 0
-            row_profit = parse_money(row.get("Profit")) or 0
-            row_discount = parse_money(note_meta.get("discount")) or 0
-            split_used = False
-            for key, label in PAYMENT_SPLIT_NOTE_KEYS.items():
-                amount = parse_money(note_meta.get(key))
-                if amount:
-                    payment_totals[label] = payment_totals.get(label, 0) + amount
-                    split_used = True
-            if not split_used:
-                payment = note_meta.get("payment", "Cash")
-                payment = "M-Pesa" if normalize_key(payment) in {"mpesa", "m pesa", "m-pesa"} else payment.title()
-                payment_totals.setdefault(payment, 0.0)
-                payment_totals[payment] += row_sales
-            discount_total += row_discount
-            total_sales += row_sales
-            profit += row_profit
-
+        totals = payment_totals_from_transactions(transactions)
+        payment_totals = totals["payment_totals"]
         return "\n".join(
             [
                 "💰 Daily Cash Summary",
@@ -1391,11 +1381,66 @@ class IntakeService:
                 f"M-Pesa: {format_kes(payment_totals.get('M-Pesa', 0))}",
                 f"Card: {format_kes(payment_totals.get('Card', 0))}",
                 f"Credit: {format_kes(payment_totals.get('Credit', 0))}",
-                f"Discounts: {format_kes(discount_total)}",
-                f"Total Sales: {format_kes(total_sales)}",
-                f"Profit: {format_kes(profit)}",
+                f"Discounts: {format_kes(totals['discounts'])}",
+                f"Total Sales: {format_kes(totals['total_sales'])}",
+                f"Profit: {format_kes(totals['profit'])}",
             ]
         )
+
+    def _analytics_reply(self, intent: dict[str, str]) -> str:
+        now = now_in_timezone(self.timezone)
+        day = intent.get("day") or "today"
+        report_date = (now.date() - timedelta(days=1)).isoformat() if day == "yesterday" else now.date().isoformat()
+        day_label = "yesterday" if day == "yesterday" else "today"
+        try:
+            transactions = self.store.read_transactions(report_date)
+            metrics = build_transaction_metrics(report_date, transactions, [])
+            if intent.get("type") in {"best_seller", "missed_demand"} and not (metrics.most_sold or metrics.missed_sales):
+                logs = self.store.read_daily_logs(report_date)
+                metrics = build_report_metrics(report_date, logs, [])
+        except SheetsUnavailableError:
+            return SHEETS_UNAVAILABLE_MESSAGE
+        except Exception:
+            return "I could not check that right now. Please check the Google Sheets connection."
+
+        if intent.get("type") == "best_seller":
+            if not metrics.most_sold:
+                return f"No records found for {day_label} yet."
+            drug_name, quantity = metrics.most_sold[0]
+            return f"Best seller {day_label}: {drug_name} — {quantity} sold"
+        if intent.get("type") == "peak_hours":
+            if not metrics.sale_transactions:
+                return f"No records found for {day_label} yet."
+            return f"⏰ Busiest time {day_label}: {metrics.peak_activity_time}"
+        if intent.get("type") == "missed_demand":
+            if not metrics.missed_sales:
+                return f"No no-stock requests found for {day_label} yet."
+            lines = [f"No-stock requests {day_label}:"]
+            lines.extend(f"- {name}: {count}" for name, count in metrics.missed_sales[:5])
+            return "\n".join(lines)
+
+        totals = payment_totals_from_transactions(transactions)
+        payment_totals = totals["payment_totals"]
+        if intent.get("type") == "payment_amount":
+            payment = intent.get("payment") or "Cash"
+            icon = {"Cash": "💵", "M-Pesa": "📱", "Card": "💳", "Credit": "🧾"}.get(payment, "💳")
+            return f"{icon} {payment} received {day_label}: {format_kes(payment_totals.get(payment, 0))}"
+        if intent.get("type") == "top_payment":
+            top_payment, amount = sorted(payment_totals.items(), key=lambda item: (-item[1], item[0]))[0]
+            if amount <= 0:
+                return f"No payment records found for {day_label} yet."
+            return f"💳 Top payment {day_label}: {top_payment} — {format_kes(amount)}"
+        if intent.get("type") == "payment_breakdown":
+            if not any(payment_totals.values()):
+                return f"No payment records found for {day_label} yet."
+            return "\n".join([
+                f"Payment breakdown {day_label}:",
+                f"Cash: {format_kes(payment_totals.get('Cash', 0))}",
+                f"M-Pesa: {format_kes(payment_totals.get('M-Pesa', 0))}",
+                f"Card: {format_kes(payment_totals.get('Card', 0))}",
+                f"Credit: {format_kes(payment_totals.get('Credit', 0))}",
+            ])
+        return UNDERSTAND_ERROR
 
     def _staff_summary_reply(self) -> str:
         report_date = now_in_timezone(self.timezone).date().isoformat()
@@ -1666,6 +1711,9 @@ class IntakeService:
         unit = str(sale.get("unit") or "")
         if instruction["mode"] == "set":
             new_display = max(parse_int(instruction.get("quantity"), default=old_display) or old_display, 0)
+        elif instruction["mode"] == "increase":
+            amount = max(parse_int(instruction.get("quantity"), default=1) or 1, 1)
+            new_display = old_display + amount
         else:
             amount = max(parse_int(instruction.get("quantity"), default=1) or 1, 1)
             new_display = max(old_display - amount, 0)
@@ -1740,12 +1788,15 @@ class IntakeService:
         sale = self.last_sale_by_conversation.get(conversation_key)
         if not sale:
             return "No recent sale to print yet."
+        amount = sale.get("total_sales")
         return "\n".join(
             [
                 "PHARMAREEN RECEIPT",
                 f"Medicine: {sale['drug_name']}",
                 f"Quantity: {sale['display_quantity']}{unit_suffix(sale.get('unit', ''), sale['display_quantity'])}",
                 f"Payment: {sale.get('payment_method') or 'Cash'}",
+                f"Amount: {format_kes(amount) if amount is not None else 'not set'}",
+                f"Time: {now_in_timezone(self.timezone).strftime('%Y-%m-%d %H:%M')}",
                 f"Trace: {sale.get('trace_id') or 'not set'}",
                 "Thank you.",
             ]
@@ -1800,9 +1851,55 @@ def build_stock_update_plan(stock: StockItem, quantity: int) -> StockUpdatePlan:
         reply_warnings.append("Stock reached 0. Please review after rush hour.")
 
     if stock.reorder_level is not None and new_stock <= stock.reorder_level:
-        warning_notes.append(f"Low stock: {stock.drug_name} is at or below reorder level.")
+        warning_notes.append(f"Low stock: {stock.drug_name} needs restocking soon.")
 
     return StockUpdatePlan(new_stock, warning_notes, reply_warnings)
+
+
+def low_stock_status_text(current_stock: Any) -> str:
+    value = parse_int(current_stock, default=None)
+    if value is None:
+        return "stock not set"
+    if value <= 0:
+        return "finished"
+    return f"{value} left"
+
+
+def payment_totals_from_transactions(transactions: list[dict[str, Any]]) -> dict[str, Any]:
+    payment_totals = {"Cash": 0.0, "M-Pesa": 0.0, "Card": 0.0, "Credit": 0.0}
+    discount_total = 0.0
+    total_sales = 0.0
+    profit = 0.0
+    sale_count = 0
+    for row in transactions:
+        if normalize_key(row.get("Type")) not in {"sale", "late sale", "late_sale"}:
+            continue
+        sale_count += 1
+        note_meta = parse_note_metadata(str(row.get("Note") or ""))
+        row_sales = parse_money(row.get("Total Sales")) or 0
+        row_profit = parse_money(row.get("Profit")) or 0
+        row_discount = parse_money(note_meta.get("discount")) or 0
+        split_used = False
+        for key, label in PAYMENT_SPLIT_NOTE_KEYS.items():
+            amount = parse_money(note_meta.get(key))
+            if amount:
+                payment_totals[label] = payment_totals.get(label, 0) + amount
+                split_used = True
+        if not split_used:
+            payment = note_meta.get("payment", "Cash")
+            payment = "M-Pesa" if normalize_key(payment) in {"mpesa", "m pesa", "m-pesa"} else payment.title()
+            payment_totals.setdefault(payment, 0.0)
+            payment_totals[payment] += row_sales
+        discount_total += row_discount
+        total_sales += row_sales
+        profit += row_profit
+    return {
+        "payment_totals": payment_totals,
+        "discounts": discount_total,
+        "total_sales": total_sales,
+        "profit": profit,
+        "sale_count": sale_count,
+    }
 
 
 def unit_suffix(unit: str, quantity: int) -> str:
@@ -1907,8 +2004,12 @@ def receipt_printer_available() -> bool:
 
 
 def is_print_receipt_last_command(text: str) -> bool:
-    return re.fullmatch(r"(?:print\s+receipt(?:\s+last)?|receipt\s+last)", text.strip(), flags=re.IGNORECASE) is not None
-
+    normalized = normalize_key(text)
+    return re.fullmatch(
+        r"(?:print\s+(?:last\s+)?receipt|print\s+receipt(?:\s+last)?|receipt\s+(?:last|ya\s+mwisho)|send\s+receipt|hiyo\s+ya\s+mwisho\s+print\s+receipt|print\s+receipt\s+for\s+.+)",
+        normalized,
+        flags=re.IGNORECASE,
+    ) is not None
 
 def parse_conversion_command(text: str) -> tuple[str, int, int] | None:
     match = re.fullmatch(
@@ -1961,6 +2062,32 @@ def is_cash_summary_command(text: str) -> bool:
     return bool(
         re.fullmatch(r"(?:cash\s+summary|daily\s+cash|payments\s+today|reconciliation\s+today)", normalized, flags=re.IGNORECASE)
     )
+
+
+def parse_analytics_command(text: str) -> dict[str, str] | None:
+    key = normalize_key(text).replace("m pesa", "mpesa").replace("m-pesa", "mpesa")
+    day = "yesterday" if any(word in key for word in ["yesterday", "jana"]) else "today"
+    if is_cash_summary_command(text):
+        return None
+    if is_low_stock_command(text):
+        return {"type": "low_stock", "day": day}
+    if any(phrase in key for phrase in ["missed demand", "no stock today", "no stock leo", "out of stock today", "hakuna stock leo"]):
+        return {"type": "missed_demand", "day": day}
+    if any(phrase in key for phrase in ["best seller", "what sold most", "what did i sell most", "sold most", "sell most", "imeuza sana", "imeuzwa sana", "dawa gani imeuza sana"]):
+        return {"type": "best_seller", "day": day}
+    if any(phrase in key for phrase in ["peak hour", "peak hours", "busiest time", "busiest hour", "rush hour"]):
+        return {"type": "peak_hours", "day": day}
+    if any(phrase in key for phrase in ["top payment", "top payment method", "top payment methods"]):
+        return {"type": "top_payment", "day": day}
+    if any(phrase in key for phrase in ["payment breakdown", "payments breakdown", "payment split", "payment methods today"]):
+        return {"type": "payment_breakdown", "day": day}
+    payment_phrases = {"cash": "Cash", "mpesa": "M-Pesa", "card": "Card", "credit": "Credit"}
+    finance_words = ["today", "leo", "yesterday", "jana", "received", "came in", "imeingia", "ingia", "summary", "how much"]
+    if any(word in key for word in finance_words):
+        for phrase, label in payment_phrases.items():
+            if phrase in key:
+                return {"type": "payment_amount", "day": day, "payment": label}
+    return None
 
 
 def is_staff_summary_command(text: str) -> bool:
@@ -2093,21 +2220,32 @@ def parse_payment_correction_command(text: str) -> tuple[str, str] | None:
         clean,
         flags=re.IGNORECASE,
     )
-    if not match:
-        return None
-    return title_drug_name(match.group(1)), parse_payment_method(match.group(2))
-
+    if match:
+        return title_drug_name(match.group(1)), parse_payment_method(match.group(2))
+    match = re.fullmatch(
+        rf"(?:change|update|badilisha)\s+(?:last\s+)?payment\s+(?:to|iwe)\s+({payment_pattern()})",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return "", parse_payment_method(match.group(1))
+    return None
 
 def parse_quantity_correction_command(text: str) -> dict[str, Any] | None:
     clean = normalize_natural_text(replace_number_words(text.strip()))
     match = re.fullmatch(r"(?:badilisha|change|update)\s+(?:ile\s+ya\s+mwisho|ya\s+mwisho|last|last\s+sale)\s+(?:iwe|to)\s+(\d+)", clean, flags=re.IGNORECASE)
+    if not match:
+        match = re.fullmatch(r"(?:fanya|make|weka)\s+(?:iwe|it|last|ya\s+mwisho)?\s*(?:to|iwe)?\s*(\d+)", clean, flags=re.IGNORECASE)
     if match:
         return {"mode": "set", "quantity": positive_quantity(match.group(1))}
     match = re.fullmatch(r"(?:punguza|reduce)\s*(\d+)?", clean, flags=re.IGNORECASE)
     if match:
         return {"mode": "reduce", "quantity": positive_quantity(match.group(1) or 1)}
+    match = re.fullmatch(r"(?:ongeza|add)\s*(?:moja|one|another|nyingine|\d+)?", clean, flags=re.IGNORECASE)
+    if match:
+        amount = re.search(r"\d+", clean)
+        return {"mode": "increase", "quantity": positive_quantity(amount.group(0) if amount else 1)}
     return None
-
 
 def is_best_seller_command(text: str) -> bool:
     key = normalize_key(text)
@@ -2338,6 +2476,35 @@ def make_restock_command(
 
 def parse_complex_restock_command(clean: str, raw_text: str) -> OperatingCommand | None:
     detail_clean, supplier, expiry_date = extract_restock_metadata(clean)
+
+    match = re.fullmatch(
+        rf"\+(.+?)\s+(\d+)(?:\s+({unit_pattern()}))?\s+(?:plus\s+)?bonus\s+(\d+)(?:\s+(?:cost|paid)\s+(\d+(?:\.\d+)?))?(?:\s+discount\s+(\d+(?:\.\d+)?))?",
+        detail_clean,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return make_restock_command(
+            drug_name=match.group(1),
+            ordered_quantity=positive_quantity(match.group(2)),
+            unit=match.group(3) or "",
+            bonus_quantity=positive_quantity(match.group(4)),
+            actual_paid_amount=parse_money(match.group(5)),
+            discount_amount=parse_money(match.group(6)) or 0,
+            supplier=supplier,
+            expiry_date=expiry_date,
+            raw_text=raw_text,
+        )
+
+    match = re.fullmatch(r"(.+?)\s+stock\s+\+(\d+)(?:\s+(?:cost|paid)\s+(\d+(?:\.\d+)?))?", detail_clean, flags=re.IGNORECASE)
+    if match:
+        return make_restock_command(
+            drug_name=match.group(1),
+            ordered_quantity=positive_quantity(match.group(2)),
+            actual_paid_amount=parse_money(match.group(3)),
+            supplier=supplier,
+            expiry_date=expiry_date,
+            raw_text=raw_text,
+        )
 
     match = re.fullmatch(r"supplier\s+gave\s+(.+?)\s+(\d+),?\s+bonus\s+(\d+)", detail_clean, flags=re.IGNORECASE)
     if match:
@@ -3293,3 +3460,4 @@ def compact_low_stock(items) -> str:
         f"{item.drug_name} ({item.current_stock})"
         for item in items
     )
+

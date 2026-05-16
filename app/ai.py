@@ -57,6 +57,20 @@ RECOMMENDATION_SCHEMA: dict[str, Any] = {
 }
 
 
+AI_USAGE_LOG: list[dict[str, str]] = []
+
+
+def log_ai_call(reason: str, route: str, purpose: str) -> None:
+    record = {"reason": reason, "route": route, "purpose": purpose}
+    AI_USAGE_LOG.append(record)
+    del AI_USAGE_LOG[:-20]
+    print(f"AI_CALL route={route} reason={reason} purpose={purpose}", flush=True)
+
+
+def ai_usage_snapshot() -> dict[str, Any]:
+    return {"total_logged": len(AI_USAGE_LOG), "recent": list(AI_USAGE_LOG[-5:])}
+
+
 NUMBER_WORDS = {
     "one": 1,
     "two": 2,
@@ -87,6 +101,7 @@ class AIService:
         extension = mimetypes.guess_extension(clean_content_type) or ".ogg"
         filename = f"voice-note{extension}"
 
+        log_ai_call("voice_transcription", "audio/transcriptions", "voice note transcription")
         result = self.client.audio.transcriptions.create(
             model=self.settings.openai_transcription_model,
             file=(filename, audio_bytes, clean_content_type),
@@ -111,6 +126,7 @@ class AIService:
         if not known_drugs:
             known_drugs = "- No Master_Stock drugs were loaded."
 
+        log_ai_call("local_parser_failed", "chat/completions", "messy text normalization")
         completion = self.client.chat.completions.create(
             model=self.settings.openai_parse_model,
             messages=[
@@ -184,6 +200,7 @@ class AIService:
     def generate_recommendations(self, metrics: dict[str, Any]) -> list[str]:
         if self.client is None:
             return []
+        log_ai_call("advanced_summary_requested", "chat/completions", "business recommendations")
         completion = self.client.chat.completions.create(
             model=self.settings.openai_parse_model,
             messages=[
@@ -222,6 +239,7 @@ class AIService:
         clean_content_type = (content_type or "image/jpeg").split(";")[0].strip()
         encoded = base64.b64encode(image_bytes).decode("ascii")
         data_url = f"data:{clean_content_type};base64,{encoded}"
+        log_ai_call("photo_invoice_extraction", "chat/completions", "invoice/photo extraction")
         completion = self.client.chat.completions.create(
             model=self.settings.openai_parse_model,
             messages=[

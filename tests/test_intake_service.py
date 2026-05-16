@@ -331,8 +331,11 @@ def test_low_stock_and_stock_value_commands_are_available():
     low_stock_reply = service.process_text("low stock")
     stock_value_reply = service.process_text("stock value")
 
-    assert "Low Stock" in low_stock_reply
-    assert "Cough Syrup: 2 left, reorder at 2" in low_stock_reply
+    assert "Running low" in low_stock_reply
+    assert "Cough Syrup" in low_stock_reply
+    assert "2 left" in low_stock_reply
+    assert "restock when left with 2" in low_stock_reply
+    assert "reorder at" not in low_stock_reply.lower()
     assert "Stock Value" in stock_value_reply
     assert "Cost value:" in stock_value_reply
     assert "Selling value:" in stock_value_reply
@@ -530,7 +533,7 @@ def test_stock_check_returns_current_stock_price_and_reorder_level():
     assert reply == (
         "📦 Panadol stock: 20\n"
         "Price: KES 220\n"
-        "Reorder level: 5"
+        "Restock when left with 5"
     )
     assert parser.called is False
 
@@ -1327,3 +1330,80 @@ def test_report_by_date_missing_returns_simple_message():
 
 
 
+
+def test_deterministic_analytics_router_handles_payment_peak_and_best_seller_without_ai():
+    store = FakeStore()
+    parser = FailingParser()
+    service = IntakeService(parser, store)
+
+    service.process_text("Panadol 2 cash")
+    service.process_text("Amoxyl 1 mpesa")
+    best = service.process_text("What sold most today")
+    cash = service.process_text("How much cash came in today")
+    mpesa = service.process_text("How much Mpesa imeingia leo")
+    top_payment = service.process_text("Top payment methods today")
+    peak = service.process_text("Peak hours leo")
+
+    assert best == "Best seller today: Panadol — 2 sold"
+    assert "Cash received today: KES 440" in cash
+    assert "M-Pesa received today: KES 450" in mpesa
+    assert "Top payment today: M-Pesa" in top_payment or "Top payment today: Cash" in top_payment
+    assert "Busiest time today:" in peak
+    assert parser.called is False
+
+
+def test_plus_bonus_restock_keeps_purchased_quantity_and_bonus():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    reply = service.process_text("+Panadol 20 bonus 5 cost 2000")
+
+    assert "Panadol restocked: 20 + 5 bonus = 25 added" in reply
+    assert "Panadol +25 added" in reply
+    assert "Paid: KES 2,000" in reply
+    assert store.stocks["panadol"].current_stock == 45
+    assert store.transactions[-1]["Quantity"] == 25
+    assert store.transactions[-1]["Total Cost"] == 2000
+    assert "Ordered quantity 20" in store.transactions[-1]["Note"]
+    assert "Bonus quantity 5" in store.transactions[-1]["Note"]
+
+
+def test_stock_plus_restock_variant_and_low_stock_wording_are_owner_friendly():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    restock_reply = service.process_text("Panadol stock +20")
+    service.process_text("Cough Syrup 2")
+    low_stock = service.process_text("low stock")
+    stock_reply = service.process_text("Panadol stock")
+
+    assert "Panadol +20 added" in restock_reply
+    assert "Running low" in low_stock
+    assert "Cough Syrup" in low_stock
+    assert "restock when left with" in low_stock
+    assert "reorder at" not in low_stock.lower()
+    assert "Reorder level" not in stock_reply
+    assert "Restock when left with" in stock_reply
+
+
+def test_short_correction_and_receipt_variants_use_local_memory_without_ai():
+    store = FakeStore()
+    parser = FailingParser()
+    service = IntakeService(parser, store)
+
+    service.process_text("Panadol 2 cash", conversation_id="rush")
+    payment_reply = service.process_text("badilisha payment iwe mpesa", conversation_id="rush")
+    qty_reply = service.process_text("fanya iwe 5", conversation_id="rush")
+    inc_reply = service.process_text("ongeza moja", conversation_id="rush")
+    receipt = service.process_text("hiyo ya mwisho print receipt", conversation_id="rush")
+
+    assert "Updated last Panadol sale" in payment_reply
+    assert "M-Pesa" in payment_reply
+    assert "Updated last sale quantity: 2" in qty_reply
+    assert "5" in qty_reply
+    assert "Updated last sale quantity: 5" in inc_reply
+    assert "6" in inc_reply
+    assert "PHARMAREEN RECEIPT" in receipt
+    assert "Payment: M-Pesa" in receipt
+    assert "Amount:" in receipt
+    assert parser.called is False
