@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -896,6 +897,17 @@ def pid_file_running(path: Path) -> bool:
         pid = int(path.read_text(encoding="utf-8").strip())
     except Exception:
         return False
+    if os.name == "nt":
+        try:
+            result = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            return str(pid) in result.stdout
+        except Exception:
+            return False
     try:
         os.kill(pid, 0)
         return True
