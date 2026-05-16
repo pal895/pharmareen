@@ -280,6 +280,21 @@ NUMBER_WORDS = {
     "ninety": 90,
     "hundred": 100,
     "thousand": 1000,
+    "moja": 1,
+    "mbili": 2,
+    "tatu": 3,
+    "nne": 4,
+    "ine": 4,
+    "tano": 5,
+    "sita": 6,
+    "saba": 7,
+    "nane": 8,
+    "tisa": 9,
+    "kumi": 10,
+    "ishirini": 20,
+    "thelathini": 30,
+    "arobaini": 40,
+    "hamsini": 50,
 }
 
 SHORTCUT_DRUGS = {
@@ -289,6 +304,8 @@ SHORTCUT_DRUGS = {
     "ors": "ORS",
     "a": "Antacid",
     "ant": "Antacid",
+    "amox": "Amoxyl",
+    "amoxil": "Amoxyl",
     "i": "Insulin",
     "ins": "Insulin",
 }
@@ -403,6 +420,18 @@ class IntakeService:
         if is_print_receipt_last_command(text):
             return self._receipt_last_reply(conversation_key)
 
+        payment_correction = parse_payment_correction_command(text)
+        if payment_correction is not None:
+            return self._payment_correction_reply(
+                payment_correction[0],
+                payment_correction[1],
+                conversation_key,
+            )
+
+        quantity_correction = parse_quantity_correction_command(text)
+        if quantity_correction is not None:
+            return self._quantity_correction_reply(quantity_correction, conversation_key)
+
         conversion = parse_conversion_command(text)
         if conversion is not None:
             drug_name, strips_per_box, tablets_per_strip = conversion
@@ -429,6 +458,9 @@ class IntakeService:
 
         if is_profit_today_command(text):
             return self._profit_today_reply()
+
+        if is_best_seller_command(text):
+            return self._best_seller_reply(text)
 
         if is_cash_summary_command(text):
             return self._cash_summary_reply()
@@ -1601,6 +1633,88 @@ class IntakeService:
             )
         return DrugResolution()
 
+    def _payment_correction_reply(self, drug_name: str, new_payment: str, conversation_key: str) -> str:
+        sale = self.last_sale_by_conversation.get(conversation_key)
+        if not sale:
+            return "No recent sale found to update."
+        sale_drug = str(sale.get("drug_name") or "")
+        if drug_name and normalize_key(drug_name) not in {normalize_key(sale_drug), ""}:
+            return f"Which {title_drug_name(drug_name)} sale should I update?"
+        old_payment = str(sale.get("payment_method") or "Cash")
+        sale["payment_method"] = new_payment
+        try:
+            self._append_transaction(
+                "correction",
+                sale_drug,
+                0,
+                note=build_note(
+                    f"Payment correction {old_payment} to {new_payment}",
+                    trace_id=trace_id("CORR"),
+                    original_trace_id=str(sale.get("trace_id") or ""),
+                    payment=new_payment,
+                ),
+            )
+        except Exception:
+            pass
+        return f"✅ Updated last {sale_drug} sale: {old_payment} → {new_payment}"
+
+    def _quantity_correction_reply(self, instruction: dict[str, Any], conversation_key: str) -> str:
+        sale = self.last_sale_by_conversation.get(conversation_key)
+        if not sale:
+            return "Which medicine should I update?"
+        old_display = parse_int(sale.get("display_quantity"), default=0) or 0
+        unit = str(sale.get("unit") or "")
+        if instruction["mode"] == "set":
+            new_display = max(parse_int(instruction.get("quantity"), default=old_display) or old_display, 0)
+        else:
+            amount = max(parse_int(instruction.get("quantity"), default=1) or 1, 1)
+            new_display = max(old_display - amount, 0)
+        if new_display == old_display:
+            return "No change needed."
+        drug_name = str(sale.get("drug_name") or "")
+        old_base = parse_int(sale.get("quantity"), default=old_display) or old_display
+        new_base = self._to_base_quantity(drug_name, new_display, unit) if unit else new_display
+        stock_change = old_base - new_base
+        try:
+            stock = self._resolve_stock(drug_name)
+            if stock and stock.current_stock is not None:
+                self.store.update_current_stock(stock, stock.current_stock + stock_change)
+            self._append_transaction(
+                "correction",
+                drug_name,
+                stock_change,
+                note=build_note(
+                    f"Quantity correction {old_display} to {new_display}",
+                    trace_id=trace_id("CORR"),
+                    original_trace_id=str(sale.get("trace_id") or ""),
+                    unit=unit or "unit",
+                ),
+            )
+        except Exception:
+            return "I could not update that sale right now. Please check the connection."
+        sale["display_quantity"] = new_display
+        sale["quantity"] = new_base
+        return f"✅ Updated last sale quantity: {old_display} → {new_display}"
+
+    def _best_seller_reply(self, text: str) -> str:
+        now = now_in_timezone(self.timezone)
+        report_date = (now.date() - timedelta(days=1)).isoformat() if "yesterday" in text.lower() or "jana" in text.lower() else now.date().isoformat()
+        try:
+            transactions = self.store.read_transactions(report_date)
+            metrics = build_transaction_metrics(report_date, transactions, [])
+            if not metrics.most_sold:
+                logs = self.store.read_daily_logs(report_date)
+                metrics = build_report_metrics(report_date, logs, [])
+        except SheetsUnavailableError:
+            return SHEETS_UNAVAILABLE_MESSAGE
+        except Exception:
+            return "I could not check that right now. Please check the Google Sheets connection."
+        if not metrics.most_sold:
+            return "No sales recorded today yet." if report_date == now.date().isoformat() else "No sales recorded for that day."
+        drug_name, quantity = metrics.most_sold[0]
+        day_label = "today" if report_date == now.date().isoformat() else "yesterday"
+        return f"Best seller {day_label}: {drug_name} — {quantity} sold"
+
     def _details_last_reply(self, conversation_key: str) -> str:
         sale = self.last_sale_by_conversation.get(conversation_key)
         if not sale:
@@ -1941,6 +2055,14 @@ def parse_followup_prompt(text: str) -> FollowUpPrompt | None:
             f"How many {drug_name} were sold?",
         )
 
+    late_match = re.fullmatch(r"(?:late|later|missed)\s+(.+)", clean, flags=re.IGNORECASE)
+    if late_match:
+        drug_name = title_drug_name(late_match.group(1))
+        return FollowUpPrompt(
+            OperatingCommand(kind="late_sale", drug_name=drug_name, quantity=0, raw_text=text),
+            f"How many {drug_name} were sold earlier?",
+        )
+
     restock_match = re.fullmatch(r"(?:restock|restocked|add|received)\s+(.+)", clean, flags=re.IGNORECASE)
     if not restock_match:
         restock_match = re.fullmatch(r"(.+?)\s+(?:restock|restocked)", clean, flags=re.IGNORECASE)
@@ -1964,12 +2086,50 @@ def parse_followup_prompt(text: str) -> FollowUpPrompt | None:
     return None
 
 
+def parse_payment_correction_command(text: str) -> tuple[str, str] | None:
+    clean = normalize_natural_text(replace_number_words(text.strip()))
+    match = re.fullmatch(
+        rf"(.+?)\s+(?:ilikuwa|was)\s+({payment_pattern()})\s+(?:si|not)\s+({payment_pattern()})",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return None
+    return title_drug_name(match.group(1)), parse_payment_method(match.group(2))
+
+
+def parse_quantity_correction_command(text: str) -> dict[str, Any] | None:
+    clean = normalize_natural_text(replace_number_words(text.strip()))
+    match = re.fullmatch(r"(?:badilisha|change|update)\s+(?:ile\s+ya\s+mwisho|ya\s+mwisho|last|last\s+sale)\s+(?:iwe|to)\s+(\d+)", clean, flags=re.IGNORECASE)
+    if match:
+        return {"mode": "set", "quantity": positive_quantity(match.group(1))}
+    match = re.fullmatch(r"(?:punguza|reduce)\s*(\d+)?", clean, flags=re.IGNORECASE)
+    if match:
+        return {"mode": "reduce", "quantity": positive_quantity(match.group(1) or 1)}
+    return None
+
+
+def is_best_seller_command(text: str) -> bool:
+    key = normalize_key(text)
+    return any(
+        phrase in key
+        for phrase in [
+            "best seller",
+            "what did i sell most",
+            "sell most",
+            "fast moving",
+            "imeuza sana",
+            "imeuzwa sana",
+        ]
+    )
+
+
 def complete_followup_command(text: str, pending: OperatingCommand) -> OperatingCommand | None:
     clean = normalize_natural_text(replace_number_words(text.strip()))
     clean = " ".join(clean.split())
     if not clean:
         return None
-    if pending.kind in {"sale", "restock"}:
+    if pending.kind in {"sale", "late_sale", "restock"}:
         quantity = parse_int(clean, default=None)
         if quantity is not None and quantity > 0 and pending.drug_name:
             return replace(pending, quantity=quantity, raw_text=f"{pending.raw_text} {quantity}".strip())
@@ -1982,7 +2142,7 @@ def complete_followup_command(text: str, pending: OperatingCommand) -> Operating
 
 
 def parse_operating_commands(text: str) -> list[OperatingCommand] | None:
-    clean_text = normalize_natural_text(replace_number_words(text.strip()))
+    clean_text = expand_compact_pharmacy_text(normalize_natural_text(replace_number_words(text.strip())))
     if not clean_text:
         return None
 
@@ -2515,6 +2675,22 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
         )
 
     match = re.fullmatch(
+        r"(.+?)\s+\+(\d+)(?:\s+(\d+(?:\.\d+)?))?(?:\s+(bonus|disc|discount|discounted))?",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        total_cost, restock_type = parse_restock_details(match.group(3), match.group(4))
+        return OperatingCommand(
+            kind="restock",
+            drug_name=title_drug_name(match.group(1)),
+            quantity=positive_quantity(match.group(2)),
+            total_cost=total_cost,
+            restock_type=restock_type,
+            raw_text=text,
+        )
+
+    match = re.fullmatch(
         r"\+(.+?)\s+(\d+)\s+ordered\s+(\d+(?:\.\d+)?)\s+paid\s+(\d+(?:\.\d+)?)(?:\s+(disc|discount|discounted))?",
         clean,
         flags=re.IGNORECASE,
@@ -2899,9 +3075,29 @@ def format_plain_number(value: float | None) -> str:
 def normalize_natural_text(text: str) -> str:
     clean = "\n".join(" ".join(line.split()) for line in text.strip().splitlines())
     clean = re.sub(r"^please\s+", "", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"^(?:nimeuza|niliuza)\s+", "sold ", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"^(?:customer\s+amesema\s+hakuna|amesema\s+hakuna|hakuna)\s+(.+)$", r"\1 no stock", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"^nilisahau\s+kuuza\s+(.+?)\s*(?:earlier|mapema)?$", r"late \1", clean, flags=re.IGNORECASE)
     if "\n" not in clean and re.match(r"^(?:i\s+sold|sold|restocked|no\s+stock)\b", clean, flags=re.IGNORECASE):
         clean = re.sub(r"\s+and\s+", ", ", clean, flags=re.IGNORECASE)
     return clean
+
+
+def expand_compact_pharmacy_text(text: str) -> str:
+    clean = str(text or "").strip()
+    if not clean:
+        return clean
+    expanded_lines: list[str] = []
+    for line in clean.splitlines():
+        expanded = re.sub(r"(?<=\w)\+(?=\d)", " +", line.strip())
+        expanded = re.sub(r"(?<=[A-Za-z])(?=\d)", " ", expanded)
+        expanded = re.sub(r"(?<=\d)(?=[A-Za-z])", " ", expanded)
+        expanded = re.sub(r"\b(INV|B)\s+(\d+)\b", r"\1\2", expanded, flags=re.IGNORECASE)
+        expanded = re.sub(r"^(late|later)([A-Za-z])", r"\1 \2", expanded, flags=re.IGNORECASE)
+        if " " not in expanded and re.fullmatch(r"[A-Za-z]+stock", expanded, flags=re.IGNORECASE):
+            expanded = re.sub(r"stock$", " stock", expanded, flags=re.IGNORECASE)
+        expanded_lines.append(" ".join(expanded.split()))
+    return "\n".join(line for line in expanded_lines if line)
 
 
 def format_kes(amount: float | int | None) -> str:

@@ -357,9 +357,9 @@ def test_whatsapp_web_bridge_photo_quota_fallback(monkeypatch, tmp_path):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert data["reply"] == "\U0001F4F8 Photo received safely. Invoice AI is ready. OpenAI credits are not active yet."
+    assert data["reply"] == "📷 Invoice photo saved safely\nAI extraction: waiting"
     assert data["message_type"] == "image"
-    assert data["command_handler"] == "photo_received_waiting_for_openai_credits"
+    assert data["command_handler"] == "photo_received_saved_safely"
     saved_images = list((tmp_path / "data" / "photo_uploads").glob("*.jpg"))
     assert len(saved_images) == 1
     assert saved_images[0].read_bytes() == b"fake image bytes"
@@ -368,8 +368,8 @@ def test_whatsapp_web_bridge_photo_quota_fallback(monkeypatch, tmp_path):
     log_entry = json.loads(log_path.read_text(encoding="utf-8").strip())
     assert log_entry["media_type"] == "image/jpeg"
     assert log_entry["file_path"].startswith("data/photo_uploads/")
-    assert log_entry["processing_status"] == "waiting_for_openai_credits"
-    assert log_entry["extraction"]["extraction_status"] == "waiting_for_openai_credits"
+    assert log_entry["processing_status"] == "saved_waiting_for_scan_request"
+    assert log_entry["extraction"]["extraction_status"] == "saved_waiting_for_scan_request"
     status_data = status.json()
     assert status_data["photo_pipeline_installed"] is True
     assert status_data["upload_folder_exists"] is True

@@ -4,6 +4,7 @@ import base64
 import json
 import logging
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -31,7 +32,7 @@ from app.config import Settings, get_settings
 from app.demo_store import DemoPharmacyStore
 from app.intake import IntakeService, normalize_spoken_command_text
 from app.pdf_reports import generate_daily_report_pdf, reports_pdf_dir
-from app.reports import LowStockWarning, ReportMetrics, ReportService
+from app.reports import LowStockWarning, ReportMetrics, ReportService, build_report_metrics, build_transaction_metrics, low_stock_from_items
 from app.routes.admin import router as admin_router
 from app.routes.meta_webhook import meta_callback_router, router as meta_whatsapp_router
 from app.routes.offline_sync import router as offline_sync_router
@@ -63,7 +64,7 @@ last_openai_error: dict[str, Any] = {
     "timestamp": "",
 }
 VOICE_QUOTA_REPLY = "🎧 Voice received safely. AI transcription is ready but OpenAI credits are not active yet."
-PHOTO_QUOTA_REPLY = "\U0001F4F8 Photo received safely. Invoice AI is ready. OpenAI credits are not active yet."
+PHOTO_QUOTA_REPLY = "📷 Invoice photo saved safely\nAI extraction: waiting"
 DEFAULT_PUBLIC_BASE_URL = "https://pharmareen-1--pal895.replit.app"
 
 
@@ -115,7 +116,7 @@ OFFLINE_NO_CACHE_HEADERS = {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
     "Pragma": "no-cache",
     "Expires": "0",
-    "X-PharMareen-Offline-Version": "phase6-smooth-test-v14",
+    "X-PharMareen-Offline-Version": "phase6-smooth-test-v15",
 }
 
 
@@ -283,6 +284,10 @@ def offline_entry_to_command(entry: dict[str, Any]) -> str:
 def offline_media_reply(entry: dict[str, Any]) -> str:
     action = offline_entry_action(entry)
     if action in {"photo", "image"}:
+        return "📷 Invoice photo saved safely\nAI extraction: waiting"
+    if action in {"voice", "audio"}:
+        return "🎤 Voice note saved safely\nStatus: Needs review"
+    if action in {"photo", "image"}:
         return "Photo saved. AI reading needs credits. Text commands still work."
     return "Voice/photo saved. AI reading needs credits. Text commands still work."
 
@@ -311,7 +316,9 @@ def offline_sync_success_message(entries: list[dict[str, Any]], synced: list[dic
             lines.append("• Voice note saved")
     time_format = "%#I:%M %p" if os.name == "nt" else "%-I:%M %p"
     lines.append(f"Saved safely at {now_in_timezone(get_settings().timezone).strftime(time_format)}")
-    return "\n".join(lines)
+    message = "\n".join(lines)
+    message = re.sub(r"^.*Offline records synced", "✅ Offline records synced safely", message, count=1)
+    return message.replace("â€¢", "•").replace("• Photo saved", "• Invoice photo saved")
 
 
 @app.post("/offline/sync")
@@ -557,9 +564,62 @@ def icon() -> Response:
 def download_report(filename: str) -> FileResponse:
     safe_name = Path(filename).name
     report_path = find_report_pdf(safe_name)
+    if not report_path.exists() and safe_name.lower().endswith(".pdf"):
+        report_path = regenerate_missing_report_pdf(safe_name)
     if not report_path.exists() or report_path.suffix.lower() != ".pdf":
         raise HTTPException(status_code=404, detail="Report not found.")
     return FileResponse(report_path, media_type="application/pdf", filename=safe_name)
+
+
+def regenerate_missing_report_pdf(safe_name: str) -> Path:
+    date_match = re.search(r"(\d{4}-\d{2}-\d{2})", safe_name)
+    if not date_match:
+        return reports_pdf_dir() / safe_name
+    report_date = date_match.group(1)
+    settings = get_settings()
+    try:
+        store = get_sheet_store()
+        try:
+            transactions = store.read_transactions(report_date)
+        except Exception:
+            transactions = []
+        try:
+            logs = store.read_daily_logs(report_date)
+        except Exception:
+            logs = []
+        try:
+            low_stock = low_stock_from_items(store.list_low_stock_items())
+        except Exception:
+            low_stock = []
+        metrics = build_transaction_metrics(report_date, transactions, low_stock) if transactions else build_report_metrics(report_date, logs, low_stock)
+    except Exception:
+        metrics = ReportMetrics(
+            report_date=report_date,
+            total_sales=0,
+            total_items_sold=0,
+            sale_transactions=0,
+            most_requested=[],
+            most_sold=[],
+            missed_sales=[],
+            not_sold=[],
+            low_stock_warnings=[],
+            peak_activity_time="No sales yet",
+        )
+    try:
+        generated = generate_daily_report_pdf(
+            metrics,
+            pharmacy_name=settings.pharmacy_name or "PharMareen",
+            report_time=now_in_timezone(settings.timezone).strftime("%H:%M"),
+        )
+        target = reports_pdf_dir() / safe_name
+        if generated.name != safe_name:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(generated, target)
+            return target
+        return generated
+    except Exception:
+        logger.exception("REPORT_PDF_REGEN_FAILED filename=%s", safe_name)
+        return reports_pdf_dir() / safe_name
 
 
 def report_pdf_search_dirs() -> list[Path]:
@@ -884,6 +944,17 @@ def debug_system_status() -> dict[str, Any]:
             "reports": {
                 "public_base_url": report_public_base_url(settings),
                 "uses_stable_replit_domain": report_public_base_url(settings).startswith(DEFAULT_PUBLIC_BASE_URL),
+                "reports_directory": str(reports_pdf_dir()),
+            },
+            "ai": {
+                "openai_key_present": bool(settings.openai_api_key.strip()),
+                "invoice_ai_enabled": boolish(os.getenv("ENABLE_INVOICE_AI")) or boolish(os.getenv("ENABLE_VISION_AI")),
+                "vision_ai_enabled": boolish(os.getenv("ENABLE_VISION_AI")),
+                "voice_ai_enabled": boolish(os.getenv("ENABLE_VOICE_INPUT")) or bool(settings.openai_api_key.strip()),
+            },
+            "app": {
+                "app_base_url": effective_app_base_url(settings),
+                "report_base_url": report_public_base_url(settings),
             },
             "startup": {
                 "backend_pid_file_exists": backend_pid_file.exists(),
@@ -918,7 +989,7 @@ def debug_photo_ai() -> dict[str, Any]:
     if bool(last_openai_error.get("quota_missing")):
         quota_status = "quota_missing"
     elif settings.openai_api_key.strip():
-        quota_status = "key_present_waiting_for_billing"
+        quota_status = "key_present_ready_when_requested"
     else:
         quota_status = "openai_key_missing"
     return {
@@ -1214,11 +1285,7 @@ async def process_whatsapp_web_payload(
             image_bytes=image_bytes,
             timestamp=now_in_timezone(settings.timezone).isoformat(timespec="seconds"),
         )
-        extraction_status = (
-            "waiting_for_openai_credits"
-            if settings.openai_api_key.strip() or bool(last_openai_error.get("quota_missing"))
-            else "waiting_for_openai_key"
-        )
+        extraction_status = "saved_waiting_for_scan_request" if settings.openai_api_key.strip() else "waiting_for_openai_key"
         extraction = build_invoice_extraction_placeholder(extraction_status=extraction_status)
         intake_record = {
             "sender": mask_phone(sender),
@@ -1246,8 +1313,8 @@ async def process_whatsapp_web_payload(
             reply=PHOTO_QUOTA_REPLY,
             message_type="image",
             success=True,
-            error_reason="openai_insufficient_quota" if extraction_status == "waiting_for_openai_credits" else "openai_key_missing",
-            command_handler="photo_received_waiting_for_openai_credits",
+            error_reason="photo_saved_no_ai_requested" if extraction_status == "saved_waiting_for_scan_request" else "openai_key_missing",
+            command_handler="photo_received_saved_safely",
         )
 
     return WhatsAppProcessResult(

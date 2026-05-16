@@ -459,6 +459,67 @@ def test_more_natural_stock_and_report_phrases_work():
     assert report_reply.startswith("📊 Daily Report")
     assert summary_reply.startswith("📊 Daily Report")
 
+
+def test_compact_rush_hour_commands_are_normalized_safely():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    sale_reply = service.process_text("Panadol2")
+    stock_reply = service.process_text("Panadolstock")
+    restock_reply = service.process_text("Panadol+20")
+    late_reply = service.process_text("latepanadol5")
+
+    assert "Panadol x2 recorded" in sale_reply
+    assert "Panadol stock: 18" in stock_reply
+    assert "Panadol +20 added" in restock_reply
+    assert "Late sale recorded" in late_reply
+    assert store.stocks["panadol"].current_stock == 33
+
+
+def test_compact_multi_sale_and_swahili_phrases_work():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    batch_reply = service.process_text("Panadol2amox1ors3")
+    swahili_reply = service.process_text("Nimeuza Panadol mbili cash", conversation_id="2547")
+    no_stock_reply = service.process_text("Customer amesema hakuna insulin")
+
+    assert "Batch processed" in batch_reply
+    assert "Panadol x2" in batch_reply
+    assert "Amoxyl x1" in batch_reply
+    assert "ORS x3" in batch_reply
+    assert "Panadol x2 recorded" in swahili_reply
+    assert "Insulin no-stock request logged" in no_stock_reply
+
+
+def test_last_sale_payment_and_quantity_corrections_are_short():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    service.process_text("Panadol 2 cash", conversation_id="2547")
+    payment_reply = service.process_text("Panadol ilikuwa mpesa si cash", conversation_id="2547")
+    quantity_reply = service.process_text("Badilisha ile ya mwisho iwe 5", conversation_id="2547")
+    reduce_reply = service.process_text("Punguza moja", conversation_id="2547")
+
+    assert "Updated last Panadol sale: Cash" in payment_reply
+    assert "M-Pesa" in payment_reply
+    assert "Updated last sale quantity: 2" in quantity_reply
+    assert "5" in quantity_reply
+    assert "Updated last sale quantity: 5" in reduce_reply
+    assert "4" in reduce_reply
+    assert store.stocks["panadol"].current_stock == 16
+
+
+def test_best_seller_question_answers_directly():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    service.process_text("Panadol 2")
+    service.process_text("Insulin 1")
+    reply = service.process_text("Best seller today")
+
+    assert reply == "Best seller today: Panadol — 2 sold"
+
 def test_stock_check_returns_current_stock_price_and_reorder_level():
     store = FakeStore()
     parser = FailingParser()

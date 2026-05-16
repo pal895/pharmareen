@@ -9,7 +9,7 @@ const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
-const SERVICE_WORKER_VERSION = "phase6-smooth-test-v14";
+const SERVICE_WORKER_VERSION = "phase6-smooth-test-v15";
 const DEFAULT_MEDICINE_SHORTCUTS = ["Panadol", "Amox", "Piriton", "ORS"];
 
 const examples = {
@@ -55,6 +55,7 @@ let mediaRecorder = null;
 let recordedChunks = [];
 let currentPaymentMode = localStorage.getItem(PAYMENT_MODE_KEY) || "Cash";
 let lastBarcodeScan = { code: "", at: 0 };
+let pendingBarcodeScan = { code: "", count: 0, at: 0 };
 
 function loadJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
@@ -201,6 +202,7 @@ async function stopBarcodeScanner() {
   if (barcodeVideo) barcodeVideo.srcObject = null;
   if (barcodeCameraBox) barcodeCameraBox.hidden = true;
   if (torchToggle) torchToggle.hidden = true;
+  pendingBarcodeScan = { code: "", count: 0, at: 0 };
 }
 
 async function toggleTorch() {
@@ -247,10 +249,22 @@ async function startBarcodeScanner() {
         if (!codes.length) return;
         const rawValue = codes[0].rawValue || "";
         const now = Date.now();
+        if (!rawValue) return;
+        if (rawValue !== pendingBarcodeScan.code || now - pendingBarcodeScan.at > 2500) {
+          pendingBarcodeScan = { code: rawValue, count: 1, at: now };
+          barcodeResult.textContent = "Confirming barcode...";
+          return;
+        }
+        pendingBarcodeScan = { code: rawValue, count: pendingBarcodeScan.count + 1, at: now };
+        if (pendingBarcodeScan.count < 2) {
+          barcodeResult.textContent = "Confirming barcode...";
+          return;
+        }
         if (rawValue && rawValue === lastBarcodeScan.code && now - lastBarcodeScan.at < 2500) return;
         lastBarcodeScan = { code: rawValue, at: now };
         barcodeInput.value = rawValue;
         updateBarcodeResult();
+        if (!currentBarcodeMedicine) barcodeResult.textContent = `✅ Barcode detected: ${rawValue}`;
         gentleFeedback();
         await stopBarcodeScanner();
       } catch {

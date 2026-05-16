@@ -70,7 +70,7 @@ def test_offline_app_routes_return_html():
     assert "PharMareen Offline Mode" in compat_response.text
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in compat_response.text
     assert "no-store" in compat_response.headers.get("cache-control", "")
-    assert compat_response.headers.get("x-pharmareen-offline-version") == "phase6-smooth-test-v14"
+    assert compat_response.headers.get("x-pharmareen-offline-version") == "phase6-smooth-test-v15"
     assert parser_response.status_code == 200
     assert manifest_response.status_code == 200
     assert worker_response.status_code == 200
@@ -194,7 +194,7 @@ def test_offline_sync_logs_photo_and_voice_placeholders(monkeypatch, tmp_path):
     assert data["status"] == "ok"
     assert [item["status"] for item in data["synced"]] == ["media_logged", "media_logged"]
     assert "Offline records synced" in data["message"]
-    assert "Photo saved" in data["message"]
+    assert "Invoice photo saved" in data["message"]
     assert "Voice note saved" in data["message"]
     assert fake.messages == []
     assert (tmp_path / "data" / "offline_sync_log.jsonl").exists()
@@ -260,6 +260,9 @@ const cases = {
   newline: parser.splitCommands('Panadol sold 2\nAmoxil sold 5\nZinc restock 10'),
   semicolon: parser.splitCommands('Panadol sold 2; Amoxil sold 5'),
   fast: parser.splitCommands('Panadol 1 cash Amox 2 mpesa'),
+  compact: parser.splitCommands('Panadol2Amox1ORS3'),
+  compactStock: parser.parseCommand('Panadolstock'),
+  compactRestock: parser.parseCommand('Panadol+20'),
   fastParsed: parser.splitCommands('Panadol 1 cash Amox 2 mpesa').map(value => parser.parseCommand(value))
 };
 console.log(JSON.stringify(cases));
@@ -291,6 +294,9 @@ console.log(JSON.stringify(cases));
     assert len(data["newline"]) == 3
     assert len(data["semicolon"]) == 2
     assert data["fast"] == ["Panadol 1 cash", "Amox 2 mpesa"]
+    assert data["compact"] == ["Panadol 2", "Amox 1", "ORS 3"]
+    assert data["compactStock"]["action"] == "stock_check"
+    assert data["compactRestock"]["action"] == "restock"
     assert data["fastParsed"][0]["payment_method"] == "Cash"
     assert data["fastParsed"][1]["payment_method"] == "M-Pesa"
 
@@ -329,7 +335,7 @@ def test_legacy_offline_app_folder_matches_final_frontend():
     assert " required" not in legacy_html
     assert "disableNativeRequiredValidation" in legacy_app
     assert "queueMediaFiles" in legacy_app
-    assert "pharmareen-offline-v14" in legacy_worker
+    assert "pharmareen-offline-v15" in legacy_worker
     assert legacy_parser.exists()
 
 
@@ -497,6 +503,8 @@ def test_offline_barcode_flow_has_safe_actions_and_success_feedback():
     assert "Last scanned:" in html
     assert "✅ ${medicine} detected" in script
     assert "lastBarcodeScan" in script
+    assert "pendingBarcodeScan" in script
+    assert "Confirming barcode" in script
     assert "focusMode" in script
     assert "gentleFeedback" in script
     assert "await stopBarcodeScanner()" in script
@@ -534,6 +542,6 @@ def test_offline_pwa_assets_contain_auto_sync_media_and_retry_logic():
     assert "Tap & Talk" in html
     assert '"start_url": "/offline-app"' in manifest
     assert "/offline_app/parser.js" in worker
-    assert "pharmareen-offline-v14" in worker
+    assert "pharmareen-offline-v15" in worker
     assert "caches.open" in worker
 

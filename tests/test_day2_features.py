@@ -252,6 +252,29 @@ def test_pdf_download_route_searches_configured_report_folder(tmp_path, monkeypa
     assert response.content.startswith(b"%PDF-1.4")
 
 
+def test_pdf_download_route_regenerates_missing_daily_report(tmp_path, monkeypatch):
+    class EmptyReportStore:
+        def read_transactions(self, report_date):
+            return []
+
+        def read_daily_logs(self, report_date):
+            return []
+
+        def list_low_stock_items(self):
+            return []
+
+    monkeypatch.setattr(main, "reports_pdf_dir", lambda: tmp_path)
+    monkeypatch.setattr(main, "get_sheet_store", lambda: EmptyReportStore())
+    monkeypatch.setattr(main, "get_settings", lambda: Settings(_env_file=None, pharmacy_name="PharMareen"))
+
+    with TestClient(main.app) as client:
+        response = client.get("/reports/download/PharMareen_Daily_Report_2026-05-16.pdf")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.content.startswith(b"%PDF")
+
+
 def test_voice_note_uses_mocked_transcription(monkeypatch):
     fake_intake = FakeIntake()
     monkeypatch.setattr(main, "get_whatsapp_client", lambda: FakeWhatsApp())

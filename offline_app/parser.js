@@ -28,6 +28,11 @@
     thirty: 30,
     forty: 40,
     fifty: 50,
+    moja: 1,
+    mbili: 2,
+    tatu: 3,
+    nne: 4,
+    tano: 5,
     hundred: 100
   };
 
@@ -38,6 +43,8 @@
     ors: "ORS",
     a: "Antacid",
     ant: "Antacid",
+    amox: "Amoxyl",
+    amoxil: "Amoxyl",
     i: "Insulin",
     ins: "Insulin"
   };
@@ -60,6 +67,19 @@
     Object.entries(NUMBER_WORDS).forEach(([word, number]) => {
       text = text.replace(new RegExp(`\\b${word}\\b`, "g"), String(number));
     });
+    return normalizeSpaces(text);
+  }
+
+  function expandCompactPharmacyText(value) {
+    let text = String(value || "").trim();
+    text = text.replace(/(?<=\w)\+(?=\d)/g, " +");
+    text = text.replace(/(?<=[A-Za-z])(?=\d)/g, " ");
+    text = text.replace(/(?<=\d)(?=[A-Za-z])/g, " ");
+    text = text.replace(/\b(INV|B)\s+(\d+)\b/gi, "$1$2");
+    text = text.replace(/^(late|later)([A-Za-z])/i, "$1 $2");
+    if (!/\s/.test(text) && /^[A-Za-z]+stock$/i.test(text)) {
+      text = text.replace(/stock$/i, " stock");
+    }
     return normalizeSpaces(text);
   }
 
@@ -93,7 +113,7 @@
   }
 
   function splitFastSaleLine(line) {
-    const text = normalizeSpaces(line);
+    const text = expandCompactPharmacyText(line);
     if (!text) return [];
     if (/\b(restock|received|bought|bonus|discount|cost|supplier|expiry|invoice|batch|barcode|no stock|report|summary|stock)\b/i.test(text)) {
       return [text];
@@ -156,7 +176,7 @@
   }
 
   function parseCommand(rawText) {
-    const original = normalizeSpaces(rawText);
+    const original = expandCompactPharmacyText(rawText);
     const text = normalizeNumberWords(original);
     const lower = text.toLowerCase();
     const now = new Date().toISOString();
@@ -210,6 +230,16 @@
         action: "stock_check",
         type: "stock_check",
         drug_name: SHORTCUT_DRUGS[shortcutStock[1]]
+      };
+    }
+
+    const drugStock = lower.match(/^(.+?)\s+stock$/i);
+    if (drugStock) {
+      return {
+        ...base,
+        action: "stock_check",
+        type: "stock_check",
+        drug_name: titleCaseDrugName(drugStock[1])
       };
     }
 
