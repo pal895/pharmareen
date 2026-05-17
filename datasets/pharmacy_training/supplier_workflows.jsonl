@@ -1,0 +1,6 @@
+{"id": "sup_001", "category": "supplier", "text": "+Panadol 20 bonus 5 cost 2000", "expect_contains": ["20 + 5 bonus = 25 added", "Paid: KES 2,000"], "ai_allowed": false, "simulate": true}
+{"id": "sup_002", "category": "supplier", "text": "Panadol restock 20 bonus 5 cost 2000 supplier Beta expiry Jan 2027", "expect_contains": ["20 + 5 bonus = 25 added", "Paid: KES 2,000"], "ai_allowed": false, "simulate": true}
+{"id": "sup_003", "category": "supplier", "text": "received Panadol 1 box supplier Beta invoice INV123 batch B001 expiry Jan 2027", "expect_contains": ["Panadol +1 box added", "Equivalent"], "ai_allowed": false, "simulate": true}
+{"id": "sup_004", "category": "supplier", "text": "Amoxyl received 30 paid 2500 discount 300", "expect_contains": ["Amoxyl +30 added", "Discount: KES 300"], "ai_allowed": false, "simulate": true}
+{"id": "sup_005", "category": "supplier", "text": "Supplier gave Panadol 20, bonus 5", "expect_contains": ["20 + 5 bonus = 25 added"], "ai_allowed": false, "simulate": true}
+{"id": "sup_006", "category": "supplier", "text": "Bought Cetirizine 50, paid for 45, bonus 5", "expect_contains": ["50 + 5 bonus = 55 added"], "ai_allowed": false, "simulate": true}

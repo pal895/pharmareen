@@ -26,6 +26,7 @@ from app.services.pharmacy_engine import (
     trace_id,
     unit_pattern,
 )
+from app.services.operational_intelligence import OperationalMemory
 from app.sheets import SHEETS_UNAVAILABLE_MESSAGE, SheetsUnavailableError
 from app.utils import format_ksh, normalize_key, now_in_timezone, parse_int, parse_money
 
@@ -362,6 +363,7 @@ class IntakeService:
         self.conversions_by_drug: dict[str, dict[str, int]] = {}
         self.aliases_by_key = self._load_pharmacy_aliases()
         self.receipt_printing_enabled = False
+        self.operational_memory = OperationalMemory()
 
     def process_text(self, text: str, conversation_id: str | None = None) -> str:
         text = text.strip()
@@ -410,6 +412,10 @@ class IntakeService:
         if is_details_last_command(text):
             return self._details_last_reply(conversation_key)
 
+        memory_reference_reply = self._memory_reference_reply(text, conversation_key)
+        if memory_reference_reply:
+            return memory_reference_reply
+
         receipt_setting = parse_receipt_setting_command(text)
         if receipt_setting is not None:
             self.receipt_printing_enabled = receipt_setting
@@ -451,16 +457,16 @@ class IntakeService:
                 ]
             )
 
-        followup_prompt = parse_followup_prompt(text)
-        if followup_prompt is not None:
-            self.pending_followups[conversation_key] = followup_prompt.command
-            return followup_prompt.question
-
         analytics_intent = parse_analytics_command(text)
         if analytics_intent is not None:
             if analytics_intent.get("type") == "low_stock":
                 return self._low_stock_reply()
             return self._analytics_reply(analytics_intent)
+
+        followup_prompt = parse_followup_prompt(text)
+        if followup_prompt is not None:
+            self.pending_followups[conversation_key] = followup_prompt.command
+            return followup_prompt.question
 
         if is_profit_today_command(text):
             return self._profit_today_reply()
@@ -537,6 +543,22 @@ class IntakeService:
         return f"Logged {len(logged_results)} entries:\n\n" + "\n".join(
             f"- {line}" for line in lines
         )
+
+    def _memory_reference_reply(self, text: str, conversation_key: str) -> str:
+        normalized = normalize_key(text)
+        if normalized in {"same kama jana", "same as yesterday", "same again", "rudia ile", "repeat last"}:
+            last = self.operational_memory.resolve_reference(conversation_key, text)
+            if last:
+                drug = str(last.get("drug_name") or "medicine")
+                quantity = parse_int(last.get("display_quantity"), default=parse_int(last.get("quantity"), default=1)) or 1
+                payment = str(last.get("payment_method") or "Cash")
+                return f"Repeat {drug} x{quantity} {payment}? Reply YES to save, or type the correct medicine and quantity."
+            return "Which medicine and quantity should I repeat?"
+        if normalized in {"nilikosea quantity", "wrong quantity", "ile ya mwisho ilikuwa wrong quantity"}:
+            if self.operational_memory.resolve_reference(conversation_key, "last"):
+                return "Ni quantity gani sahihi?"
+            return "Which medicine quantity should I correct?"
+        return ""
 
     def _share_reply(self) -> str:
         return "\n".join(
@@ -892,6 +914,7 @@ class IntakeService:
         if command.drug_name and command.kind in {"sale", "late_sale", "restock", "stock_check", "no_stock"}:
             resolution = self._resolve_drug_name(command.drug_name)
             if resolution.question:
+                self.operational_memory.remember_clarification(conversation_key, resolution.question)
                 return EntryResult(
                     logged=False,
                     reply=resolution.question,
@@ -1129,7 +1152,7 @@ class IntakeService:
             else:
                 reply_parts.append("🧾 Digital receipt ready — printer not detected.")
         reply = "\n".join(reply_parts)
-        self.last_sale_by_conversation[conversation_key] = {
+        sale_memory = {
             "drug_name": stock.drug_name,
             "quantity": base_quantity,
             "unit": unit,
@@ -1143,6 +1166,8 @@ class IntakeService:
             "fefo": fefo_reply,
             "missing_profit_data": missing_profit_data,
         }
+        self.last_sale_by_conversation[conversation_key] = sale_memory
+        self.operational_memory.remember_transaction(conversation_key, sale_memory)
 
         return EntryResult(
             logged=True,

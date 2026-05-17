@@ -1,0 +1,8 @@
+{"id": "mem_001", "category": "memory", "text": "Panadol 2 cash", "expect_contains": ["Panadol x2", "Stock"], "ai_allowed": false, "simulate": true}
+{"id": "mem_002", "category": "memory", "text": "badilisha payment iwe mpesa", "expect_contains": ["Updated last Panadol sale", "M-Pesa"], "ai_allowed": false, "simulate": true}
+{"id": "mem_003", "category": "memory", "text": "fanya iwe 5", "expect_contains": ["Updated last sale quantity", "5"], "ai_allowed": false, "simulate": true}
+{"id": "mem_004", "category": "memory", "text": "ongeza moja", "expect_contains": ["Updated last sale quantity", "6"], "ai_allowed": false, "simulate": true}
+{"id": "mem_005", "category": "memory", "text": "punguza moja", "expect_contains": ["Updated last sale quantity", "5"], "ai_allowed": false, "simulate": true}
+{"id": "mem_006", "category": "memory", "text": "receipt ya mwisho", "expect_contains": ["PHARMAREEN RECEIPT", "Medicine: Panadol"], "ai_allowed": false, "simulate": true}
+{"id": "mem_007", "category": "memory", "text": "hiyo ya mwisho print receipt", "expect_contains": ["PHARMAREEN RECEIPT"], "ai_allowed": false, "simulate": true}
+{"id": "mem_008", "category": "memory", "text": "same kama jana", "expect_contains": ["Repeat Panadol"], "ai_allowed": false, "simulate": true}

@@ -1,0 +1,10 @@
+{"id": "short_001", "category": "shorthand", "text": "Panadol2cash", "expect_contains": ["Panadol x2", "Stock"], "ai_allowed": false, "simulate": true}
+{"id": "short_002", "category": "shorthand", "text": "Amox1", "expect_contains": ["Amoxyl x1", "Stock"], "ai_allowed": false, "simulate": true}
+{"id": "short_003", "category": "shorthand", "text": "Panadol+20", "expect_contains": ["Panadol +20 added"], "ai_allowed": false, "simulate": true}
+{"id": "short_004", "category": "shorthand", "text": "Panadolstock", "expect_contains": ["Panadol stock"], "ai_allowed": false, "simulate": true}
+{"id": "short_005", "category": "shorthand", "text": "latepanadol5", "expect_contains": ["Late sale recorded", "Panadol x5"], "ai_allowed": false, "simulate": true}
+{"id": "short_006", "category": "shorthand", "text": "Panadol2amox1ors3", "expect_contains": ["Batch processed", "Panadol x2", "ORS x3"], "ai_allowed": false, "simulate": true}
+{"id": "short_007", "category": "shorthand", "text": "panadol mbili cash", "expect_contains": ["Panadol x2", "Stock"], "ai_allowed": false, "simulate": true}
+{"id": "short_008", "category": "shorthand", "text": "Nimeuza Panadol mbili cash", "expect_contains": ["Panadol x2", "Stock"], "ai_allowed": false, "simulate": true}
+{"id": "short_009", "category": "shorthand", "text": "Niliuza Panadol mbili cash", "expect_contains": ["Panadol x2", "Stock"], "ai_allowed": false, "simulate": true}
+{"id": "short_010", "category": "shorthand", "text": "Panadl 2", "expect_contains": ["Panadol x2", "Stock"], "ai_allowed": false, "simulate": true}

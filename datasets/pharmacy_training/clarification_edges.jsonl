@@ -1,0 +1,6 @@
+{"id": "clar_001", "category": "clarification", "text": "pa 2", "expect_contains": ["Did you mean:", "Panadol", "Paracetamol"], "ai_allowed": false, "simulate": true}
+{"id": "clar_002", "category": "clarification", "text": "pd 2", "expect_contains": ["not sure what"], "ai_allowed": false, "simulate": true}
+{"id": "clar_003", "category": "clarification", "text": "sell panadol", "expect_contains": ["How many Panadol"], "ai_allowed": false, "simulate": true}
+{"id": "clar_004", "category": "clarification", "text": "restock panadol", "expect_contains": ["How many Panadol"], "ai_allowed": false, "simulate": true}
+{"id": "clar_005", "category": "clarification", "text": "check stock", "expect_contains": ["Which medicine"], "ai_allowed": false, "simulate": true}
+{"id": "clar_006", "category": "clarification", "text": "customer amesema hakuna insulin", "expect_contains": ["Insulin no-stock request logged"], "ai_allowed": false, "simulate": true}

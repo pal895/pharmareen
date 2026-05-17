@@ -1,0 +1,8 @@
+{"id": "off_001", "category": "offline", "text": "Panadol 1 cash", "expect_contains": ["Panadol x1", "Stock"], "ai_allowed": false, "simulate": true}
+{"id": "off_002", "category": "offline", "text": "Amoxyl 2 mpesa", "expect_contains": ["Amoxyl x2", "Stock"], "ai_allowed": false, "simulate": true}
+{"id": "off_003", "category": "offline", "text": "Nimeuza Panadol mbili cash", "expect_contains": ["Panadol x2", "Stock"], "ai_allowed": false, "simulate": true}
+{"id": "off_004", "category": "offline", "text": "Panadol 1 cash, Amoxyl 2 mpesa", "expect_contains": ["Batch processed", "Panadol x1", "Amoxyl x2"], "ai_allowed": false, "simulate": true}
+{"id": "off_005", "category": "offline", "text": "Invoice photo saved safely", "simulate": false, "expected": "photo_safe_store", "ai_allowed": false}
+{"id": "off_006", "category": "offline", "text": "Voice note saved safely", "simulate": false, "expected": "voice_safe_store", "ai_allowed": false}
+{"id": "off_007", "category": "offline", "text": "Stock photo awaiting review", "simulate": false, "expected": "photo_needs_review", "ai_allowed": false}
+{"id": "off_008", "category": "offline", "text": "Offline records synced safely", "simulate": false, "expected": "grouped_confirmation", "ai_allowed": false}

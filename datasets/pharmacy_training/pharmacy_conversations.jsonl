@@ -1,0 +1,8 @@
+{"id": "conv_001", "category": "conversation", "text": "hello", "expect_contains": ["Welcome to PharMareen"], "ai_allowed": false, "simulate": true}
+{"id": "conv_002", "category": "conversation", "text": "help", "expect_contains": ["PHARMAREEN QUICK COMMANDS"], "ai_allowed": false, "simulate": true}
+{"id": "conv_003", "category": "conversation", "text": "how do I use this", "expect_contains": ["PHARMAREEN QUICK COMMANDS"], "ai_allowed": false, "simulate": true}
+{"id": "conv_004", "category": "conversation", "text": "what can you do", "expect_contains": ["Sales:"], "ai_allowed": false, "simulate": true}
+{"id": "conv_005", "category": "conversation", "text": "habari", "expect_contains": ["Welcome to PharMareen"], "ai_allowed": false, "simulate": true}
+{"id": "conv_006", "category": "conversation", "text": "morning", "expect_contains": ["Welcome to PharMareen"], "ai_allowed": false, "simulate": true}
+{"id": "conv_007", "category": "conversation", "text": "same kama jana", "expect_contains": ["Which medicine and quantity"], "ai_allowed": false, "simulate": true}
+{"id": "conv_008", "category": "conversation", "text": "nilikosea quantity", "expect_contains": ["Which medicine quantity"], "ai_allowed": false, "simulate": true}
