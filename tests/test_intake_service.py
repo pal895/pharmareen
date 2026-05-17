@@ -1506,3 +1506,32 @@ def test_payment_method_used_most_is_deterministic_without_ai_parser():
     assert "M-Pesa" in reply
     assert "/ 2 sales" in reply
     assert parser.called is False
+
+
+
+def test_undo_after_compact_and_corrected_sale_uses_recent_memory():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    sale_reply = service.process_text("panadol2cash", conversation_id="rush")
+    correction_reply = service.process_text("nilikosea ilikuwa 4", conversation_id="rush")
+    confirm = service.process_text("undo hiyo ya mwisho", conversation_id="rush")
+
+    assert "Panadol x2" in sale_reply
+    assert "Updated last Panadol sale quantity: 2" in correction_reply
+    assert confirm == "Undo last sale: Panadol x4 Cash?\nReply YES to confirm."
+
+
+def test_payment_analytics_does_not_use_ai_usage_log():
+    from app.ai import AI_USAGE_LOG
+
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+    AI_USAGE_LOG.clear()
+
+    service.process_text("Panadol 2 cash")
+    service.process_text("Amoxyl 1 mpesa")
+    reply = service.process_text("Which payment method was used most")
+
+    assert "Most used payment today" in reply
+    assert AI_USAGE_LOG == []

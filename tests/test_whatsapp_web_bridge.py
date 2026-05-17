@@ -397,7 +397,7 @@ def test_whatsapp_web_bridge_photo_quota_fallback(monkeypatch, tmp_path):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert data["reply"] == "📷 Photo received safely. I saved it for review."
+    assert "AI reading is ready but OpenAI credits are not active yet" in data["reply"]
     assert data["message_type"] == "image"
     assert data["command_handler"] == "photo_received_saved_safely"
     saved_images = list((tmp_path / "data" / "photo_uploads").glob("*.jpg"))
@@ -408,10 +408,10 @@ def test_whatsapp_web_bridge_photo_quota_fallback(monkeypatch, tmp_path):
     log_entry = json.loads(log_path.read_text(encoding="utf-8").strip())
     assert log_entry["media_type"] == "image/jpeg"
     assert log_entry["file_path"].startswith("data/photo_uploads/")
-    assert log_entry["processing_status"] == "needs_review"
+    assert log_entry["processing_status"] == "waiting_for_openai_credits"
     assert log_entry["classification"]["media_kind"] == "unknown_photo"
     assert log_entry["media_job"]["requires_confirmation"] is False
-    assert log_entry["extraction"]["extraction_status"] == "saved_needs_review"
+    assert log_entry["extraction"]["extraction_status"] == "waiting_for_openai_credits"
     status_data = status.json()
     assert status_data["photo_pipeline_installed"] is True
     assert status_data["upload_folder_exists"] is True
@@ -795,3 +795,77 @@ def test_offline_invoice_photo_sync_runs_ai_when_enabled(monkeypatch, tmp_path):
     assert "Invoice processed" in data["synced"][0]["reply"]
     assert "Supplier: MedCare" in data["synced"][0]["reply"]
     assert "Panadol x20" in data["synced"][0]["reply"]
+
+
+
+def test_whatsapp_voice_splits_joined_swahili_quantity_payment(monkeypatch):
+    class FakeTranscriptionService:
+        is_available = True
+
+        def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
+            return "Panadol Mbilkash"
+
+    seen: dict[str, str] = {}
+
+    def fake_process_intake_text_for_sender(text: str, sender: str) -> str:
+        seen["text"] = text
+        return "? Panadol x2 cash recorded\nStock left: 18"
+
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_transcription_service", lambda: FakeTranscriptionService())
+    monkeypatch.setattr(main, "process_intake_text_for_sender", fake_process_intake_text_for_sender)
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"fake voice bytes").decode("ascii")
+    payload["media_mime_type"] = "audio/ogg"
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=payload)
+
+    data = response.json()
+    assert response.status_code == 200
+    assert seen["text"] == "Panadol 2 cash"
+    assert "Heard: Panadol mbili cash" in data["reply"]
+    assert "Panadol x2 cash recorded" in data["reply"]
+
+
+def test_whatsapp_unknown_photo_uses_ai_to_extract_invoice_when_key_active(monkeypatch, tmp_path):
+    class FakeAIService:
+        client = object()
+
+        def extract_restock_from_image(self, image_bytes: bytes, content_type: str | None = None):
+            assert image_bytes == b"captionless invoice bytes"
+            return {
+                "supplier": "Beta Suppliers",
+                "confidence": 0.81,
+                "items": [
+                    {"drug_name": "Panadol", "quantity": 20},
+                    {"drug_name": "ORS", "quantity": 10},
+                ],
+            }
+
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_ai_service", lambda: FakeAIService())
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"captionless invoice bytes").decode("ascii")
+    payload["media_mime_type"] = "image/jpeg"
+    payload["filename"] = "photo.jpg"
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=payload)
+
+    data = response.json()
+    assert response.status_code == 200
+    assert "Invoice processed" in data["reply"]
+    assert "Supplier: Beta Suppliers" in data["reply"]
+    assert "Panadol x20" in data["reply"]

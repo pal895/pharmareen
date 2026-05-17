@@ -719,7 +719,22 @@ function mediaStatusLabel(item) {
   return "⏳ Waiting";
 }
 
+function friendlyReplySummary(value) {
+  const lines = String(value || "")
+    .replace(/\r/g, "\n")
+    .split(/\n+/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .filter(line => !/^Command:/i.test(line) && !/^Result:?$/i.test(line));
+  if (!lines.length) return "";
+  return lines.slice(0, 4).join("\n");
+}
+
 function entryLabel(item) {
+  if (item.sync_status === "synced" && item.reply) {
+    const summary = friendlyReplySummary(item.reply);
+    if (summary) return summary;
+  }
   if (item.type === "photo") {
     const label = item.display_label || mediaDisplayPrefix("photo", item.purpose);
     return `${item.sync_status === "synced" ? "✅" : "📷"} ${label}\n${mediaStatusLabel(item)}`;
@@ -794,7 +809,16 @@ async function mergeResults(queue, data) {
     if (synced.has(item.id)) {
       const result = synced.get(item.id);
       await deleteQueueEntry(item.id);
-      await addHistoryEntry({ ...item, blob: undefined, sync_status: "synced", last_error: "", reply: result.reply || result.message || "Sent successfully" });
+      await addHistoryEntry({
+        ...item,
+        blob: undefined,
+        sync_status: "synced",
+        last_error: "",
+        reply: result.reply || result.result_summary || result.message || "Synced safely",
+        result_summary: result.result_summary || result.reply || "Synced safely",
+        whatsapp_confirmation: result.whatsapp_confirmation || "ready",
+        synced_at: new Date().toISOString()
+      });
       continue;
     }
     if (failed.has(item.id)) {

@@ -317,7 +317,9 @@ def clean_voice_transcript_for_intake(transcript: str) -> str:
     clean = " ".join(str(transcript or "").replace("\n", " ").split())
     if not clean:
         return ""
+    clean = re.sub(r"\b(?:mbil(?:i|l)?|billi|bili|billy)\s*(?:kash|cash)\b", "mbili cash", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\b(?:billi|bili|billy)\b", "mbili", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\bkash\b", "cash", clean, flags=re.IGNORECASE)
     comma_parts = [part.strip() for part in clean.split(",") if part.strip()]
     if len(comma_parts) > 1 and all(len(part.split()) == 1 for part in comma_parts):
         clean = " ".join(comma_parts)
@@ -327,33 +329,60 @@ def clean_voice_transcript_for_intake(transcript: str) -> str:
     return " ".join(clean.split())
 
 
+def compact_offline_reply(reply: str, max_lines: int = 3) -> str:
+    lines = [line.strip() for line in str(reply or "").replace("\r", "\n").splitlines() if line.strip()]
+    clean_lines: list[str] = []
+    for line in lines:
+        if line.lower().startswith("command:"):
+            continue
+        if line.lower() == "result:":
+            continue
+        clean_lines.append(line)
+    if not clean_lines:
+        return "Synced safely"
+    summary = " | ".join(clean_lines[:max_lines])
+    return summary[:280]
+
+
+def offline_result_summary(entry: dict[str, Any], result: dict[str, Any]) -> str:
+    action = offline_entry_action(entry)
+    reply = str(result.get("reply") or "").strip()
+    if reply:
+        summary = compact_offline_reply(reply, max_lines=4 if action in {"voice", "audio", "photo", "image"} else 3)
+        if action in {"voice", "audio"} and "voice" not in summary.lower():
+            return f"Offline voice processed | {summary}"
+        return summary
+    if action == "sale":
+        drug = str(entry.get("drug_name") or "Sale").strip()
+        quantity = entry.get("quantity") or ""
+        payment = str(entry.get("payment_method") or "").strip()
+        return f"{drug} x{quantity}{(' ' + payment) if payment else ''} recorded".strip()
+    if action == "stock_check":
+        drug = str(entry.get("drug_name") or "Stock").strip()
+        return f"{drug} stock checked"
+    if action in {"restock", "bonus_restock", "discount_restock"}:
+        drug = str(entry.get("drug_name") or "Restock").strip()
+        quantity = entry.get("total_received_quantity") or entry.get("quantity") or ""
+        return f"{drug} +{quantity} recorded".strip()
+    if action in {"photo", "image"}:
+        return "Invoice photo saved safely"
+    if action in {"voice", "audio"}:
+        return "Voice note saved safely"
+    return "Synced safely"
+
+
 def offline_sync_success_message(entries: list[dict[str, Any]], synced: list[dict[str, Any]]) -> str:
-    synced_ids = {str(item.get("id") or "") for item in synced}
-    lines = ["✅ Offline records synced"]
+    synced_by_id = {str(item.get("id") or ""): item for item in synced}
+    lines = ["Offline records synced safely"]
     for entry in entries:
         entry_id = str(entry.get("id") or entry.get("action_id") or "").strip()
-        if entry_id not in synced_ids:
+        result = synced_by_id.get(entry_id)
+        if not result:
             continue
-        action = offline_entry_action(entry)
-        if action == "sale":
-            drug = str(entry.get("drug_name") or "Sale").strip()
-            quantity = entry.get("quantity") or ""
-            payment = str(entry.get("payment_method") or "").strip()
-            payment_text = f" {payment}" if payment else ""
-            lines.append(f"• {drug} x{quantity}{payment_text}".rstrip())
-        elif action in {"restock", "bonus_restock", "discount_restock"}:
-            drug = str(entry.get("drug_name") or "Restock").strip()
-            quantity = entry.get("total_received_quantity") or entry.get("quantity") or ""
-            lines.append(f"• {drug} +{quantity}".rstrip())
-        elif action in {"photo", "image"}:
-            lines.append("• Photo saved")
-        elif action in {"voice", "audio"}:
-            lines.append("• Voice note saved")
+        lines.append(f"- {offline_result_summary(entry, result)}")
     time_format = "%#I:%M %p" if os.name == "nt" else "%-I:%M %p"
-    lines.append(f"Saved safely at {now_in_timezone(get_settings().timezone).strftime(time_format)}")
-    message = "\n".join(lines)
-    message = re.sub(r"^.*Offline records synced", "✅ Offline records synced safely", message, count=1)
-    return message.replace("â€¢", "•").replace("• Photo saved", "• Invoice photo saved")
+    lines.append(f"Synced at {now_in_timezone(get_settings().timezone).strftime(time_format)}")
+    return "\n".join(lines)
 
 
 @app.post("/offline/sync")
@@ -401,8 +430,10 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
                         "id": entry_id,
                         "status": status,
                         "reply": result.reply,
+                        "result_summary": compact_offline_reply(result.reply),
                         "message_type": result.message_type,
                         "command_handler": result.command_handler,
+                        "whatsapp_confirmation": "ready",
                     }
                     if result.success:
                         offline_synced_entry_ids.add(entry_id)
@@ -418,13 +449,13 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
                 continue
             reply = offline_media_reply(entry)
             offline_synced_entry_ids.add(entry_id)
-            synced.append({"id": entry_id, "status": "media_logged", "reply": reply})
+            synced.append({"id": entry_id, "status": "media_logged", "reply": reply, "result_summary": compact_offline_reply(reply), "whatsapp_confirmation": "ready"})
             append_offline_sync_log(entry, "media_logged", reply, "")
             continue
         if action == "barcode_mapping":
             reply = "Barcode saved for this medicine."
             offline_synced_entry_ids.add(entry_id)
-            synced.append({"id": entry_id, "status": "synced", "reply": reply})
+            synced.append({"id": entry_id, "status": "synced", "reply": reply, "result_summary": compact_offline_reply(reply), "whatsapp_confirmation": "ready"})
             append_offline_sync_log(entry, "synced", reply, "")
             continue
 
@@ -436,14 +467,15 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
             continue
         entry_for_log = {**entry, "command_text": command_text}
         try:
-            reply = get_intake_service().process_text(command_text)
+            sync_sender = str(payload.get("sender") or entry.get("sender") or "offline_app")
+            reply = process_intake_text_for_sender(command_text, sync_sender)
             if is_offline_sync_failure_reply(reply):
                 reason = sanitize_error_message(ValueError(reply))
                 pending.append({"id": entry_id, "status": "pending", "reason": reason})
                 append_offline_sync_log(entry_for_log, "pending", "", reason)
                 continue
             offline_synced_entry_ids.add(entry_id)
-            synced.append({"id": entry_id, "status": "synced", "reply": reply})
+            synced.append({"id": entry_id, "status": "synced", "reply": reply, "result_summary": compact_offline_reply(reply), "whatsapp_confirmation": "ready"})
             append_offline_sync_log(entry_for_log, "synced", reply, "")
         except Exception as exc:
             reason = sanitize_error_message(exc)
@@ -1416,7 +1448,9 @@ async def process_whatsapp_web_payload(
         legacy_extraction_status = "saved_needs_review" if settings.openai_api_key.strip() else "saved_needs_review_openai_key_missing"
         extraction = build_invoice_extraction_placeholder(extraction_status=legacy_extraction_status)
         ai_reply = ""
-        ai_requested = photo_ai_requested(media_caption, media_purpose, classification)
+        ai_requested = photo_ai_requested(media_caption, media_purpose, classification) or bool(
+            settings.openai_api_key.strip() and classification.get("media_kind") == "unknown_photo"
+        )
         if ai_requested:
             if not settings.openai_api_key.strip():
                 extraction_status = "saved_needs_review_openai_key_missing"
@@ -1525,7 +1559,8 @@ def photo_ai_active_for_request(settings: Settings, caption: str, purpose: str, 
     media_kind = str(classification.get("media_kind") or "")
     invoice_like = media_kind in {"supplier_invoice", "supplier_receipt", "handwritten_invoice", "delivery_note"}
     explicit_invoice = any(word in direct_text for word in ["invoice", "receipt", "supplier", "delivery note"])
-    return bool(settings.openai_api_key.strip() and (invoice_like or explicit_invoice))
+    unknown_photo = media_kind == "unknown_photo"
+    return bool(settings.openai_api_key.strip() and (invoice_like or explicit_invoice or unknown_photo))
 
 
 def format_invoice_extraction_reply(extraction_result: dict[str, Any]) -> str:
@@ -1556,7 +1591,7 @@ def format_invoice_extraction_reply(extraction_result: dict[str, Any]) -> str:
             lines.append(detail)
     else:
         message = str(extraction_result.get("message") or "").strip()
-        lines.append(message or "No clear medicine rows found.")
+        lines.append(message or "No invoice data detected.")
     lines.append("Review needed before stock update.")
     return "\n".join(lines)
 

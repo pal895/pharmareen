@@ -98,13 +98,56 @@ def test_offline_sync_accepts_sale_and_restock_entries(monkeypatch, tmp_path):
     assert data["failed"] == []
     assert data["pending"] == []
     assert "Offline records synced" in data["message"]
-    assert "Panadol x2 Cash" in data["message"]
+    assert "Panadol sold 2 Cash" in data["message"]
     assert data["whatsapp_reply"] == data["message"]
     assert data["admin_message"] == data["message"]
     assert fake.messages == ["Panadol sold 2 Cash", "Panadol restock 20"]
     log_path = tmp_path / "data" / "offline_sync_log.jsonl"
     assert log_path.exists()
 
+
+
+
+def test_offline_sync_uses_backend_replies_for_whatsapp_confirmation(monkeypatch, tmp_path):
+    class ReplyingIntake:
+        def __init__(self):
+            self.messages = []
+
+        def process_text(self, text: str) -> str:
+            self.messages.append(text)
+            if "stock" in text.lower():
+                return "?? Panadol stock left: 18\nPrice: KES 220"
+            if "report" in text.lower():
+                return "?? Today report ready\nCash: KES 500\nM-Pesa: KES 300\nSales: KES 800"
+            return "? Panadol x2 cash recorded\nStock left: 18"
+
+    fake = ReplyingIntake()
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(main, "get_intake_service", lambda: fake)
+    main.offline_synced_entry_ids.clear()
+
+    payload = {
+        "sender": "254700000000@s.whatsapp.net",
+        "entries": [
+            {"id": "offline-sale", "action": "sale", "drug_name": "Panadol", "quantity": 2, "payment_method": "cash"},
+            {"id": "offline-stock", "action": "stock_check", "raw_text": "Panadol stock"},
+            {"id": "offline-report", "action": "unknown", "raw_text": "report today"},
+        ],
+    }
+
+    with TestClient(main.app) as client:
+        response = client.post("/offline/sync", json=payload)
+
+    data = response.json()
+    assert response.status_code == 200
+    assert data["status"] == "ok"
+    assert "Offline records synced safely" in data["whatsapp_reply"]
+    assert "Panadol x2 cash recorded" in data["whatsapp_reply"]
+    assert "Stock left: 18" in data["whatsapp_reply"]
+    assert "Panadol stock left: 18" in data["whatsapp_reply"]
+    assert "Today report ready" in data["whatsapp_reply"]
+    assert data["synced"][0]["result_summary"]
+    assert data["synced"][0]["whatsapp_confirmation"] == "ready"
 
 def test_offline_sync_accepts_bonus_and_discount_restock(monkeypatch, tmp_path):
     fake = FakeIntake()
@@ -384,7 +427,7 @@ def test_offline_app_uses_pharmacy_owner_language_not_technical_queue_terms():
     script = (root / "static" / "offline_app" / "app.js").read_text(encoding="utf-8")
 
     assert "Saved Offline" in html
-    assert "Sent successfully" in html
+    assert "Synced safely" in html
     assert "Tap & Talk" in html
     assert "Save Voice" in html
     assert "Save Photo" in html
@@ -444,7 +487,7 @@ def test_offline_media_items_render_pending_and_synced_labels():
     assert "Voice note saved safely" in script
     assert "Voice synced" in script
     assert "Waiting" in script
-    assert "Synced" in script
+    assert "Synced safely" in script
     assert 'sync_status: "synced"' in script
     assert "addHistoryEntry" in script
 
