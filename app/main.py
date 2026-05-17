@@ -924,9 +924,10 @@ def bridge_process_running(script_name: str) -> bool:
     script = str(script_name or "local_whatsapp_bridge.js")
     try:
         if os.name == "nt":
+            script_pattern = script.replace("'", "''")
             command = (
                 "Get-CimInstance Win32_Process | "
-                f"Where-Object {{ $_.CommandLine -match '{script.replace("'", "''")}' }} | "
+                f"Where-Object {{ $_.CommandLine -match '{script_pattern}' }} | "
                 "Select-Object -First 1 -ExpandProperty ProcessId"
             )
             result = subprocess.run(
