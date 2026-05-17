@@ -295,11 +295,9 @@ def test_voice_note_uses_mocked_transcription(monkeypatch):
         )
 
     assert response.status_code == 200
-    assert "Voice note received" in response.text
+    assert "Heard:" in response.text
     assert "Heard: Panadol two, later Cetrizine three" in response.text
     assert "Command: Panadol 2, later Cetrizine 3" in response.text
-    assert "Result:" in response.text
-    assert "Records updated" in response.text
     assert fake_intake.received == "Panadol 2, later Cetrizine 3"
 
 
@@ -436,8 +434,8 @@ def test_unclear_voice_note_asks_for_small_correction(monkeypatch):
             },
         )
 
-    assert "I heard: maybe panadol. I need one small correction." in first.text
-    assert "Try: Panadol 2 / +Panadol 20 / bonus Panadol 5." in first.text
+    assert "I could not safely record that." in first.text
+    assert "Try: Panadol 2 cash" in first.text
     assert fake_intake.received == ""
 
 

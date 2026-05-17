@@ -286,6 +286,9 @@ NUMBER_WORDS = {
     "thousand": 1000,
     "moja": 1,
     "mbili": 2,
+    "bili": 2,
+    "billi": 2,
+    "billy": 2,
     "tatu": 3,
     "nne": 4,
     "ine": 4,
@@ -362,6 +365,7 @@ class IntakeService:
         self.staff_by_conversation: dict[str, str] = {}
         self.last_sale_by_conversation: dict[str, dict[str, Any]] = {}
         self.pending_void_reason: dict[str, dict[str, Any]] = {}
+        self.pending_void_confirmation: dict[str, dict[str, Any]] = {}
         self.conversions_by_drug: dict[str, dict[str, int]] = {}
         self.aliases_by_key = self._load_pharmacy_aliases()
         self.receipt_printing_enabled = False
@@ -373,6 +377,17 @@ class IntakeService:
             return "Please send a short text message or voice note."
 
         conversation_key = conversation_id or "__default__"
+        pending_void_confirmation = self.pending_void_confirmation.get(conversation_key)
+        if pending_void_confirmation is not None:
+            response_key = normalize_key(text)
+            if response_key in {"yes", "y", "confirm", "ndio", "sawa"}:
+                self.pending_void_confirmation.pop(conversation_key, None)
+                return self._commit_void(pending_void_confirmation, "Confirmed by user", conversation_key)
+            if response_key in {"cancel", "stop", "no", "hapana"}:
+                self.pending_void_confirmation.pop(conversation_key, None)
+                return "No problem. The sale was not undone."
+            return "Reply YES to undo the last sale, or CANCEL."
+
         pending_void = self.pending_void_reason.get(conversation_key)
         if pending_void is not None:
             if normalize_key(text) in {"cancel", "stop"}:
@@ -1508,10 +1523,20 @@ class IntakeService:
             icon = {"Cash": "💵", "M-Pesa": "📱", "Card": "💳", "Credit": "🧾"}.get(payment, "💳")
             return f"{icon} {payment} received {day_label}: {format_kes(payment_totals.get(payment, 0))}"
         if intent.get("type") == "top_payment":
-            top_payment, amount = sorted(payment_totals.items(), key=lambda item: (-item[1], item[0]))[0]
-            if amount <= 0:
+            payment_counts = totals.get("payment_counts", {})
+            ranked = [
+                (method, payment_totals.get(method, 0), payment_counts.get(method, 0))
+                for method in ["Cash", "M-Pesa", "Card", "Credit"]
+                if payment_totals.get(method, 0) or payment_counts.get(method, 0)
+            ]
+            if not ranked:
                 return f"No payment records found for {day_label} yet."
-            return f"💳 Top payment {day_label}: {top_payment} — {format_kes(amount)}"
+            ranked.sort(key=lambda item: (-item[2], -item[1], item[0]))
+            top_method, top_amount, top_count = ranked[0]
+            lines = [f"Most used payment {day_label}: {top_method} - {format_kes(top_amount)} / {top_count} sales"]
+            for method, amount, count in ranked[1:4]:
+                lines.append(f"{method} - {format_kes(amount)} / {count} sales")
+            return "\n".join(lines)
         if intent.get("type") == "payment_breakdown":
             if not any(payment_totals.values()):
                 return f"No payment records found for {day_label} yet."
@@ -1612,6 +1637,17 @@ class IntakeService:
                 category="errors",
             )
         reason = command.notes.strip()
+        if reason == "__confirm_void__":
+            self.pending_void_confirmation[conversation_key] = sale
+            drug_name = str(sale.get("drug_name") or "sale")
+            display_quantity = parse_int(sale.get("display_quantity"), default=parse_int(sale.get("quantity"), default=0)) or 0
+            payment = str(sale.get("payment_method") or "Cash")
+            return EntryResult(
+                logged=False,
+                reply=f"Undo last sale: {drug_name} x{display_quantity} {payment}?\nReply YES to confirm.",
+                summary_line="Undo confirmation needed",
+                category="errors",
+            )
         if not reason:
             self.pending_void_reason[conversation_key] = sale
             return EntryResult(
@@ -1837,7 +1873,8 @@ class IntakeService:
             return "I could not update that sale right now. Please check the connection."
         sale["display_quantity"] = new_display
         sale["quantity"] = new_base
-        return f"✅ Updated last sale quantity: {old_display} → {new_display}"
+        return f"✅ Updated last {drug_name} sale quantity: {old_display} → {new_display}"
+
 
     def _best_seller_reply(self, text: str) -> str:
         now = now_in_timezone(self.timezone)
@@ -2000,6 +2037,7 @@ def low_stock_status_text(current_stock: Any) -> str:
 
 def payment_totals_from_transactions(transactions: list[dict[str, Any]]) -> dict[str, Any]:
     payment_totals = {"Cash": 0.0, "M-Pesa": 0.0, "Card": 0.0, "Credit": 0.0}
+    payment_counts = {"Cash": 0, "M-Pesa": 0, "Card": 0, "Credit": 0}
     discount_total = 0.0
     total_sales = 0.0
     profit = 0.0
@@ -2017,17 +2055,21 @@ def payment_totals_from_transactions(transactions: list[dict[str, Any]]) -> dict
             amount = parse_money(note_meta.get(key))
             if amount:
                 payment_totals[label] = payment_totals.get(label, 0) + amount
+                payment_counts[label] = payment_counts.get(label, 0) + 1
                 split_used = True
         if not split_used:
             payment = note_meta.get("payment", "Cash")
             payment = "M-Pesa" if normalize_key(payment) in {"mpesa", "m pesa", "m-pesa"} else payment.title()
             payment_totals.setdefault(payment, 0.0)
+            payment_counts.setdefault(payment, 0)
             payment_totals[payment] += row_sales
+            payment_counts[payment] += 1
         discount_total += row_discount
         total_sales += row_sales
         profit += row_profit
     return {
         "payment_totals": payment_totals,
+        "payment_counts": payment_counts,
         "discounts": discount_total,
         "total_sales": total_sales,
         "profit": profit,
@@ -2210,7 +2252,17 @@ def parse_analytics_command(text: str) -> dict[str, str] | None:
         return {"type": "best_seller", "day": day}
     if any(phrase in key for phrase in ["peak hour", "peak hours", "busiest time", "busiest hour", "rush hour"]):
         return {"type": "peak_hours", "day": day}
-    if any(phrase in key for phrase in ["top payment", "top payment method", "top payment methods"]):
+    if any(phrase in key for phrase in [
+        "top payment",
+        "top payment method",
+        "top payment methods",
+        "which payment method",
+        "payment method was used most",
+        "payment was used most",
+        "most used payment",
+        "most used payment method",
+        "payment method used most",
+    ]):
         return {"type": "top_payment", "day": day}
     if any(phrase in key for phrase in ["payment breakdown", "payments breakdown", "payment split", "payment methods today"]):
         return {"type": "payment_breakdown", "day": day}
@@ -2366,6 +2418,13 @@ def parse_payment_correction_command(text: str) -> tuple[str, str] | None:
 
 def parse_quantity_correction_command(text: str) -> dict[str, Any] | None:
     clean = normalize_natural_text(replace_number_words(text.strip()))
+    match = re.fullmatch(
+        r"(?:nilikosea|nimekosea|wrong\s+quantity|nilikosea\s+quantity|ile\s+ya\s+mwisho\s+ilikuwa\s+wrong\s+quantity)\s+(?:ilikuwa|iwe|to)?\s*(\d+)",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return {"mode": "set", "quantity": positive_quantity(match.group(1))}
     match = re.fullmatch(r"(?:badilisha|change|update)\s+(?:ile\s+ya\s+mwisho|ya\s+mwisho|last|last\s+sale)\s+(?:iwe|to)\s+(\d+)", clean, flags=re.IGNORECASE)
     if not match:
         match = re.fullmatch(r"(?:fanya|make|weka)\s+(?:iwe|it|last|ya\s+mwisho)?\s*(?:to|iwe)?\s*(\d+)", clean, flags=re.IGNORECASE)
@@ -2987,6 +3046,14 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
     staff_name = parse_staff_name(clean)
     if staff_name:
         return OperatingCommand(kind="set_staff", staff_name=staff_name, raw_text=text)
+
+    swahili_void_match = re.fullmatch(
+        r"(?:undo|void|cancel)\s+(?:hiyo\s+ya\s+mwisho|ile\s+ya\s+mwisho|ya\s+mwisho|last\s+sale)",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    if swahili_void_match:
+        return OperatingCommand(kind="void", notes="__confirm_void__", raw_text=text)
 
     void_match = re.fullmatch(r"(?:void|undo|correct)\s+(?:last|sale(?:\s+([A-Za-z0-9_-]+))?)(?:\s+(.+))?", clean, flags=re.IGNORECASE)
     if void_match:

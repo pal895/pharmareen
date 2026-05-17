@@ -298,6 +298,35 @@ def offline_media_reply(entry: dict[str, Any]) -> str:
     return "Voice/photo saved safely. Needs review."
 
 
+def media_base64_from_offline_entry(entry: dict[str, Any]) -> tuple[str, str]:
+    media_base64 = str(entry.get("media_base64") or "").strip()
+    mime_type = str(entry.get("media_mime_type") or entry.get("file_type") or "").strip()
+    data_url = str(entry.get("data_url") or "").strip()
+    if not media_base64 and data_url:
+        if data_url.startswith("data:") and "," in data_url:
+            header, encoded = data_url.split(",", 1)
+            media_base64 = encoded.strip()
+            if not mime_type:
+                mime_type = header[5:].split(";", 1)[0].strip()
+        else:
+            media_base64 = data_url
+    return media_base64, mime_type
+
+
+def clean_voice_transcript_for_intake(transcript: str) -> str:
+    clean = " ".join(str(transcript or "").replace("\n", " ").split())
+    if not clean:
+        return ""
+    clean = re.sub(r"\b(?:billi|bili|billy)\b", "mbili", clean, flags=re.IGNORECASE)
+    comma_parts = [part.strip() for part in clean.split(",") if part.strip()]
+    if len(comma_parts) > 1 and all(len(part.split()) == 1 for part in comma_parts):
+        clean = " ".join(comma_parts)
+    else:
+        clean = ", ".join(comma_parts) if comma_parts else clean
+    clean = re.sub(r"\s+na\s+(?=[A-Za-z])", ", ", clean, flags=re.IGNORECASE)
+    return " ".join(clean.split())
+
+
 def offline_sync_success_message(entries: list[dict[str, Any]], synced: list[dict[str, Any]]) -> str:
     synced_ids = {str(item.get("id") or "") for item in synced}
     lines = ["✅ Offline records synced"]
@@ -354,6 +383,39 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
             append_offline_sync_log(entry, "already_synced", "Already synced.", "")
             continue
         if action in {"photo", "image", "voice", "audio"}:
+            media_base64, media_mime_type = media_base64_from_offline_entry(entry)
+            if media_base64 and media_mime_type:
+                try:
+                    result = await process_whatsapp_web_payload(
+                        message="",
+                        sender=str(payload.get("sender") or entry.get("sender") or "offline_app"),
+                        message_id=entry_id,
+                        media_base64=media_base64,
+                        media_mime_type=media_mime_type,
+                        media_caption=str(entry.get("command_text") or entry.get("raw_text") or entry.get("purpose") or ""),
+                        media_filename=str(entry.get("file_name") or ""),
+                        media_purpose=str(entry.get("purpose") or action),
+                    )
+                    status = "synced" if result.success else "pending"
+                    record = {
+                        "id": entry_id,
+                        "status": status,
+                        "reply": result.reply,
+                        "message_type": result.message_type,
+                        "command_handler": result.command_handler,
+                    }
+                    if result.success:
+                        offline_synced_entry_ids.add(entry_id)
+                        synced.append(record)
+                        append_offline_sync_log(entry, "synced", result.reply, "")
+                    else:
+                        pending.append({"id": entry_id, "status": "pending", "reason": result.reply or result.error_reason})
+                        append_offline_sync_log(entry, "pending", result.reply, result.error_reason)
+                except Exception as exc:
+                    reason = sanitize_error_message(exc)
+                    pending.append({"id": entry_id, "status": "pending", "reason": reason})
+                    append_offline_sync_log(entry, "pending", "", reason)
+                continue
             reply = offline_media_reply(entry)
             offline_synced_entry_ids.add(entry_id)
             synced.append({"id": entry_id, "status": "media_logged", "reply": reply})
@@ -1283,8 +1345,9 @@ async def process_whatsapp_web_payload(
             )
         try:
             audio_bytes = base64.b64decode(media_base64)
-            transcript = transcription_service.transcribe_audio(audio_bytes, media_mime_type)
+            raw_transcript = transcription_service.transcribe_audio(audio_bytes, media_mime_type)
             clear_last_openai_error("voice")
+            transcript = clean_voice_transcript_for_intake(raw_transcript)
             if voice_transcribe_only:
                 clean_transcript = transcript.strip()
                 if not clean_transcript:
@@ -1360,11 +1423,11 @@ async def process_whatsapp_web_payload(
                 media_job["processing_status"] = extraction_status
                 extraction = build_invoice_extraction_placeholder(extraction_status=extraction_status)
                 ai_reply = "📷 Photo received safely. AI reading is not enabled yet."
-            elif not photo_ai_enabled():
+            elif not photo_ai_active_for_request(settings, media_caption, media_purpose, classification):
                 extraction_status = "saved_needs_review_ai_disabled"
                 media_job["processing_status"] = extraction_status
                 extraction = build_invoice_extraction_placeholder(extraction_status=extraction_status)
-                ai_reply = "📷 Photo received safely. AI reading is switched off for now."
+                ai_reply = "Photo received safely. AI reading is switched off for now."
             else:
                 try:
                     extraction_result = get_ai_service().extract_restock_from_image(image_bytes, media_mime_type)
@@ -1449,10 +1512,20 @@ def photo_ai_enabled() -> bool:
 
 def photo_ai_requested(caption: str, purpose: str, classification: dict[str, Any]) -> bool:
     direct_text = " ".join([str(caption or ""), str(purpose or "")]).lower()
-    if any(word in direct_text for word in ["scan", "analyze", "analyse", "read", "extract"]):
+    if any(word in direct_text for word in ["scan", "analyze", "analyse", "read", "extract", "invoice", "receipt", "supplier"]):
         return True
     media_kind = str(classification.get("media_kind") or "")
     return photo_ai_enabled() and media_kind in {"supplier_invoice", "supplier_receipt", "handwritten_invoice", "delivery_note"}
+
+
+def photo_ai_active_for_request(settings: Settings, caption: str, purpose: str, classification: dict[str, Any]) -> bool:
+    if photo_ai_enabled():
+        return True
+    direct_text = " ".join([str(caption or ""), str(purpose or "")]).lower()
+    media_kind = str(classification.get("media_kind") or "")
+    invoice_like = media_kind in {"supplier_invoice", "supplier_receipt", "handwritten_invoice", "delivery_note"}
+    explicit_invoice = any(word in direct_text for word in ["invoice", "receipt", "supplier", "delivery note"])
+    return bool(settings.openai_api_key.strip() and (invoice_like or explicit_invoice))
 
 
 def format_invoice_extraction_reply(extraction_result: dict[str, Any]) -> str:
@@ -1728,7 +1801,7 @@ async def incoming_text_from_form(
                 )
             try:
                 audio_bytes = await whatsapp.download_media(media_url)
-                transcript = transcription_service.transcribe_audio(audio_bytes, content_type)
+                transcript = clean_voice_transcript_for_intake(transcription_service.transcribe_audio(audio_bytes, content_type))
             except TranscriptionUnavailableError as exc:
                 raise UnsupportedInputError(voice_transcription_failed_message()) from exc
             except Exception as exc:
@@ -1748,30 +1821,31 @@ async def incoming_text_from_form(
 
 def voice_reply(original_transcript: str, interpreted_command: str, processed_reply: str) -> str:
     lower_reply = processed_reply.lower()
-    if (
-        "could not understand" in lower_reply
-        or "please send it like" in lower_reply
-        or "didn’t understand" in lower_reply
-        or "didn't understand" in lower_reply
-    ):
+    failure_markers = [
+        "could not understand",
+        "could not be understood",
+        "not fully sure",
+        "please send it like",
+        "didn\u2019t understand",
+        "didn't understand",
+        "was not found in inventory",
+        "did you mean",
+        "which medicine",
+    ]
+    if any(marker in lower_reply for marker in failure_markers) or ("errors:" in lower_reply and "- none" not in lower_reply):
         return voice_needs_correction_reply(original_transcript)
     clean_reply = processed_reply
-    if clean_reply.startswith("✅ Batch processed\n\n"):
-        clean_reply = clean_reply.replace("✅ Batch processed\n\n", "", 1)
+    if clean_reply.startswith("\u2705 Batch processed\n\n"):
+        clean_reply = clean_reply.replace("\u2705 Batch processed\n\n", "", 1)
     clean_reply = clean_reply.replace("\n\nErrors:\n- None", "")
     return "\n".join(
         [
-            "🎙 Voice note received",
-            f"Heard: {original_transcript}",
+            f"\U0001F399 Heard: {original_transcript}",
             f"Command: {interpreted_command}",
             "",
-            "Result:",
             clean_reply,
-            "",
-            "✅ Records updated safely.",
         ]
     )
-
 
 def unclear_voice_message() -> str:
     return "⚠️ I could not clearly understand the voice note.\nPlease type it like:\nPanadol 2\nAmoxil 1"
@@ -1780,10 +1854,10 @@ def unclear_voice_message() -> str:
 def voice_needs_correction_reply(transcript: str) -> str:
     heard = transcript.strip() or "nothing clear"
     return (
-        f"I heard: {heard}. I need one small correction.\n"
-        "Try: Panadol 2 / +Panadol 20 / bonus Panadol 5."
+        f"\U0001F399 Heard: {heard}\n"
+        "I could not safely record that.\n"
+        "Try: Panadol 2 cash"
     )
-
 
 def voice_transcription_failed_message() -> str:
     return "🎙 I heard the voice but could not read it clearly. Try saying: \"Panadol two\" or type: Panadol 2."

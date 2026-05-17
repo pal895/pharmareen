@@ -4,5 +4,5 @@
 {"id": "pay_004", "category": "payments", "text": "Panadol 1 card", "expect_contains": ["Panadol x1", "Stock"], "ai_allowed": false, "simulate": true}
 {"id": "pay_005", "category": "payments", "text": "Panadol 2 cash 100 mpesa 200", "expect_contains": ["Panadol x2", "Stock"], "ai_allowed": false, "simulate": true}
 {"id": "pay_006", "category": "payments", "text": "cash summary", "expect_contains": ["Daily Cash Summary"], "ai_allowed": false, "simulate": true}
-{"id": "pay_007", "category": "payments", "text": "Top payment methods today", "expect_contains": ["Top payment today"], "ai_allowed": false, "simulate": true}
+{"id": "pay_007", "category": "payments", "text": "Top payment methods today", "expect_contains": ["Most used payment today"], "ai_allowed": false, "simulate": true}
 {"id": "pay_008", "category": "payments", "text": "How much Mpesa imeingia leo", "expect_contains": ["M-Pesa received today"], "ai_allowed": false, "simulate": true}

@@ -5,6 +5,7 @@ import mimetypes
 from openai import OpenAI
 
 from app.config import Settings
+from app.ai import log_ai_call
 
 
 class TranscriptionUnavailableError(RuntimeError):
@@ -32,6 +33,7 @@ class TranscriptionService:
         extension = mimetypes.guess_extension(clean_content_type) or ".ogg"
         filename = f"voice-note{extension}"
 
+        log_ai_call("voice_transcription", "audio/transcriptions", "voice note transcription")
         result = self.client.audio.transcriptions.create(
             model=self.settings.openai_transcription_model,
             file=(filename, audio_bytes, clean_content_type),

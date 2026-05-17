@@ -1,9 +1,9 @@
 {"id": "corr2_001", "category": "memory", "text": "Panadol 2 cash", "expect_contains": ["Panadol x2", "Stock left"], "ai_allowed": false, "simulate": true}
 {"id": "corr2_002", "category": "memory", "text": "badilisha payment iwe mpesa", "expect_contains": ["Updated last Panadol sale", "M-Pesa"], "ai_allowed": false, "simulate": true}
 {"id": "corr2_003", "category": "memory", "text": "nilikosea quantity", "expect_contains": ["Ni quantity gani sahihi"], "ai_allowed": false, "simulate": true}
-{"id": "corr2_004", "category": "memory", "text": "fanya iwe 5", "expect_contains": ["Updated last sale quantity", "5"], "ai_allowed": false, "simulate": true}
-{"id": "corr2_005", "category": "memory", "text": "punguza mbili", "expect_contains": ["Updated last sale quantity", "3"], "ai_allowed": false, "simulate": true}
-{"id": "corr2_006", "category": "memory", "text": "ongeza moja", "expect_contains": ["Updated last sale quantity", "4"], "ai_allowed": false, "simulate": true}
+{"id": "corr2_004", "category": "memory", "text": "fanya iwe 5", "expect_contains": ["Updated last Panadol sale quantity", "5"], "ai_allowed": false, "simulate": true}
+{"id": "corr2_005", "category": "memory", "text": "punguza mbili", "expect_contains": ["Updated last Panadol sale quantity", "3"], "ai_allowed": false, "simulate": true}
+{"id": "corr2_006", "category": "memory", "text": "ongeza moja", "expect_contains": ["Updated last Panadol sale quantity", "4"], "ai_allowed": false, "simulate": true}
 {"id": "corr2_007", "category": "memory", "text": "receipt ya mwisho", "expect_contains": ["PHARMAREEN RECEIPT", "Medicine: Panadol"], "ai_allowed": false, "simulate": true}
 {"id": "corr2_008", "category": "correction", "text": "undo hiyo ya mwisho", "simulate": false, "expected": "void last with reason if needed", "ai_allowed": false}
 {"id": "corr2_009", "category": "correction", "text": "no nilimaanisha amoxicillin", "simulate": false, "expected": "safe medicine correction clarification", "ai_allowed": false}

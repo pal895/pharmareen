@@ -328,8 +328,8 @@ def test_whatsapp_web_bridge_processes_voice_transcript_through_local_intake(mon
     data = response.json()
     assert data["status"] == "ok"
     assert data["command_handler"] == "voice_note_processed"
-    assert "Voice note received" in data["reply"]
-    assert "Heard: Panadol mbili cash na Amox moja mpesa" in data["reply"]
+    assert "Heard:" in data["reply"]
+    assert "Heard: Panadol mbili cash, Amox moja mpesa" in data["reply"]
     assert "Panadol x2 cash" in data["reply"]
     assert seen["sender"] == "254700000000@s.whatsapp.net"
 
@@ -419,12 +419,19 @@ def test_whatsapp_web_bridge_photo_quota_fallback(monkeypatch, tmp_path):
     assert status_data["last_uploaded_image"]["file_path"].startswith("data/photo_uploads/")
 
 
-def test_whatsapp_web_bridge_classifies_invoice_photo_without_calling_ai(monkeypatch, tmp_path):
-    class FailingAIService:
+
+def test_whatsapp_web_bridge_processes_invoice_photo_with_ai_when_key_active(monkeypatch, tmp_path):
+    class FakeAIService:
         client = object()
 
         def extract_restock_from_image(self, image_bytes: bytes, content_type: str | None = None):
-            raise AssertionError("photo intake should not call AI unless extraction is explicitly requested")
+            assert image_bytes == b"invoice image bytes"
+            assert content_type == "image/jpeg"
+            return {
+                "supplier": "MedCare",
+                "confidence": 0.9,
+                "items": [{"drug_name": "Panadol", "quantity": 20}],
+            }
 
     monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(
@@ -432,7 +439,7 @@ def test_whatsapp_web_bridge_classifies_invoice_photo_without_calling_ai(monkeyp
         "get_settings",
         lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
     )
-    monkeypatch.setattr(main, "get_ai_service", lambda: FailingAIService())
+    monkeypatch.setattr(main, "get_ai_service", lambda: FakeAIService())
 
     payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
     payload["media_base64"] = base64.b64encode(b"invoice image bytes").decode("ascii")
@@ -444,11 +451,12 @@ def test_whatsapp_web_bridge_classifies_invoice_photo_without_calling_ai(monkeyp
 
     assert response.status_code == 200
     data = response.json()
-    assert data["reply"] == "📷 Photo received safely. This looks like a supplier invoice.\nWaiting for your confirmation before stock update."
+    assert "Invoice processed" in data["reply"]
+    assert "Supplier: MedCare" in data["reply"]
+    assert "Panadol x20" in data["reply"]
     log_entry = json.loads((tmp_path / "data" / "photo_intake_log.jsonl").read_text(encoding="utf-8").strip())
     assert log_entry["classification"]["media_kind"] == "supplier_invoice"
     assert log_entry["media_job"]["requires_confirmation"] is True
-
 
 def test_whatsapp_web_bridge_runs_invoice_ai_when_scan_is_requested(monkeypatch, tmp_path):
     class FakeAIService:
@@ -631,3 +639,159 @@ def test_windows_local_bridge_helper_requires_backend_and_allowlist():
     assert "set ALLOWED_WHATSAPP_NUMBERS=254757637709" in guide
     assert "set ALLOW_ALL_DIRECT_CHATS_FOR_TEST=true" in guide
     assert "require('./baileys-bridge')" in wrapper
+
+
+
+def test_whatsapp_voice_cleans_swahili_misheard_number_and_records(monkeypatch):
+    class FakeTranscriptionService:
+        is_available = True
+
+        def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
+            assert audio_bytes == b"fake voice bytes"
+            return "Panadol, billi, cash"
+
+    seen: dict[str, str] = {}
+
+    def fake_process_intake_text_for_sender(text: str, sender: str) -> str:
+        seen["text"] = text
+        return "? Panadol x2 cash recorded\nStock left: 18"
+
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_transcription_service", lambda: FakeTranscriptionService())
+    monkeypatch.setattr(main, "process_intake_text_for_sender", fake_process_intake_text_for_sender)
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"fake voice bytes").decode("ascii")
+    payload["media_mime_type"] = "audio/ogg"
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=payload)
+
+    data = response.json()
+    assert response.status_code == 200
+    assert data["status"] == "ok"
+    assert seen["text"] == "Panadol 2 cash"
+    assert "Heard: Panadol mbili cash" in data["reply"]
+    assert "Panadol x2 cash recorded" in data["reply"]
+
+
+def test_whatsapp_voice_does_not_claim_records_updated_when_parse_fails(monkeypatch):
+    class FakeTranscriptionService:
+        is_available = True
+
+        def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
+            return "Panadol, billi, cash"
+
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_transcription_service", lambda: FakeTranscriptionService())
+    monkeypatch.setattr(main, "process_intake_text_for_sender", lambda text, sender: "I am not fully sure what you meant.")
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"fake voice bytes").decode("ascii")
+    payload["media_mime_type"] = "audio/ogg"
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=payload)
+
+    data = response.json()
+    assert response.status_code == 200
+    assert "I could not safely record that" in data["reply"]
+    assert "Records updated safely" not in data["reply"]
+
+
+def test_offline_voice_sync_transcribes_and_returns_parsed_confirmation(monkeypatch, tmp_path):
+    class FakeTranscriptionService:
+        is_available = True
+
+        def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
+            assert audio_bytes == b"offline voice"
+            assert content_type == "audio/ogg"
+            return "Panadol mbili cash"
+
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(main, "get_transcription_service", lambda: FakeTranscriptionService())
+    monkeypatch.setattr(main, "process_intake_text_for_sender", lambda text, sender: "? Panadol x2 cash recorded\nStock left: 18")
+    main.offline_synced_entry_ids.clear()
+
+    payload = {
+        "sender": "254700000000@s.whatsapp.net",
+        "entries": [
+            {
+                "id": "voice-ai-1",
+                "action": "audio",
+                "file_type": "audio/ogg",
+                "data_url": "data:audio/ogg;base64," + base64.b64encode(b"offline voice").decode("ascii"),
+                "sync_status": "pending",
+            }
+        ],
+    }
+
+    with TestClient(main.app) as client:
+        response = client.post("/offline/sync", json=payload)
+
+    data = response.json()
+    assert response.status_code == 200
+    assert data["status"] == "ok"
+    assert data["synced"][0]["message_type"] == "voice"
+    assert "Panadol x2 cash recorded" in data["synced"][0]["reply"]
+    assert "Offline records synced safely" in data["whatsapp_reply"]
+
+
+def test_offline_invoice_photo_sync_runs_ai_when_enabled(monkeypatch, tmp_path):
+    class FakeAIService:
+        client = object()
+
+        def extract_restock_from_image(self, image_bytes: bytes, content_type: str | None = None):
+            assert image_bytes == b"invoice bytes"
+            assert content_type == "image/jpeg"
+            return {
+                "supplier": "MedCare",
+                "confidence": 0.88,
+                "items": [
+                    {"drug_name": "Panadol", "quantity": 20},
+                    {"drug_name": "ORS", "quantity": 10},
+                ],
+            }
+
+    monkeypatch.setenv("ENABLE_INVOICE_AI", "true")
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_ai_service", lambda: FakeAIService())
+    main.offline_synced_entry_ids.clear()
+
+    payload = {
+        "sender": "254700000000@s.whatsapp.net",
+        "entries": [
+            {
+                "id": "photo-ai-1",
+                "action": "photo",
+                "file_name": "supplier-invoice.jpg",
+                "file_type": "image/jpeg",
+                "purpose": "invoice_photo",
+                "data_url": "data:image/jpeg;base64," + base64.b64encode(b"invoice bytes").decode("ascii"),
+                "sync_status": "pending",
+            }
+        ],
+    }
+
+    with TestClient(main.app) as client:
+        response = client.post("/offline/sync", json=payload)
+
+    data = response.json()
+    assert response.status_code == 200
+    assert data["synced"][0]["message_type"] == "image"
+    assert "Invoice processed" in data["synced"][0]["reply"]
+    assert "Supplier: MedCare" in data["synced"][0]["reply"]
+    assert "Panadol x20" in data["synced"][0]["reply"]

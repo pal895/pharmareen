@@ -508,9 +508,9 @@ def test_last_sale_payment_and_quantity_corrections_are_short():
 
     assert "Updated last Panadol sale: Cash" in payment_reply
     assert "M-Pesa" in payment_reply
-    assert "Updated last sale quantity: 2" in quantity_reply
+    assert "Updated last Panadol sale quantity: 2" in quantity_reply
     assert "5" in quantity_reply
-    assert "Updated last sale quantity: 5" in reduce_reply
+    assert "Updated last Panadol sale quantity: 5" in reduce_reply
     assert "4" in reduce_reply
     assert store.stocks["panadol"].current_stock == 16
 
@@ -1349,7 +1349,7 @@ def test_deterministic_analytics_router_handles_payment_peak_and_best_seller_wit
     assert best == "Best seller today: Panadol — 2 sold"
     assert "Cash received today: KES 440" in cash
     assert "M-Pesa received today: KES 450" in mpesa
-    assert "Top payment today: M-Pesa" in top_payment or "Top payment today: Cash" in top_payment
+    assert "Most used payment today:" in top_payment
     assert "Peak time today:" in peak
     assert "Top medicines:" in peak
     assert "Payments:" in peak
@@ -1454,11 +1454,55 @@ def test_short_correction_and_receipt_variants_use_local_memory_without_ai():
 
     assert "Updated last Panadol sale" in payment_reply
     assert "M-Pesa" in payment_reply
-    assert "Updated last sale quantity: 2" in qty_reply
+    assert "Updated last Panadol sale quantity: 2" in qty_reply
     assert "5" in qty_reply
-    assert "Updated last sale quantity: 5" in inc_reply
+    assert "Updated last Panadol sale quantity: 5" in inc_reply
     assert "6" in inc_reply
     assert "PHARMAREEN RECEIPT" in receipt
     assert "Payment: M-Pesa" in receipt
     assert "Amount:" in receipt
+    assert parser.called is False
+
+
+
+def test_quantity_correction_swahili_updates_last_sale_quantity():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    service.process_text("Panadol 2 cash", conversation_id="owner")
+    reply = service.process_text("nilikosea ilikuwa 5", conversation_id="owner")
+
+    assert "Updated last Panadol sale quantity: 2" in reply
+    assert "5" in reply
+    assert store.stocks["panadol"].current_stock == 15
+    assert store.transactions[-1]["Type"] == "correction"
+
+
+def test_swahili_undo_last_sale_asks_short_confirmation_then_reverses_stock():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    service.process_text("Panadol 2 cash", conversation_id="owner")
+    confirm = service.process_text("undo hiyo ya mwisho", conversation_id="owner")
+    final = service.process_text("YES", conversation_id="owner")
+
+    assert confirm == "Undo last sale: Panadol x2 Cash?\nReply YES to confirm."
+    assert "Sale voided" in final
+    assert store.stocks["panadol"].current_stock == 20
+    assert store.transactions[-1]["Type"] == "void"
+
+
+def test_payment_method_used_most_is_deterministic_without_ai_parser():
+    store = FakeStore()
+    parser = FailingParser()
+    service = IntakeService(parser, store)
+
+    service.process_text("Panadol 2 cash")
+    service.process_text("Amoxyl 1 mpesa")
+    service.process_text("ORS 1 cash")
+    reply = service.process_text("Which payment method was used most")
+
+    assert "Most used payment today: Cash" in reply
+    assert "M-Pesa" in reply
+    assert "/ 2 sales" in reply
     assert parser.called is False
