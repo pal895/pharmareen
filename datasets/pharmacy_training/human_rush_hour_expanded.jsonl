@@ -1,0 +1,15 @@
+{"id": "rush2_001", "category": "rush_hour", "text": "P2cash", "expect_contains": ["Panadol x2", "Stock left"], "ai_allowed": false, "simulate": true}
+{"id": "rush2_002", "category": "rush_hour", "text": "Pan2mpesa", "expect_contains": ["Panadol x2", "Stock left"], "ai_allowed": false, "simulate": true}
+{"id": "rush2_003", "category": "rush_hour", "text": "Amox5", "expect_contains": ["Amoxyl x5", "Stock left"], "ai_allowed": false, "simulate": true}
+{"id": "rush2_004", "category": "rush_hour", "text": "Panadol tatu mpesa", "expect_contains": ["Panadol x3", "Stock left"], "ai_allowed": false, "simulate": true}
+{"id": "rush2_005", "category": "rush_hour", "text": "Piriton 1 cash", "expect_contains": ["Piriton x1", "Stock left"], "ai_allowed": false, "simulate": true}
+{"id": "rush2_006", "category": "rush_hour", "text": "ORS2cash", "expect_contains": ["ORS x2", "Stock left"], "ai_allowed": false, "simulate": true}
+{"id": "rush2_007", "category": "rush_hour", "text": "Antacid3mpesa", "expect_contains": ["Antacid x3", "Stock left"], "ai_allowed": false, "simulate": true}
+{"id": "rush2_008", "category": "rush_hour", "text": "Panadol2cash Amoxyl1mpesa ORS3cash", "expect_contains": ["Batch processed", "Panadol x2", "Amoxyl x1", "ORS x3"], "ai_allowed": false, "simulate": false, "expected": "continuous compact multi-payment teaching case"}
+{"id": "rush2_009", "category": "rush_hour", "text": "Panadol 2; Amoxyl 1; ORS 3", "expect_contains": ["Batch processed", "Panadol x2", "Amoxyl x1", "ORS x3"], "ai_allowed": false, "simulate": true}
+{"id": "rush2_010", "category": "rush_hour", "text": "late Panadol 2; late Amoxyl 1", "expect_contains": ["Batch processed", "Late Sales"], "ai_allowed": false, "simulate": true}
+{"id": "rush2_011", "category": "rush_hour", "text": "Panadol 1 tablet credit", "expect_contains": ["Panadol x1 tablet", "Stock left"], "ai_allowed": false, "simulate": true}
+{"id": "rush2_012", "category": "rush_hour", "text": "Panadol 2 strips mpesa", "expect_contains": ["Panadol x2 strips", "Equivalent"], "ai_allowed": false, "simulate": true}
+{"id": "rush2_013", "category": "rush_hour", "text": "Panadol 1 box cash", "expect_contains": ["Panadol x1 box", "Equivalent"], "ai_allowed": false, "simulate": true}
+{"id": "rush2_014", "category": "rush_hour", "text": "stock pan", "expect_contains": ["Panadol stock left"], "ai_allowed": false, "simulate": true}
+{"id": "rush2_015", "category": "rush_hour", "text": "Panadolstock", "expect_contains": ["Panadol stock left"], "ai_allowed": false, "simulate": true}

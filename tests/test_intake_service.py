@@ -256,7 +256,7 @@ def test_sale_with_strip_unit_payment_and_discount_records_engine_metadata():
 
     assert "Panadol x1 strip recorded" in reply
     assert "Equivalent: 10 tablets" in reply
-    assert "Stock: 10 tablets" in reply
+    assert "Stock left: 10 tablets" in reply
     assert "Profit:" not in reply
     details = service.process_text("details last", conversation_id="staff-phone")
     assert "Payment: M-Pesa" in details
@@ -281,7 +281,7 @@ def test_restock_box_unit_converts_to_tablets():
 
     assert "Panadol +1 box added" in reply
     assert "Equivalent: +100 tablets" in reply
-    assert "New stock: 120 tablets" in reply
+    assert "Stock left: 120 tablets" in reply
     assert store.stocks["panadol"].current_stock == 120
     transaction = store.transactions[-1]
     assert transaction["Quantity"] == 100
@@ -447,7 +447,7 @@ def test_stock_followup_checks_named_drug():
     second = service.process_text("Panadol", conversation_id="2547")
 
     assert "Which medicine should I check" in first
-    assert "Panadol stock: 20" in second
+    assert "Panadol stock left: 20" in second
 
 
 def test_more_natural_stock_and_report_phrases_work():
@@ -458,7 +458,7 @@ def test_more_natural_stock_and_report_phrases_work():
     report_reply = service.process_text("today sales")
     summary_reply = service.process_text("summary today")
 
-    assert "Panadol stock: 20" in stock_reply
+    assert "Panadol stock left: 20" in stock_reply
     assert report_reply.startswith("📊 Daily Report")
     assert summary_reply.startswith("📊 Daily Report")
 
@@ -473,7 +473,7 @@ def test_compact_rush_hour_commands_are_normalized_safely():
     late_reply = service.process_text("latepanadol5")
 
     assert "Panadol x2 recorded" in sale_reply
-    assert "Panadol stock: 18" in stock_reply
+    assert "Panadol stock left: 18" in stock_reply
     assert "Panadol +20 added" in restock_reply
     assert "Late sale recorded" in late_reply
     assert store.stocks["panadol"].current_stock == 33
@@ -531,7 +531,7 @@ def test_stock_check_returns_current_stock_price_and_reorder_level():
     reply = service.process_text("Panadol stock")
 
     assert reply == (
-        "📦 Panadol stock: 20\n"
+        "📦 Panadol stock left: 20\n"
         "Price: KES 220\n"
         "Restock when left with 5"
     )
@@ -549,7 +549,7 @@ def test_report_today_returns_compact_summary_without_saved_report_lookup():
     assert "Sales:" in reply
     assert "Cost:" in reply
     assert "Profit:" in reply
-    assert "Low Stock:" in reply
+    assert "Running low:" in reply
     assert "PDF report:" in reply
     assert parser.called is False
 
@@ -564,7 +564,7 @@ def test_sold_item_with_price_found_logs_total_and_reduces_stock():
     reply = service.process_text("Panadol sold 2")
 
     assert "Panadol x2 recorded" in reply
-    assert "Stock: 18" in reply
+    assert "Stock left: 18" in reply
     assert "Profit:" not in reply
     assert "Profit: KES 160" in service.process_text("details last")
     assert store.logged[0][0].drug_name == "Panadol"
@@ -648,7 +648,7 @@ def test_restock_item_increases_current_stock_and_logs():
 
     assert "Panadol +20 added" in reply
     assert "Avg cost:" not in reply
-    assert "New stock: 40" in reply
+    assert "Stock left: 40" in reply
     assert store.stocks["panadol"].current_stock == 40
     assert store.logged[0][0].action == Action.RESTOCKED
     assert store.logged[0][1] is None
@@ -665,7 +665,7 @@ def test_sale_reply_includes_low_stock_warning():
     reply = service.process_text("Cough Syrup sold 2")
 
     assert "Cough Syrup x2 recorded" in reply
-    assert "Stock: 2" in reply
+    assert "Stock left: 2" in reply
 
 
 def test_multiple_items_in_one_message_logs_each_item():
@@ -786,7 +786,7 @@ def test_simple_restock_plus_command_records_restock():
     reply = service.process_text("+Panadol 20")
 
     assert "Panadol +20 added" in reply
-    assert "New stock: 40" in reply
+    assert "Stock left: 40" in reply
     assert store.transactions[-1]["Type"] == "restock"
 
 
@@ -798,7 +798,7 @@ def test_restock_aliases_add_received_and_stock_work():
         reply = service.process_text(message)
 
         assert "Panadol +20 added" in reply
-        assert "New stock: 40" in reply
+        assert "Stock left: 40" in reply
         assert store.transactions[-1]["Type"] == "restock"
 
 
@@ -821,7 +821,7 @@ def test_bonus_restock_records_free_stock_type():
 
     assert "Panadol +5 added" in reply
     assert "Bonus: 5" in reply
-    assert "New stock: 25" in reply
+    assert "Stock left: 25" in reply
     assert store.stocks["panadol"].current_stock == 25
     assert store.transactions[-1]["Total Cost"] == 0
     assert "Restock type: bonus" in store.transactions[-1]["Note"]
@@ -836,7 +836,7 @@ def test_bonus_restock_aliases_are_understood():
 
         assert "Panadol +5 added" in reply
         assert "Bonus: 5" in reply
-        assert "New stock: 25" in reply
+        assert "Stock left: 25" in reply
         assert store.transactions[-1]["Total Cost"] == 0
 
 
@@ -913,7 +913,7 @@ def test_natural_restock_cost_phrase_records_cost():
 
     assert "Panadol +20 added" in reply
     assert "Paid: KES 2,000" in reply
-    assert "New stock: 40" in reply
+    assert "Stock left: 40" in reply
     assert store.transactions[-1]["Total Cost"] == 2000
 
 
@@ -926,7 +926,7 @@ def test_bonus_restock_with_cost_records_total_received():
     assert "Panadol +25 added" in reply
     assert "Bought 20 + bonus 5" in reply
     assert "Paid: KES 2,000" in reply
-    assert "New stock: 45" in reply
+    assert "Stock left: 45" in reply
     assert store.transactions[-1]["Quantity"] == 25
     assert store.transactions[-1]["Total Cost"] == 2000
     assert "Bonus quantity 5" in store.transactions[-1]["Note"]
@@ -1099,7 +1099,7 @@ def test_batch_message_processes_each_line():
     assert "- Amoxyl x1" in reply
     assert "- Insulin +10" in reply
     assert "- Cetirizine x3" in reply
-    assert "No Stock:\n- Insulin" in reply
+    assert "No-stock requests:\n- Insulin" in reply
 
 
 def test_natural_bulk_sale_message_processes_each_item():
@@ -1157,7 +1157,7 @@ def test_natural_bulk_no_stock_message_processes_each_item():
 
     reply = service.process_text("No stock Insulin, Ventolin")
 
-    assert "No Stock:" in reply
+    assert "No-stock requests:" in reply
     assert "- Insulin" in reply
     assert "- Ventolin" in reply
 

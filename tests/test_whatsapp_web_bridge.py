@@ -189,7 +189,7 @@ def test_whatsapp_web_bridge_followup_sale_uses_sender_context(monkeypatch):
     assert first.json()["reply"] == "How many Panadol were sold?"
     assert second.status_code == 200
     assert "Panadol x2 recorded" in second.json()["reply"]
-    assert "Stock:" in second.json()["reply"]
+    assert "Stock left:" in second.json()["reply"]
 
 
 def test_whatsapp_web_bridge_ignores_lid_sender_without_test_mode(monkeypatch):
@@ -428,7 +428,7 @@ def test_demo_mode_allows_sale_for_allowed_sender(monkeypatch):
     data = response.json()
     assert data["status"] == "ok"
     assert "Panadol" in data["reply"]
-    assert "Stock:" in data["reply"]
+    assert "Stock left:" in data["reply"]
 
 
 def test_blocked_sender_logs_masked_phone_without_message_body(monkeypatch, caplog):

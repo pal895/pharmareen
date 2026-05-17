@@ -121,7 +121,7 @@ class BatchService:
         lines = [str(drug_name).strip().title()]
         if stock is not None:
             stock_text = stock.current_stock if stock.current_stock is not None else "not set"
-            lines.append(f"Stock: {stock_text}")
+            lines.append(f"Stock left: {stock_text}")
             if stock.reorder_level is not None and stock.current_stock is not None and stock.current_stock <= stock.reorder_level:
                 lines.append("Low stock warning")
         if batches:

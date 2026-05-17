@@ -73,7 +73,7 @@ HELP_TEXT = "\n".join(
         "- Insulin sold 1",
         "- sell Panadol",
         "",
-        "Stock:",
+        "Stock checks:",
         "- Panadol stock",
         "- stock p",
         "- low stock",
@@ -546,7 +546,7 @@ class IntakeService:
 
     def _memory_reference_reply(self, text: str, conversation_key: str) -> str:
         normalized = normalize_key(text)
-        if normalized in {"same kama jana", "same as yesterday", "same again", "rudia ile", "repeat last"}:
+        if normalized in {"same kama jana", "same as yesterday", "same again", "rudia ile", "repeat last", "repeat last please"}:
             last = self.operational_memory.resolve_reference(conversation_key, text)
             if last:
                 drug = str(last.get("drug_name") or "medicine")
@@ -603,7 +603,7 @@ class IntakeService:
             pass
 
         stock_text = str(stock.current_stock) if stock.current_stock is not None else "not set"
-        lines = [f"📦 {stock.drug_name} stock: {stock_text}"]
+        lines = [f"📦 {stock.drug_name} stock left: {stock_text}"]
         if stock.selling_price is not None:
             lines.append(f"Price: {format_kes(stock.selling_price)}")
         if stock.reorder_level is not None:
@@ -706,7 +706,7 @@ class IntakeService:
         lines = [f"Trace {name}", ""]
         if stock:
             stock_text = stock.current_stock if stock.current_stock is not None else "not set"
-            lines.append(f"Stock: {stock_text}")
+            lines.append(f"Stock left: {stock_text}")
             if stock.selling_price is not None:
                 lines.append(f"Price: {format_kes(stock.selling_price)}")
         if batches:
@@ -886,7 +886,7 @@ class IntakeService:
             ("Sales", "sales"),
             ("Late Sales", "late_sales"),
             ("Restocks", "restocks"),
-            ("No Stock", "no_stock"),
+            ("No-stock requests", "no_stock"),
         ]
         section_titles = [(title, key) for title, key in section_candidates if groups[key]]
         if groups["stock_checks"]:
@@ -1141,9 +1141,9 @@ class IntakeService:
         if unit and base_quantity != display_quantity:
             reply_parts.append(f"Equivalent: {base_quantity} tablets")
         if stock_plan.new_current_stock is not None:
-            reply_parts.append(f"Stock: {self._format_stock_level(stock.drug_name, stock_plan.new_current_stock, unit)}")
+            reply_parts.append(f"Stock left: {self._format_stock_level(stock.drug_name, stock_plan.new_current_stock, unit)}")
         else:
-            reply_parts.append("Stock: not set")
+            reply_parts.append("Stock left: not set")
         if stock_plan.reply_warnings:
             reply_parts.extend(stock_plan.reply_warnings)
         if self.receipt_printing_enabled:
@@ -1319,7 +1319,7 @@ class IntakeService:
             reply_parts.append(f"Supplier: {command.supplier}")
         if command.expiry_date:
             reply_parts.append(f"Expiry: {command.expiry_date}")
-        reply_parts.append(f"New stock: {self._format_stock_level(stock.drug_name, new_current_stock, unit)}")
+        reply_parts.append(f"Stock left: {self._format_stock_level(stock.drug_name, new_current_stock, unit)}")
         return EntryResult(
             logged=True,
             reply="\n".join(reply_parts),
@@ -1636,6 +1636,12 @@ class IntakeService:
         if stock is not None:
             return stock
 
+        alias = self.aliases_by_key.get(normalize_key(drug_name))
+        if alias:
+            stock = self.store.find_stock(alias)
+            if stock is not None:
+                return stock
+
         names = self.store.list_master_drug_names()
         normalized_to_name = {normalize_key(name): name for name in names if name.strip()}
         match = get_close_matches(normalize_key(drug_name), list(normalized_to_name.keys()), n=1, cutoff=0.82)
@@ -1876,7 +1882,7 @@ def build_stock_update_plan(stock: StockItem, quantity: int) -> StockUpdatePlan:
         reply_warnings.append("Stock reached 0. Please review after rush hour.")
 
     if stock.reorder_level is not None and new_stock <= stock.reorder_level:
-        warning_notes.append(f"Low stock: {stock.drug_name} needs restocking soon.")
+        warning_notes.append(f"Running low: {stock.drug_name} needs restocking soon.")
 
     return StockUpdatePlan(new_stock, warning_notes, reply_warnings)
 
@@ -2094,11 +2100,11 @@ def parse_analytics_command(text: str) -> dict[str, str] | None:
     day = "yesterday" if any(word in key for word in ["yesterday", "jana"]) else "today"
     if is_cash_summary_command(text):
         return None
-    if is_low_stock_command(text):
+    if is_low_stock_command(text) or "low stock" in key:
         return {"type": "low_stock", "day": day}
-    if any(phrase in key for phrase in ["missed demand", "no stock today", "no stock leo", "out of stock today", "hakuna stock leo"]):
+    if any(phrase in key for phrase in ["missed demand", "most missed demand", "no stock today", "no stock leo", "out of stock today", "hakuna stock leo"]):
         return {"type": "missed_demand", "day": day}
-    if any(phrase in key for phrase in ["best seller", "what sold most", "what did i sell most", "sold most", "sell most", "imeuza sana", "imeuzwa sana", "dawa gani imeuza sana"]):
+    if any(phrase in key for phrase in ["best seller", "what sold most", "what did i sell most", "sold most", "sell most", "imeuza sana", "imeuzwa sana", "dawa gani imeuza sana", "fastest moving medicine", "fast moving medicine", "what is moving fast"]):
         return {"type": "best_seller", "day": day}
     if any(phrase in key for phrase in ["peak hour", "peak hours", "busiest time", "busiest hour", "rush hour"]):
         return {"type": "peak_hours", "day": day}
@@ -2320,6 +2326,9 @@ def parse_operating_commands(text: str) -> list[OperatingCommand] | None:
             for line in clean_text.splitlines()
             if line.strip()
         ]
+
+    if ";" in clean_text:
+        clean_text = clean_text.replace(";", ",")
 
     if "," in clean_text:
         complex_restock = parse_complex_restock_command(clean_text, clean_text)
@@ -2613,6 +2622,22 @@ def parse_complex_restock_command(clean: str, raw_text: str) -> OperatingCommand
             drug_name=match.group(1),
             ordered_quantity=positive_quantity(match.group(2)),
             actual_paid_amount=parse_money(match.group(3)),
+            supplier=supplier,
+            expiry_date=expiry_date,
+            raw_text=raw_text,
+        )
+
+    match = re.fullmatch(
+        r"(.+?)\s+(?:restock|restocked|received|bought)\s+(\d+)\s+discount\s+(\d+(?:\.\d+)?)",
+        detail_clean,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return make_restock_command(
+            drug_name=match.group(1),
+            ordered_quantity=positive_quantity(match.group(2)),
+            discount_amount=parse_money(match.group(3)) or 0,
+            restock_type="discount",
             supplier=supplier,
             expiry_date=expiry_date,
             raw_text=raw_text,
@@ -3268,6 +3293,7 @@ def normalize_natural_text(text: str) -> str:
     clean = "\n".join(" ".join(line.split()) for line in text.strip().splitlines())
     clean = re.sub(r"^please\s+", "", clean, flags=re.IGNORECASE)
     clean = re.sub(r"^(?:nimeuza|niliuza)\s+", "sold ", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"^ongeza\s+(.+?)\s+(\d+)(.*)$", r"add \1 \2\3", clean, flags=re.IGNORECASE)
     clean = re.sub(r"^(?:customer\s+amesema\s+hakuna|amesema\s+hakuna|hakuna)\s+(.+)$", r"\1 no stock", clean, flags=re.IGNORECASE)
     clean = re.sub(r"^nilisahau\s+kuuza\s+(.+?)\s*(?:earlier|mapema)?$", r"late \1", clean, flags=re.IGNORECASE)
     if "\n" not in clean and re.match(r"^(?:i\s+sold|sold|restocked|no\s+stock)\b", clean, flags=re.IGNORECASE):
@@ -3456,7 +3482,7 @@ def render_whatsapp_report(metrics: ReportMetrics, report_type: str) -> str:
             f"Transactions: {metrics.sale_transactions}",
             f"Best Seller: {best_seller}",
             f"Peak Time: {metrics.peak_activity_time}",
-            f"Low Stock: {low_stock}",
+            f"Running low: {low_stock}",
         ]
     )
 

@@ -47,7 +47,7 @@ async def test_drug_name_only_returns_drug_card():
     result = await router.handle(NormalizedMessage("meta", "2547", "wamid.2", "text", text="Panadol"))
 
     assert "Panadol" in result.reply
-    assert "Stock: 65" in result.reply
+    assert "Stock left: 65" in result.reply
     assert "Batches:" in result.reply
     assert "2026-03-01" in result.reply
 

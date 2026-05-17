@@ -1,0 +1,8 @@
+{"id": "emo_001", "category": "trust", "text": "nimepanic panadol2cash", "simulate": false, "expected": "calm correction support", "ai_allowed": false}
+{"id": "emo_002", "category": "trust", "text": "did it save?", "simulate": false, "expected": "saved safely reassurance", "ai_allowed": false}
+{"id": "emo_003", "category": "trust", "text": "send again same thing", "simulate": false, "expected": "duplicate prevention", "ai_allowed": false}
+{"id": "emo_004", "category": "trust", "text": "I think record imepotea", "simulate": false, "expected": "recent transactions reassurance", "ai_allowed": false}
+{"id": "emo_005", "category": "trust", "text": "repeat last please", "expect_contains": ["Which medicine and quantity"], "ai_allowed": false, "simulate": true}
+{"id": "emo_006", "category": "trust", "text": "same kama jana", "expect_contains": ["Which medicine and quantity"], "ai_allowed": false, "simulate": true}
+{"id": "emo_007", "category": "trust", "text": "I am offline", "simulate": false, "expected": "Offline mode active ? saving safely", "ai_allowed": false}
+{"id": "emo_008", "category": "trust", "text": "sync failed?", "simulate": false, "expected": "Needs attention", "ai_allowed": false}

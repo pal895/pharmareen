@@ -1,0 +1,10 @@
+{"id": "sup2_001", "category": "supplier", "text": "supplier delivery Panadol 20", "simulate": false, "expected": "supplier delivery restock clarification", "ai_allowed": false}
+{"id": "sup2_002", "category": "supplier", "text": "+Panadol 20 bonus 5", "expect_contains": ["20 + 5 bonus = 25 added"], "ai_allowed": false, "simulate": true}
+{"id": "sup2_003", "category": "supplier", "text": "+Panadol 20 bonus 5 cost 2000", "expect_contains": ["20 + 5 bonus = 25 added", "Paid: KES 2,000"], "ai_allowed": false, "simulate": true}
+{"id": "sup2_004", "category": "supplier", "text": "Panadol restock 20 discount 200", "expect_contains": ["Panadol +20 added"], "ai_allowed": false, "simulate": true}
+{"id": "sup2_005", "category": "supplier", "text": "partial invoice Beta INV123 Panadol 10", "simulate": false, "expected": "invoice needs review", "ai_allowed": false}
+{"id": "sup2_006", "category": "supplier", "text": "damaged stock Panadol batch B001", "simulate": false, "expected": "high risk confirmation", "ai_allowed": false}
+{"id": "sup2_007", "category": "supplier", "text": "expired stock Amoxyl", "simulate": false, "expected": "high risk confirmation", "ai_allowed": false}
+{"id": "sup2_008", "category": "supplier", "text": "return Panadol to supplier Beta", "simulate": false, "expected": "return confirmation required", "ai_allowed": false}
+{"id": "sup2_009", "category": "supplier", "text": "invoice correction INV123", "simulate": false, "expected": "invoice correction flow", "ai_allowed": false}
+{"id": "sup2_010", "category": "supplier", "text": "received Panadol 2 boxes supplier Beta invoice INV123 batch B001 expiry Jan 2027", "expect_contains": ["Panadol +2 boxes added", "Equivalent"], "ai_allowed": false, "simulate": true}

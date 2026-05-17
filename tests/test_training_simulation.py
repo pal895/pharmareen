@@ -8,14 +8,15 @@ from app.services.operational_intelligence import (
     decide_ai_route,
     voice_pattern_hint,
 )
-from app.services.pharmacy_simulation import load_training_cases, run_simulation
+from app.intake import IntakeService
+from app.services.pharmacy_simulation import SimulationParser, SimulationStore, load_training_cases, run_simulation
 
 
 def test_training_datasets_cover_real_pharmacy_behaviors():
     cases = load_training_cases(Path("datasets/pharmacy_training"))
     categories = {case.category for case in cases}
 
-    assert len(cases) >= 80
+    assert len(cases) >= 170
     assert {
         "conversation",
         "shorthand",
@@ -28,6 +29,8 @@ def test_training_datasets_cover_real_pharmacy_behaviors():
         "media",
         "voice",
         "clarification",
+        "swahili",
+        "trust",
     }.issubset(categories)
 
 
@@ -94,7 +97,39 @@ def test_photo_and_voice_classification_are_local_until_extraction_needed():
     assert classify_photo_kind(filename="invoice_123.jpg", caption="invoice ya jana") == "invoice_photo"
     assert classify_photo_kind(filename="shelf.jpg", caption="stock shelf photo") == "stock_shelf_photo"
     assert classify_photo_kind(filename="pack.jpg", caption="barcode medicine pack") == "barcode_or_pack_photo"
+    assert classify_photo_kind(filename="random.jpg", caption="family photo") == "unknown_photo"
     assert voice_pattern_hint("Niliuza Panadol mbili cash") == "parse_locally_after_transcription"
+
+
+def test_pharmacy_facing_stock_wording_says_stock_left():
+    service = IntakeService(SimulationParser(), SimulationStore())
+
+    sale_reply = service.process_text("Panadol2cash", conversation_id="wording")
+    stock_reply = service.process_text("Panadolstock", conversation_id="wording")
+    restock_reply = service.process_text("+Panadol 20 bonus 5 cost 2000", conversation_id="wording")
+
+    for reply in [sale_reply, stock_reply, restock_reply]:
+        assert "Stock left:" in reply or "stock left:" in reply
+        assert "Stock:" not in reply
+        assert "stock:" not in reply
+    assert "Saved safely" not in sale_reply  # sale confirmations stay short, not verbose
+
+
+def test_expanded_training_examples_teach_current_friction():
+    cases = load_training_cases(Path("datasets/pharmacy_training"))
+    texts = {case.text.lower() for case in cases}
+
+    for required in [
+        "p2cash",
+        "pan2mpesa",
+        "nimeuza panadol mbili cash",
+        "badilisha payment iwe mpesa",
+        "supplier invoice",
+        "random non pharmacy image",
+        "best seller leo",
+        "offline save panadol 1 cash",
+    ]:
+        assert required in texts
 
 
 def test_pharmacy_simulation_runs_rush_hour_cases_without_unexpected_ai():

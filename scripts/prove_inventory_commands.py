@@ -39,7 +39,7 @@ def main() -> None:
 
     restock_response = post_whatsapp("Panadol restock 20")
     assert_contains(restock_response, "Panadol +20 added", "restock confirmation")
-    assert_contains(restock_response, "New stock: 44", "restock new stock")
+    assert_contains(restock_response, "Stock left: 44", "restock new stock")
     print("RESTOCK TEST OK")
 
     missed_response = post_whatsapp("Insulin no stock")

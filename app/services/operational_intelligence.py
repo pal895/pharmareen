@@ -11,15 +11,15 @@ from app.utils import normalize_key
 
 LOCAL_FIRST_PATTERNS: tuple[tuple[str, str], ...] = (
     ("conversation", r"^(hello|hi|hey|habari|morning|good morning|mambo|sasa|help|menu|commands|guide|tutorial|how do i use this|what can you do)$"),
-    ("memory", r"\b(same kama jana|same again|same as yesterday|nilikosea quantity|wrong quantity|ile ya mwisho|hiyo ya mwisho|ya mwisho)\b"),
+    ("memory", r"\b(same kama jana|same again|same as yesterday|repeat last|nilikosea quantity|wrong quantity|ile ya mwisho|hiyo ya mwisho|ya mwisho)\b"),
     ("clarification", r"\b(sell|sold|sale|restock|add|received|check stock|stock)\b"),
-    ("analytics", r"\b(best seller|sold most|peak hours?|busiest|cash|mpesa|payment breakdown|top payment|low stock|missed demand|no stock|hakuna|out of stock)\b"),
+    ("analytics", r"\b(best seller|sold most|sell most|imeuza sana|imeuzwa sana|dawa gani imeuza sana|fastest moving|fast moving|peak hours?|busiest|cash|mpesa|payment breakdown|top payment|low stock|missed demand|no stock|hakuna|out of stock)\b"),
     ("receipt", r"\b(receipt|risiti|print)\b"),
     ("correction", r"\b(undo|void|badilisha|change|update|punguza|ongeza|fanya|wrong quantity|payment iwe)\b"),
     ("report", r"\b(report|summary|profit today|sales today|daily report)\b"),
     ("stock", r"\b(stock|remaining|expiry|expiring|trace|history)\b|stock$"),
     ("restock", r"(^\s*\+|\b(restock|received|bought|bonus|supplier|invoice|batch|expiry)\b)"),
-    ("sale", r"\b(sold|sell|late|later|missed|nimeuza|niliuza|cash|mpesa|credit|card|strip|tablet|box)\b|^[a-z]+\s*\d+|^late[a-z]+\d+"),
+    ("sale", r"\b(sold|sell|late|later|missed|nilisahau|nimeuza|niliuza|cash|mpesa|credit|card|mixed|strip|tablet|box)\b|^[a-z]+\s*\d+|^late[a-z]+\d+"),
     ("barcode", r"\b(barcode|scan|sku)\b"),
 )
 

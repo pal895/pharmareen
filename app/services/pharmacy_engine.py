@@ -41,6 +41,9 @@ PAYMENT_ALIASES = {
     "m pesa": "M-Pesa",
     "card": "Card",
     "credit": "Credit",
+    "mixed": "Mixed",
+    "pay later": "Credit",
+    "unpaid": "Credit",
 }
 
 

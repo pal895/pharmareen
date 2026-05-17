@@ -37,7 +37,7 @@ class FailingTranscription:
 class FakeIntake:
     def __init__(self, reply: str | None = None):
         self.received = ""
-        self.reply = reply or "✅ Batch processed\n\nSales:\n- Panadol x2\n\nLate Sales:\n- Cetrizine x3\n\nRestocks:\n- None\n\nNo Stock:\n- None\n\nErrors:\n- None"
+        self.reply = reply or "✅ Batch processed\n\nSales:\n- Panadol x2\n\nLate Sales:\n- Cetrizine x3\n\nRestocks:\n- None\n\nNo-stock requests:\n- None\n\nErrors:\n- None"
 
     def process_text(self, text: str) -> str:
         self.received = text

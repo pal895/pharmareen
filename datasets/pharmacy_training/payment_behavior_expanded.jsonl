@@ -1,0 +1,10 @@
+{"id": "pay2_001", "category": "payments", "text": "Panadol 2 cash 100 mpesa 200", "expect_contains": ["Panadol x2", "Stock left"], "ai_allowed": false, "simulate": true}
+{"id": "pay2_002", "category": "payments", "text": "Panadol 2 mixed", "expect_contains": ["Panadol x2", "Stock left"], "ai_allowed": false, "simulate": true}
+{"id": "pay2_003", "category": "payments", "text": "Panadol 1 credit", "expect_contains": ["Panadol x1", "Stock left"], "ai_allowed": false, "simulate": true}
+{"id": "pay2_004", "category": "payments", "text": "Panadol 1 pay later", "simulate": false, "expected": "credit sale mapping", "ai_allowed": false}
+{"id": "pay2_005", "category": "payments", "text": "customer cleared debt", "simulate": false, "expected": "debt payment record", "ai_allowed": false}
+{"id": "pay2_006", "category": "payments", "text": "partial payment Panadol 100 cash balance 50", "simulate": false, "expected": "partial payment safe record", "ai_allowed": false}
+{"id": "pay2_007", "category": "payments", "text": "credit sale Panadol 2", "expect_contains": ["Panadol x2", "Stock left"], "ai_allowed": false, "simulate": true}
+{"id": "pay2_008", "category": "payments", "text": "Top payment method today", "expect_contains": ["Top payment today"], "ai_allowed": false, "simulate": true}
+{"id": "pay2_009", "category": "payments", "text": "How much cash came in today", "expect_contains": ["Cash received today"], "ai_allowed": false, "simulate": true}
+{"id": "pay2_010", "category": "payments", "text": "How much Mpesa imeingia leo", "expect_contains": ["M-Pesa received today"], "ai_allowed": false, "simulate": true}

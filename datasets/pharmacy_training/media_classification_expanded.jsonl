@@ -1,0 +1,8 @@
+{"id": "media2_001", "category": "media", "text": "invoice photo from supplier", "simulate": false, "expected": "invoice_photo", "ai_allowed": false}
+{"id": "media2_002", "category": "media", "text": "shelf stock photo", "simulate": false, "expected": "stock_shelf_photo", "ai_allowed": false}
+{"id": "media2_003", "category": "media", "text": "barcode image medicine pack", "simulate": false, "expected": "barcode_or_pack_photo", "ai_allowed": false}
+{"id": "media2_004", "category": "media", "text": "receipt image", "simulate": false, "expected": "supplier_receipt", "ai_allowed": false}
+{"id": "media2_005", "category": "media", "text": "supplier invoice", "simulate": false, "expected": "invoice_photo", "ai_allowed": false}
+{"id": "media2_006", "category": "media", "text": "medicine shelf", "simulate": false, "expected": "stock_shelf_photo", "ai_allowed": false}
+{"id": "media2_007", "category": "media", "text": "random non pharmacy image", "simulate": false, "expected": "unknown_photo", "ai_allowed": false}
+{"id": "media2_008", "category": "voice", "text": "Panadol mbili cash noisy voice", "simulate": false, "expected": "voice transcribe then local parse", "ai_allowed": false}

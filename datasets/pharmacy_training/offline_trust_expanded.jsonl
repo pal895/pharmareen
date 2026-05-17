@@ -1,0 +1,8 @@
+{"id": "off2_001", "category": "offline", "text": "offline save Panadol 1 cash", "simulate": false, "expected": "Saved safely", "ai_allowed": false}
+{"id": "off2_002", "category": "offline", "text": "reconnect sync", "simulate": false, "expected": "Synced safely", "ai_allowed": false}
+{"id": "off2_003", "category": "offline", "text": "grouped sync confirmation", "simulate": false, "expected": "Offline records synced safely", "ai_allowed": false}
+{"id": "off2_004", "category": "offline", "text": "duplicate prevention", "simulate": false, "expected": "No duplicate created", "ai_allowed": false}
+{"id": "off2_005", "category": "offline", "text": "conflict clarification Panadol stock mismatch", "simulate": false, "expected": "Needs review", "ai_allowed": false}
+{"id": "off2_006", "category": "offline", "text": "delayed voice processing", "simulate": false, "expected": "Voice saved safely", "ai_allowed": false}
+{"id": "off2_007", "category": "offline", "text": "delayed photo processing", "simulate": false, "expected": "Photo received safely", "ai_allowed": false}
+{"id": "off2_008", "category": "offline", "text": "Panadol 1 cash, Amoxyl 2 mpesa", "expect_contains": ["Batch processed", "Panadol x1", "Amoxyl x2"], "ai_allowed": false, "simulate": true}

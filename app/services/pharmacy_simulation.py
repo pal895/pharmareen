@@ -83,7 +83,6 @@ class SimulationStore:
         self.stocks = {
             "panadol": StockItem("Panadol", 10, 5, 800, 50, 2),
             "amoxyl": StockItem("Amoxyl", 80, 50, 120, 20, 3),
-            "amox": StockItem("Amox", 80, 50, 120, 20, 4),
             "ors": StockItem("ORS", 50, 30, 90, 15, 5),
             "piriton": StockItem("Piriton", 20, 12, 100, 20, 6),
             "insulin": StockItem("Insulin", 500, 300, 12, 4, 7),

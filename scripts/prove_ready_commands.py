@@ -35,9 +35,9 @@ def main() -> None:
     print("HELP TEST OK")
 
     stock_response = post_whatsapp("Panadol stock")
-    assert_contains(stock_response, "Panadol stock: 44", "stock count")
+    assert_contains(stock_response, "Panadol stock left: 44", "stock count")
     assert_contains(stock_response, "Price: KES 220", "stock price")
-    assert_contains(stock_response, "Reorder level: 10", "stock reorder level")
+    assert_contains(stock_response, "Restock when left with 10", "stock reorder level")
     print("STOCK CHECK TEST OK")
 
     report_response = post_whatsapp("report today")
@@ -54,7 +54,7 @@ def main() -> None:
 
     restock_response = post_whatsapp("Panadol restock 20")
     assert_contains(restock_response, "Panadol +20 added", "restock confirmation")
-    assert_contains(restock_response, "New stock: 62", "restock new stock")
+    assert_contains(restock_response, "Stock left: 62", "restock new stock")
     print("RESTOCK STILL WORKS OK")
 
     print("PHARMACY BOT READY")

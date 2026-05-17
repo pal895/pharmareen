@@ -52,12 +52,12 @@ class ZeroTest:
         stock_response = self.post_and_check(
             label="STOCK TEST",
             message="Panadol stock",
-            required=["📦 Panadol stock: 42", "Price: KES 220", "Reorder level: 10"],
+            required=["📦 Panadol stock left: 42", "Price: KES 220", "Restock when left with 10"],
         )
         restock_response = self.post_and_check(
             label="RESTOCK TEST",
             message="+Panadol 20",
-            required=["✅ Panadol +20 added", "New stock: 62"],
+            required=["✅ Panadol +20 added", "Stock left: 62"],
         )
         missed_response = self.post_and_check(
             label="MISSED DEMAND TEST",
@@ -79,7 +79,7 @@ class ZeroTest:
                 "Profit:",
                 "Items Sold:",
                 "Transactions:",
-                "Low Stock:",
+                "Running low:",
                 "Best Seller:",
                 "PDF report:",
             ],
