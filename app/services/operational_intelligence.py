@@ -36,6 +36,18 @@ class AIRoutingDecision:
     confidence: float
 
 
+@dataclass(frozen=True)
+class MediaClassification:
+    media_kind: str
+    label: str
+    confidence: float
+    processing_status: str
+    user_message: str
+    extraction_target: str = ""
+    needs_ai: bool = False
+    evidence: tuple[str, ...] = ()
+
+
 @dataclass
 class OperationalMemorySnapshot:
     last_transaction: dict[str, Any] | None = None
@@ -184,15 +196,151 @@ def decide_ai_route(
     return AIRoutingDecision(True, "chat/completions", "messy text after local parser fails", confidence)
 
 
+MEDIA_KEYWORDS: tuple[tuple[str, str, tuple[str, ...], str, str], ...] = (
+    (
+        "blurry_unclear_photo",
+        "unclear photo",
+        ("blurry", "blur", "unclear", "dark", "poor light", "poor lighting", "cropped", "compressed", "not clear", "too far"),
+        "needs_review",
+        "Photo saved safely, but some text is unclear. Please retake closer or send as file.",
+    ),
+    (
+        "mixed_photo",
+        "mixed pharmacy photo",
+        ("mixed", "shelf and receipt", "invoice and shelf", "stock and receipt", "many things", "multiple documents"),
+        "needs_review",
+        "📷 Photo received safely. It looks mixed, so please confirm what you want me to read.",
+    ),
+    (
+        "handwritten_invoice",
+        "handwritten supplier note",
+        ("handwritten", "hand written", "mkono", "manual note", "written note", "supplier note"),
+        "needs_review",
+        "📷 Photo received safely. This looks handwritten, so I will ask for confirmation before any stock update.",
+    ),
+    (
+        "delivery_note",
+        "delivery note",
+        ("delivery note", "goods received", "grn", "delivery", "delivered items", "stock imefika"),
+        "needs_review",
+        "📷 Photo received safely. This looks like a delivery note.",
+    ),
+    (
+        "supplier_invoice",
+        "supplier invoice",
+        ("invoice", "inv", "tax invoice", "bill", "supplier invoice", "goods invoice"),
+        "needs_review",
+        "📷 Photo received safely. This looks like a supplier invoice.",
+    ),
+    (
+        "supplier_receipt",
+        "supplier receipt",
+        ("supplier receipt", "payment receipt", "paid receipt", "receipt", "payment slip", "supplier statement"),
+        "needs_review",
+        "📷 Photo received safely. This looks like a supplier receipt.",
+    ),
+    (
+        "pharmacy_stock_shelf_photo",
+        "stock shelf photo",
+        ("shelf", "drawer", "stock shelf", "stock photo", "stock count", "medicine shelf", "display", "shelfie"),
+        "needs_review",
+        "📷 Stock photo received. I can see stock, but I will not count it unless it is clear.",
+    ),
+    (
+        "barcode_photo",
+        "barcode photo",
+        ("barcode", "ean", "qr code", "scan code", "bar code"),
+        "completed",
+        "📷 Photo received safely. This looks like a barcode photo.",
+    ),
+    (
+        "medicine_pack_photo",
+        "medicine pack photo",
+        ("medicine pack", "pack photo", "blister", "packet", "box label", "drug label", "label photo"),
+        "needs_review",
+        "📷 Photo received safely. This looks like a medicine pack photo.",
+    ),
+    (
+        "random_non_pharmacy_photo",
+        "non-pharmacy photo",
+        ("family photo", "selfie", "random", "non pharmacy", "non-pharmacy", "not pharmacy"),
+        "needs_review",
+        "📷 Photo received safely, but it does not look like a pharmacy document.",
+    ),
+)
+
+
+def _media_confidence(media_kind: str, key: str, keywords: tuple[str, ...]) -> float:
+    hits = sum(1 for word in keywords if word in key)
+    if media_kind in {"blurry_unclear_photo", "random_non_pharmacy_photo"}:
+        return 0.9 if hits else 0.75
+    if hits >= 2:
+        return 0.92
+    return 0.82
+
+
+def classify_media_input(
+    *,
+    filename: str = "",
+    caption: str = "",
+    purpose: str = "",
+    content_type: str = "",
+    quality_hint: str = "",
+    ocr_text: str = "",
+) -> MediaClassification:
+    key = normalize_key(" ".join([filename, caption, purpose, content_type, quality_hint, ocr_text]))
+    evidence: list[str] = []
+    for media_kind, label, keywords, status, message in MEDIA_KEYWORDS:
+        matched = [word for word in keywords if word in key]
+        if not matched:
+            continue
+        evidence.extend(matched[:3])
+        extraction_target = ""
+        needs_ai = False
+        if media_kind in {"supplier_invoice", "handwritten_invoice", "delivery_note"}:
+            extraction_target = "invoice_items"
+            needs_ai = True
+        elif media_kind == "supplier_receipt":
+            extraction_target = "supplier_payment"
+            needs_ai = True
+        elif media_kind == "pharmacy_stock_shelf_photo":
+            extraction_target = "stock_shelf_review"
+            needs_ai = True
+        elif media_kind == "medicine_pack_photo":
+            extraction_target = "medicine_pack_details"
+            needs_ai = True
+        return MediaClassification(
+            media_kind=media_kind,
+            label=label,
+            confidence=_media_confidence(media_kind, key, keywords),
+            processing_status=status,
+            user_message=message,
+            extraction_target=extraction_target,
+            needs_ai=needs_ai,
+            evidence=tuple(evidence),
+        )
+
+    return MediaClassification(
+        media_kind="unknown_photo",
+        label="unknown photo",
+        confidence=0.35,
+        processing_status="needs_review",
+        user_message="📷 Photo received safely. I saved it for review.",
+        extraction_target="unknown_review",
+        needs_ai=False,
+        evidence=(),
+    )
+
+
 def classify_photo_kind(*, filename: str = "", caption: str = "", purpose: str = "") -> str:
-    key = normalize_key(" ".join([filename, caption, purpose]))
-    if any(word in key for word in ["invoice", "inv", "delivery note", "stock imefika"]):
+    classification = classify_media_input(filename=filename, caption=caption, purpose=purpose)
+    if classification.media_kind in {"supplier_invoice", "handwritten_invoice", "delivery_note"}:
         return "invoice_photo"
-    if any(word in key for word in ["supplier", "receipt", "payment"]):
+    if classification.media_kind == "supplier_receipt":
         return "supplier_receipt"
-    if any(word in key for word in ["shelf", "stock count", "stock photo", "display"]):
+    if classification.media_kind == "pharmacy_stock_shelf_photo":
         return "stock_shelf_photo"
-    if any(word in key for word in ["barcode", "pack", "medicine pack", "label"]):
+    if classification.media_kind in {"barcode_photo", "medicine_pack_photo"}:
         return "barcode_or_pack_photo"
     return "unknown_photo"
 

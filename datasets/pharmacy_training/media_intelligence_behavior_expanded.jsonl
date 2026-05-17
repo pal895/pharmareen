@@ -1,0 +1,90 @@
+{"id":"media3_001","category":"media","text":"supplier invoice MedCare INV123 Panadol 20 boxes Amoxyl 10 packs","expected":"supplier_invoice needs confirmation","ai_allowed":true,"simulate":false}
+{"id":"media3_002","category":"media","text":"blurry invoice poor lighting","expected":"retake closer","ai_allowed":false,"simulate":false}
+{"id":"media3_003","category":"media","text":"handwritten supplier note Beta Pharmacy Panadol 5","expected":"handwritten needs review","ai_allowed":true,"simulate":false}
+{"id":"media3_004","category":"media","text":"stock shelf photo Panadol ORS Antacid","expected":"cannot count safely","ai_allowed":true,"simulate":false}
+{"id":"media3_005","category":"media","text":"barcode photo 9789914441314","expected":"barcode_photo completed","ai_allowed":false,"simulate":false}
+{"id":"media3_006","category":"media","text":"medicine pack photo Panadol label","expected":"medicine_pack_photo needs review","ai_allowed":true,"simulate":false}
+{"id":"media3_007","category":"media","text":"supplier receipt partial payment","expected":"supplier_receipt needs review","ai_allowed":true,"simulate":false}
+{"id":"media3_008","category":"media","text":"delivery note stock imefika Beta DN001","expected":"delivery_note needs review","ai_allowed":true,"simulate":false}
+{"id":"media3_009","category":"media","text":"mixed shelf and receipt photo","expected":"mixed_photo needs review","ai_allowed":false,"simulate":false}
+{"id":"media3_010","category":"media","text":"random non pharmacy image","expected":"non-pharmacy needs review","ai_allowed":false,"simulate":false}
+{"id":"media3_011","category":"media","text":"cropped invoice missing totals","expected":"unclear needs review","ai_allowed":false,"simulate":false}
+{"id":"media3_012","category":"media","text":"WhatsApp compressed invoice not clear","expected":"retake closer","ai_allowed":false,"simulate":false}
+{"id":"media3_013","category":"media","text":"supplier invoice with bonus stock","expected":"extract bonus quantities","ai_allowed":true,"simulate":false}
+{"id":"media3_014","category":"media","text":"invoice with discount amount","expected":"extract discount safely","ai_allowed":true,"simulate":false}
+{"id":"media3_015","category":"media","text":"invoice missing supplier name","expected":"needs review","ai_allowed":true,"simulate":false}
+{"id":"media3_016","category":"media","text":"invoice number visible but date cropped","expected":"needs review","ai_allowed":true,"simulate":false}
+{"id":"media3_017","category":"media","text":"supplier statement for monthly purchases","expected":"supplier_receipt needs review","ai_allowed":true,"simulate":false}
+{"id":"media3_018","category":"media","text":"goods returned note damaged Panadol","expected":"delivery_note needs review","ai_allowed":true,"simulate":false}
+{"id":"media3_019","category":"media","text":"medicine drawer photo mixed tablets","expected":"stock photo cannot count safely","ai_allowed":true,"simulate":false}
+{"id":"media3_020","category":"media","text":"dark shelf photo low light","expected":"retake closer","ai_allowed":false,"simulate":false}
+{"id":"media3_021","category":"media","text":"barcode label on medicine pack","expected":"barcode_or_pack","ai_allowed":false,"simulate":false}
+{"id":"media3_022","category":"media","text":"supplier receipt paid cash 2500","expected":"receipt extraction needs confirmation","ai_allowed":true,"simulate":false}
+{"id":"media3_023","category":"media","text":"supplier receipt paid mpesa 4000 balance 500","expected":"partial payment needs review","ai_allowed":true,"simulate":false}
+{"id":"media3_024","category":"media","text":"handwritten invoice with poor handwriting","expected":"needs review no fake confidence","ai_allowed":true,"simulate":false}
+{"id":"media3_025","category":"media","text":"blurry supplier receipt","expected":"retake closer","ai_allowed":false,"simulate":false}
+{"id":"media3_026","category":"media","text":"stock photo shelf but no quantity labels","expected":"cannot count safely","ai_allowed":true,"simulate":false}
+{"id":"media3_027","category":"media","text":"medicine pack photo expiry visible","expected":"medicine pack needs review","ai_allowed":true,"simulate":false}
+{"id":"media3_028","category":"media","text":"invoice photo with expiry Jan 2027 batch B001","expected":"extract batch expiry for review","ai_allowed":true,"simulate":false}
+{"id":"media3_029","category":"media","text":"delivery note with missing invoice total","expected":"needs confirmation","ai_allowed":true,"simulate":false}
+{"id":"media3_030","category":"media","text":"random selfie sent by mistake","expected":"non pharmacy saved safely","ai_allowed":false,"simulate":false}
+{"id":"voice3_001","category":"voice","text":"nimeuza panadol mbili cash noisy","expected":"transcribe then parse locally","ai_allowed":true,"simulate":false}
+{"id":"voice3_002","category":"voice","text":"uza amox moja mpesa fast speech","expected":"transcribe then local sale","ai_allowed":true,"simulate":false}
+{"id":"voice3_003","category":"voice","text":"ongeza moja after previous sale","expected":"memory correction local after transcription","ai_allowed":true,"simulate":false}
+{"id":"voice3_004","category":"voice","text":"hapana ilikuwa amoxicillin voice correction","expected":"memory correction needs confirmation","ai_allowed":true,"simulate":false}
+{"id":"voice3_005","category":"voice","text":"badilisha payment iwe mpesa voice","expected":"payment correction local after transcription","ai_allowed":true,"simulate":false}
+{"id":"voice3_006","category":"voice","text":"restock panadol twenty bonus five","expected":"restock parser after transcription","ai_allowed":true,"simulate":false}
+{"id":"voice3_007","category":"voice","text":"sold two panadol and one ors cash","expected":"multi sale after transcription","ai_allowed":true,"simulate":false}
+{"id":"voice3_008","category":"voice","text":"customer amesema hakuna insulin","expected":"no stock log after transcription","ai_allowed":true,"simulate":false}
+{"id":"voice3_009","category":"voice","text":"nilisahau kuuza ors earlier","expected":"ask quantity only","ai_allowed":true,"simulate":false}
+{"id":"voice3_010","category":"voice","text":"print receipt ya mwisho","expected":"receipt local after transcription","ai_allowed":true,"simulate":false}
+{"id":"offline3_001","category":"offline","text":"offline photo sync invoice saved safely","expected":"grouped confirmation","ai_allowed":false,"simulate":false}
+{"id":"offline3_002","category":"offline","text":"offline voice sync awaiting transcription","expected":"needs review confirmation","ai_allowed":false,"simulate":false}
+{"id":"offline3_003","category":"offline","text":"offline stock photo saved safely","expected":"AI review pending not stuck","ai_allowed":false,"simulate":false}
+{"id":"offline3_004","category":"offline","text":"offline duplicate photo no duplicate record","expected":"no duplicate created","ai_allowed":false,"simulate":false}
+{"id":"offline3_005","category":"offline","text":"offline reconnect grouped WhatsApp confirmation","expected":"synced safely summary","ai_allowed":false,"simulate":false}
+{"id":"supplier3_001","category":"supplier","text":"supplier delivered Panadol 20 boxes bonus 5 invoice INV777","expected":"stock review before update","ai_allowed":false,"simulate":false}
+{"id":"supplier3_002","category":"supplier","text":"partial invoice DawaPlus Panadol 10 paid 2000 balance 500","expected":"partial payment needs review","ai_allowed":false,"simulate":false}
+{"id":"supplier3_003","category":"supplier","text":"damaged stock returned to supplier","expected":"supplier return log","ai_allowed":false,"simulate":false}
+{"id":"supplier3_004","category":"supplier","text":"expired stock return Beta invoice INV999","expected":"supplier return needs review","ai_allowed":false,"simulate":false}
+{"id":"supplier3_005","category":"supplier","text":"stock imefika kutoka MedCare invoice 456","expected":"delivery note/invoice review","ai_allowed":false,"simulate":false}
+{"id":"analytics3_001","category":"analytics","text":"which invoice had Panadol yesterday","expected":"deterministic invoice lookup","ai_allowed":false,"simulate":false}
+{"id":"analytics3_002","category":"analytics","text":"supplier gani ametuletea Panadol sana","expected":"supplier analytics local","ai_allowed":false,"simulate":false}
+{"id":"analytics3_003","category":"analytics","text":"which photos need review","expected":"media review list","ai_allowed":false,"simulate":false}
+{"id":"analytics3_004","category":"analytics","text":"show photos waiting confirmation","expected":"media review list","ai_allowed":false,"simulate":false}
+{"id":"analytics3_005","category":"analytics","text":"invoice extraction status","expected":"media job status","ai_allowed":false,"simulate":false}
+{"id":"trust3_001","category":"trust","text":"photo saved but internet was off","expected":"saved safely reassurance","ai_allowed":false,"simulate":false}
+{"id":"trust3_002","category":"trust","text":"did the invoice update stock automatically","expected":"waiting for confirmation","ai_allowed":false,"simulate":false}
+{"id":"trust3_003","category":"trust","text":"will this photo spend tokens","expected":"only when extraction requested","ai_allowed":false,"simulate":false}
+{"id":"trust3_004","category":"trust","text":"stock photo count not safe","expected":"cannot count safely reassurance","ai_allowed":false,"simulate":false}
+{"id":"trust3_005","category":"trust","text":"receipt photo unclear","expected":"retake closer or send file","ai_allowed":false,"simulate":false}
+{"id":"rush3_001","category":"rush_hour","text":"P2cash invoice photo later","expected":"sale local photo separate","ai_allowed":false,"simulate":false}
+{"id":"rush3_002","category":"rush_hour","text":"Pan2mpesa shelf photo","expected":"sale local shelf needs review","ai_allowed":false,"simulate":false}
+{"id":"rush3_003","category":"rush_hour","text":"Amox5 receipt","expected":"sale local receipt separate","ai_allowed":false,"simulate":false}
+{"id":"rush3_004","category":"rush_hour","text":"PCM2 barcode image","expected":"local alias or clarify barcode no AI","ai_allowed":false,"simulate":false}
+{"id":"rush3_005","category":"rush_hour","text":"same kama jana then invoice photo","expected":"memory local media saved","ai_allowed":false,"simulate":false}
+{"id":"voice3_011","category":"voice","text":"niliuza panadol mbili cash na amox moja mpesa","expected":"multi sale after transcription","ai_allowed":true,"simulate":false}
+{"id":"voice3_012","category":"voice","text":"panadol tatu mpesa noisy customer background","expected":"voice transcription then local parser","ai_allowed":true,"simulate":false}
+{"id":"voice3_013","category":"voice","text":"weka discount kwa ile ya mwisho","expected":"local memory after transcription","ai_allowed":true,"simulate":false}
+{"id":"voice3_014","category":"voice","text":"receipt ya mwisho tafadhali","expected":"receipt local after transcription","ai_allowed":true,"simulate":false}
+{"id":"voice3_015","category":"voice","text":"ongeza amox moja","expected":"memory/action local after transcription","ai_allowed":true,"simulate":false}
+{"id":"media3_031","category":"media","text":"invoice clear enough MedCare INV123 Panadol 20 boxes","expected":"completed extraction needs confirmation","ai_allowed":true,"simulate":false}
+{"id":"media3_032","category":"media","text":"invoice photo too far unreadable","expected":"failed with reason or needs review","ai_allowed":false,"simulate":false}
+{"id":"media3_033","category":"media","text":"supplier receipt with mpesa transaction code","expected":"supplier receipt classification","ai_allowed":true,"simulate":false}
+{"id":"media3_034","category":"media","text":"stock shelf photo ORS finished","expected":"needs human quantity confirmation","ai_allowed":true,"simulate":false}
+{"id":"media3_035","category":"media","text":"barcode medicine pack expiry visible","expected":"pack/barcode review","ai_allowed":true,"simulate":false}
+{"id":"media3_036","category":"media","text":"delivery note damaged stock marked rejected","expected":"needs review no stock update","ai_allowed":true,"simulate":false}
+{"id":"media3_037","category":"media","text":"supplier invoice discount 300 bonus 5","expected":"extract discount bonus for review","ai_allowed":true,"simulate":false}
+{"id":"media3_038","category":"media","text":"handwritten invoice missing quantities","expected":"needs review ask quantities","ai_allowed":true,"simulate":false}
+{"id":"media3_039","category":"media","text":"receipt photo from customer purchase","expected":"receipt image needs review","ai_allowed":true,"simulate":false}
+{"id":"media3_040","category":"media","text":"medicine pack photo not invoice","expected":"do not treat as invoice","ai_allowed":true,"simulate":false}
+{"id":"world3_001","category":"supplier","text":"retail pharmacy end of day supplier invoice batch entry","expected":"operational pattern","ai_allowed":false,"simulate":false}
+{"id":"world3_002","category":"payments","text":"credit sale customer cleared debt later","expected":"payment update local","ai_allowed":false,"simulate":false}
+{"id":"world3_003","category":"offline","text":"rural pharmacy weak internet photo saved safely","expected":"offline trust pattern","ai_allowed":false,"simulate":false}
+{"id":"world3_004","category":"barcode","text":"external scanner typed barcode then sell","expected":"local barcode lookup","ai_allowed":false,"simulate":false}
+{"id":"world3_005","category":"analytics","text":"end of day reconciliation cash mpesa credit","expected":"deterministic report","ai_allowed":false,"simulate":false}
+{"id":"world3_006","category":"correction","text":"cashier panic correction after wrong medicine","expected":"short clarification","ai_allowed":false,"simulate":false}
+{"id":"world3_007","category":"trust","text":"owner fears lost records after offline sync","expected":"synced safely reassurance","ai_allowed":false,"simulate":false}
+{"id":"world3_008","category":"voice","text":"fast noisy voice note during rush hour","expected":"transcribe only then local parser","ai_allowed":true,"simulate":false}
+{"id":"world3_009","category":"media","text":"medicine shelf with mixed brands no count","expected":"stock photo cannot count safely","ai_allowed":true,"simulate":false}
+{"id":"world3_010","category":"media","text":"supplier invoice printed plus handwritten bonus note","expected":"mixed/handwritten needs review","ai_allowed":true,"simulate":false}

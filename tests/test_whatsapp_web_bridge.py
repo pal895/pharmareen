@@ -357,7 +357,7 @@ def test_whatsapp_web_bridge_photo_quota_fallback(monkeypatch, tmp_path):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert data["reply"] == "📷 Invoice photo saved safely\nAI extraction: waiting"
+    assert data["reply"] == "📷 Photo received safely. I saved it for review."
     assert data["message_type"] == "image"
     assert data["command_handler"] == "photo_received_saved_safely"
     saved_images = list((tmp_path / "data" / "photo_uploads").glob("*.jpg"))
@@ -368,13 +368,46 @@ def test_whatsapp_web_bridge_photo_quota_fallback(monkeypatch, tmp_path):
     log_entry = json.loads(log_path.read_text(encoding="utf-8").strip())
     assert log_entry["media_type"] == "image/jpeg"
     assert log_entry["file_path"].startswith("data/photo_uploads/")
-    assert log_entry["processing_status"] == "saved_waiting_for_scan_request"
-    assert log_entry["extraction"]["extraction_status"] == "saved_waiting_for_scan_request"
+    assert log_entry["processing_status"] == "needs_review"
+    assert log_entry["classification"]["media_kind"] == "unknown_photo"
+    assert log_entry["media_job"]["requires_confirmation"] is False
+    assert log_entry["extraction"]["extraction_status"] == "saved_needs_review"
     status_data = status.json()
     assert status_data["photo_pipeline_installed"] is True
     assert status_data["upload_folder_exists"] is True
     assert status_data["images_received_count"] == 1
     assert status_data["last_uploaded_image"]["file_path"].startswith("data/photo_uploads/")
+
+
+def test_whatsapp_web_bridge_classifies_invoice_photo_without_calling_ai(monkeypatch, tmp_path):
+    class FailingAIService:
+        client = object()
+
+        def extract_restock_from_image(self, image_bytes: bytes, content_type: str | None = None):
+            raise AssertionError("photo intake should not call AI unless extraction is explicitly requested")
+
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_ai_service", lambda: FailingAIService())
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"invoice image bytes").decode("ascii")
+    payload["media_mime_type"] = "image/jpeg"
+    payload["caption"] = "supplier invoice MedCare INV123"
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["reply"] == "📷 Photo received safely. This looks like a supplier invoice.\nWaiting for your confirmation before stock update."
+    log_entry = json.loads((tmp_path / "data" / "photo_intake_log.jsonl").read_text(encoding="utf-8").strip())
+    assert log_entry["classification"]["media_kind"] == "supplier_invoice"
+    assert log_entry["media_job"]["requires_confirmation"] is True
 
 
 def test_whatsapp_web_bridge_payload_test_mode_still_blocks_group(monkeypatch):

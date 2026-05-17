@@ -725,7 +725,7 @@ function entryLabel(item) {
     return `${item.sync_status === "synced" ? "✅" : "📷"} ${label}\n${mediaStatusLabel(item)}`;
   }
   if (item.type === "voice" || item.type === "audio") {
-    return `${item.sync_status === "synced" ? "✅ Voice synced" : "🎤 Voice note saved safely"}\n${mediaStatusLabel(item)}`;
+    return `${item.sync_status === "synced" ? "✅ Voice synced safely" : "🎤 Voice note saved safely"}\n${mediaStatusLabel(item)}`;
   }
   if (item.action === "restock") {
     const bonus = Number(item.bonus_quantity || 0) > 0 ? ` + bonus ${item.bonus_quantity}` : "";

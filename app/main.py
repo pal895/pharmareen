@@ -40,6 +40,8 @@ from app.routes.offline_sync import router as offline_sync_router
 from app.services.photo_intake import (
     append_photo_intake_log,
     build_invoice_extraction_placeholder,
+    build_media_job_placeholder,
+    classify_photo_for_intake,
     ensure_photo_intake_dirs,
     google_sheets_preparation_helpers,
     read_photo_intake_stats,
@@ -65,7 +67,7 @@ last_openai_error: dict[str, Any] = {
     "timestamp": "",
 }
 VOICE_QUOTA_REPLY = "🎧 Voice received safely. AI transcription is ready but OpenAI credits are not active yet."
-PHOTO_QUOTA_REPLY = "📷 Invoice photo saved safely\nAI extraction: waiting"
+PHOTO_QUOTA_REPLY = "📷 Photo received safely. Saved for review."
 DEFAULT_PUBLIC_BASE_URL = "https://pharmareen-1--pal895.replit.app"
 
 
@@ -285,12 +287,15 @@ def offline_entry_to_command(entry: dict[str, Any]) -> str:
 def offline_media_reply(entry: dict[str, Any]) -> str:
     action = offline_entry_action(entry)
     if action in {"photo", "image"}:
-        return "📷 Invoice photo saved safely\nAI extraction: waiting"
+        purpose = str(entry.get("purpose") or "").replace("_", " ").strip()
+        if "stock" in purpose:
+            return "📷 Stock photo saved safely\nStatus: Needs review"
+        if "receipt" in purpose:
+            return "📷 Supplier receipt saved safely\nStatus: Needs review"
+        return "📷 Invoice photo saved safely\nStatus: Needs review"
     if action in {"voice", "audio"}:
         return "🎤 Voice note saved safely\nStatus: Needs review"
-    if action in {"photo", "image"}:
-        return "Photo saved. AI reading needs credits. Text commands still work."
-    return "Voice/photo saved. AI reading needs credits. Text commands still work."
+    return "Voice/photo saved safely. Needs review."
 
 
 def offline_sync_success_message(entries: list[dict[str, Any]], synced: list[dict[str, Any]]) -> str:
@@ -1171,6 +1176,9 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
     message_id = str(payload.get("message_id") or payload.get("id") or "").strip()
     media_base64 = str(payload.get("media_base64") or "").strip()
     media_mime_type = str(payload.get("media_mime_type") or payload.get("mimetype") or "").strip()
+    media_caption = str(payload.get("caption") or payload.get("media_caption") or payload.get("message_caption") or "").strip()
+    media_filename = str(payload.get("file_name") or payload.get("filename") or payload.get("media_filename") or "").strip()
+    media_purpose = str(payload.get("purpose") or payload.get("media_purpose") or "").strip()
     voice_transcribe_only = boolish(
         payload.get("voice_transcribe_only")
         or payload.get("transcribe_only")
@@ -1224,6 +1232,9 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
         message_id=message_id,
         media_base64=media_base64,
         media_mime_type=media_mime_type,
+        media_caption=media_caption,
+        media_filename=media_filename,
+        media_purpose=media_purpose,
         voice_transcribe_only=voice_transcribe_only,
     )
     log_webhook_request(sender, "whatsapp_web", result.success, result.error_reason)
@@ -1244,6 +1255,9 @@ async def process_whatsapp_web_payload(
     message_id: str = "",
     media_base64: str = "",
     media_mime_type: str = "",
+    media_caption: str = "",
+    media_filename: str = "",
+    media_purpose: str = "",
     voice_transcribe_only: bool = False,
 ) -> WhatsAppProcessResult:
     if message:
@@ -1327,8 +1341,16 @@ async def process_whatsapp_web_payload(
             image_bytes=image_bytes,
             timestamp=now_in_timezone(settings.timezone).isoformat(timespec="seconds"),
         )
-        extraction_status = "saved_waiting_for_scan_request" if settings.openai_api_key.strip() else "waiting_for_openai_key"
-        extraction = build_invoice_extraction_placeholder(extraction_status=extraction_status)
+        classification = classify_photo_for_intake(
+            filename=media_filename or upload["relative_file_path"],
+            caption=media_caption,
+            purpose=media_purpose,
+            media_type=media_mime_type,
+        )
+        media_job = build_media_job_placeholder(classification)
+        extraction_status = media_job["processing_status"]
+        legacy_extraction_status = "saved_needs_review" if settings.openai_api_key.strip() else "saved_needs_review_openai_key_missing"
+        extraction = build_invoice_extraction_placeholder(extraction_status=legacy_extraction_status)
         intake_record = {
             "sender": mask_phone(sender),
             "timestamp": upload["timestamp"],
@@ -1336,26 +1358,35 @@ async def process_whatsapp_web_payload(
             "file_path": upload["relative_file_path"],
             "message_id": message_id,
             "processing_status": extraction_status,
+            "classification": classification,
+            "media_job": media_job,
             "byte_count": len(image_bytes),
             "source": "whatsapp_web_bridge",
             "extraction": extraction,
         }
         append_photo_intake_log(PROJECT_ROOT, intake_record)
         logger.info(
-            "PHOTO_RECEIVED sender=%s message_id=%s mime=%s bytes=%s file_path=%s status=%s",
+            "PHOTO_RECEIVED sender=%s message_id=%s mime=%s bytes=%s file_path=%s kind=%s status=%s ai_needed=%s",
             mask_phone(sender),
             message_id,
             media_mime_type,
             len(image_bytes),
             upload["relative_file_path"],
+            classification["media_kind"],
             extraction_status,
+            classification["needs_ai"],
         )
+        reply = classification["user_message"]
+        if classification["media_kind"] in {"supplier_invoice", "supplier_receipt", "handwritten_invoice", "delivery_note"}:
+            reply = f"{reply}\nWaiting for your confirmation before stock update."
+        elif classification["media_kind"] == "pharmacy_stock_shelf_photo":
+            reply = f"{reply}\nReply with quantities or scan barcode."
 
         return WhatsAppProcessResult(
-            reply=PHOTO_QUOTA_REPLY,
+            reply=reply,
             message_type="image",
             success=True,
-            error_reason="photo_saved_no_ai_requested" if extraction_status == "saved_waiting_for_scan_request" else "openai_key_missing",
+            error_reason="photo_saved_for_review",
             command_handler="photo_received_saved_safely",
         )
 

@@ -4,6 +4,7 @@ from app.ai import AI_USAGE_LOG
 from app.services.operational_intelligence import (
     AdaptiveAliasLearner,
     OperationalMemory,
+    classify_media_input,
     classify_photo_kind,
     decide_ai_route,
     voice_pattern_hint,
@@ -16,7 +17,7 @@ def test_training_datasets_cover_real_pharmacy_behaviors():
     cases = load_training_cases(Path("datasets/pharmacy_training"))
     categories = {case.category for case in cases}
 
-    assert len(cases) >= 170
+    assert len(cases) >= 250
     assert {
         "conversation",
         "shorthand",
@@ -98,6 +99,9 @@ def test_photo_and_voice_classification_are_local_until_extraction_needed():
     assert classify_photo_kind(filename="shelf.jpg", caption="stock shelf photo") == "stock_shelf_photo"
     assert classify_photo_kind(filename="pack.jpg", caption="barcode medicine pack") == "barcode_or_pack_photo"
     assert classify_photo_kind(filename="random.jpg", caption="family photo") == "unknown_photo"
+    assert classify_media_input(caption="supplier invoice MedCare INV123").media_kind == "supplier_invoice"
+    assert classify_media_input(caption="handwritten supplier note").media_kind == "handwritten_invoice"
+    assert classify_media_input(caption="blurry invoice poor lighting").media_kind == "blurry_unclear_photo"
     assert voice_pattern_hint("Niliuza Panadol mbili cash") == "parse_locally_after_transcription"
 
 
@@ -126,6 +130,9 @@ def test_expanded_training_examples_teach_current_friction():
         "badilisha payment iwe mpesa",
         "supplier invoice",
         "random non pharmacy image",
+        "blurry invoice poor lighting",
+        "nimeuza panadol mbili cash noisy",
+        "supplier receipt partial payment",
         "best seller leo",
         "offline save panadol 1 cash",
     ]:
