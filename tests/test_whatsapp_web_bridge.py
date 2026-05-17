@@ -294,6 +294,46 @@ def test_whatsapp_web_bridge_transcribes_audio_payload(monkeypatch):
     assert data["command_handler"] == "voice_note_transcribed"
 
 
+def test_whatsapp_web_bridge_processes_voice_transcript_through_local_intake(monkeypatch):
+    class FakeTranscriptionService:
+        is_available = True
+
+        def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
+            assert audio_bytes == b"fake voice bytes"
+            return "Panadol mbili cash na Amox moja mpesa"
+
+    seen: dict[str, str] = {}
+
+    def fake_process_intake_text_for_sender(text: str, sender: str) -> str:
+        seen["text"] = text
+        seen["sender"] = sender
+        return "✅ Recorded:\n• Panadol x2 cash\n• Amox x1 M-Pesa\nStock updated."
+
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_transcription_service", lambda: FakeTranscriptionService())
+    monkeypatch.setattr(main, "process_intake_text_for_sender", fake_process_intake_text_for_sender)
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"fake voice bytes").decode("ascii")
+    payload["media_mime_type"] = "audio/ogg"
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["command_handler"] == "voice_note_processed"
+    assert "Voice note received" in data["reply"]
+    assert "Heard: Panadol mbili cash na Amox moja mpesa" in data["reply"]
+    assert "Panadol x2 cash" in data["reply"]
+    assert seen["sender"] == "254700000000@s.whatsapp.net"
+
+
 def test_whatsapp_web_bridge_voice_quota_fallback(monkeypatch):
     class FakeTranscriptionService:
         is_available = True
@@ -408,6 +448,51 @@ def test_whatsapp_web_bridge_classifies_invoice_photo_without_calling_ai(monkeyp
     log_entry = json.loads((tmp_path / "data" / "photo_intake_log.jsonl").read_text(encoding="utf-8").strip())
     assert log_entry["classification"]["media_kind"] == "supplier_invoice"
     assert log_entry["media_job"]["requires_confirmation"] is True
+
+
+def test_whatsapp_web_bridge_runs_invoice_ai_when_scan_is_requested(monkeypatch, tmp_path):
+    class FakeAIService:
+        client = object()
+
+        def extract_restock_from_image(self, image_bytes: bytes, content_type: str | None = None):
+            assert image_bytes == b"invoice image bytes"
+            assert content_type == "image/jpeg"
+            return {
+                "confidence": 0.87,
+                "items": [
+                    {"drug_name": "Panadol", "quantity": 20, "unit_type": "boxes", "supplier": "MedCare"},
+                    {"drug_name": "ORS", "quantity": 10, "unit_type": "packs", "supplier": "MedCare"},
+                ],
+                "message": "2 invoice rows found",
+            }
+
+    monkeypatch.setenv("ENABLE_INVOICE_AI", "true")
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_ai_service", lambda: FakeAIService())
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"invoice image bytes").decode("ascii")
+    payload["media_mime_type"] = "image/jpeg"
+    payload["caption"] = "scan invoice MedCare INV123"
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "📷 Invoice processed" in data["reply"]
+    assert "Supplier: MedCare" in data["reply"]
+    assert "Panadol x20 boxes" in data["reply"]
+    assert "Review needed before stock update." in data["reply"]
+    log_entry = json.loads((tmp_path / "data" / "photo_intake_log.jsonl").read_text(encoding="utf-8").strip())
+    assert log_entry["extraction"]["extraction_status"] == "needs_review"
+    assert log_entry["extraction"]["items"][0]["drug_name"] == "Panadol"
 
 
 def test_whatsapp_web_bridge_payload_test_mode_still_blocks_group(monkeypatch):

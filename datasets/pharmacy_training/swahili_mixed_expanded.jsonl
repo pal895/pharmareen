@@ -4,7 +4,7 @@
 {"id": "swa_004", "category": "swahili", "text": "Ongeza amox moja", "expect_contains": ["Amoxyl +1 added"], "ai_allowed": false, "simulate": true}
 {"id": "swa_005", "category": "swahili", "text": "Hii dawa imeisha", "simulate": false, "expected": "needs medicine clarification", "ai_allowed": false}
 {"id": "swa_006", "category": "swahili", "text": "Customer amesema hakuna insulin", "expect_contains": ["Insulin no-stock request logged"], "ai_allowed": false, "simulate": true}
-{"id": "swa_007", "category": "swahili", "text": "Nilisahau kuuza ORS mbili earlier", "expect_contains": ["Late sale recorded", "ORS x2"], "ai_allowed": false, "simulate": true}
+{"id": "swa_007", "category": "swahili", "text": "Nilisahau kuuza ORS mbili earlier", "expect_contains": ["Late sale saved", "ORS x2"], "ai_allowed": false, "simulate": true}
 {"id": "swa_008", "category": "swahili", "text": "Hiyo ya jana", "simulate": false, "expected": "memory reference needs safe clarification", "ai_allowed": false}
 {"id": "swa_009", "category": "swahili", "text": "Hiyo ingine", "simulate": false, "expected": "memory reference needs safe clarification", "ai_allowed": false}
 {"id": "swa_010", "category": "swahili", "text": "Dawa gani imeuza sana leo", "expect_contains": ["Best seller today"], "ai_allowed": false, "simulate": true}

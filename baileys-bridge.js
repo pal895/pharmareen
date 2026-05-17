@@ -370,7 +370,7 @@ async function startBaileys(options = {}) {
           const data = await sendToBackend('', sender, messageId, {
             media_base64: mediaBase64,
             media_mime_type: mimeType,
-            voice_transcribe_only: true
+            voice_transcribe_only: false
           });
           console.log(`BACKEND_REPLY_RECEIVED from ${maskSender(sender)} status=${data.status || 'unknown'} handler=${data.command_handler || 'unknown'} reason=${data.error_reason || 'none'}`);
           const reply = extractBackendReply(data);

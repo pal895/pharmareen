@@ -475,7 +475,7 @@ def test_compact_rush_hour_commands_are_normalized_safely():
     assert "Panadol x2 recorded" in sale_reply
     assert "Panadol stock left: 18" in stock_reply
     assert "Panadol +20 added" in restock_reply
-    assert "Late sale recorded" in late_reply
+    assert "Late sale saved" in late_reply
     assert store.stocks["panadol"].current_stock == 33
 
 
@@ -489,7 +489,9 @@ def test_compact_multi_sale_and_swahili_phrases_work():
 
     assert "Batch processed" in batch_reply
     assert "Panadol x2" in batch_reply
-    assert "Amoxyl x1" in batch_reply
+    assert "Did you mean:" in batch_reply
+    assert "Amoxyl" in batch_reply
+    assert "Amoxicillin" in batch_reply
     assert "ORS x3" in batch_reply
     assert "Panadol x2 recorded" in swahili_reply
     assert "Insulin no-stock request logged" in no_stock_reply
@@ -996,7 +998,7 @@ def test_late_sale_command_records_late_sale():
 
     reply = service.process_text("later Panadol 3")
 
-    assert "Late sale recorded" in reply
+    assert "Late sale saved" in reply
     assert "Panadol x3" in reply
     assert store.transactions[-1]["Type"] == "late_sale"
     assert store.logged[-1][0].action == Action.LATE_SALE
@@ -1008,7 +1010,7 @@ def test_late_keyword_records_late_sale():
 
     reply = service.process_text("late Panadol 3")
 
-    assert "Late sale recorded" in reply
+    assert "Late sale saved" in reply
     assert "Panadol x3" in reply
     assert store.transactions[-1]["Type"] == "late_sale"
     assert store.logged[-1][0].action == Action.LATE_SALE
@@ -1020,7 +1022,7 @@ def test_missed_sale_alias_records_late_sale():
 
     reply = service.process_text("missed Panadol 3")
 
-    assert "Late sale recorded" in reply
+    assert "Late sale saved" in reply
     assert store.transactions[-1]["Type"] == "late_sale"
 
 
@@ -1269,7 +1271,7 @@ def test_chat_like_no_stock_and_missed_commands():
     service = IntakeService(FailingParser(), store)
 
     assert "Insulin no-stock request logged" in service.process_text("Insulin is out of stock")
-    assert "Late sale recorded" in service.process_text("I missed Panadol 3")
+    assert "Late sale saved" in service.process_text("I missed Panadol 3")
 
 
 def test_report_by_date_found_returns_saved_report():
@@ -1348,8 +1350,61 @@ def test_deterministic_analytics_router_handles_payment_peak_and_best_seller_wit
     assert "Cash received today: KES 440" in cash
     assert "M-Pesa received today: KES 450" in mpesa
     assert "Top payment today: M-Pesa" in top_payment or "Top payment today: Cash" in top_payment
-    assert "Busiest time today:" in peak
+    assert "Peak time today:" in peak
+    assert "Top medicines:" in peak
+    assert "Payments:" in peak
     assert parser.called is False
+
+
+def test_late_sale_commands_route_before_cash_analytics_and_keep_payment():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    for message in [
+        "late Panadol 3 yesterday cash",
+        "latepanadol5cash",
+        "yesterday panadol 3 cash",
+        "niliuza jana panadol 3 cash",
+    ]:
+        reply = service.process_text(message)
+        assert "Late sale saved" in reply
+        assert "Panadol x" in reply
+        assert "Cash" in reply
+        assert "Cash received" not in reply
+        assert store.transactions[-1]["Type"] == "late_sale"
+
+
+def test_sale_discounts_support_amount_percent_and_compact_less_aliases():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    cash_reply = service.process_text("Panadol 2 cash discount 20")
+    percent_reply = service.process_text("Amoxyl 1 mpesa less10%")
+    mixed_reply = service.process_text("ORS 2 mixed100/200 less50")
+
+    assert "Panadol x2 recorded" in cash_reply
+    assert "Original:" in cash_reply
+    assert "Discount: KES 20" in cash_reply
+    assert "Paid:" in cash_reply
+    assert "Amoxyl x1 recorded" in percent_reply
+    assert "M-Pesa" in percent_reply
+    assert "Discount: KES 45 (10%)" in percent_reply
+    assert "ORS x2 recorded" in mixed_reply
+    assert "Mixed" in mixed_reply
+    assert "payment_cash=100.0" in store.transactions[-1]["Note"]
+    assert "payment_mpesa=200.0" in store.transactions[-1]["Note"]
+
+
+def test_default_aliases_do_not_override_ambiguous_inventory_prefixes():
+    store = FakeStore()
+    store.stocks["paracetamol"] = StockItem("Paracetamol", 100, 60, 20, 5, 10)
+    service = IntakeService(FailingParser(), store)
+
+    amox_reply = service.process_text("Amox1mpesa")
+
+    assert "Did you mean:" in amox_reply
+    assert "Amoxyl" in amox_reply
+    assert "Amoxicillin" in amox_reply
 
 
 def test_plus_bonus_restock_keeps_purchased_quantity_and_bonus():

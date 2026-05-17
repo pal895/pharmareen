@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64
 import json
@@ -1352,6 +1352,44 @@ async def process_whatsapp_web_payload(
         extraction_status = media_job["processing_status"]
         legacy_extraction_status = "saved_needs_review" if settings.openai_api_key.strip() else "saved_needs_review_openai_key_missing"
         extraction = build_invoice_extraction_placeholder(extraction_status=legacy_extraction_status)
+        ai_reply = ""
+        ai_requested = photo_ai_requested(media_caption, media_purpose, classification)
+        if ai_requested:
+            if not settings.openai_api_key.strip():
+                extraction_status = "saved_needs_review_openai_key_missing"
+                media_job["processing_status"] = extraction_status
+                extraction = build_invoice_extraction_placeholder(extraction_status=extraction_status)
+                ai_reply = "📷 Photo received safely. AI reading is not enabled yet."
+            elif not photo_ai_enabled():
+                extraction_status = "saved_needs_review_ai_disabled"
+                media_job["processing_status"] = extraction_status
+                extraction = build_invoice_extraction_placeholder(extraction_status=extraction_status)
+                ai_reply = "📷 Photo received safely. AI reading is switched off for now."
+            else:
+                try:
+                    extraction_result = get_ai_service().extract_restock_from_image(image_bytes, media_mime_type)
+                    clear_last_openai_error("photo")
+                    extraction_status = "needs_review"
+                    extraction = {
+                        "extraction_status": extraction_status,
+                        "confidence": extraction_result.get("confidence", 0),
+                        "message": extraction_result.get("message", ""),
+                        "items": extraction_result.get("items", []),
+                    }
+                    media_job["processing_status"] = extraction_status
+                    ai_reply = format_invoice_extraction_reply(extraction_result)
+                except Exception as exc:
+                    record_openai_error("photo", exc)
+                    if is_openai_quota_error(exc):
+                        extraction_status = "waiting_for_openai_credits"
+                        media_job["processing_status"] = extraction_status
+                        extraction = build_invoice_extraction_placeholder(extraction_status=extraction_status)
+                        ai_reply = "📷 Photo received safely. AI reading is ready but OpenAI credits are not active yet."
+                    else:
+                        extraction_status = "failed"
+                        media_job["processing_status"] = extraction_status
+                        extraction = build_invoice_extraction_placeholder(extraction_status=extraction_status)
+                        ai_reply = "📷 Photo received safely. AI reading needs review."
         intake_record = {
             "sender": mask_phone(sender),
             "timestamp": upload["timestamp"],
@@ -1377,9 +1415,10 @@ async def process_whatsapp_web_payload(
             extraction_status,
             classification["needs_ai"],
         )
-        reply = classification["user_message"]
+        reply = ai_reply or classification["user_message"]
         if classification["media_kind"] in {"supplier_invoice", "supplier_receipt", "handwritten_invoice", "delivery_note"}:
-            reply = f"{reply}\nWaiting for your confirmation before stock update."
+            if "confirmation before stock update" not in reply:
+                reply = f"{reply}\nWaiting for your confirmation before stock update."
         elif classification["media_kind"] == "pharmacy_stock_shelf_photo":
             reply = f"{reply}\nReply with quantities or scan barcode."
 
@@ -1398,6 +1437,55 @@ async def process_whatsapp_web_payload(
         error_reason="unsupported_media",
         command_handler="unsupported_media",
     )
+
+
+def photo_ai_enabled() -> bool:
+    return (
+        boolish(os.getenv("ENABLE_INVOICE_AI"))
+        or boolish(os.getenv("ENABLE_VISION_AI"))
+        or boolish(os.getenv("OPENAI_ENABLED"))
+    )
+
+
+def photo_ai_requested(caption: str, purpose: str, classification: dict[str, Any]) -> bool:
+    direct_text = " ".join([str(caption or ""), str(purpose or "")]).lower()
+    if any(word in direct_text for word in ["scan", "analyze", "analyse", "read", "extract"]):
+        return True
+    media_kind = str(classification.get("media_kind") or "")
+    return photo_ai_enabled() and media_kind in {"supplier_invoice", "supplier_receipt", "handwritten_invoice", "delivery_note"}
+
+
+def format_invoice_extraction_reply(extraction_result: dict[str, Any]) -> str:
+    items = list(extraction_result.get("items") or [])
+    supplier = str(extraction_result.get("supplier") or "").strip()
+    if not supplier:
+        for item in items:
+            supplier = str(item.get("supplier") or item.get("supplier_name") or "").strip()
+            if supplier:
+                break
+    lines = ["📷 Invoice processed"]
+    if supplier:
+        lines.append(f"Supplier: {supplier}")
+    if items:
+        lines.append("Items found:")
+        for item in items[:8]:
+            name = str(item.get("drug_name") or item.get("medicine") or item.get("name") or "Medicine").strip()
+            quantity = item.get("quantity") or item.get("total_received_quantity") or item.get("ordered_quantity") or ""
+            unit = str(item.get("unit") or item.get("unit_type") or "").strip()
+            cost = item.get("cost") or item.get("unit_cost") or item.get("total") or ""
+            detail = f"• {name}"
+            if quantity:
+                detail += f" x{quantity}"
+            if unit:
+                detail += f" {unit}"
+            if cost not in ("", None):
+                detail += f" — {cost}"
+            lines.append(detail)
+    else:
+        message = str(extraction_result.get("message") or "").strip()
+        lines.append(message or "No clear medicine rows found.")
+    lines.append("Review needed before stock update.")
+    return "\n".join(lines)
 
 
 def process_intake_text_for_sender(text: str, sender: str) -> str:
@@ -1663,31 +1751,30 @@ def voice_reply(original_transcript: str, interpreted_command: str, processed_re
     if (
         "could not understand" in lower_reply
         or "please send it like" in lower_reply
-        or "didnâ€™t understand" in lower_reply
+        or "didn’t understand" in lower_reply
         or "didn't understand" in lower_reply
     ):
         return voice_needs_correction_reply(original_transcript)
     clean_reply = processed_reply
-    if clean_reply.startswith("âœ… Batch processed\n\n"):
-        clean_reply = clean_reply.replace("âœ… Batch processed\n\n", "", 1)
+    if clean_reply.startswith("✅ Batch processed\n\n"):
+        clean_reply = clean_reply.replace("✅ Batch processed\n\n", "", 1)
     clean_reply = clean_reply.replace("\n\nErrors:\n- None", "")
     return "\n".join(
         [
-            "ðŸŽ™ï¸ Voice note received",
-            "",
+            "🎙 Voice note received",
             f"Heard: {original_transcript}",
             f"Command: {interpreted_command}",
             "",
             "Result:",
             clean_reply,
             "",
-            "âœ… Records updated.",
+            "✅ Records updated safely.",
         ]
     )
 
 
 def unclear_voice_message() -> str:
-    return "âš ï¸ I could not clearly understand the voice note.\nPlease type it like:\nPanadol 2\nAmoxil 1"
+    return "⚠️ I could not clearly understand the voice note.\nPlease type it like:\nPanadol 2\nAmoxil 1"
 
 
 def voice_needs_correction_reply(transcript: str) -> str:
@@ -1699,8 +1786,7 @@ def voice_needs_correction_reply(transcript: str) -> str:
 
 
 def voice_transcription_failed_message() -> str:
-    return 'ðŸŽ™ï¸ I heard the voice but could not read it clearly. Try saying: "Panadol two" or type: Panadol 2.'
-
+    return "🎙 I heard the voice but could not read it clearly. Try saying: \"Panadol two\" or type: Panadol 2."
 
 def voice_transcript_is_clear(transcript: str) -> bool:
     from app.intake import parse_operating_commands

@@ -1,4 +1,4 @@
-{"id": "rush2_001", "category": "rush_hour", "text": "P2cash", "expect_contains": ["Panadol x2", "Stock left"], "ai_allowed": false, "simulate": true}
+{"id": "rush2_001", "category": "rush_hour", "text": "P2cash", "expect_contains": ["Did you mean:", "Panadol", "Piriton"], "ai_allowed": false, "simulate": true}
 {"id": "rush2_002", "category": "rush_hour", "text": "Pan2mpesa", "expect_contains": ["Panadol x2", "Stock left"], "ai_allowed": false, "simulate": true}
 {"id": "rush2_003", "category": "rush_hour", "text": "Amox5", "expect_contains": ["Amoxyl x5", "Stock left"], "ai_allowed": false, "simulate": true}
 {"id": "rush2_004", "category": "rush_hour", "text": "Panadol tatu mpesa", "expect_contains": ["Panadol x3", "Stock left"], "ai_allowed": false, "simulate": true}

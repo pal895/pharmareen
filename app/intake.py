@@ -16,6 +16,7 @@ from app.services.pharmacy_engine import (
     build_note,
     canonical_unit,
     parse_note_metadata,
+    parse_discount_percent,
     parse_payment_method,
     parse_staff_name,
     parse_trace_modifiers,
@@ -228,6 +229,7 @@ class OperatingCommand:
     base_quantity: int | None = None
     payment_method: str = ""
     discount: float = 0
+    discount_percent: float = 0
     staff_name: str = ""
     batch_number: str = ""
     invoice_number: str = ""
@@ -236,6 +238,7 @@ class OperatingCommand:
     notes: str = ""
     raw_text: str = ""
     error: str = ""
+    target_day: str = ""
 
 
 @dataclass(frozen=True)
@@ -305,7 +308,6 @@ SHORTCUT_DRUGS = {
     "ors": "ORS",
     "a": "Antacid",
     "ant": "Antacid",
-    "amox": "Amoxyl",
     "amoxil": "Amoxyl",
     "i": "Insulin",
     "ins": "Insulin",
@@ -457,6 +459,22 @@ class IntakeService:
                 ]
             )
 
+        if is_cash_summary_command(text):
+            return self._cash_summary_reply()
+
+        if is_staff_summary_command(text):
+            return self._staff_summary_reply()
+
+        if is_low_stock_command(text):
+            return self._low_stock_reply()
+
+        if is_stock_value_command(text):
+            return self._stock_value_reply()
+
+        commands = parse_operating_commands(text)
+        if commands is not None:
+            return self._process_commands(commands, conversation_key=conversation_key)
+
         analytics_intent = parse_analytics_command(text)
         if analytics_intent is not None:
             if analytics_intent.get("type") == "low_stock":
@@ -507,10 +525,6 @@ class IntakeService:
         report_date = parse_report_command(text, self.timezone)
         if report_date:
             return self._saved_report_reply(report_date)
-
-        commands = parse_operating_commands(text)
-        if commands is not None:
-            return self._process_commands(commands, conversation_key=conversation_key)
 
         try:
             master_drug_names = self.store.list_master_drug_names()
@@ -619,15 +633,24 @@ class IntakeService:
             return "I could not check low stock right now. Please check the Google Sheets connection."
         if not items:
             return "Low Stock\n\nNo low stock items right now."
-        lines = ["⚠ Running low:"]
+        out_of_stock: list[str] = []
+        running_low: list[str] = []
         for item in items[:20]:
-            stock_text = low_stock_status_text(item.current_stock)
-            reorder_text = (
-                f"; restock when left with {item.reorder_level}"
-                if item.reorder_level is not None
-                else ""
-            )
-            lines.append(f"- {item.drug_name} — {stock_text}{reorder_text}")
+            current_stock = parse_int(item.current_stock, default=0) or 0
+            if current_stock <= 0:
+                out_of_stock.append(f"- {item.drug_name} out of stock")
+                continue
+            reorder_text = f"; restock when left with {item.reorder_level}" if item.reorder_level is not None else ""
+            running_low.append(f"- {item.drug_name} — {current_stock} left{reorder_text}")
+        lines = ["⚠ Stock needs attention"]
+        if out_of_stock:
+            lines.append("")
+            lines.append("Out of stock:")
+            lines.extend(out_of_stock)
+        if running_low:
+            lines.append("")
+            lines.append("Running low:")
+            lines.extend(running_low)
         return "\n".join(lines)
 
     def _stock_value_reply(self) -> str:
@@ -984,6 +1007,8 @@ class IntakeService:
 
     def _process_sale_command(self, command: OperatingCommand, is_late: bool, conversation_key: str = "__default__") -> EntryResult:
         note = "Entered later" if is_late else ""
+        if command.target_day:
+            note = merge_notes(note, f"Target day: {command.target_day}.")
         payment_breakdown = parse_payment_breakdown(command.raw_text)
         if payment_breakdown:
             note = merge_notes(
@@ -1006,12 +1031,14 @@ class IntakeService:
             base_quantity=command.base_quantity,
             payment_method="Mixed" if payment_breakdown else command.payment_method,
             discount=command.discount,
+            discount_percent=command.discount_percent,
             staff_name=staff_name,
             trace_id_value=command.trace_id,
             batch_number=command.batch_number,
             invoice_number=command.invoice_number,
             supplier=command.supplier,
             barcode=command.barcode,
+            target_day=command.target_day,
             conversation_key=conversation_key,
         )
 
@@ -1025,12 +1052,14 @@ class IntakeService:
         base_quantity: int | None = None,
         payment_method: str = "",
         discount: float = 0,
+        discount_percent: float = 0,
         staff_name: str = "",
         trace_id_value: str = "",
         batch_number: str = "",
         invoice_number: str = "",
         supplier: str = "",
         barcode: str = "",
+        target_day: str = "",
         conversation_key: str = "__default__",
     ) -> EntryResult:
         try:
@@ -1053,6 +1082,9 @@ class IntakeService:
         base_quantity = self._to_base_quantity(stock.drug_name, quantity, unit) if unit else (base_quantity or to_base_quantity(quantity, unit))
         payment_method = payment_method or "Cash"
         discount = float(discount or 0)
+        gross_sales = stock.selling_price * base_quantity if stock.selling_price is not None else None
+        if gross_sales is not None and discount_percent:
+            discount = round(gross_sales * (float(discount_percent) / 100), 2)
         sale_trace_id = trace_id_value or trace_id("SALE")
         stock_plan = build_stock_update_plan(stock, base_quantity)
         notes = merge_notes(note, stock_plan.warning_notes)
@@ -1082,6 +1114,7 @@ class IntakeService:
             base_quantity=base_quantity,
             payment=payment_method,
             discount=discount if discount else "",
+            discount_percent=discount_percent if discount_percent else "",
             staff=staff_name,
             batch=batch_number,
             invoice=invoice_number,
@@ -1089,7 +1122,6 @@ class IntakeService:
             barcode=barcode,
         )
         event = ParsedEvent(stock.drug_name, action, quantity=base_quantity, notes=notes)
-        gross_sales = stock.selling_price * base_quantity if stock.selling_price is not None else None
         total_sales = max(gross_sales - discount, 0) if gross_sales is not None else None
         total_cost = stock.cost_price * base_quantity if stock.cost_price is not None else None
         profit = (
@@ -1098,9 +1130,10 @@ class IntakeService:
             else None
         )
         missing_profit_data = stock.selling_price is None or stock.cost_price is None
+        created_at = self._created_at_for_target_day(target_day)
 
         try:
-            self.store.append_daily_log(event, stock.selling_price, total_sales)
+            self._append_daily_log(event, stock.selling_price, total_sales, created_at=created_at)
             self._append_transaction(
                 "late_sale" if is_late else "sale",
                 stock.drug_name,
@@ -1111,6 +1144,7 @@ class IntakeService:
                 total_sales=total_sales,
                 profit=profit,
                 note=notes,
+                created_at=created_at,
             )
         except SheetsUnavailableError:
             return EntryResult(logged=False, reply=SHEETS_UNAVAILABLE_MESSAGE, summary_line="", category="errors")
@@ -1125,21 +1159,29 @@ class IntakeService:
                     "Stock level could not be updated because Google Sheets could not be updated."
                 )
 
+        payment_label = payment_method or "Cash"
         if is_late:
             reply_parts = [
-                "✅ Late sale recorded",
-                f"{event.drug_name} x{display_quantity}{unit_suffix(unit, display_quantity)}",
+                f"✅ Late sale saved{f' for {target_day}' if target_day else ''}:",
+                f"{event.drug_name} x{display_quantity}{unit_suffix(unit, display_quantity)} recorded • {payment_label}",
             ]
         elif missing_profit_data:
             reply_parts = [
-                f"✅ {event.drug_name} x{display_quantity}{unit_suffix(unit, display_quantity)} recorded",
+                f"✅ {event.drug_name} x{display_quantity}{unit_suffix(unit, display_quantity)} recorded • {payment_label}",
             ]
         else:
             reply_parts = [
-                f"✅ {event.drug_name} x{display_quantity}{unit_suffix(unit, display_quantity)} recorded",
+                f"✅ {event.drug_name} x{display_quantity}{unit_suffix(unit, display_quantity)} recorded • {payment_label}",
             ]
         if unit and base_quantity != display_quantity:
             reply_parts.append(f"Equivalent: {base_quantity} tablets")
+        if discount and gross_sales is not None:
+            reply_parts.append(f"Original: {format_kes(gross_sales)}")
+            if discount_percent:
+                reply_parts.append(f"Discount: {format_kes(discount)} ({format_plain_number(discount_percent)}%)")
+            else:
+                reply_parts.append(f"Discount: {format_kes(discount)}")
+            reply_parts.append(f"Paid: {format_kes(total_sales)}")
         if stock_plan.new_current_stock is not None:
             reply_parts.append(f"Stock left: {self._format_stock_level(stock.drug_name, stock_plan.new_current_stock, unit)}")
         else:
@@ -1160,6 +1202,7 @@ class IntakeService:
             "trace_id": sale_trace_id,
             "payment_method": payment_method,
             "discount": discount,
+            "discount_percent": discount_percent,
             "profit": profit,
             "total_sales": total_sales,
             "total_cost": total_cost,
@@ -1172,7 +1215,7 @@ class IntakeService:
         return EntryResult(
             logged=True,
             reply=reply,
-            summary_line=f"{event.drug_name} x{display_quantity}{unit_suffix(unit, display_quantity)}",
+            summary_line=f"{event.drug_name} x{display_quantity}{unit_suffix(unit, display_quantity)} {payment_label}",
             category="late_sales" if is_late else "sales",
         )
 
@@ -1436,7 +1479,21 @@ class IntakeService:
         if intent.get("type") == "peak_hours":
             if not metrics.sale_transactions:
                 return f"No records found for {day_label} yet."
-            return f"⏰ Busiest time {day_label}: {metrics.peak_activity_time}"
+            totals = payment_totals_from_transactions(transactions)
+            payment_totals = totals["payment_totals"]
+            lines = [f"⏰ Peak time {day_label}: {metrics.peak_activity_time}"]
+            if metrics.most_sold:
+                lines.append("Top medicines:")
+                lines.extend(f"• {name} — {quantity} sold" for name, quantity in metrics.most_sold[:3])
+            if any(payment_totals.values()):
+                lines.append("Payments:")
+                lines.append(f"• Cash — {format_kes(payment_totals.get('Cash', 0))}")
+                lines.append(f"• M-Pesa — {format_kes(payment_totals.get('M-Pesa', 0))}")
+                if payment_totals.get("Card", 0):
+                    lines.append(f"• Card — {format_kes(payment_totals.get('Card', 0))}")
+                if payment_totals.get("Credit", 0):
+                    lines.append(f"• Credit — {format_kes(payment_totals.get('Credit', 0))}")
+            return "\n".join(lines)
         if intent.get("type") == "missed_demand":
             if not metrics.missed_sales:
                 return f"No no-stock requests found for {day_label} yet."
@@ -1669,15 +1726,22 @@ class IntakeService:
         stock = self.store.find_stock(drug_name)
         if stock is not None:
             return DrugResolution(stock.drug_name)
-        alias = self.aliases_by_key.get(text_key)
-        if alias:
-            alias_stock = self.store.find_stock(alias)
-            return DrugResolution(alias_stock.drug_name if alias_stock else alias)
         try:
             names = [name for name in self.store.list_master_drug_names() if str(name).strip()]
         except Exception:
             names = []
         normalized_to_name = {normalize_key(name): name for name in names}
+        alias = self.aliases_by_key.get(text_key)
+        if alias:
+            prefix_matches = [
+                name
+                for key, name in normalized_to_name.items()
+                if key.startswith(text_key) or text_key.startswith(key)
+            ]
+            if text_key in SHORTCUT_DRUGS and len(prefix_matches) > 1:
+                return DrugResolution(question=medicine_choice_question(drug_name, prefix_matches[:3]))
+            alias_stock = self.store.find_stock(alias)
+            return DrugResolution(alias_stock.drug_name if alias_stock else alias)
         if text_key in normalized_to_name:
             return DrugResolution(normalized_to_name[text_key])
         prefix_matches = [
@@ -1833,6 +1897,30 @@ class IntakeService:
             ]
         )
 
+    def _created_at_for_target_day(self, target_day: str = "") -> datetime | None:
+        if normalize_key(target_day) != "yesterday":
+            return None
+        created_at = now_in_timezone(self.timezone) - timedelta(days=1)
+        return created_at.replace(hour=12, minute=0, second=0, microsecond=0)
+
+    def _append_daily_log(
+        self,
+        event: ParsedEvent,
+        price: float | None,
+        total_value: float | None,
+        created_at: datetime | None = None,
+    ) -> bool:
+        append_daily_log = getattr(self.store, "append_daily_log", None)
+        if append_daily_log is None:
+            return False
+        try:
+            append_daily_log(event, price, total_value, created_at=created_at)
+        except TypeError:
+            append_daily_log(event, price, total_value)
+        except Exception:
+            return False
+        return True
+
     def _append_transaction(
         self,
         transaction_type: str,
@@ -1844,11 +1932,25 @@ class IntakeService:
         total_sales: float | None = None,
         profit: float | None = None,
         note: str = "",
+        created_at: datetime | None = None,
     ) -> bool:
         append_transaction = getattr(self.store, "append_transaction", None)
         if append_transaction is None:
             return False
         try:
+            append_transaction(
+                transaction_type,
+                drug_name,
+                quantity,
+                unit_cost=unit_cost,
+                unit_selling_price=unit_selling_price,
+                total_cost=total_cost,
+                total_sales=total_sales,
+                profit=profit,
+                note=note,
+                created_at=created_at,
+            )
+        except TypeError:
             append_transaction(
                 transaction_type,
                 drug_name,
@@ -2353,6 +2455,18 @@ def parse_operating_commands(text: str) -> list[OperatingCommand] | None:
     return [command] if command is not None else None
 
 
+def parse_target_day(text: str) -> str:
+    key = normalize_key(text)
+    if any(word in key.split() for word in ["yesterday", "jana"]):
+        return "yesterday"
+    return ""
+
+
+def strip_temporal_words(text: str) -> str:
+    clean = re.sub(r"\b(?:yesterday|jana)\b", " ", text, flags=re.IGNORECASE)
+    return " ".join(clean.split())
+
+
 def parse_natural_bulk_commands(text: str) -> list[OperatingCommand] | None:
     late_sale_match = re.fullmatch(
         r"(?:later|late|missed|i\s+missed)\s+(.+)",
@@ -2673,11 +2787,13 @@ def enrich_command_metadata(command: OperatingCommand, raw_text: str) -> Operati
         command,
         payment_method=command.payment_method or modifiers.payment_method,
         discount=command.discount or modifiers.discount,
+        discount_percent=command.discount_percent or modifiers.discount_percent,
         supplier=command.supplier or modifiers.supplier,
         expiry_date=command.expiry_date or modifiers.expiry_date,
         invoice_number=command.invoice_number or modifiers.invoice_number,
         batch_number=command.batch_number or modifiers.batch_number,
         barcode=command.barcode or modifiers.barcode,
+        target_day=command.target_day or parse_target_day(raw_text),
     )
 
 
@@ -2775,10 +2891,12 @@ def parse_engine_sale_command(clean: str, raw_text: str) -> OperatingCommand | N
             base_quantity=to_base_quantity(quantity, unit),
             payment_method=modifiers.payment_method,
             discount=modifiers.discount,
+            discount_percent=modifiers.discount_percent,
             supplier=modifiers.supplier,
             invoice_number=modifiers.invoice_number,
             batch_number=modifiers.batch_number,
             barcode=modifiers.barcode,
+            target_day=parse_target_day(clean),
             raw_text=raw_text,
         )
     return None
@@ -2818,6 +2936,45 @@ def parse_shortcut_command(clean: str, raw_text: str) -> OperatingCommand | None
     return None
 
 
+def parse_late_sale_command(clean: str, raw_text: str) -> OperatingCommand | None:
+    target_day = parse_target_day(clean)
+    starts_late = re.match(r"^(?:later|late|missed|i\s+missed)\b", clean, flags=re.IGNORECASE)
+    if not starts_late and not target_day:
+        return None
+
+    late_body = re.sub(r"^(?:later|late|missed|i\s+missed)\s+", "", clean, flags=re.IGNORECASE)
+    late_body = strip_temporal_words(late_body)
+    late_body = re.sub(r"^sold\s+", "", late_body, flags=re.IGNORECASE)
+    late_body = re.sub(r"^(?:sale|sell)\s+", "", late_body, flags=re.IGNORECASE)
+    late_body = " ".join(late_body.split())
+    if not late_body:
+        return None
+
+    sale = parse_engine_sale_command(late_body, raw_text)
+    if sale is not None:
+        return replace(
+            sale,
+            kind="late_sale",
+            raw_text=raw_text,
+            target_day=target_day,
+        )
+
+    modifiers = parse_trace_modifiers(clean)
+    match = re.fullmatch(r"(.+?)\s+(\d+)", strip_modifier_phrases(late_body), flags=re.IGNORECASE)
+    if match:
+        return OperatingCommand(
+            kind="late_sale",
+            drug_name=title_drug_name(match.group(1)),
+            quantity=positive_quantity(match.group(2)),
+            payment_method=modifiers.payment_method,
+            discount=modifiers.discount,
+            discount_percent=modifiers.discount_percent,
+            target_day=target_day,
+            raw_text=raw_text,
+        )
+    return None
+
+
 def parse_single_operating_command(text: str) -> OperatingCommand | None:
     clean = " ".join(text.strip().split())
     if not clean:
@@ -2838,6 +2995,10 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
     stock_name = parse_stock_check_command(clean)
     if stock_name:
         return OperatingCommand(kind="stock_check", drug_name=title_drug_name(stock_name), raw_text=text)
+
+    late_candidate = parse_late_sale_command(clean, text)
+    if late_candidate is not None:
+        return late_candidate
 
     engine_restock = parse_engine_restock_command(clean, text)
     if engine_restock is not None:
@@ -3015,15 +3176,6 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
             drug_name=title_drug_name(match.group(1)),
             quantity=positive_quantity(match.group(2)),
             total_cost=parse_money(match.group(3)),
-            raw_text=text,
-        )
-
-    match = re.fullmatch(r"(?:later|late|missed|i\s+missed)\s+(.+?)\s+(\d+)", clean, flags=re.IGNORECASE)
-    if match:
-        return OperatingCommand(
-            kind="late_sale",
-            drug_name=title_drug_name(match.group(1)),
-            quantity=positive_quantity(match.group(2)),
             raw_text=text,
         )
 
@@ -3292,6 +3444,8 @@ def format_plain_number(value: float | None) -> str:
 def normalize_natural_text(text: str) -> str:
     clean = "\n".join(" ".join(line.split()) for line in text.strip().splitlines())
     clean = re.sub(r"^please\s+", "", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"^(?:nimeuza|niliuza)\s+(?:jana|yesterday)\s+(.+)$", r"late yesterday \1", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"^(?:jana|yesterday)\s+(.+)$", r"late yesterday \1", clean, flags=re.IGNORECASE)
     clean = re.sub(r"^(?:nimeuza|niliuza)\s+", "sold ", clean, flags=re.IGNORECASE)
     clean = re.sub(r"^ongeza\s+(.+?)\s+(\d+)(.*)$", r"add \1 \2\3", clean, flags=re.IGNORECASE)
     clean = re.sub(r"^(?:customer\s+amesema\s+hakuna|amesema\s+hakuna|hakuna)\s+(.+)$", r"\1 no stock", clean, flags=re.IGNORECASE)
@@ -3310,6 +3464,8 @@ def expand_compact_pharmacy_text(text: str) -> str:
         expanded = re.sub(r"(?<=\w)\+(?=\d)", " +", line.strip())
         expanded = re.sub(r"(?<=[A-Za-z])(?=\d)", " ", expanded)
         expanded = re.sub(r"(?<=\d)(?=[A-Za-z])", " ", expanded)
+        expanded = re.sub(r"\b(less|discount)(?=\d)", r"\1 ", expanded, flags=re.IGNORECASE)
+        expanded = re.sub(r"\bmixed\s*(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)", r"mixed cash \1 mpesa \2", expanded, flags=re.IGNORECASE)
         expanded = re.sub(r"\b(INV|B)\s+(\d+)\b", r"\1\2", expanded, flags=re.IGNORECASE)
         expanded = re.sub(r"^(late|later)([A-Za-z])", r"\1 \2", expanded, flags=re.IGNORECASE)
         if " " not in expanded and re.fullmatch(r"[A-Za-z]+stock", expanded, flags=re.IGNORECASE):

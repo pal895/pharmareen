@@ -1,7 +1,7 @@
 {"id": "ana_001", "category": "analytics", "text": "Best seller today", "expect_contains": ["Best seller today"], "ai_allowed": false, "simulate": true}
 {"id": "ana_002", "category": "analytics", "text": "Best seller leo", "expect_contains": ["Best seller today"], "ai_allowed": false, "simulate": true}
 {"id": "ana_003", "category": "analytics", "text": "What sold most yesterday", "expect_contains": ["No records found for yesterday"], "ai_allowed": false, "simulate": true}
-{"id": "ana_004", "category": "analytics", "text": "Peak hours leo", "expect_contains": ["Busiest time today"], "ai_allowed": false, "simulate": true}
+{"id": "ana_004", "category": "analytics", "text": "Peak hours leo", "expect_contains": ["Peak time today", "Top medicines:", "Payments:"], "ai_allowed": false, "simulate": true}
 {"id": "ana_005", "category": "analytics", "text": "What was the busiest time yesterday", "expect_contains": ["No records found for yesterday"], "ai_allowed": false, "simulate": true}
 {"id": "ana_006", "category": "analytics", "text": "How much cash came in today", "expect_contains": ["Cash received today"], "ai_allowed": false, "simulate": true}
 {"id": "ana_007", "category": "analytics", "text": "Payment breakdown today", "expect_contains": ["Payment breakdown today"], "ai_allowed": false, "simulate": true}

@@ -1,0 +1,10 @@
+{"id":"live_l1_001","category":"routing","text":"late Panadol 3 yesterday cash","expect_contains":["Late sale saved","Panadol x3","Cash"],"ai_allowed":false,"simulate":true}
+{"id":"live_l1_002","category":"routing","text":"latepanadol5cash","expect_contains":["Late sale saved","Panadol x5","Cash"],"ai_allowed":false,"simulate":true}
+{"id":"live_l1_003","category":"routing","text":"niliuza jana panadol tatu cash","expect_contains":["Late sale saved","Panadol x3","Cash"],"ai_allowed":false,"simulate":true}
+{"id":"live_l1_004","category":"discount","text":"Panadol 2 cash discount 20","expect_contains":["Panadol x2 recorded","Discount: KES 20","Paid:"],"ai_allowed":false,"simulate":true}
+{"id":"live_l1_005","category":"discount","text":"Amox 1 mpesa less10%","expect_contains":["Amoxyl x1 recorded","M-Pesa","Discount:"],"ai_allowed":false,"simulate":true}
+{"id":"live_l1_006","category":"rush_hour","text":"Panadol2cash","expect_contains":["Panadol x2 recorded","Cash","Stock left:"],"ai_allowed":false,"simulate":true}
+{"id":"live_l1_007","category":"rush_hour","text":"Pandol2","expect_contains":["Panadol x2 recorded","Stock left:"],"ai_allowed":false,"simulate":true}
+{"id":"live_l1_008","category":"analytics","text":"Peak hours leo","expect_contains":["Peak time today","Top medicines:","Payments:"],"ai_allowed":false,"simulate":true}
+{"id":"live_l2_001","category":"voice","text":"voice: Panadol mbili cash na Amox moja mpesa","expected":"transcribe first, then route transcript through local intake","ai_allowed":true,"simulate":false}
+{"id":"live_l2_002","category":"photo","text":"scan invoice MedCare Panadol 20 boxes ORS 10 packs","expected":"photo AI extraction returns review-needed invoice items, no automatic stock update","ai_allowed":true,"simulate":false}

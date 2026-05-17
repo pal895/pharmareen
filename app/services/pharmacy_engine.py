@@ -65,6 +65,7 @@ class QuantityUnit:
 class ParsedModifiers:
     payment_method: str = ""
     discount: float = 0
+    discount_percent: float = 0
     staff_name: str = ""
     supplier: str = ""
     invoice_number: str = ""
@@ -120,7 +121,17 @@ def parse_payment_method(text: str) -> str:
 
 
 def parse_discount(text: str) -> float:
-    match = re.search(r"\bdiscount\s+(\d+(?:\.\d+)?)\b", text, flags=re.IGNORECASE)
+    match = re.search(r"\b(?:discount|less)\s*(\d+(?:\.\d+)?)(?:\s*%)?\b", text, flags=re.IGNORECASE)
+    if not match:
+        return 0
+    try:
+        return float(match.group(1))
+    except ValueError:
+        return 0
+
+
+def parse_discount_percent(text: str) -> float:
+    match = re.search(r"\b(?:discount|less)\s*(\d+(?:\.\d+)?)\s*%", text, flags=re.IGNORECASE)
     if not match:
         return 0
     try:
@@ -135,14 +146,15 @@ def parse_staff_name(text: str) -> str:
 
 
 def parse_trace_modifiers(text: str) -> ParsedModifiers:
-    supplier = _extract_after_label(text, ["supplier"], stop_labels=["invoice", "batch", "expiry", "expires", "exp", "barcode", "payment", "discount"])
-    invoice = _extract_after_label(text, ["invoice", "inv"], stop_labels=["batch", "expiry", "expires", "exp", "supplier", "barcode", "payment", "discount"])
-    batch = _extract_after_label(text, ["batch"], stop_labels=["invoice", "expiry", "expires", "exp", "supplier", "barcode", "payment", "discount"])
-    barcode = _extract_after_label(text, ["barcode", "code"], stop_labels=["invoice", "batch", "expiry", "expires", "exp", "supplier", "payment", "discount"])
-    expiry = _extract_after_label(text, ["expiry", "expires", "exp"], stop_labels=["invoice", "batch", "supplier", "barcode", "payment", "discount"])
+    supplier = _extract_after_label(text, ["supplier"], stop_labels=["invoice", "batch", "expiry", "expires", "exp", "barcode", "payment", "discount", "less"])
+    invoice = _extract_after_label(text, ["invoice", "inv"], stop_labels=["batch", "expiry", "expires", "exp", "supplier", "barcode", "payment", "discount", "less"])
+    batch = _extract_after_label(text, ["batch"], stop_labels=["invoice", "expiry", "expires", "exp", "supplier", "barcode", "payment", "discount", "less"])
+    barcode = _extract_after_label(text, ["barcode", "code"], stop_labels=["invoice", "batch", "expiry", "expires", "exp", "supplier", "payment", "discount", "less"])
+    expiry = _extract_after_label(text, ["expiry", "expires", "exp"], stop_labels=["invoice", "batch", "supplier", "barcode", "payment", "discount", "less"])
     return ParsedModifiers(
         payment_method=parse_payment_method(text),
         discount=parse_discount(text),
+        discount_percent=parse_discount_percent(text),
         supplier=supplier,
         invoice_number=invoice,
         batch_number=batch,
@@ -154,7 +166,8 @@ def parse_trace_modifiers(text: str) -> ParsedModifiers:
 def strip_modifier_phrases(text: str) -> str:
     clean = f" {text.strip()} "
     clean = re.sub(rf"\s+\b{payment_pattern()}\b(?:\s+\d+(?:\.\d+)?)?", " ", clean, flags=re.IGNORECASE)
-    clean = re.sub(r"\s+\bdiscount\s+\d+(?:\.\d+)?\b", " ", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\s+\b(?:discount|less)\s*\d+(?:\.\d+)?\s*%?\b", " ", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\s+%", " ", clean)
     clean = re.sub(r"\s+\b(?:supplier|invoice|inv|batch|barcode|code|expiry|expires|exp)\s+.+?(?=\s+\b(?:supplier|invoice|inv|batch|barcode|code|expiry|expires|exp|payment|discount)\b|$)", " ", clean, flags=re.IGNORECASE)
     return " ".join(clean.split())
 
