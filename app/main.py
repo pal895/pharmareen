@@ -322,17 +322,107 @@ VOICE_MEDICINE_NAMES = [
     "Paracetamol",
     "Amoxyl",
     "Amoxicillin",
+    "Cetirizine",
     "ORS",
     "Insulin",
     "Antacid",
     "Piriton",
     "Glucose",
     "Cough Syrup",
+    "Antibiotic Cream",
+    "WaterGuard",
+    "PEP Lime Cordial",
 ]
+
+VOICE_MEDICINE_ALIASES = {
+    "anadol": "Panadol",
+    "panado": "Panadol",
+    "panadol": "Panadol",
+    "piritone": "Piriton",
+    "piraton": "Piriton",
+    "piriton": "Piriton",
+    "pcm": "Paracetamol",
+    "paracet": "Paracetamol",
+    "paracetmol": "Paracetamol",
+    "paracetamol": "Paracetamol",
+    "amox": "Amoxyl",
+    "amoxil": "Amoxyl",
+    "amoxyl": "Amoxyl",
+    "amoxicilin": "Amoxicillin",
+    "amoxicillin": "Amoxicillin",
+    "cet": "Cetirizine",
+    "cetrizine": "Cetirizine",
+    "cetirizine": "Cetirizine",
+    "ors": "ORS",
+    "glucose": "Glucose",
+    "insulin": "Insulin",
+    "antacid": "Antacid",
+    "cough syrup": "Cough Syrup",
+    "coughsirup": "Cough Syrup",
+    "antibiotic cream": "Antibiotic Cream",
+    "antibioticcream": "Antibiotic Cream",
+    "water guard": "WaterGuard",
+    "waterguard": "WaterGuard",
+    "watergard": "WaterGuard",
+    "pep lime": "PEP Lime Cordial",
+    "pep lime cordial": "PEP Lime Cordial",
+    "peplimecordial": "PEP Lime Cordial",
+}
+
+VOICE_NON_MEDICINE_WORDS = {
+    "mbili",
+    "bili",
+    "billi",
+    "tukas",
+    "cash",
+    "mpesa",
+    "m-pesa",
+    "credit",
+    "card",
+    "mixed",
+    "moja",
+    "tatu",
+    "one",
+    "two",
+    "three",
+    "ongeza",
+    "niliuza",
+    "nimeuza",
+    "nimetoa",
+    "sold",
+    "sell",
+    "sale",
+    "restock",
+}
 
 
 def voice_token_similarity(left: str, right: str) -> float:
     return SequenceMatcher(None, left.lower(), right.lower()).ratio()
+
+
+def split_joined_voice_words(text: str) -> str:
+    clean = text
+    quantity_words = "moja|mbili|bili|billi|tatu|one|two|too|to|three|1|2|3"
+    payment_words = "cash|kash|mpesa|m-pesa|credit|card"
+    clean = re.sub(r"\b([A-Za-z]{3,})one(mpesa|cash|kash)\b", r"\1 one \2", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\b([A-Za-z]{3,})moja(mpesa|cash|kash)\b", r"\1 moja \2", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\b([A-Za-z]{3,})mbili(mpesa|cash|kash)\b", r"\1 mbili \2", clean, flags=re.IGNORECASE)
+    clean = re.sub(rf"\b({quantity_words})\s*({payment_words})\b", r"\1 \2", clean, flags=re.IGNORECASE)
+    clean = re.sub(rf"\b([A-Za-z]{{3,}})({quantity_words})\b", r"\1 \2", clean, flags=re.IGNORECASE)
+    clean = re.sub(rf"\b([A-Za-z]{{3,}})({payment_words})\b", r"\1 \2", clean, flags=re.IGNORECASE)
+    clean = re.sub(rf"\b([A-Za-z]{{3,}})(\d+)\b", r"\1 \2", clean, flags=re.IGNORECASE)
+    return clean
+
+
+def apply_voice_medicine_aliases(text: str) -> str:
+    clean = text
+    for alias, medicine in sorted(VOICE_MEDICINE_ALIASES.items(), key=lambda item: len(item[0]), reverse=True):
+        if alias == "pep lime":
+            pattern = r"\bpep\s+lime\b(?!\s+cordial)"
+        else:
+            pattern = r"\b" + re.escape(alias).replace(r"\ ", r"\s+") + r"\b"
+        clean = re.sub(pattern, medicine, clean, flags=re.IGNORECASE)
+    return clean
 
 
 def repair_voice_medicine_tokens(text: str) -> str:
@@ -340,7 +430,7 @@ def repair_voice_medicine_tokens(text: str) -> str:
     repaired: list[str] = []
     for token in tokens:
         bare = re.sub(r"[^A-Za-z]", "", token)
-        if len(bare) < 5 or bare.lower() in {"mbili", "bili", "billi", "tukas", "cash", "mpesa", "m-pesa", "credit", "card", "moja", "tatu"}:
+        if len(bare) < 5 or bare.lower() in VOICE_NON_MEDICINE_WORDS:
             repaired.append(token)
             continue
         best = max(VOICE_MEDICINE_NAMES, key=lambda name: voice_token_similarity(bare, name))
@@ -362,9 +452,12 @@ def clean_voice_transcript_for_intake(transcript: str) -> str:
     clean = re.sub(r"\b(?:tukas|tukash|two\s*kash|two\s*cash|too\s*cash|to\s*cash)\b", "two cash", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\b(?:moja|mojaa)\s*(?:mpesa|m-pesa)\b", "moja mpesa", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\b(?:tatu|tattoo)\s*(?:kash|cash|mpesa|m-pesa)\b", lambda m: m.group(0).replace("kash", "cash"), clean, flags=re.IGNORECASE)
+    clean = split_joined_voice_words(clean)
     clean = re.sub(r"\b(?:billi|bili|billy|mbil|mbilii|mbele|mbeli)\b", "mbili", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\bkash\b", "cash", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\bmpessa\b", "mpesa", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"^nimetoa\s+", "sold ", clean, flags=re.IGNORECASE)
+    clean = apply_voice_medicine_aliases(clean)
     clean = repair_voice_medicine_tokens(clean)
     comma_parts = [part.strip() for part in clean.split(",") if part.strip()]
     if len(comma_parts) > 1 and all(len(part.split()) == 1 for part in comma_parts):
@@ -1753,14 +1846,23 @@ def extraction_has_invoice_structure(extraction_result: dict[str, Any], classifi
 
 def format_shelf_photo_reply_from_extraction(extraction_result: dict[str, Any]) -> str:
     items = list(extraction_result.get("items") or [])
-    lines = ["Shelf photo analyzed"]
+    lines = ["\U0001F4F7 Shelf photo analyzed"]
     if items:
         lines.append("Products seen:")
         for item in items[:8]:
             lines.append(f"- {invoice_item_name(item)}")
     else:
         lines.append("No clear invoice data detected.")
-    lines.extend(["Missing:", "- quantities", "- invoice values", "- supplier", "Reply example:", "PEP Lime Cordial 10", "or", "restock PEP Lime Cordial 10"])
+    lines.extend([
+        "Missing:",
+        "- quantities",
+        "- invoice values",
+        "- supplier",
+        "Reply example:",
+        "restock PEP Lime Cordial 10",
+        "or",
+        "add new item PEP Lime Cordial price 250 stock 10",
+    ])
     return "\n".join(lines)
 
 
@@ -1846,7 +1948,7 @@ def process_pending_invoice_review_message(sender: str, message: str) -> str | N
                 return f"Renamed {name} to {value}. Reply approve to add stock."
         return "I could not find that invoice item. Try: rename old name to new name."
 
-    quick_quantity_match = re.fullmatch(r"edit\s+(.+?)\s+(\d+(?:\.\d+)?)", text, flags=re.IGNORECASE)
+    quick_quantity_match = re.fullmatch(r"edit\s+(.+?)\s+(?:x\s*)?(\d+(?:\.\d+)?)", text, flags=re.IGNORECASE)
     if quick_quantity_match:
         target = quick_quantity_match.group(1).strip().lower()
         value = quick_quantity_match.group(2).strip()
@@ -1887,6 +1989,7 @@ def process_pending_invoice_review_message(sender: str, message: str) -> str | N
     supplier = str(pending.get("supplier") or "").strip()
     invoice_number = str(pending.get("invoice_number") or "").strip()
     lines = ["Invoice approved and stock updated"]
+    needs_setup: list[str] = []
     for item in items:
         name = invoice_item_name(item)
         quantity = invoice_item_quantity(item) or 0
@@ -1901,14 +2004,40 @@ def process_pending_invoice_review_message(sender: str, message: str) -> str | N
             command_parts.append(f"supplier {supplier}")
         if invoice_number:
             command_parts.append(f"invoice {invoice_number}")
-        process_intake_text_for_sender(" ".join(command_parts), sender)
+        intake_reply = process_intake_text_for_sender(" ".join(command_parts), sender)
+        if invoice_stock_update_needs_new_item(intake_reply):
+            needs_setup.append(f"- {name} x{quantity}")
+            continue
         label = f"- {name} x{quantity}"
         if unit:
             label += f" {unit}"
         label += " added"
         lines.append(label)
+    if needs_setup:
+        guidance = [
+            "Some invoice items need item setup before stock update.",
+            "New item not in stock list:",
+            *needs_setup,
+            "Reply: add new item PEP Lime Cordial price 250 stock 10",
+            "or edit the invoice item, then approve again.",
+        ]
+        return "\n".join(guidance)
     pending_invoice_reviews.pop(key, None)
     return "\n".join(lines)
+
+
+def invoice_stock_update_needs_new_item(reply: str) -> bool:
+    normalized = str(reply or "").lower()
+    return any(
+        phrase in normalized
+        for phrase in [
+            "not found in inventory",
+            "not in stock list",
+            "unknown medicine",
+            "medicine not found",
+            "add new item",
+        ]
+    )
 
 def process_intake_text_for_sender(text: str, sender: str) -> str:
     intake_service = get_intake_service()

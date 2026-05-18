@@ -37,7 +37,7 @@ class FailingTranscription:
 class FakeIntake:
     def __init__(self, reply: str | None = None):
         self.received = ""
-        self.reply = reply or "✅ Batch processed\n\nSales:\n- Panadol x2\n\nLate Sales:\n- Cetrizine x3\n\nRestocks:\n- None\n\nNo-stock requests:\n- None\n\nErrors:\n- None"
+        self.reply = reply or "✅ Batch processed\n\nSales:\n- Panadol x2\n\nLate Sales:\n- Cetirizine x3\n\nRestocks:\n- None\n\nNo-stock requests:\n- None\n\nErrors:\n- None"
 
     def process_text(self, text: str) -> str:
         self.received = text
@@ -296,9 +296,9 @@ def test_voice_note_uses_mocked_transcription(monkeypatch):
 
     assert response.status_code == 200
     assert "Heard:" in response.text
-    assert "Heard: Panadol two, later Cetrizine three" in response.text
-    assert "Command: Panadol 2, later Cetrizine 3" in response.text
-    assert fake_intake.received == "Panadol 2, later Cetrizine 3"
+    assert "Heard: Panadol two, later Cetirizine three" in response.text
+    assert "Command: Panadol 2, later Cetirizine 3" in response.text
+    assert fake_intake.received == "Panadol 2, later Cetirizine 3"
 
 
 def test_unclear_voice_note_returns_clear_message(monkeypatch):

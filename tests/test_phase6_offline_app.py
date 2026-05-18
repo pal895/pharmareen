@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import base64
 import json
 import subprocess
 from pathlib import Path
@@ -598,6 +599,8 @@ def test_offline_frontend_history_uses_synced_safely_not_sent_successfully():
     assert "Synced safely" in script
     assert "Sent successfully" not in script
     assert "Nothing synced safely yet." in script
+    assert "Remove before sync" in script
+    assert "item.reply || item.result_summary || item.message" in script
 
 
 
@@ -639,3 +642,101 @@ def test_offline_sync_preserves_backend_result_for_duplicate_and_queues_whatsapp
     assert "Panadol x2 cash recorded" in outbox.json()["confirmations"][0]["message"]
     assert ack.json()["acked"] == 1
     assert after_ack.json()["confirmations"] == []
+
+
+def test_offline_sync_returns_per_item_results_for_sale_stock_and_report(monkeypatch, tmp_path):
+    replies = {
+        "Panadol 2 cash": "Panadol x2 cash recorded\nStock left: 691",
+        "Panadol stock": "Panadol stock left: 721",
+        "report today": "Today report:\nCash: KES 300\nM-Pesa: KES 200\nSales: 2",
+    }
+
+    def fake_process(text: str, sender: str) -> str:
+        return replies[text]
+
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(main, "process_intake_text_for_sender", fake_process)
+    main.offline_synced_entry_ids.clear()
+    main.offline_synced_entry_results.clear()
+    main.offline_whatsapp_outbox.clear()
+
+    payload = {
+        "sender": "254700000000@s.whatsapp.net",
+        "entries": [
+            {"id": "offline-manual-sale", "command_text": "Panadol 2 cash", "sync_status": "pending"},
+            {"id": "offline-stock-check", "command_text": "Panadol stock", "sync_status": "pending"},
+            {"id": "offline-report", "command_text": "report today", "sync_status": "pending"},
+        ],
+    }
+
+    with TestClient(main.app) as client:
+        response = client.post("/offline/sync", json=payload)
+        outbox = client.get("/offline/whatsapp-confirmations")
+
+    data = response.json()
+    replies_by_id = {item["id"]: item["reply"] for item in data["synced"]}
+    assert "Panadol x2 cash recorded" in replies_by_id["offline-manual-sale"]
+    assert "Stock left: 691" in replies_by_id["offline-manual-sale"]
+    assert "Panadol stock left: 721" in replies_by_id["offline-stock-check"]
+    assert "Today report:" in replies_by_id["offline-report"]
+    assert "Offline records synced safely" in data["whatsapp_reply"]
+    assert "Panadol x2 cash recorded" in data["whatsapp_reply"]
+    assert "Panadol stock left: 721" in data["whatsapp_reply"]
+    assert "Cash: KES 300" in data["whatsapp_reply"]
+    assert outbox.json()["confirmations"]
+
+
+def test_offline_sync_media_results_are_preserved_and_grouped(monkeypatch, tmp_path):
+    async def fake_process_whatsapp_web_payload(**kwargs):
+        mime_type = kwargs.get("media_mime_type", "")
+        if str(mime_type).startswith("audio"):
+            return main.WhatsAppProcessResult(
+                reply="🎙 Offline voice processed\nHeard: Piriton one mpesa\nPiriton x1 M-Pesa recorded\nStock left: 88",
+                message_type="voice",
+                success=True,
+                command_handler="voice_note_processed",
+            )
+        return main.WhatsAppProcessResult(
+            reply="📷 Invoice processed\nSupplier: MedCare\nItems found:\n- Paracetamol x20\nReview needed before stock update.",
+            message_type="image",
+            success=True,
+            command_handler="photo_invoice_extracted",
+        )
+
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(main, "process_whatsapp_web_payload", fake_process_whatsapp_web_payload)
+    main.offline_synced_entry_ids.clear()
+    main.offline_synced_entry_results.clear()
+    main.offline_whatsapp_outbox.clear()
+
+    payload = {
+        "sender": "254700000000@s.whatsapp.net",
+        "entries": [
+            {
+                "id": "offline-voice-result",
+                "action": "voice",
+                "file_type": "audio/ogg",
+                "data_url": "data:audio/ogg;base64," + base64.b64encode(b"voice").decode("ascii"),
+                "sync_status": "pending",
+            },
+            {
+                "id": "offline-invoice-result",
+                "action": "photo",
+                "purpose": "invoice_photo",
+                "file_type": "image/jpeg",
+                "data_url": "data:image/jpeg;base64," + base64.b64encode(b"invoice").decode("ascii"),
+                "sync_status": "pending",
+            },
+        ],
+    }
+
+    with TestClient(main.app) as client:
+        response = client.post("/offline/sync", json=payload)
+
+    data = response.json()
+    replies_by_id = {item["id"]: item["reply"] for item in data["synced"]}
+    assert "Piriton x1 M-Pesa recorded" in replies_by_id["offline-voice-result"]
+    assert "Invoice processed" in replies_by_id["offline-invoice-result"]
+    assert "Paracetamol x20" in replies_by_id["offline-invoice-result"]
+    assert "Piriton x1 M-Pesa recorded" in data["whatsapp_reply"]
+    assert "Invoice processed" in data["whatsapp_reply"]

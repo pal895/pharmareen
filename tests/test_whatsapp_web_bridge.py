@@ -329,7 +329,7 @@ def test_whatsapp_web_bridge_processes_voice_transcript_through_local_intake(mon
     assert data["status"] == "ok"
     assert data["command_handler"] == "voice_note_processed"
     assert "Heard:" in data["reply"]
-    assert "Heard: Panadol mbili cash, Amox moja mpesa" in data["reply"]
+    assert "Heard: Panadol mbili cash, Amoxyl moja mpesa" in data["reply"]
     assert "Panadol x2 cash" in data["reply"]
     assert seen["sender"] == "254700000000@s.whatsapp.net"
 
@@ -1156,3 +1156,103 @@ def test_unknown_product_photo_with_no_invoice_metadata_returns_shelf_review(mon
     assert "Missing:" in reply
     assert "Invoice processed" not in reply
     assert main.pending_invoice_reviews == {}
+
+
+def test_voice_cleanup_supports_many_medicines_and_messy_phrases():
+    cases = [
+        ("Panadol mbili cash", "Panadol 2 cash"),
+        ("Anadol Mbelekash", "Panadol 2 cash"),
+        ("Panadol Tukas", "Panadol 2 cash"),
+        ("Panadol billi cash", "Panadol 2 cash"),
+        ("Piriton moja mpesa", "Piriton 1 mpesa"),
+        ("Piritononempesa", "Piriton 1 mpesa"),
+        ("Paracet mbili cash", "Paracetamol 2 cash"),
+        ("PCM mbili mpesa", "Paracetamol 2 mpesa"),
+        ("Amox moja mpesa", "Amoxyl 1 mpesa"),
+        ("Amoxil mbili cash", "Amoxyl 2 cash"),
+        ("Amoxicilin tatu cash", "Amoxicillin 3 cash"),
+        ("Cetirizine tukas", "Cetirizine 2 cash"),
+        ("Cetrizine moja mpesa", "Cetirizine 1 mpesa"),
+        ("ORS mbili cash", "ORS 2 cash"),
+        ("Glucose moja mpesa", "Glucose 1 mpesa"),
+        ("Insulin two cash", "Insulin 2 cash"),
+        ("Antacid mbilicash", "Antacid 2 cash"),
+        ("Coughsirup two cash", "Cough Syrup 2 cash"),
+        ("Cough Syrup moja mpesa", "Cough Syrup 1 mpesa"),
+        ("Antibioticcream one mpesa", "Antibiotic Cream 1 mpesa"),
+        ("Antibiotic Cream mbili cash", "Antibiotic Cream 2 cash"),
+        ("Watergard moja cash", "WaterGuard 1 cash"),
+        ("Water guard mbili mpesa", "WaterGuard 2 mpesa"),
+        ("PEP lime cordial mbili mpesa", "PEP Lime Cordial 2 mpesa"),
+        ("PEP lime mbili mpesa", "PEP Lime Cordial 2 mpesa"),
+        ("nimeuza Panadol mbili cash", "sold Panadol 2 cash"),
+        ("niliuza Piriton moja mpesa", "sold Piriton 1 mpesa"),
+        ("nimetoa Amox mbili cash", "sold Amoxyl 2 cash"),
+        ("ongeza Cetirizine mbili", "+Cetirizine 2"),
+        ("ongeza Watergard moja", "+WaterGuard 1"),
+    ]
+
+    for raw, expected in cases:
+        cleaned = main.clean_voice_transcript_for_intake(raw)
+        interpreted = main.normalize_spoken_command_text(cleaned)
+        assert interpreted == expected, raw
+
+
+def test_invoice_review_edit_x_quantity_and_cancel_win_before_inventory_parser(monkeypatch):
+    calls: list[str] = []
+    sender = "254700000000@s.whatsapp.net"
+    main.pending_invoice_reviews.clear()
+    main.pending_invoice_reviews[main.invoice_review_key(sender)] = {
+        "supplier": "MedCare",
+        "invoice_number": "INV777",
+        "items": [{"drug_name": "Paracetamol"}, {"drug_name": "Cough Syrup", "quantity": 2}],
+    }
+
+    def fake_process(text: str, sender_value: str) -> str:
+        calls.append(text)
+        return text
+
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000"),
+    )
+    monkeypatch.setattr(main, "process_intake_text_for_sender", fake_process)
+
+    with TestClient(main.app) as client:
+        edit = client.post("/bridge/whatsapp-web", json=bridge_payload("Edit paracetamol x20", sender=sender))
+        cancel = client.post("/bridge/whatsapp-web", json=bridge_payload("cancel", sender=sender))
+
+    assert "Updated Paracetamol quantity to 20" in edit.json()["reply"]
+    assert "Invoice review cancelled" in cancel.json()["reply"]
+    assert calls == []
+    assert main.pending_invoice_reviews == {}
+
+
+def test_invoice_approval_guides_add_new_item_when_stock_update_reports_missing(monkeypatch):
+    sender = "254700000000@s.whatsapp.net"
+    main.pending_invoice_reviews.clear()
+    main.pending_invoice_reviews[main.invoice_review_key(sender)] = {
+        "supplier": "MedCare",
+        "invoice_number": "INV778",
+        "items": [{"drug_name": "PEP Lime Cordial", "quantity": 10}],
+    }
+
+    def fake_process(text: str, sender_value: str) -> str:
+        return "PEP Lime Cordial not found in inventory. Add new item first."
+
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000"),
+    )
+    monkeypatch.setattr(main, "process_intake_text_for_sender", fake_process)
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=bridge_payload("approve", sender=sender))
+
+    reply = response.json()["reply"]
+    assert "Some invoice items need item setup before stock update" in reply
+    assert "PEP Lime Cordial x10" in reply
+    assert "add new item PEP Lime Cordial price 250 stock 10" in reply
+    assert main.invoice_review_key(sender) in main.pending_invoice_reviews

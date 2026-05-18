@@ -731,8 +731,8 @@ function friendlyReplySummary(value) {
 }
 
 function entryLabel(item) {
-  if (item.sync_status === "synced" && item.reply) {
-    const summary = friendlyReplySummary(item.reply);
+  if (item.sync_status === "synced" && (item.reply || item.result_summary || item.message)) {
+    const summary = friendlyReplySummary(item.reply || item.result_summary || item.message);
     if (summary) return summary;
   }
   if (item.type === "photo") {
@@ -773,6 +773,18 @@ function renderList(target, items, emptyText) {
     const friendlyError = friendlySyncError(item.last_error);
     if (friendlyError) meta.textContent += ` - ${friendlyError}`;
     li.append(title, meta);
+    if (target === pendingEntries && item.sync_status !== "syncing") {
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.className = "secondary small-action";
+      removeButton.textContent = "Remove before sync";
+      removeButton.addEventListener("click", async () => {
+        await deleteQueueEntry(item.id);
+        setStatus(navigator.onLine ? "online" : "offline", "Removed safely before sync");
+        await renderQueue();
+      });
+      li.appendChild(removeButton);
+    }
     target.appendChild(li);
   }
 }
@@ -814,8 +826,8 @@ async function mergeResults(queue, data) {
         blob: undefined,
         sync_status: "synced",
         last_error: "",
-        reply: result.reply || result.result_summary || result.message || "Synced safely",
-        result_summary: result.result_summary || result.reply || "Synced safely",
+        reply: result.reply || result.result_summary || result.message || entryLabel(item),
+        result_summary: result.result_summary || result.reply || result.message || entryLabel(item),
         whatsapp_confirmation: result.whatsapp_confirmation || "ready",
         synced_at: new Date().toISOString()
       });
