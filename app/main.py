@@ -14,6 +14,7 @@ import traceback
 from html import escape
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 from datetime import date
 from functools import lru_cache
 from pathlib import Path
@@ -57,6 +58,7 @@ logger = logging.getLogger(__name__)
 processed_message_sids: set[str] = set()
 offline_synced_entry_ids: set[str] = set()
 pending_voice_confirmations: dict[str, tuple[str, float]] = {}
+pending_invoice_reviews: dict[str, dict[str, Any]] = {}
 PENDING_VOICE_TTL_SECONDS = 600
 startup_status_printed = False
 XML_CONTENT_TYPE = "application/xml"
@@ -313,21 +315,63 @@ def media_base64_from_offline_entry(entry: dict[str, Any]) -> tuple[str, str]:
     return media_base64, mime_type
 
 
+VOICE_MEDICINE_NAMES = [
+    "Panadol",
+    "Paracetamol",
+    "Amoxyl",
+    "Amoxicillin",
+    "ORS",
+    "Insulin",
+    "Antacid",
+    "Piriton",
+    "Glucose",
+    "Cough Syrup",
+]
+
+
+def voice_token_similarity(left: str, right: str) -> float:
+    return SequenceMatcher(None, left.lower(), right.lower()).ratio()
+
+
+def repair_voice_medicine_tokens(text: str) -> str:
+    tokens = text.split()
+    repaired: list[str] = []
+    for token in tokens:
+        bare = re.sub(r"[^A-Za-z]", "", token)
+        if len(bare) < 5 or bare.lower() in {"mbili", "bili", "billi", "tukas", "cash", "mpesa", "m-pesa", "credit", "card", "moja", "tatu"}:
+            repaired.append(token)
+            continue
+        best = max(VOICE_MEDICINE_NAMES, key=lambda name: voice_token_similarity(bare, name))
+        score = voice_token_similarity(bare, best)
+        if score >= 0.80:
+            repaired.append(best)
+        else:
+            repaired.append(token)
+    return " ".join(repaired)
+
+
 def clean_voice_transcript_for_intake(transcript: str) -> str:
     clean = " ".join(str(transcript or "").replace("\n", " ").split())
     if not clean:
         return ""
-    clean = re.sub(r"\b(?:mbil(?:i|l)?|billi|bili|billy)\s*(?:kash|cash)\b", "mbili cash", clean, flags=re.IGNORECASE)
-    clean = re.sub(r"\b(?:billi|bili|billy)\b", "mbili", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"[,;]+", ",", clean)
+    clean = re.sub(r"\b(?:mbe?le|mbele|mbeli|mbili|mbil|mbil[iy]?|billi|bili|billy)\s*(?:kash|cash)\b", "mbili cash", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\b(?:mbe?le|mbele|mbeli)(?=cash|kash)\b", "mbili ", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\b(?:tukas|tukash|two\s*kash|two\s*cash|too\s*cash|to\s*cash)\b", "two cash", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\b(?:moja|mojaa)\s*(?:mpesa|m-pesa)\b", "moja mpesa", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\b(?:tatu|tattoo)\s*(?:kash|cash|mpesa|m-pesa)\b", lambda m: m.group(0).replace("kash", "cash"), clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\b(?:billi|bili|billy|mbil|mbilii|mbele|mbeli)\b", "mbili", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\bkash\b", "cash", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\bmpessa\b", "mpesa", clean, flags=re.IGNORECASE)
+    clean = repair_voice_medicine_tokens(clean)
     comma_parts = [part.strip() for part in clean.split(",") if part.strip()]
     if len(comma_parts) > 1 and all(len(part.split()) == 1 for part in comma_parts):
         clean = " ".join(comma_parts)
     else:
         clean = ", ".join(comma_parts) if comma_parts else clean
     clean = re.sub(r"\s+na\s+(?=[A-Za-z])", ", ", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\b(moja|mbili|tatu|one|two|three|\d+)\s*,\s*(cash|mpesa|m-pesa|credit|card)\b", r"\1 \2", clean, flags=re.IGNORECASE)
     return " ".join(clean.split())
-
 
 def compact_offline_reply(reply: str, max_lines: int = 3) -> str:
     lines = [line.strip() for line in str(reply or "").replace("\r", "\n").splitlines() if line.strip()]
@@ -1356,6 +1400,14 @@ async def process_whatsapp_web_payload(
     voice_transcribe_only: bool = False,
 ) -> WhatsAppProcessResult:
     if message:
+        invoice_review_reply = process_pending_invoice_review_message(sender, message)
+        if invoice_review_reply:
+            return WhatsAppProcessResult(
+                reply=invoice_review_reply,
+                message_type="text",
+                success=True,
+                command_handler="invoice_review",
+            )
         return await process_whatsapp_form_values(
             {
                 "Body": message,
@@ -1474,6 +1526,7 @@ async def process_whatsapp_web_payload(
                         "items": extraction_result.get("items", []),
                     }
                     media_job["processing_status"] = extraction_status
+                    store_pending_invoice_review(sender, extraction_result)
                     ai_reply = format_invoice_extraction_reply(extraction_result)
                 except Exception as exc:
                     record_openai_error("photo", exc)
@@ -1563,6 +1616,48 @@ def photo_ai_active_for_request(settings: Settings, caption: str, purpose: str, 
     return bool(settings.openai_api_key.strip() and (invoice_like or explicit_invoice or unknown_photo))
 
 
+def invoice_item_name(item: dict[str, Any]) -> str:
+    return str(item.get("drug_name") or item.get("medicine") or item.get("name") or "Medicine").strip()
+
+
+def invoice_item_quantity(item: dict[str, Any]) -> int | None:
+    raw = item.get("quantity") or item.get("total_received_quantity") or item.get("ordered_quantity")
+    try:
+        quantity = int(float(str(raw).strip()))
+    except Exception:
+        return None
+    return quantity if quantity > 0 else None
+
+
+def invoice_item_unit(item: dict[str, Any]) -> str:
+    return str(item.get("unit") or item.get("unit_type") or "").strip()
+
+
+def invoice_item_cost(item: dict[str, Any]) -> Any:
+    return item.get("cost") or item.get("unit_cost") or item.get("total_cost") or item.get("total") or ""
+
+
+def invoice_review_key(sender: str) -> str:
+    return mask_phone(sender)
+
+
+def store_pending_invoice_review(sender: str, extraction_result: dict[str, Any]) -> None:
+    items = [dict(item) for item in list(extraction_result.get("items") or [])]
+    if not items:
+        return
+    pending_invoice_reviews[invoice_review_key(sender)] = {
+        "supplier": str(extraction_result.get("supplier") or "").strip(),
+        "invoice_number": str(extraction_result.get("invoice_number") or extraction_result.get("invoice") or "").strip(),
+        "date": str(extraction_result.get("date") or extraction_result.get("invoice_date") or "").strip(),
+        "items": items,
+        "created_at": now_in_timezone(get_settings().timezone).isoformat(timespec="seconds"),
+    }
+
+
+def invoice_review_actions_text() -> str:
+    return "Review needed before stock update.\nReply: approve, add to stock, edit item name/quantity/cost, or cancel."
+
+
 def format_invoice_extraction_reply(extraction_result: dict[str, Any]) -> str:
     items = list(extraction_result.get("items") or [])
     supplier = str(extraction_result.get("supplier") or "").strip()
@@ -1571,30 +1666,110 @@ def format_invoice_extraction_reply(extraction_result: dict[str, Any]) -> str:
             supplier = str(item.get("supplier") or item.get("supplier_name") or "").strip()
             if supplier:
                 break
-    lines = ["📷 Invoice processed"]
+    lines = ["\U0001F4F7 Invoice processed"]
     if supplier:
         lines.append(f"Supplier: {supplier}")
     if items:
         lines.append("Items found:")
+        missing_quantity: list[str] = []
         for item in items[:8]:
-            name = str(item.get("drug_name") or item.get("medicine") or item.get("name") or "Medicine").strip()
-            quantity = item.get("quantity") or item.get("total_received_quantity") or item.get("ordered_quantity") or ""
-            unit = str(item.get("unit") or item.get("unit_type") or "").strip()
-            cost = item.get("cost") or item.get("unit_cost") or item.get("total") or ""
-            detail = f"• {name}"
+            name = invoice_item_name(item)
+            quantity = invoice_item_quantity(item)
+            unit = invoice_item_unit(item)
+            cost = invoice_item_cost(item)
+            detail = f"- {name}"
             if quantity:
                 detail += f" x{quantity}"
+            else:
+                missing_quantity.append(name)
             if unit:
                 detail += f" {unit}"
             if cost not in ("", None):
-                detail += f" — {cost}"
+                detail += f" - {cost}"
             lines.append(detail)
+        if missing_quantity:
+            lines.append("Some quantities are missing. Please reply like:")
+            lines.append(f"{missing_quantity[0]} 10")
+        lines.append(invoice_review_actions_text())
     else:
         message = str(extraction_result.get("message") or "").strip()
         lines.append(message or "No invoice data detected.")
-    lines.append("Review needed before stock update.")
+        lines.append("Photo saved for review. No stock updated.")
     return "\n".join(lines)
 
+
+def process_pending_invoice_review_message(sender: str, message: str) -> str | None:
+    key = invoice_review_key(sender)
+    pending = pending_invoice_reviews.get(key)
+    if not pending:
+        return None
+    text = " ".join(str(message or "").strip().split())
+    lower = text.lower()
+    if lower in {"cancel", "cancel invoice", "cancel review"}:
+        pending_invoice_reviews.pop(key, None)
+        return "Invoice review cancelled. No stock updated."
+
+    remove_match = re.fullmatch(r"remove\s+(?:item\s+)?(\d+)", lower)
+    if remove_match:
+        index = int(remove_match.group(1)) - 1
+        items = pending.get("items") or []
+        if 0 <= index < len(items):
+            removed = invoice_item_name(items.pop(index))
+            return f"Removed {removed} from invoice review. Reply approve to add the remaining stock."
+        return "That item number was not found. Reply remove item 1, or approve."
+
+    edit_match = re.fullmatch(r"edit\s+(.+?)\s+(quantity|qty|cost|price|name)\s+(.+)", text, flags=re.IGNORECASE)
+    if edit_match:
+        target = edit_match.group(1).strip().lower()
+        field = edit_match.group(2).lower()
+        value = edit_match.group(3).strip()
+        for item in pending.get("items") or []:
+            name = invoice_item_name(item)
+            if target in name.lower() or name.lower() in target:
+                if field in {"quantity", "qty"}:
+                    item["quantity"] = value
+                    return f"Updated {name} quantity to {value}. Reply approve to add stock."
+                if field in {"cost", "price"}:
+                    item["cost"] = value
+                    return f"Updated {name} cost to {value}. Reply approve to add stock."
+                item["drug_name"] = value
+                return f"Updated item name to {value}. Reply approve to add stock."
+        return "I could not find that invoice item. Try: edit Panadol quantity 20."
+
+    approve_phrases = {"approve", "approved", "review approved", "add to stock", "approve invoice", "save invoice"}
+    if lower not in approve_phrases:
+        return None
+
+    items = pending.get("items") or []
+    missing = [invoice_item_name(item) for item in items if invoice_item_quantity(item) is None]
+    if missing:
+        return "I found item names but not quantities. Please reply like:\n" + "\n".join(f"{name} 10" for name in missing[:3])
+
+    supplier = str(pending.get("supplier") or "").strip()
+    invoice_number = str(pending.get("invoice_number") or "").strip()
+    lines = ["Invoice approved and stock updated"]
+    for item in items:
+        name = invoice_item_name(item)
+        quantity = invoice_item_quantity(item) or 0
+        unit = invoice_item_unit(item)
+        cost = invoice_item_cost(item)
+        command_parts = [f"{name} restock {quantity}"]
+        if unit:
+            command_parts.append(unit)
+        if cost not in ("", None):
+            command_parts.append(f"cost {cost}")
+        if supplier:
+            command_parts.append(f"supplier {supplier}")
+        if invoice_number:
+            command_parts.append(f"invoice {invoice_number}")
+        process_intake_text_for_sender(" ".join(command_parts), sender)
+        label = f"- {name} x{quantity}"
+        if unit:
+            label += f" {unit}"
+        label += " added"
+        lines.append(label)
+    pending_invoice_reviews.pop(key, None)
+    return "\n".join(lines)
 
 def process_intake_text_for_sender(text: str, sender: str) -> str:
     intake_service = get_intake_service()
@@ -1712,13 +1887,18 @@ async def process_whatsapp_form_values(form_values: dict[str, Any]) -> WhatsAppP
             command_handler = "voice_confirmation_yes"
             incoming = IncomingInput(text=pending, is_voice=False)
             clear_pending_voice(from_number)
-            reply = "âœ… Confirmed. Records updated.\n\n" + process_intake_text_for_sender(incoming.text, from_number)
+            reply = "Confirmed. Records updated.\n\n" + process_intake_text_for_sender(incoming.text, from_number)
         elif body:
-            if pending:
-                command_handler = "voice_correction_text"
-                clear_pending_voice(from_number)
-            incoming = IncomingInput(text=body, is_voice=False)
-            reply = process_intake_text_for_sender(incoming.text, from_number)
+            invoice_review_reply = process_pending_invoice_review_message(from_number, body)
+            if invoice_review_reply:
+                command_handler = "invoice_review"
+                reply = invoice_review_reply
+            else:
+                if pending:
+                    command_handler = "voice_correction_text"
+                    clear_pending_voice(from_number)
+                incoming = IncomingInput(text=body, is_voice=False)
+                reply = process_intake_text_for_sender(incoming.text, from_number)
         else:
             whatsapp = get_whatsapp_client()
             incoming = await incoming_text_from_form(form_values, whatsapp, get_transcription_service())
@@ -1731,6 +1911,7 @@ async def process_whatsapp_form_values(form_values: dict[str, Any]) -> WhatsAppP
                 reply = process_intake_text_for_sender(incoming.text, from_number)
                 if incoming.is_voice:
                     reply = voice_reply(incoming.original_text or incoming.text, incoming.text, reply)
+
 
         media_url = media_url_from_reply(reply)
         if media_url:

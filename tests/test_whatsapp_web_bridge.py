@@ -869,3 +869,195 @@ def test_whatsapp_unknown_photo_uses_ai_to_extract_invoice_when_key_active(monke
     assert "Invoice processed" in data["reply"]
     assert "Supplier: Beta Suppliers" in data["reply"]
     assert "Panadol x20" in data["reply"]
+
+
+
+def test_whatsapp_voice_repairs_close_medicine_and_joined_payment(monkeypatch):
+    class FakeTranscriptionService:
+        is_available = True
+
+        def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
+            return "Anadol Mbelekash"
+
+    seen: dict[str, str] = {}
+
+    def fake_process_intake_text_for_sender(text: str, sender: str) -> str:
+        seen["text"] = text
+        return "Panadol x2 cash recorded\nStock left: 18"
+
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_transcription_service", lambda: FakeTranscriptionService())
+    monkeypatch.setattr(main, "process_intake_text_for_sender", fake_process_intake_text_for_sender)
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"fake voice bytes").decode("ascii")
+    payload["media_mime_type"] = "audio/ogg"
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=payload)
+
+    data = response.json()
+    assert response.status_code == 200
+    assert seen["text"] == "Panadol 2 cash"
+    assert "Heard: Panadol mbili cash" in data["reply"]
+    assert "Panadol x2 cash recorded" in data["reply"]
+
+
+def test_whatsapp_voice_repairs_tukas_as_two_cash(monkeypatch):
+    class FakeTranscriptionService:
+        is_available = True
+
+        def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
+            return "Panadol Tukas"
+
+    seen: dict[str, str] = {}
+
+    def fake_process_intake_text_for_sender(text: str, sender: str) -> str:
+        seen["text"] = text
+        return "Panadol x2 cash recorded\nStock left: 18"
+
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_transcription_service", lambda: FakeTranscriptionService())
+    monkeypatch.setattr(main, "process_intake_text_for_sender", fake_process_intake_text_for_sender)
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"fake voice bytes").decode("ascii")
+    payload["media_mime_type"] = "audio/ogg"
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=payload)
+
+    data = response.json()
+    assert response.status_code == 200
+    assert seen["text"] == "Panadol 2 cash"
+    assert "Heard: Panadol two cash" in data["reply"]
+    assert "Panadol x2 cash recorded" in data["reply"]
+
+
+def test_invoice_review_approve_updates_stock_after_ai_extraction(monkeypatch, tmp_path):
+    class FakeAIService:
+        client = object()
+
+        def extract_restock_from_image(self, image_bytes: bytes, content_type: str | None = None):
+            return {
+                "supplier": "MedCare",
+                "invoice_number": "INV123",
+                "confidence": 0.9,
+                "items": [
+                    {"drug_name": "Paracetamol", "quantity": 10, "unit": "boxes"},
+                    {"drug_name": "Cough Syrup", "quantity": 20},
+                ],
+            }
+
+    commands: list[str] = []
+
+    def fake_process_intake_text_for_sender(text: str, sender: str) -> str:
+        commands.append(text)
+        return f"restocked: {text}"
+
+    main.pending_invoice_reviews.clear()
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_ai_service", lambda: FakeAIService())
+    monkeypatch.setattr(main, "process_intake_text_for_sender", fake_process_intake_text_for_sender)
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"invoice image bytes").decode("ascii")
+    payload["media_mime_type"] = "image/jpeg"
+    payload["caption"] = "supplier invoice"
+
+    with TestClient(main.app) as client:
+        first = client.post("/bridge/whatsapp-web", json=payload)
+        approve = client.post("/bridge/whatsapp-web", json=bridge_payload("approve invoice", sender="254700000000@s.whatsapp.net"))
+
+    assert first.status_code == 200
+    assert "Review needed before stock update" in first.json()["reply"]
+    assert "approve" in first.json()["reply"]
+    assert approve.status_code == 200
+    assert "Invoice approved and stock updated" in approve.json()["reply"]
+    assert "Paracetamol restock 10 boxes" in commands[0]
+    assert "supplier MedCare" in commands[0]
+    assert "invoice INV123" in commands[0]
+    assert "Cough Syrup restock 20" in commands[1]
+
+
+def test_invoice_review_edit_item_quantity_before_approval(monkeypatch, tmp_path):
+    class FakeAIService:
+        client = object()
+
+        def extract_restock_from_image(self, image_bytes: bytes, content_type: str | None = None):
+            return {"supplier": "MedCare", "items": [{"drug_name": "Paracetamol"}]}
+
+    commands: list[str] = []
+
+    def fake_process_intake_text_for_sender(text: str, sender: str) -> str:
+        commands.append(text)
+        return f"restocked: {text}"
+
+    main.pending_invoice_reviews.clear()
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_ai_service", lambda: FakeAIService())
+    monkeypatch.setattr(main, "process_intake_text_for_sender", fake_process_intake_text_for_sender)
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"invoice image bytes").decode("ascii")
+    payload["media_mime_type"] = "image/jpeg"
+    payload["caption"] = "supplier invoice"
+
+    with TestClient(main.app) as client:
+        first = client.post("/bridge/whatsapp-web", json=payload)
+        edit = client.post("/bridge/whatsapp-web", json=bridge_payload("edit Paracetamol quantity 20", sender="254700000000@s.whatsapp.net"))
+        approve = client.post("/bridge/whatsapp-web", json=bridge_payload("add to stock", sender="254700000000@s.whatsapp.net"))
+
+    assert first.status_code == 200
+    assert "Some quantities are missing" in first.json()["reply"]
+    assert "Updated Paracetamol quantity to 20" in edit.json()["reply"]
+    assert "Invoice approved and stock updated" in approve.json()["reply"]
+    assert commands == ["Paracetamol restock 20 supplier MedCare"]
+
+
+def test_shelf_photo_is_not_treated_as_invoice(monkeypatch, tmp_path):
+    class FakeAIService:
+        client = object()
+
+        def extract_restock_from_image(self, image_bytes: bytes, content_type: str | None = None):
+            raise AssertionError("shelf photo should not run invoice extraction")
+
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_ai_service", lambda: FakeAIService())
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"shelf image bytes").decode("ascii")
+    payload["media_mime_type"] = "image/jpeg"
+    payload["caption"] = "stock shelf photo"
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=payload)
+
+    data = response.json()
+    assert response.status_code == 200
+    assert "Stock photo received" in data["reply"]
+    assert "scan barcode" in data["reply"]
+    assert "Invoice processed" not in data["reply"]

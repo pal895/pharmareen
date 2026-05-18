@@ -588,3 +588,13 @@ def test_offline_pwa_assets_contain_auto_sync_media_and_retry_logic():
     assert "pharmareen-offline-v15" in worker
     assert "caches.open" in worker
 
+
+
+
+def test_offline_frontend_history_uses_synced_safely_not_sent_successfully():
+    root = Path(__file__).resolve().parents[1]
+    script = (root / "static" / "offline_app" / "app.js").read_text(encoding="utf-8")
+
+    assert "Synced safely" in script
+    assert "Sent successfully" not in script
+    assert "Nothing synced safely yet." in script

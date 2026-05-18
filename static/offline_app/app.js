@@ -714,7 +714,7 @@ async function saveOfflineEntries() {
 function mediaStatusLabel(item) {
   const status = item.sync_status || "pending";
   if (status === "syncing") return "🔄 Syncing";
-  if (status === "synced") return "✅ Synced";
+  if (status === "synced") return "\u2705 Synced safely";
   if (status === "failed") return "⚠️ Needs attention";
   return "⏳ Waiting";
 }
@@ -790,7 +790,7 @@ async function renderQueue() {
   const history = await loadHistory();
   queueCount.textContent = String(pending.length);
   renderList(pendingEntries, pending.slice(-12).reverse(), "Nothing saved offline yet.");
-  renderList(syncedEntries, history.slice(0, 10), "Nothing sent yet.");
+  renderList(syncedEntries, history.slice(0, 10), "Nothing synced safely yet.");
 }
 
 async function entryForSync(item) {
