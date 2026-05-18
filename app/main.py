@@ -32,7 +32,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from app.ai import AIService, ai_usage_snapshot
 from app.config import Settings, get_settings
 from app.demo_store import DemoPharmacyStore
-from app.intake import IntakeService, normalize_spoken_command_text
+from app.intake import IntakeService, normalize_key, normalize_spoken_command_text
 from app.pdf_reports import generate_daily_report_pdf, reports_pdf_dir
 from app.reports import LowStockWarning, ReportMetrics, ReportService, build_report_metrics, build_transaction_metrics, low_stock_from_items
 from app.routes.admin import router as admin_router
@@ -57,6 +57,8 @@ from app.whatsapp import WhatsAppClient, xml_message_response
 logger = logging.getLogger(__name__)
 processed_message_sids: set[str] = set()
 offline_synced_entry_ids: set[str] = set()
+offline_synced_entry_results: dict[str, dict[str, Any]] = {}
+offline_whatsapp_outbox: list[dict[str, Any]] = []
 pending_voice_confirmations: dict[str, tuple[str, float]] = {}
 pending_invoice_reviews: dict[str, dict[str, Any]] = {}
 PENDING_VOICE_TTL_SECONDS = 600
@@ -429,6 +431,64 @@ def offline_sync_success_message(entries: list[dict[str, Any]], synced: list[dic
     return "\n".join(lines)
 
 
+def remember_offline_synced_result(entry_id: str, record: dict[str, Any]) -> dict[str, Any]:
+    stored = dict(record)
+    stored.setdefault("id", entry_id)
+    if not stored.get("reply") and stored.get("result_summary"):
+        stored["reply"] = stored["result_summary"]
+    if not stored.get("result_summary") and stored.get("reply"):
+        stored["result_summary"] = compact_offline_reply(str(stored.get("reply") or ""))
+    stored.setdefault("whatsapp_confirmation", "ready")
+    offline_synced_entry_ids.add(entry_id)
+    offline_synced_entry_results[entry_id] = stored
+    return stored
+
+
+def offline_confirmation_recipient(payload: dict[str, Any]) -> str:
+    settings = get_settings()
+    raw = str(payload.get("sender") or payload.get("whatsapp_sender") or settings.owner_whatsapp_to or "").strip()
+    if not raw and settings.allowed_whatsapp_numbers.strip():
+        raw = settings.allowed_whatsapp_numbers.split(",", 1)[0].strip()
+    if not raw:
+        return ""
+    if "@" in raw:
+        return raw
+    digits = re.sub(r"\D", "", raw)
+    return f"{digits}@s.whatsapp.net" if digits else raw
+
+
+def queue_offline_whatsapp_confirmation(recipient: str, message: str) -> dict[str, Any] | None:
+    if not recipient or not message.strip():
+        return None
+    item = {
+        "id": f"offline-confirm-{int(time.time() * 1000)}-{len(offline_whatsapp_outbox) + 1}",
+        "to": recipient,
+        "message": message.strip(),
+        "created_at": now_in_timezone(get_settings().timezone).isoformat(timespec="seconds"),
+    }
+    offline_whatsapp_outbox.append(item)
+    return {"status": "queued", "id": item["id"], "to": mask_phone(recipient)}
+
+
+@app.get("/offline/whatsapp-confirmations")
+def offline_whatsapp_confirmations(limit: int = Query(default=10, ge=1, le=50)) -> dict[str, Any]:
+    return {"status": "ok", "confirmations": offline_whatsapp_outbox[:limit]}
+
+
+@app.post("/offline/whatsapp-confirmations/ack")
+async def offline_whatsapp_confirmations_ack(request: Request) -> dict[str, Any]:
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    ids = {str(item).strip() for item in payload.get("ids", []) if str(item).strip()} if isinstance(payload, dict) else set()
+    if not ids:
+        return {"status": "ok", "acked": 0}
+    before = len(offline_whatsapp_outbox)
+    offline_whatsapp_outbox[:] = [item for item in offline_whatsapp_outbox if str(item.get("id")) not in ids]
+    return {"status": "ok", "acked": before - len(offline_whatsapp_outbox)}
+
+
 @app.post("/offline/sync")
 async def offline_sync_entries(request: Request) -> dict[str, Any]:
     try:
@@ -452,8 +512,13 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
             failed.append({"id": "", "status": "failed", "error": "Missing id."})
             continue
         if entry_id in offline_synced_entry_ids:
-            synced.append({"id": entry_id, "status": "already_synced", "reply": "Already synced."})
-            append_offline_sync_log(entry, "already_synced", "Already synced.", "")
+            previous = dict(offline_synced_entry_results.get(entry_id) or {})
+            if not previous:
+                fallback_reply = offline_result_summary(entry, {})
+                previous = {"id": entry_id, "reply": fallback_reply, "result_summary": fallback_reply, "whatsapp_confirmation": "ready"}
+            previous["status"] = "already_synced"
+            synced.append(previous)
+            append_offline_sync_log(entry, "already_synced", str(previous.get("reply") or previous.get("result_summary") or "Synced safely"), "")
             continue
         if action in {"photo", "image", "voice", "audio"}:
             media_base64, media_mime_type = media_base64_from_offline_entry(entry)
@@ -480,7 +545,7 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
                         "whatsapp_confirmation": "ready",
                     }
                     if result.success:
-                        offline_synced_entry_ids.add(entry_id)
+                        record = remember_offline_synced_result(entry_id, record)
                         synced.append(record)
                         append_offline_sync_log(entry, "synced", result.reply, "")
                     else:
@@ -492,14 +557,14 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
                     append_offline_sync_log(entry, "pending", "", reason)
                 continue
             reply = offline_media_reply(entry)
-            offline_synced_entry_ids.add(entry_id)
-            synced.append({"id": entry_id, "status": "media_logged", "reply": reply, "result_summary": compact_offline_reply(reply), "whatsapp_confirmation": "ready"})
+            record = remember_offline_synced_result(entry_id, {"id": entry_id, "status": "media_logged", "reply": reply, "result_summary": compact_offline_reply(reply), "whatsapp_confirmation": "ready"})
+            synced.append(record)
             append_offline_sync_log(entry, "media_logged", reply, "")
             continue
         if action == "barcode_mapping":
             reply = "Barcode saved for this medicine."
-            offline_synced_entry_ids.add(entry_id)
-            synced.append({"id": entry_id, "status": "synced", "reply": reply, "result_summary": compact_offline_reply(reply), "whatsapp_confirmation": "ready"})
+            record = remember_offline_synced_result(entry_id, {"id": entry_id, "status": "synced", "reply": reply, "result_summary": compact_offline_reply(reply), "whatsapp_confirmation": "ready"})
+            synced.append(record)
             append_offline_sync_log(entry, "synced", reply, "")
             continue
 
@@ -518,19 +583,26 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
                 pending.append({"id": entry_id, "status": "pending", "reason": reason})
                 append_offline_sync_log(entry_for_log, "pending", "", reason)
                 continue
-            offline_synced_entry_ids.add(entry_id)
-            synced.append({"id": entry_id, "status": "synced", "reply": reply, "result_summary": compact_offline_reply(reply), "whatsapp_confirmation": "ready"})
+            record = remember_offline_synced_result(entry_id, {"id": entry_id, "status": "synced", "reply": reply, "result_summary": compact_offline_reply(reply), "whatsapp_confirmation": "ready"})
+            synced.append(record)
             append_offline_sync_log(entry_for_log, "synced", reply, "")
         except Exception as exc:
             reason = sanitize_error_message(exc)
             pending.append({"id": entry_id, "status": "pending", "reason": reason})
             append_offline_sync_log(entry_for_log, "pending", "", reason)
     message = offline_sync_success_message(entries, synced) if synced else ""
+    has_new_synced_records = any(str(item.get("status") or "") != "already_synced" for item in synced)
+    confirmation_status = (
+        queue_offline_whatsapp_confirmation(offline_confirmation_recipient(payload if isinstance(payload, dict) else {}), message)
+        if message and has_new_synced_records
+        else None
+    )
     return {
         "status": "ok",
         "message": message,
         "whatsapp_reply": message,
         "admin_message": message,
+        "whatsapp_confirmation": confirmation_status or {"status": "not_queued"},
         "synced": synced,
         "failed": failed,
         "pending": pending,
@@ -1526,8 +1598,11 @@ async def process_whatsapp_web_payload(
                         "items": extraction_result.get("items", []),
                     }
                     media_job["processing_status"] = extraction_status
-                    store_pending_invoice_review(sender, extraction_result)
-                    ai_reply = format_invoice_extraction_reply(extraction_result)
+                    if extraction_has_invoice_structure(extraction_result, classification):
+                        store_pending_invoice_review(sender, extraction_result)
+                        ai_reply = format_invoice_extraction_reply(extraction_result)
+                    else:
+                        ai_reply = format_shelf_photo_reply_from_extraction(extraction_result)
                 except Exception as exc:
                     record_openai_error("photo", exc)
                     if is_openai_quota_error(exc):
@@ -1658,6 +1733,37 @@ def invoice_review_actions_text() -> str:
     return "Review needed before stock update.\nReply: approve, add to stock, edit item name/quantity/cost, or cancel."
 
 
+def extraction_has_invoice_structure(extraction_result: dict[str, Any], classification: dict[str, Any]) -> bool:
+    media_kind = str(classification.get("media_kind") or "")
+    if media_kind in {"supplier_invoice", "supplier_receipt", "handwritten_invoice", "delivery_note"}:
+        return True
+    photo_type = normalize_key(extraction_result.get("photo_type") or extraction_result.get("document_type") or extraction_result.get("image_type") or "")
+    if any(word in photo_type for word in ["shelf", "product", "pack", "barcode", "random", "unclear"]):
+        return False
+    if any(word in photo_type for word in ["invoice", "receipt", "deliverynote", "supplier"]):
+        return True
+    metadata_keys = ["supplier", "supplier_name", "invoice", "invoice_number", "invoice_date", "date", "total", "grand_total"]
+    if any(str(extraction_result.get(key) or "").strip() for key in metadata_keys):
+        return True
+    for item in extraction_result.get("items") or []:
+        if any(str(item.get(key) or "").strip() for key in ["supplier", "supplier_name", "invoice_number", "cost", "unit_cost", "total", "total_cost"]):
+            return True
+    return False
+
+
+def format_shelf_photo_reply_from_extraction(extraction_result: dict[str, Any]) -> str:
+    items = list(extraction_result.get("items") or [])
+    lines = ["Shelf photo analyzed"]
+    if items:
+        lines.append("Products seen:")
+        for item in items[:8]:
+            lines.append(f"- {invoice_item_name(item)}")
+    else:
+        lines.append("No clear invoice data detected.")
+    lines.extend(["Missing:", "- quantities", "- invoice values", "- supplier", "Reply example:", "PEP Lime Cordial 10", "or", "restock PEP Lime Cordial 10"])
+    return "\n".join(lines)
+
+
 def format_invoice_extraction_reply(extraction_result: dict[str, Any]) -> str:
     items = list(extraction_result.get("items") or [])
     supplier = str(extraction_result.get("supplier") or "").strip()
@@ -1717,6 +1823,39 @@ def process_pending_invoice_review_message(sender: str, message: str) -> str | N
             removed = invoice_item_name(items.pop(index))
             return f"Removed {removed} from invoice review. Reply approve to add the remaining stock."
         return "That item number was not found. Reply remove item 1, or approve."
+
+    remove_name_match = re.fullmatch(r"remove\s+(.+)", text, flags=re.IGNORECASE)
+    if remove_name_match:
+        target = remove_name_match.group(1).strip().lower()
+        items = pending.get("items") or []
+        for index, item in enumerate(list(items)):
+            name = invoice_item_name(item)
+            if target in name.lower() or name.lower() in target:
+                items.pop(index)
+                return f"Removed {name} from invoice review. Reply approve to add the remaining stock."
+        return "I could not find that invoice item. Try: remove item 1."
+
+    rename_match = re.fullmatch(r"rename\s+(.+?)\s+to\s+(.+)", text, flags=re.IGNORECASE)
+    if rename_match:
+        target = rename_match.group(1).strip().lower()
+        value = rename_match.group(2).strip()
+        for item in pending.get("items") or []:
+            name = invoice_item_name(item)
+            if target in name.lower() or name.lower() in target:
+                item["drug_name"] = value
+                return f"Renamed {name} to {value}. Reply approve to add stock."
+        return "I could not find that invoice item. Try: rename old name to new name."
+
+    quick_quantity_match = re.fullmatch(r"edit\s+(.+?)\s+(\d+(?:\.\d+)?)", text, flags=re.IGNORECASE)
+    if quick_quantity_match:
+        target = quick_quantity_match.group(1).strip().lower()
+        value = quick_quantity_match.group(2).strip()
+        for item in pending.get("items") or []:
+            name = invoice_item_name(item)
+            if target in name.lower() or name.lower() in target:
+                item["quantity"] = value
+                return f"Updated {name} quantity to {value}. Reply approve to add stock."
+        return "I could not find that invoice item. Try: edit Panadol quantity 20."
 
     edit_match = re.fullmatch(r"edit\s+(.+?)\s+(quantity|qty|cost|price|name)\s+(.+)", text, flags=re.IGNORECASE)
     if edit_match:

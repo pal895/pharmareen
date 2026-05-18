@@ -12,6 +12,8 @@ const baileysLogLevel = process.env.BAILEYS_LOG_LEVEL || 'info';
 const autoResetOnLoggedOut = String(process.env.AUTO_RESET_BAILEYS_ON_LOGOUT || 'true').toLowerCase() !== 'false';
 const allowAllDirectChatsForTest = String(process.env.ALLOW_ALL_DIRECT_CHATS_FOR_TEST || 'false').toLowerCase() === 'true';
 const allowedNumbers = parseAllowedNumbers(process.env.ALLOWED_WHATSAPP_NUMBERS || '');
+const offlineConfirmationPollMs = Number(process.env.OFFLINE_CONFIRMATION_POLL_MS || 10000);
+let offlineConfirmationPoller = null;
 
 function phoneDigits(value) {
   return String(value || '').replace(/whatsapp:/g, '').replace(/\D/g, '');
@@ -212,6 +214,43 @@ async function sendToBackend(text, sender, messageId, extraPayload = {}) {
   return response.data || {};
 }
 
+function normalizeConfirmationJid(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.includes('@')) return raw;
+  const digits = phoneDigits(raw);
+  return digits ? `${digits}@s.whatsapp.net` : raw;
+}
+
+async function pollOfflineConfirmations(sock) {
+  try {
+    const response = await axios.get(`${backendUrl}/offline/whatsapp-confirmations`, { timeout: 10000 });
+    const confirmations = response.data && Array.isArray(response.data.confirmations) ? response.data.confirmations : [];
+    if (!confirmations.length) return;
+    const sentIds = [];
+    for (const item of confirmations) {
+      const target = normalizeConfirmationJid(item.to || item.sender || item.jid);
+      const message = String(item.message || '').trim();
+      if (!target || !message) continue;
+      const sent = await safeSendReply(sock, target, message);
+      if (sent && item.id) sentIds.push(item.id);
+    }
+    if (sentIds.length) {
+      await axios.post(`${backendUrl}/offline/whatsapp-confirmations/ack`, { ids: sentIds }, { timeout: 10000 });
+      console.log(`OFFLINE_CONFIRMATIONS_SENT count=${sentIds.length}`);
+    }
+  } catch (error) {
+    console.log(`OFFLINE_CONFIRMATION_POLL_SKIPPED ${error.message}`);
+  }
+}
+
+function startOfflineConfirmationPolling(sock) {
+  if (!offlineConfirmationPollMs || offlineConfirmationPollMs < 1000) return;
+  if (offlineConfirmationPoller) clearInterval(offlineConfirmationPoller);
+  offlineConfirmationPoller = setInterval(() => pollOfflineConfirmations(sock), offlineConfirmationPollMs);
+  pollOfflineConfirmations(sock);
+}
+
 function extractBackendReply(data) {
   const keys = ['reply', 'message', 'text', 'response', 'whatsapp_reply'];
   for (const key of keys) {
@@ -306,6 +345,7 @@ async function startBaileys(options = {}) {
     }
     if (connection === 'open') {
       console.log('Baileys bridge ready. Send a pharmacy message from an allowed direct chat.');
+      startOfflineConfirmationPolling(sock);
     }
     if (connection === 'close') {
       const statusCode = lastDisconnect && lastDisconnect.error && lastDisconnect.error.output

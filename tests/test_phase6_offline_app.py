@@ -598,3 +598,44 @@ def test_offline_frontend_history_uses_synced_safely_not_sent_successfully():
     assert "Synced safely" in script
     assert "Sent successfully" not in script
     assert "Nothing synced safely yet." in script
+
+
+
+def test_offline_sync_preserves_backend_result_for_duplicate_and_queues_whatsapp(monkeypatch, tmp_path):
+    class ReplyingIntake:
+        def process_text(self, text: str) -> str:
+            return "Panadol x2 cash recorded\nStock left: 721"
+
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(main, "get_intake_service", lambda: ReplyingIntake())
+    main.offline_synced_entry_ids.clear()
+    main.offline_synced_entry_results.clear()
+    main.offline_whatsapp_outbox.clear()
+
+    payload = {
+        "sender": "254700000000@s.whatsapp.net",
+        "entries": [{"id": "offline-sale-trust", "action": "sale", "drug_name": "Panadol", "quantity": 2, "payment_method": "cash"}],
+    }
+
+    with TestClient(main.app) as client:
+        first = client.post("/offline/sync", json=payload)
+        second = client.post("/offline/sync", json=payload)
+        outbox = client.get("/offline/whatsapp-confirmations")
+        ack = client.post("/offline/whatsapp-confirmations/ack", json={"ids": [outbox.json()["confirmations"][0]["id"]]})
+        after_ack = client.get("/offline/whatsapp-confirmations")
+
+    first_data = first.json()
+    second_data = second.json()
+    assert first.status_code == 200
+    assert first_data["whatsapp_confirmation"]["status"] == "queued"
+    assert "Panadol x2 cash recorded" in first_data["synced"][0]["reply"]
+    assert "Stock left: 721" in first_data["synced"][0]["reply"]
+    assert second_data["synced"][0]["status"] == "already_synced"
+    assert "Already synced" not in second_data["synced"][0]["reply"]
+    assert "Panadol x2 cash recorded" in second_data["synced"][0]["reply"]
+    assert second_data["whatsapp_confirmation"]["status"] == "not_queued"
+    assert len(outbox.json()["confirmations"]) == 1
+    assert "Offline records synced safely" in outbox.json()["confirmations"][0]["message"]
+    assert "Panadol x2 cash recorded" in outbox.json()["confirmations"][0]["message"]
+    assert ack.json()["acked"] == 1
+    assert after_ack.json()["confirmations"] == []

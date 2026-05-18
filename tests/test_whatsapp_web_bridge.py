@@ -1061,3 +1061,98 @@ def test_shelf_photo_is_not_treated_as_invoice(monkeypatch, tmp_path):
     assert "Stock photo received" in data["reply"]
     assert "scan barcode" in data["reply"]
     assert "Invoice processed" not in data["reply"]
+
+
+
+def test_invoice_review_short_edit_rename_and_remove_stay_in_context(monkeypatch, tmp_path):
+    class FakeAIService:
+        client = object()
+
+        def extract_restock_from_image(self, image_bytes: bytes, content_type: str | None = None):
+            return {
+                "supplier": "MedCare",
+                "items": [
+                    {"drug_name": "PEP Lime Cordial", "quantity": 3},
+                    {"drug_name": "WaterGuard", "quantity": 5},
+                    {"drug_name": "Antibiotic Cream", "quantity": 2},
+                ],
+            }
+
+    commands: list[str] = []
+
+    def fake_process_intake_text_for_sender(text: str, sender: str) -> str:
+        commands.append(text)
+        return text
+
+    main.pending_invoice_reviews.clear()
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_ai_service", lambda: FakeAIService())
+    monkeypatch.setattr(main, "process_intake_text_for_sender", fake_process_intake_text_for_sender)
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"invoice image bytes").decode("ascii")
+    payload["media_mime_type"] = "image/jpeg"
+    payload["caption"] = "supplier invoice"
+
+    with TestClient(main.app) as client:
+        client.post("/bridge/whatsapp-web", json=payload)
+        edit = client.post("/bridge/whatsapp-web", json=bridge_payload("Edit PEP Lime Cordial 20", sender="254700000000@s.whatsapp.net"))
+        rename = client.post("/bridge/whatsapp-web", json=bridge_payload("Rename WaterGuard to Water Guard", sender="254700000000@s.whatsapp.net"))
+        remove = client.post("/bridge/whatsapp-web", json=bridge_payload("Remove Antibiotic Cream", sender="254700000000@s.whatsapp.net"))
+        approve = client.post("/bridge/whatsapp-web", json=bridge_payload("approve", sender="254700000000@s.whatsapp.net"))
+
+    assert "Updated PEP Lime Cordial quantity to 20" in edit.json()["reply"]
+    assert "Renamed WaterGuard to Water Guard" in rename.json()["reply"]
+    assert "Removed Antibiotic Cream" in remove.json()["reply"]
+    assert "Invoice approved and stock updated" in approve.json()["reply"]
+    assert commands == [
+        "PEP Lime Cordial restock 20 supplier MedCare",
+        "Water Guard restock 5 supplier MedCare",
+    ]
+
+
+def test_unknown_product_photo_with_no_invoice_metadata_returns_shelf_review(monkeypatch, tmp_path):
+    class FakeAIService:
+        client = object()
+
+        def extract_restock_from_image(self, image_bytes: bytes, content_type: str | None = None):
+            return {
+                "photo_type": "stock shelf photo",
+                "confidence": 0.7,
+                "items": [
+                    {"drug_name": "PEP Lime Cordial"},
+                    {"drug_name": "WaterGuard"},
+                    {"drug_name": "Luron Aloe Lotion"},
+                ],
+            }
+
+    main.pending_invoice_reviews.clear()
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_ai_service", lambda: FakeAIService())
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"unknown shelf bytes").decode("ascii")
+    payload["media_mime_type"] = "image/jpeg"
+    payload["filename"] = "photo.jpg"
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=payload)
+
+    reply = response.json()["reply"]
+    assert "Shelf photo analyzed" in reply
+    assert "PEP Lime Cordial" in reply
+    assert "WaterGuard" in reply
+    assert "Luron Aloe Lotion" in reply
+    assert "Missing:" in reply
+    assert "Invoice processed" not in reply
+    assert main.pending_invoice_reviews == {}
