@@ -222,6 +222,93 @@ function normalizeConfirmationJid(value) {
   return digits ? `${digits}@s.whatsapp.net` : raw;
 }
 
+async function resolveOfflineConfirmationTarget(sock, rawTarget, itemId) {
+  const normalized = normalizeConfirmationJid(rawTarget);
+  console.log(`normalized jid: ${maskSender(normalized)} ${jidDebug(normalized)}`);
+  if (!normalized) {
+    console.log(`offline confirmation send failed id=${itemId || 'unknown'} reason=missing_target`);
+    return '';
+  }
+  if (jidDomain(normalized) !== '@s.whatsapp.net' || typeof sock.onWhatsApp !== 'function') {
+    return normalized;
+  }
+
+  try {
+    const lookup = await sock.onWhatsApp(normalized);
+    const results = Array.isArray(lookup) ? lookup : [];
+    const match = results.find((row) => row && row.exists);
+    const resolved = match && match.jid ? match.jid : '';
+    console.log(
+      `offline confirmation onWhatsApp result id=${itemId || 'unknown'} ` +
+      `exists=${Boolean(resolved)} jid=${maskSender(resolved || normalized)}`
+    );
+    if (!resolved) {
+      console.log(
+        `offline confirmation send failed id=${itemId || 'unknown'} ` +
+        `to=${maskSender(normalized)} reason=number_not_registered_on_whatsapp`
+      );
+      console.log(
+        `confirmation delivery result id=${itemId || 'unknown'} sent=false ` +
+        `acked=false reason=number_not_registered_on_whatsapp`
+      );
+      return '';
+    }
+    return resolved;
+  } catch (error) {
+    console.log(
+      `offline confirmation onWhatsApp check failed id=${itemId || 'unknown'} ` +
+      `reason=${error.message || error} fallback=normalized_jid`
+    );
+    return normalized;
+  }
+}
+
+async function sendOfflineConfirmation(sock, target, text, itemId) {
+  const safety = isAllowedDirectChat(target);
+  if (!safety.allowed) {
+    console.log(
+      `offline confirmation send failed id=${itemId || 'unknown'} ` +
+      `to=${maskSender(target)} reason=${safety.reason}`
+    );
+    console.log(
+      `confirmation delivery result id=${itemId || 'unknown'} sent=false ` +
+      `acked=false reason=${safety.reason}`
+    );
+    return { sent: false, error: safety.reason };
+  }
+
+  const body = String(text || '').slice(0, 4000);
+  if (!body) {
+    console.log(`offline confirmation send failed id=${itemId || 'unknown'} reason=empty_message`);
+    console.log(`confirmation delivery result id=${itemId || 'unknown'} sent=false acked=false reason=empty_message`);
+    return { sent: false, error: 'empty_message' };
+  }
+
+  console.log(`sending offline confirmation id=${itemId || 'unknown'} to=${maskSender(target)} length=${body.length}`);
+  console.log(`WHATSAPP_SEND_TARGET jid=${maskSender(target)} ${jidDebug(target)} length=${body.length}`);
+  try {
+    const result = await sock.sendMessage(target, { text: body });
+    const messageId = result && result.key ? result.key.id : '';
+    console.log(
+      `offline confirmation sent successfully id=${itemId || 'unknown'} ` +
+      `to=${maskSender(target)} message_id=${messageId || 'unknown'}`
+    );
+    console.log(
+      `confirmation delivery result id=${itemId || 'unknown'} sent=true ` +
+      `acked=false message_id=${messageId || 'unknown'}`
+    );
+    return { sent: true, messageId };
+  } catch (error) {
+    const reason = error && (error.stack || error.message) ? (error.stack || error.message) : String(error);
+    console.error(`offline confirmation send failed id=${itemId || 'unknown'} to=${maskSender(target)} reason=${reason}`);
+    console.log(
+      `confirmation delivery result id=${itemId || 'unknown'} sent=false ` +
+      `acked=false reason=${error.message || 'send_failed'}`
+    );
+    return { sent: false, error: error.message || 'send_failed' };
+  }
+}
+
 async function pollOfflineConfirmations(sock) {
   try {
     const response = await axios.get(`${backendUrl}/offline/whatsapp-confirmations`, { timeout: 10000 });
@@ -231,14 +318,11 @@ async function pollOfflineConfirmations(sock) {
     for (const item of confirmations) {
       const rawTarget = item.to || item.sender || item.jid;
       console.log(`bridge picked offline confirmation id=${item.id || 'unknown'} to=${maskSender(rawTarget)}`);
-      const target = normalizeConfirmationJid(rawTarget);
-      console.log(`normalized jid: ${maskSender(target)} ${jidDebug(target)}`);
+      const target = await resolveOfflineConfirmationTarget(sock, rawTarget, item.id);
       const message = String(item.message || '').trim();
       if (!target || !message) continue;
-      console.log(`sending offline confirmation id=${item.id || 'unknown'} to=${maskSender(target)} length=${message.length}`);
-      const sent = await safeSendReply(sock, target, message);
-      if (sent && item.id) {
-        console.log(`offline confirmation sent successfully id=${item.id} to=${maskSender(target)}`);
+      const delivery = await sendOfflineConfirmation(sock, target, message, item.id);
+      if (delivery.sent && item.id) {
         sentIds.push(item.id);
       } else {
         console.log(`offline confirmation send failed id=${item.id || 'unknown'} to=${maskSender(target)}`);
@@ -247,6 +331,9 @@ async function pollOfflineConfirmations(sock) {
     if (sentIds.length) {
       await axios.post(`${backendUrl}/offline/whatsapp-confirmations/ack`, { ids: sentIds }, { timeout: 10000 });
       console.log(`OFFLINE_CONFIRMATIONS_SENT count=${sentIds.length}`);
+      for (const sentId of sentIds) {
+        console.log(`confirmation delivery result id=${sentId} sent=true acked=true`);
+      }
     }
   } catch (error) {
     console.log(`OFFLINE_CONFIRMATION_POLL_SKIPPED ${error.message}`);

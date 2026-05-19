@@ -1097,7 +1097,8 @@ class IntakeService:
         base_quantity = self._to_base_quantity(stock.drug_name, quantity, unit) if unit else (base_quantity or to_base_quantity(quantity, unit))
         payment_method = payment_method or "Cash"
         discount = float(discount or 0)
-        if stock.current_stock is not None and stock.current_stock < base_quantity:
+        current_stock_value = parse_int(stock.current_stock, default=None)
+        if current_stock_value is not None and current_stock_value < base_quantity:
             return self._record_missed_sale_attempt(
                 stock=stock,
                 display_quantity=display_quantity,
@@ -1252,7 +1253,8 @@ class IntakeService:
         payment_method: str = "Cash",
         note: str = "",
     ) -> EntryResult:
-        available = stock.current_stock or 0
+        parsed_available = parse_int(stock.current_stock, default=0)
+        available = max(parsed_available if parsed_available is not None else 0, 0)
         notes = build_note(
             merge_notes(note, "Attempted sale blocked because stock was insufficient."),
             payment=payment_method,
@@ -1316,7 +1318,7 @@ class IntakeService:
                 category="errors",
             )
 
-        current_stock = stock.current_stock or 0
+        current_stock = parse_int(stock.current_stock, default=0) or 0
         unit = canonical_unit(command.unit)
         display_quantity = command.quantity
         quantity_to_add = self._to_base_quantity(stock.drug_name, command.quantity, unit) if unit else (command.base_quantity or to_base_quantity(command.quantity, unit))
@@ -2065,19 +2067,21 @@ def build_stock_update_plan(stock: StockItem, quantity: int) -> StockUpdatePlan:
     warning_notes: list[str] = []
     reply_warnings: list[str] = []
 
-    if stock.current_stock is None:
+    current_stock = parse_int(stock.current_stock, default=None)
+    if current_stock is None:
         warning = "Current stock is blank. Please review stock when you have a moment."
         warning_notes.append(warning)
         reply_warnings.append(warning)
         return StockUpdatePlan(None, warning_notes, reply_warnings)
 
-    new_stock = max(stock.current_stock - quantity, 0)
-    if stock.current_stock < quantity:
+    new_stock = max(current_stock - quantity, 0)
+    if current_stock < quantity:
         warning = "Sold more than the recorded stock. Please review stock after rush hour."
         warning_notes.append(warning)
         reply_warnings.append("Stock reached 0. Please review after rush hour.")
 
-    if stock.reorder_level is not None and new_stock <= stock.reorder_level:
+    reorder_level = parse_int(stock.reorder_level, default=None)
+    if reorder_level is not None and new_stock <= reorder_level:
         warning_notes.append(f"Running low: {stock.drug_name} needs restocking soon.")
 
     return StockUpdatePlan(new_stock, warning_notes, reply_warnings)

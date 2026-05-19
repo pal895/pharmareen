@@ -602,9 +602,12 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "WHATSAPP_SEND_FAILED" in source
     assert "bridge picked offline confirmation" in source
     assert "normalized jid:" in source
+    assert "offline confirmation onWhatsApp result" in source
     assert "sending offline confirmation" in source
     assert "offline confirmation sent successfully" in source
     assert "offline confirmation send failed" in source
+    assert "confirmation delivery result" in source
+    assert "number_not_registered_on_whatsapp" in source
     assert "offline confirmation queued for" in backend_source
     assert "/debug/offline-confirmations" in backend_source
     assert "downloadMediaMessage" in source
@@ -626,7 +629,8 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "UNKNOWN NUMBER REPLIES: DISABLED" in source
 
     send_lines = [line.strip() for line in source.splitlines() if "sock.sendMessage" in line]
-    assert send_lines == ["const result = await sock.sendMessage(jid, { text: body });"]
+    assert "const result = await sock.sendMessage(jid, { text: body });" in send_lines
+    assert "const result = await sock.sendMessage(target, { text: body });" in send_lines
 
 
 def test_windows_local_bridge_helper_requires_backend_and_allowlist():

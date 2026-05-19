@@ -655,6 +655,29 @@ def test_insufficient_stock_sale_records_missed_sale_without_negative_stock():
     assert store.transactions[-1]["Quantity"] == 3
 
 
+def test_string_zero_stock_from_sheets_records_missed_sale_without_deducting_stock():
+    store = FakeStore()
+    store.stocks["ors"] = StockItem(
+        drug_name="ORS",
+        selling_price=80,
+        cost_price=50,
+        current_stock="0",  # type: ignore[arg-type]
+        reorder_level="10",  # type: ignore[arg-type]
+        row_number=8,
+    )
+    service = IntakeService(FailingParser(), store)
+
+    reply = service.process_text("ORS 2 cash")
+
+    assert "ORS out of stock" in reply
+    assert "Sale not recorded" in reply
+    assert "Missed sale saved: ORS x2" in reply
+    assert store.stocks["ors"].current_stock == "0"
+    assert store.transactions[-1]["Type"] == "no_stock"
+    assert store.transactions[-1]["Quantity"] == 2
+    assert not any(transaction["Type"] == "sale" and transaction["Drug"] == "ORS" for transaction in store.transactions)
+
+
 def test_out_of_stock_missing_from_master_stock_still_logs():
     store = FakeStore()
     service = IntakeService(
