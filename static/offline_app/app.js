@@ -779,7 +779,11 @@ function renderList(target, items, emptyText) {
   for (const item of items) {
     const li = document.createElement("li");
     const title = document.createElement("div");
-    title.textContent = entryLabel(item);
+    const label = entryLabel(item);
+    title.textContent = label;
+    if (/out of stock|sale not recorded|missed sale|needs review/i.test(label)) {
+      li.classList.add("needs-review-entry");
+    }
     const meta = document.createElement("div");
     meta.className = "entry-meta";
     const kind = item.type === "photo" ? "Photo" : (item.type === "audio" || item.type === "voice" ? "Voice" : "Entry");

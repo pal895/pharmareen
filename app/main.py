@@ -32,7 +32,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from app.ai import AIService, ai_usage_snapshot
 from app.config import Settings, get_settings
 from app.demo_store import DemoPharmacyStore
-from app.intake import IntakeService, normalize_key, normalize_spoken_command_text
+from app.intake import IntakeService, normalize_key, normalize_spoken_command_text, parse_operating_commands
 from app.pdf_reports import generate_daily_report_pdf, reports_pdf_dir
 from app.reports import LowStockWarning, ReportMetrics, ReportService, build_report_metrics, build_transaction_metrics, low_stock_from_items
 from app.routes.admin import router as admin_router
@@ -50,7 +50,7 @@ from app.services.photo_intake import (
 )
 from app.sheets import GoogleSheetsStore, SHEETS_UNAVAILABLE_MESSAGE, SheetsUnavailableError
 from app.transcription import TranscriptionService, TranscriptionUnavailableError
-from app.utils import now_in_timezone
+from app.utils import now_in_timezone, parse_int
 from app.whatsapp import WhatsAppClient, xml_message_response
 
 
@@ -324,6 +324,72 @@ def offline_entry_to_command(entry: dict[str, Any]) -> str:
             parts.extend(["barcode", barcode])
         return " ".join(parts).strip()
     return ""
+
+
+def offline_sale_stock_safety_reply(entry: dict[str, Any], command_text: str, service: Any) -> str | None:
+    """Block real offline sale sync before text routing when stock is unavailable."""
+    action = offline_entry_action(entry)
+    drug_name = str(entry.get("drug_name") or "").strip()
+    quantity = parse_int(entry.get("quantity"), default=None)
+    base_quantity = parse_int(entry.get("base_quantity"), default=None)
+    unit = str(entry.get("unit") or "").strip()
+    payment_method = str(entry.get("payment_method") or "").strip() or "Cash"
+
+    if action != "sale":
+        try:
+            commands = parse_operating_commands(command_text) or []
+        except Exception:
+            commands = []
+        sale_commands = [command for command in commands if command.kind in {"sale", "late_sale"}]
+        if len(commands) != 1 or not sale_commands:
+            return None
+        command = sale_commands[0]
+        drug_name = command.drug_name
+        quantity = command.quantity
+        base_quantity = command.base_quantity
+        unit = command.unit
+        payment_method = command.payment_method or payment_method
+
+    if not drug_name or quantity is None or quantity <= 0:
+        return None
+
+    store = getattr(service, "store", None)
+    find_stock = getattr(store, "find_stock", None)
+    if not callable(find_stock):
+        return None
+    try:
+        stock = find_stock(drug_name)
+    except Exception:
+        return None
+    if stock is None:
+        return None
+
+    if base_quantity is None:
+        try:
+            base_quantity = service._to_base_quantity(stock.drug_name, quantity, unit) if unit else quantity
+        except Exception:
+            base_quantity = quantity
+    current_stock = parse_int(getattr(stock, "current_stock", None), default=None)
+    if current_stock is None or base_quantity is None or current_stock >= base_quantity:
+        return None
+
+    record_missed = getattr(service, "_record_missed_sale_attempt", None)
+    if callable(record_missed):
+        result = record_missed(
+            stock=stock,
+            display_quantity=quantity,
+            base_quantity=base_quantity,
+            unit=unit,
+            payment_method=payment_method,
+            note="Offline sync sale blocked because source-of-truth stock was insufficient.",
+        )
+        return getattr(result, "reply", None) or None
+
+    available = max(current_stock, 0)
+    return (
+        f"⚠️ {stock.drug_name} out of stock. Sale not recorded. "
+        f"Missed sale saved: {stock.drug_name} x{quantity}. Stock left: {available}"
+    )
 
 
 def offline_media_reply(entry: dict[str, Any]) -> str:
@@ -878,6 +944,23 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
         entry_for_log = {**entry, "command_text": command_text}
         try:
             sync_sender = str(payload.get("sender") or entry.get("sender") or "offline_app")
+            service = get_intake_service()
+            stock_safety_reply = offline_sale_stock_safety_reply(entry, command_text, service)
+            if stock_safety_reply:
+                record = remember_offline_synced_result(
+                    entry_id,
+                    {
+                        "id": entry_id,
+                        "status": "synced",
+                        "reply": stock_safety_reply,
+                        "result_summary": compact_offline_reply(stock_safety_reply),
+                        "whatsapp_confirmation": "ready",
+                        "stock_safety": "missed_sale",
+                    },
+                )
+                synced.append(record)
+                append_offline_sync_log(entry_for_log, "synced", stock_safety_reply, "")
+                continue
             reply = process_intake_text_for_sender(command_text, sync_sender)
             if is_offline_sync_failure_reply(reply):
                 reason = sanitize_error_message(ValueError(reply))

@@ -297,6 +297,12 @@ summary {
   white-space: pre-line;
 }
 
+.entry-list li.needs-review-entry {
+  border-color: #f2b84b;
+  background: #fff8e8;
+  color: #553b00;
+}
+
 .entry-meta {
   color: var(--muted);
   font-size: 12px;

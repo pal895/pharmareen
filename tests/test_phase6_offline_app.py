@@ -493,6 +493,7 @@ def test_offline_app_uses_pharmacy_owner_language_not_technical_queue_terms():
     assert "✅ Everything synced safely" in script
     assert "🔄 Syncing ${index + 1} of ${toSync.length}" in script
     assert "records synced safely" in script
+    assert "needs-review-entry" in script
     assert "Queue audio" not in html
     assert "Queue photo" not in html
     assert "Pending queue" not in html
@@ -894,6 +895,54 @@ def test_real_browser_payload_offline_sync_blocks_zero_stock_sale_and_queues_con
     assert "Panadol x2" in confirmation["message"]
     assert "Panadol stock left" in confirmation["message"]
     assert "ORS out of stock" in confirmation["message"]
+
+
+def test_offline_structured_zero_stock_sale_is_blocked_before_text_router(monkeypatch, tmp_path):
+    store = OfflineSafetyStore()
+    service = IntakeService(None, store)
+
+    def fail_if_called(text: str, sender: str) -> str:
+        raise AssertionError(f"stock safety guard should block before text routing: {text}")
+
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(main, "get_intake_service", lambda: service)
+    monkeypatch.setattr(main, "process_intake_text_for_sender", fail_if_called)
+    main.offline_synced_entry_ids.clear()
+    main.offline_synced_entry_results.clear()
+    main.offline_whatsapp_outbox.clear()
+    main.offline_whatsapp_confirmation_history.clear()
+
+    payload = {
+        "confirmation_whatsapp": "+254708061426",
+        "entries": [
+            {
+                "id": "offline-ors-preflight-block",
+                "raw_text": "ORS 2 cash",
+                "command_text": "ORS 2 cash",
+                "action": "sale",
+                "type": "sale",
+                "drug_name": "ORS",
+                "quantity": 2,
+                "payment_method": "Cash",
+                "sync_status": "pending",
+            }
+        ],
+    }
+
+    with TestClient(main.app) as client:
+        response = client.post("/offline/sync", json=payload)
+        outbox = client.get("/offline/whatsapp-confirmations")
+
+    data = response.json()
+    reply = data["synced"][0]["reply"]
+    assert "ORS out of stock" in reply
+    assert "Sale not recorded" in reply
+    assert "Missed sale saved: ORS x2" in reply
+    assert store.stocks["ors"].current_stock == 0
+    assert store.transactions[-1]["Type"] == "no_stock"
+    assert not any(row["Type"] == "sale" and row["Drug"] == "ORS" for row in store.transactions)
+    assert outbox.json()["pending_count"] == 1
+    assert "ORS out of stock" in outbox.json()["confirmations"][0]["message"]
 
 
 def test_debug_offline_confirmations_exposes_masked_pending_queue(monkeypatch, tmp_path):

@@ -360,6 +360,7 @@ async function pollOfflineConfirmations(sock) {
       await axios.post(`${backendUrl}/offline/whatsapp-confirmations/ack`, { ids: sentIds }, { timeout: 10000 });
       console.log(`OFFLINE_CONFIRMATIONS_SENT count=${sentIds.length}`);
       for (const sentId of sentIds) {
+        console.log(`OFFLINE_CONFIRMATION_ACKED id=${sentId}`);
         console.log(`confirmation delivery result id=${sentId} sent=true acked=true`);
         console.log(`WHATSAPP_CONFIRMATION_SEND_RESULT id=${sentId} sent=true acked=true`);
       }
