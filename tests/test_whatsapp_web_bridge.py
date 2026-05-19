@@ -600,6 +600,13 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "WHATSAPP_SEND_TARGET" in source
     assert "WHATSAPP_REPLY_SENT" in source
     assert "WHATSAPP_SEND_FAILED" in source
+    assert "bridge picked offline confirmation" in source
+    assert "normalized jid:" in source
+    assert "sending offline confirmation" in source
+    assert "offline confirmation sent successfully" in source
+    assert "offline confirmation send failed" in source
+    assert "offline confirmation queued for" in backend_source
+    assert "/debug/offline-confirmations" in backend_source
     assert "downloadMediaMessage" in source
     assert "VOICE_MESSAGE_RECEIVED" in source
     assert "VOICE_MESSAGE_DOWNLOADED" in source

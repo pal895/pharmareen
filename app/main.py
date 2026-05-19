@@ -576,12 +576,30 @@ def queue_offline_whatsapp_confirmation(recipient: str, message: str) -> dict[st
         "created_at": now_in_timezone(get_settings().timezone).isoformat(timespec="seconds"),
     }
     offline_whatsapp_outbox.append(item)
+    print(f"offline confirmation queued for {mask_phone(recipient)}", flush=True)
     return {"status": "queued", "id": item["id"], "to": mask_phone(recipient)}
 
 
 @app.get("/offline/whatsapp-confirmations")
 def offline_whatsapp_confirmations(limit: int = Query(default=10, ge=1, le=50)) -> dict[str, Any]:
     return {"status": "ok", "confirmations": offline_whatsapp_outbox[:limit]}
+
+
+@app.get("/debug/offline-confirmations")
+def debug_offline_confirmations() -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "pending_count": len(offline_whatsapp_outbox),
+        "pending": [
+            {
+                "id": str(item.get("id") or ""),
+                "to": mask_phone(str(item.get("to") or "")),
+                "message_preview": str(item.get("message") or "")[:120],
+                "created_at": str(item.get("created_at") or ""),
+            }
+            for item in offline_whatsapp_outbox[:20]
+        ],
+    }
 
 
 @app.post("/offline/whatsapp-confirmations/ack")

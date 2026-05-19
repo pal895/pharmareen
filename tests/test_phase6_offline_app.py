@@ -706,6 +706,64 @@ def test_offline_sync_accepts_entry_level_confirmation_whatsapp(monkeypatch, tmp
     assert "Panadol x1 M-Pesa recorded" in confirmations[0]["message"]
 
 
+def test_offline_out_of_stock_sale_sync_returns_missed_sale_card_and_confirmation(monkeypatch, tmp_path):
+    def fake_process(text: str, sender: str) -> str:
+        assert text == "ORS 2 cash"
+        return "⚠️ ORS out of stock. Sale not recorded. Missed sale saved: ORS x2."
+
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(main, "process_intake_text_for_sender", fake_process)
+    main.offline_synced_entry_ids.clear()
+    main.offline_synced_entry_results.clear()
+    main.offline_whatsapp_outbox.clear()
+
+    payload = {
+        "confirmation_whatsapp": "+254733333333",
+        "entries": [{"id": "offline-ors-missed-sale", "command_text": "ORS 2 cash", "sync_status": "pending"}],
+    }
+
+    with TestClient(main.app) as client:
+        response = client.post("/offline/sync", json=payload)
+        outbox = client.get("/offline/whatsapp-confirmations")
+
+    data = response.json()
+    reply = data["synced"][0]["reply"]
+    confirmation = outbox.json()["confirmations"][0]
+    assert "ORS out of stock" in reply
+    assert "Sale not recorded" in reply
+    assert "Missed sale saved: ORS x2" in reply
+    assert "ORS out of stock" in data["whatsapp_reply"]
+    assert confirmation["to"] == "254733333333@s.whatsapp.net"
+    assert "Missed sale saved: ORS x2" in confirmation["message"]
+
+
+def test_debug_offline_confirmations_exposes_masked_pending_queue(monkeypatch, tmp_path):
+    class ReplyingIntake:
+        def process_text(self, text: str) -> str:
+            return "Panadol x2 cash recorded\nStock left: 721"
+
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(main, "get_intake_service", lambda: ReplyingIntake())
+    main.offline_synced_entry_ids.clear()
+    main.offline_synced_entry_results.clear()
+    main.offline_whatsapp_outbox.clear()
+
+    with TestClient(main.app) as client:
+        client.post(
+            "/offline/sync",
+            json={
+                "confirmation_whatsapp": "+254744444444",
+                "entries": [{"id": "offline-debug-confirmation", "command_text": "Panadol 2 cash"}],
+            },
+        )
+        debug = client.get("/debug/offline-confirmations")
+
+    data = debug.json()
+    assert data["pending_count"] == 1
+    assert "2547******44" in data["pending"][0]["to"]
+    assert "Panadol x2 cash recorded" in data["pending"][0]["message_preview"]
+
+
 def test_offline_sync_returns_per_item_results_for_sale_stock_and_report(monkeypatch, tmp_path):
     replies = {
         "Panadol 2 cash": "Panadol x2 cash recorded\nStock left: 691",

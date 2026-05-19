@@ -374,6 +374,8 @@ def render_daily_summary(
         f"Peak Items Sold: {metrics.peak_items_sold}",
         f"Low Stock Items: {compact_low_stock(metrics.low_stock_warnings)}",
     ]
+    if metrics.missed_sales:
+        lines.append(f"Missed sales today: {summarize_pairs(metrics.missed_sales)}")
     if metrics.missing_profit_data:
         lines.append("- Warning: Some items had missing price data, so profit may be incomplete.")
     return "\n".join(lines)

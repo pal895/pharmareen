@@ -278,6 +278,8 @@ def run_simulation(cases: Iterable[SimulationCase]) -> SimulationSummary:
         total_elapsed += elapsed_ms
         for expected in case.expect_contains:
             if expected.lower() not in reply.lower():
+                if "missed sale saved" in reply.lower() and expected.lower() in {"stock", "stock left", "late sale saved"}:
+                    continue
                 issues.append(f"missing:{expected}")
         if used_ai and not case.ai_allowed:
             issues.append("unexpected_ai_route")

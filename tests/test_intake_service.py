@@ -609,6 +609,52 @@ def test_sold_item_with_missing_cost_still_logs_with_warning():
     assert store.stocks["panadol"].current_stock == 18
 
 
+def test_out_of_stock_sale_records_missed_sale_without_deducting_stock():
+    store = FakeStore()
+    store.stocks["ors"] = StockItem(
+        drug_name="ORS",
+        selling_price=80,
+        cost_price=50,
+        current_stock=0,
+        reorder_level=10,
+        row_number=8,
+    )
+    service = IntakeService(FailingParser(), store)
+
+    reply = service.process_text("ORS 2 cash")
+
+    assert "ORS out of stock" in reply
+    assert "Sale not recorded" in reply
+    assert "Missed sale saved: ORS x2" in reply
+    assert store.stocks["ors"].current_stock == 0
+    assert store.transactions[-1]["Type"] == "no_stock"
+    assert store.transactions[-1]["Drug"] == "ORS"
+    assert store.transactions[-1]["Quantity"] == 2
+    assert not any(transaction["Type"] == "sale" and transaction["Drug"] == "ORS" for transaction in store.transactions)
+
+
+def test_insufficient_stock_sale_records_missed_sale_without_negative_stock():
+    store = FakeStore()
+    store.stocks["ors"] = StockItem(
+        drug_name="ORS",
+        selling_price=80,
+        cost_price=50,
+        current_stock=1,
+        reorder_level=10,
+        row_number=8,
+    )
+    service = IntakeService(FailingParser(), store)
+
+    reply = service.process_text("ORS 3 cash")
+
+    assert "Only 1 available" in reply
+    assert "Sale not recorded" in reply
+    assert "Missed sale saved: ORS x3" in reply
+    assert store.stocks["ors"].current_stock == 1
+    assert store.transactions[-1]["Type"] == "no_stock"
+    assert store.transactions[-1]["Quantity"] == 3
+
+
 def test_out_of_stock_missing_from_master_stock_still_logs():
     store = FakeStore()
     service = IntakeService(

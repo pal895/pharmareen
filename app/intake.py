@@ -1097,6 +1097,15 @@ class IntakeService:
         base_quantity = self._to_base_quantity(stock.drug_name, quantity, unit) if unit else (base_quantity or to_base_quantity(quantity, unit))
         payment_method = payment_method or "Cash"
         discount = float(discount or 0)
+        if stock.current_stock is not None and stock.current_stock < base_quantity:
+            return self._record_missed_sale_attempt(
+                stock=stock,
+                display_quantity=display_quantity,
+                base_quantity=base_quantity,
+                unit=unit,
+                payment_method=payment_method,
+                note=note,
+            )
         gross_sales = stock.selling_price * base_quantity if stock.selling_price is not None else None
         if gross_sales is not None and discount_percent:
             discount = round(gross_sales * (float(discount_percent) / 100), 2)
@@ -1232,6 +1241,54 @@ class IntakeService:
             reply=reply,
             summary_line=f"{event.drug_name} x{display_quantity}{unit_suffix(unit, display_quantity)} {payment_label}",
             category="late_sales" if is_late else "sales",
+        )
+
+    def _record_missed_sale_attempt(
+        self,
+        stock: StockItem,
+        display_quantity: int,
+        base_quantity: int,
+        unit: str = "",
+        payment_method: str = "Cash",
+        note: str = "",
+    ) -> EntryResult:
+        available = stock.current_stock or 0
+        notes = build_note(
+            merge_notes(note, "Attempted sale blocked because stock was insufficient."),
+            payment=payment_method,
+            unit=unit or "unit",
+            display_quantity=display_quantity,
+            base_quantity=base_quantity,
+        )
+        event = ParsedEvent(stock.drug_name, Action.OUT_OF_STOCK, quantity=base_quantity, notes=notes)
+        try:
+            self.store.append_daily_log(event, None, None)
+            self._append_transaction(
+                "no_stock",
+                stock.drug_name,
+                base_quantity,
+                note=notes or "Missed sale / insufficient stock",
+            )
+        except SheetsUnavailableError:
+            return EntryResult(logged=False, reply=SHEETS_UNAVAILABLE_MESSAGE, summary_line="", category="errors")
+        except Exception:
+            return EntryResult(logged=False, reply=SAVE_ERROR, summary_line="", category="errors")
+
+        quantity_label = f"{stock.drug_name} x{display_quantity}{unit_suffix(unit, display_quantity)}"
+        if available <= 0:
+            reason = f"{stock.drug_name} out of stock."
+        else:
+            reason = f"Only {self._format_stock_level(stock.drug_name, available, unit)} available."
+        reply = (
+            f"⚠️ {reason} Sale not recorded. "
+            f"Missed sale saved: {quantity_label}.\n"
+            f"Stock left: {self._format_stock_level(stock.drug_name, available, unit)}"
+        )
+        return EntryResult(
+            logged=True,
+            reply=reply,
+            summary_line=f"{quantity_label} missed sale",
+            category="no_stock",
         )
 
     def _process_restock(self, event: ParsedEvent) -> EntryResult:

@@ -229,11 +229,20 @@ async function pollOfflineConfirmations(sock) {
     if (!confirmations.length) return;
     const sentIds = [];
     for (const item of confirmations) {
-      const target = normalizeConfirmationJid(item.to || item.sender || item.jid);
+      const rawTarget = item.to || item.sender || item.jid;
+      console.log(`bridge picked offline confirmation id=${item.id || 'unknown'} to=${maskSender(rawTarget)}`);
+      const target = normalizeConfirmationJid(rawTarget);
+      console.log(`normalized jid: ${maskSender(target)} ${jidDebug(target)}`);
       const message = String(item.message || '').trim();
       if (!target || !message) continue;
+      console.log(`sending offline confirmation id=${item.id || 'unknown'} to=${maskSender(target)} length=${message.length}`);
       const sent = await safeSendReply(sock, target, message);
-      if (sent && item.id) sentIds.push(item.id);
+      if (sent && item.id) {
+        console.log(`offline confirmation sent successfully id=${item.id} to=${maskSender(target)}`);
+        sentIds.push(item.id);
+      } else {
+        console.log(`offline confirmation send failed id=${item.id || 'unknown'} to=${maskSender(target)}`);
+      }
     }
     if (sentIds.length) {
       await axios.post(`${backendUrl}/offline/whatsapp-confirmations/ack`, { ids: sentIds }, { timeout: 10000 });

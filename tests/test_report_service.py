@@ -100,6 +100,14 @@ def test_render_report_contains_demo_summary():
                 "Quantity": 1,
                 "Price": 50,
                 "Total Value": 50,
+            },
+            {
+                "Time": "18:05:00",
+                "Drug Name": "Vitamin C",
+                "Action": "Out of Stock",
+                "Quantity": 3,
+                "Price": "",
+                "Total Value": "",
             }
         ],
         [LowStockWarning("Panadol", current_stock=2, reorder_level=5)],
@@ -111,7 +119,8 @@ def test_render_report_contains_demo_summary():
     assert "Cost: KES 0" in report
     assert "Gross Profit: KES 0" in report
     assert "Transactions: 1" in report
-    assert "No-Stock Requests: 0" in report
+    assert "No-Stock Requests: 3" in report
+    assert "Missed sales today: Vitamin C - 3" in report
     assert "Low Stock Items: Panadol (2)" in report
     assert "Best Seller: Panadol" in report
 
