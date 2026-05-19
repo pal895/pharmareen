@@ -10,6 +10,8 @@ import app.main as main
 from app.config import Settings
 from app.sheets import (
     GoogleSheetsStore,
+    INVENTORY,
+    MASTER_STOCK,
     SHEETS_UNAVAILABLE_MESSAGE,
     SheetsUnavailableError,
     prepare_google_credentials_file,
@@ -33,6 +35,31 @@ class FakeSettings:
     report_trigger_token = None
 
 
+class FakeWorksheet:
+    def __init__(self, values):
+        self.values = values
+        self.updated_cells = []
+
+    def get_all_values(self):
+        return self.values
+
+    def update_cell(self, row, column, value):
+        self.updated_cells.append((row, column, value))
+        while len(self.values) < row:
+            self.values.append([])
+        while len(self.values[row - 1]) < column:
+            self.values[row - 1].append("")
+        self.values[row - 1][column - 1] = value
+
+
+class FakeSpreadsheet:
+    def __init__(self, worksheets):
+        self.worksheets = worksheets
+
+    def worksheet(self, title):
+        return self.worksheets[title]
+
+
 LOCAL_TMP = Path(__file__).parent / "_tmp_service_accounts"
 
 
@@ -46,6 +73,14 @@ def make_settings(service_account_path: str) -> Settings:
         whatsapp_number="254100000000",
         owner_whatsapp_to="whatsapp:+20000000000",
     )
+
+
+def make_fake_sheet_store(worksheets) -> GoogleSheetsStore:
+    store = object.__new__(GoogleSheetsStore)
+    store.spreadsheet = FakeSpreadsheet(worksheets)
+    store.settings = FakeSettings()
+    store.unavailable_message = SHEETS_UNAVAILABLE_MESSAGE
+    return store
 
 
 @pytest.mark.parametrize("file_contents", ["", "{not-json"])
@@ -105,6 +140,52 @@ def test_google_sheets_credentials_env_invalid_json_fails_clearly(tmp_path, monk
 
     with pytest.raises(ValueError, match="not valid JSON"):
         prepare_google_credentials_file(make_settings("./service-account.json"))
+
+
+def test_find_stock_prefers_inventory_zero_for_stock_safety():
+    master = FakeWorksheet(
+        [
+            ["Drug Name", "Selling Price", "Cost Price", "Current Stock", "Reorder Level"],
+            ["ORS", "80", "50", "2", "10"],
+        ]
+    )
+    inventory = FakeWorksheet(
+        [
+            ["Drug", "Stock", "Cost Price", "Selling Price", "Average Cost", "Low Stock Alert Level", "Last Updated"],
+            ["ORS", "0", "50", "80", "", "10", ""],
+        ]
+    )
+    store = make_fake_sheet_store({MASTER_STOCK: master, INVENTORY: inventory})
+
+    stock = store.find_stock("ORS")
+
+    assert stock is not None
+    assert stock.current_stock == 0
+    assert stock.selling_price == 80
+    assert stock.cost_price == 50
+    assert stock.reorder_level == 10
+
+
+def test_update_current_stock_updates_master_stock_and_inventory_tabs():
+    master = FakeWorksheet(
+        [
+            ["Drug Name", "Selling Price", "Cost Price", "Current Stock", "Reorder Level"],
+            ["ORS", "80", "50", "2", "10"],
+        ]
+    )
+    inventory = FakeWorksheet(
+        [
+            ["Drug", "Stock", "Cost Price", "Selling Price", "Average Cost", "Low Stock Alert Level", "Last Updated"],
+            ["ORS", "0", "50", "80", "", "10", ""],
+        ]
+    )
+    store = make_fake_sheet_store({MASTER_STOCK: master, INVENTORY: inventory})
+    stock = store.find_stock("ORS")
+
+    store.update_current_stock(stock, 0)
+
+    assert master.updated_cells == [(2, 4, 0)]
+    assert inventory.updated_cells == [(2, 2, 0)]
 
 
 def test_health_and_test_endpoint_work_when_sheets_are_unavailable(monkeypatch):

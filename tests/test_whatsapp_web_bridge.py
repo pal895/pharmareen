@@ -601,9 +601,12 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "WHATSAPP_REPLY_SENT" in source
     assert "WHATSAPP_SEND_FAILED" in source
     assert "bridge picked offline confirmation" in source
+    assert "BRIDGE_PICKED_OFFLINE_CONFIRMATION" in source
     assert "normalized jid=" in source
     assert "payload.pending" in source
     assert "OFFLINE_CONFIRMATION_FORMAT_EMPTY" in source
+    assert "WHATSAPP_CONFIRMATION_SEND_TARGET" in source
+    assert "WHATSAPP_CONFIRMATION_SEND_RESULT" in source
     assert "offline confirmation onWhatsApp result" in source
     assert "sending offline confirmation" in source
     assert "offline confirmation sent successfully" in source
@@ -612,6 +615,9 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "number_not_registered_on_whatsapp" in source
     assert "/offline/whatsapp-confirmations/fail" in source
     assert "offline confirmation queued for" in backend_source
+    assert "REAL_OFFLINE_SYNC_RECEIVED" in backend_source
+    assert "REAL_OFFLINE_RESULT_SUMMARY" in backend_source
+    assert "OFFLINE_CONFIRMATION_QUEUED_REAL_SYNC" in backend_source
     assert "/debug/offline-confirmations" in backend_source
     assert "/debug/offline-confirmations/test" in backend_source
     assert "downloadMediaMessage" in source

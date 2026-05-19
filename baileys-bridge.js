@@ -285,6 +285,7 @@ async function sendOfflineConfirmation(sock, target, text, itemId) {
   }
 
   console.log(`sending offline confirmation id=${itemId || 'unknown'} to=${maskSender(target)} length=${body.length}`);
+  console.log(`WHATSAPP_CONFIRMATION_SEND_TARGET id=${itemId || 'unknown'} jid=${maskSender(target)} ${jidDebug(target)} length=${body.length}`);
   console.log(`WHATSAPP_SEND_TARGET jid=${maskSender(target)} ${jidDebug(target)} length=${body.length}`);
   try {
     const result = await sock.sendMessage(target, { text: body });
@@ -297,12 +298,20 @@ async function sendOfflineConfirmation(sock, target, text, itemId) {
       `confirmation delivery result id=${itemId || 'unknown'} sent=true ` +
       `acked=false message_id=${messageId || 'unknown'}`
     );
+    console.log(
+      `WHATSAPP_CONFIRMATION_SEND_RESULT id=${itemId || 'unknown'} sent=true ` +
+      `acked=false message_id=${messageId || 'unknown'}`
+    );
     return { sent: true, messageId };
   } catch (error) {
     const reason = error && (error.stack || error.message) ? (error.stack || error.message) : String(error);
     console.error(`offline confirmation send failed id=${itemId || 'unknown'} to=${maskSender(target)} reason=${reason}`);
     console.log(
       `confirmation delivery result id=${itemId || 'unknown'} sent=false ` +
+      `acked=false reason=${error.message || 'send_failed'}`
+    );
+    console.log(
+      `WHATSAPP_CONFIRMATION_SEND_RESULT id=${itemId || 'unknown'} sent=false ` +
       `acked=false reason=${error.message || 'send_failed'}`
     );
     return { sent: false, error: error.message || 'send_failed' };
@@ -325,6 +334,7 @@ async function pollOfflineConfirmations(sock) {
     for (const item of confirmations) {
       const rawTarget = item.to || item.sender || item.jid;
       console.log(`bridge picked offline confirmation id=${item.id || 'unknown'} to=${maskSender(rawTarget)}`);
+      console.log(`BRIDGE_PICKED_OFFLINE_CONFIRMATION id=${item.id || 'unknown'} to=${maskSender(rawTarget)}`);
       const target = await resolveOfflineConfirmationTarget(sock, rawTarget, item.id);
       const message = String(item.message || '').trim();
       if (!target || !message) continue;
@@ -351,6 +361,7 @@ async function pollOfflineConfirmations(sock) {
       console.log(`OFFLINE_CONFIRMATIONS_SENT count=${sentIds.length}`);
       for (const sentId of sentIds) {
         console.log(`confirmation delivery result id=${sentId} sent=true acked=true`);
+        console.log(`WHATSAPP_CONFIRMATION_SEND_RESULT id=${sentId} sent=true acked=true`);
       }
     }
   } catch (error) {

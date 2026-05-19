@@ -765,6 +765,12 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
     except Exception:
         payload = {}
     entries = payload.get("entries") if isinstance(payload, dict) else None
+    print(
+        "REAL_OFFLINE_SYNC_RECEIVED "
+        f"entries={len(entries) if isinstance(entries, list) else 0} "
+        f"confirmation_present={has_explicit_offline_confirmation_recipient(payload if isinstance(payload, dict) else {})}",
+        flush=True,
+    )
     if not isinstance(entries, list):
         return {"status": "error", "synced": [], "failed": [{"id": "", "error": "Send entries as a list."}], "pending": []}
 
@@ -860,12 +866,25 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
             pending.append({"id": entry_id, "status": "pending", "reason": reason})
             append_offline_sync_log(entry_for_log, "pending", "", reason)
     message = offline_sync_success_message(entries, synced) if synced else ""
+    for item in synced:
+        print(
+            "REAL_OFFLINE_RESULT_SUMMARY "
+            f"id={item.get('id', '')} status={item.get('status', '')} "
+            f"summary={compact_offline_reply(str(item.get('reply') or item.get('result_summary') or ''))}",
+            flush=True,
+        )
     has_new_synced_records = any(str(item.get("status") or "") != "already_synced" for item in synced)
     explicit_confirmation_recipient = has_explicit_offline_confirmation_recipient(payload if isinstance(payload, dict) else {})
     confirmation_recipient = offline_confirmation_recipient(payload if isinstance(payload, dict) else {})
     confirmation_status = None
     if message and confirmation_recipient and (has_new_synced_records or explicit_confirmation_recipient):
         confirmation_status = queue_offline_whatsapp_confirmation(confirmation_recipient, message)
+        print(
+            "OFFLINE_CONFIRMATION_QUEUED_REAL_SYNC "
+            f"status={confirmation_status.get('status') if confirmation_status else 'not_queued'} "
+            f"to={confirmation_status.get('to') if confirmation_status else ''}",
+            flush=True,
+        )
     else:
         reason = "missing_message" if not message else "missing_recipient" if not confirmation_recipient else "already_synced_without_explicit_recipient"
         print(

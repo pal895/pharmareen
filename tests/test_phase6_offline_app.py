@@ -8,6 +8,8 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 import app.main as main
+from app.domain import StockItem
+from app.intake import IntakeService
 
 
 class FakeIntake:
@@ -18,6 +20,57 @@ class FakeIntake:
     def process_text(self, text: str) -> str:
         self.messages.append(text)
         return self.reply if self.reply != "ok" else f"synced: {text}"
+
+
+class OfflineSafetyStore:
+    def __init__(self):
+        self.stocks = {
+            "panadol": StockItem("Panadol", 220, 140, 20, 5, 2),
+            "ors": StockItem("ORS", 80, 50, 0, 10, 3),
+        }
+        self.logged = []
+        self.transactions = []
+
+    def list_master_drug_names(self):
+        return [stock.drug_name for stock in self.stocks.values()]
+
+    def find_stock(self, drug_name):
+        return self.stocks.get(str(drug_name).lower())
+
+    def append_daily_log(self, event, price, total_value):
+        self.logged.append((event, price, total_value))
+
+    def update_current_stock(self, stock, new_current_stock):
+        self.stocks[stock.drug_name.lower()] = StockItem(
+            stock.drug_name,
+            stock.selling_price,
+            stock.cost_price,
+            new_current_stock,
+            stock.reorder_level,
+            stock.row_number,
+        )
+
+    def append_transaction(
+        self,
+        transaction_type,
+        drug_name,
+        quantity,
+        unit_cost=None,
+        unit_selling_price=None,
+        total_cost=None,
+        total_sales=None,
+        profit=None,
+        note="",
+        created_at=None,
+    ):
+        self.transactions.append(
+            {
+                "Type": transaction_type,
+                "Drug": drug_name,
+                "Quantity": quantity,
+                "Note": note,
+            }
+        )
 
 
 def run_parser_case(script: str) -> dict:
@@ -767,6 +820,80 @@ def test_offline_out_of_stock_sale_sync_returns_missed_sale_card_and_confirmatio
     assert "ORS out of stock" in data["whatsapp_reply"]
     assert confirmation["to"] == "254733333333@s.whatsapp.net"
     assert "Missed sale saved: ORS x2" in confirmation["message"]
+
+
+def test_real_browser_payload_offline_sync_blocks_zero_stock_sale_and_queues_confirmation(monkeypatch, tmp_path):
+    store = OfflineSafetyStore()
+    service = IntakeService(None, store)
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(main, "get_intake_service", lambda: service)
+    main.offline_synced_entry_ids.clear()
+    main.offline_synced_entry_results.clear()
+    main.offline_whatsapp_outbox.clear()
+    main.offline_whatsapp_confirmation_history.clear()
+
+    payload = {
+        "confirmation_whatsapp": "+254757637709",
+        "entries": [
+            {
+                "id": "real-offline-panadol-sale",
+                "timestamp": "2026-05-19T10:00:00.000Z",
+                "raw_text": "Panadol 2 cash",
+                "command_text": "Panadol 2 cash",
+                "action": "sale",
+                "type": "sale",
+                "drug_name": "Panadol",
+                "quantity": 2,
+                "payment_method": "Cash",
+                "sync_status": "pending",
+            },
+            {
+                "id": "real-offline-panadol-stock",
+                "timestamp": "2026-05-19T10:00:01.000Z",
+                "raw_text": "Panadol stock",
+                "command_text": "Panadol stock",
+                "action": "stock_check",
+                "type": "stock_check",
+                "drug_name": "Panadol",
+                "quantity": 0,
+                "sync_status": "pending",
+            },
+            {
+                "id": "real-offline-ors-zero-sale",
+                "timestamp": "2026-05-19T10:00:02.000Z",
+                "raw_text": "ORS 2 cash",
+                "command_text": "ORS 2 cash",
+                "action": "sale",
+                "type": "sale",
+                "drug_name": "ORS",
+                "quantity": 2,
+                "payment_method": "Cash",
+                "sync_status": "pending",
+            },
+        ],
+    }
+
+    with TestClient(main.app) as client:
+        response = client.post("/offline/sync", json=payload)
+        outbox = client.get("/offline/whatsapp-confirmations")
+
+    data = response.json()
+    replies_by_id = {item["id"]: item["reply"] for item in data["synced"]}
+    assert "Panadol x2 recorded" in replies_by_id["real-offline-panadol-sale"]
+    assert "Panadol stock left" in replies_by_id["real-offline-panadol-stock"]
+    ors_reply = replies_by_id["real-offline-ors-zero-sale"]
+    assert "ORS out of stock" in ors_reply
+    assert "Sale not recorded" in ors_reply
+    assert "Missed sale saved: ORS x2" in ors_reply
+    assert store.stocks["ors"].current_stock == 0
+    assert store.transactions[-1]["Type"] == "no_stock"
+    assert not any(row["Type"] == "sale" and row["Drug"] == "ORS" for row in store.transactions)
+    confirmation = outbox.json()["confirmations"][0]
+    assert outbox.json()["pending_count"] == 1
+    assert confirmation["to"] == "254757637709@s.whatsapp.net"
+    assert "Panadol x2" in confirmation["message"]
+    assert "Panadol stock left" in confirmation["message"]
+    assert "ORS out of stock" in confirmation["message"]
 
 
 def test_debug_offline_confirmations_exposes_masked_pending_queue(monkeypatch, tmp_path):

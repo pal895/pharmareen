@@ -285,30 +285,51 @@ class GoogleSheetsStore:
         if not wanted:
             return None
 
+        inventory_record = self._find_inventory_stock_record(wanted)
         for record, row_number in self._master_records_with_rows():
             name = str(record.get("Drug Name") or "").strip()
             if normalize_key(name) != wanted:
                 continue
+            inventory = inventory_record[0] if inventory_record else {}
+            master_stock = parse_int(record.get("Current Stock"), default=None)
+            inventory_stock = parse_int(inventory.get("Stock") or inventory.get("Current Stock"), default=None)
 
+            return StockItem(
+                drug_name=name,
+                selling_price=parse_money(record.get("Selling Price")) or parse_money(inventory.get("Selling Price")),
+                cost_price=parse_money(record.get("Cost Price")) or parse_money(inventory.get("Cost Price")),
+                current_stock=min(
+                    value for value in [master_stock, inventory_stock] if value is not None
+                )
+                if master_stock is not None or inventory_stock is not None
+                else None,
+                reorder_level=parse_int(record.get("Reorder Level"), default=None)
+                if parse_int(record.get("Reorder Level"), default=None) is not None
+                else parse_int(inventory.get("Low Stock Alert Level") or inventory.get("Reorder Level"), default=None),
+                row_number=row_number,
+            )
+        if inventory_record:
+            record, _row_number = inventory_record
+            name = str(record.get("Drug") or record.get("Drug Name") or "").strip()
             return StockItem(
                 drug_name=name,
                 selling_price=parse_money(record.get("Selling Price")),
                 cost_price=parse_money(record.get("Cost Price")),
-                current_stock=parse_int(record.get("Current Stock"), default=None),
-                reorder_level=parse_int(record.get("Reorder Level"), default=None),
-                row_number=row_number,
+                current_stock=parse_int(record.get("Stock") or record.get("Current Stock"), default=None),
+                reorder_level=parse_int(record.get("Low Stock Alert Level") or record.get("Reorder Level"), default=None),
+                row_number=None,
             )
         return None
 
     def update_current_stock(self, stock: StockItem, new_current_stock: int) -> None:
-        if stock.row_number is None:
-            return
-        current_stock_column = MASTER_STOCK_HEADERS.index("Current Stock") + 1
-        self._worksheet(MASTER_STOCK).update_cell(
-            stock.row_number,
-            current_stock_column,
-            new_current_stock,
-        )
+        if stock.row_number is not None:
+            current_stock_column = MASTER_STOCK_HEADERS.index("Current Stock") + 1
+            self._worksheet(MASTER_STOCK).update_cell(
+                stock.row_number,
+                current_stock_column,
+                new_current_stock,
+            )
+        self._update_inventory_columns(stock.drug_name, {"Stock": new_current_stock})
 
     def update_current_stock_and_cost(
         self,
@@ -316,16 +337,18 @@ class GoogleSheetsStore:
         new_current_stock: int,
         new_cost_price: float | None,
     ) -> None:
-        if stock.row_number is None:
-            return
+        if stock.row_number is not None:
+            worksheet = self._worksheet(MASTER_STOCK)
+            current_stock_column = MASTER_STOCK_HEADERS.index("Current Stock") + 1
+            worksheet.update_cell(stock.row_number, current_stock_column, new_current_stock)
 
-        worksheet = self._worksheet(MASTER_STOCK)
-        current_stock_column = MASTER_STOCK_HEADERS.index("Current Stock") + 1
-        worksheet.update_cell(stock.row_number, current_stock_column, new_current_stock)
-
+            if new_cost_price is not None:
+                cost_price_column = MASTER_STOCK_HEADERS.index("Cost Price") + 1
+                worksheet.update_cell(stock.row_number, cost_price_column, new_cost_price)
+        inventory_updates: dict[str, Any] = {"Stock": new_current_stock}
         if new_cost_price is not None:
-            cost_price_column = MASTER_STOCK_HEADERS.index("Cost Price") + 1
-            worksheet.update_cell(stock.row_number, cost_price_column, new_cost_price)
+            inventory_updates["Cost Price"] = new_cost_price
+        self._update_inventory_columns(stock.drug_name, inventory_updates)
 
     def list_low_stock_items(self) -> list[StockItem]:
         low_stock: list[StockItem] = []
@@ -544,6 +567,33 @@ class GoogleSheetsStore:
 
     def _master_records_with_rows(self) -> list[tuple[dict[str, Any], int]]:
         return self._records_with_rows(MASTER_STOCK, MASTER_STOCK_HEADERS)
+
+    def _inventory_records_with_rows(self) -> list[tuple[dict[str, Any], int]]:
+        try:
+            return self._records_with_rows(INVENTORY, INVENTORY_HEADERS)
+        except WorksheetNotFound:
+            return []
+
+    def _find_inventory_stock_record(self, wanted_key: str) -> tuple[dict[str, Any], int] | None:
+        for record, row_number in self._inventory_records_with_rows():
+            name = str(record.get("Drug") or record.get("Drug Name") or "").strip()
+            if normalize_key(name) == wanted_key:
+                return record, row_number
+        return None
+
+    def _update_inventory_columns(self, drug_name: str, updates: dict[str, Any]) -> None:
+        wanted = normalize_key(drug_name)
+        if not wanted:
+            return
+        match = self._find_inventory_stock_record(wanted)
+        if not match:
+            return
+        _record, row_number = match
+        worksheet = self._worksheet(INVENTORY)
+        for header, value in updates.items():
+            if header not in INVENTORY_HEADERS:
+                continue
+            worksheet.update_cell(row_number, INVENTORY_HEADERS.index(header) + 1, value)
 
     def _records(self, title: str, headers: list[str]) -> list[dict[str, Any]]:
         return [record for record, _row_number in self._records_with_rows(title, headers)]
