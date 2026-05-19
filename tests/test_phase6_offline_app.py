@@ -671,6 +671,8 @@ def test_offline_sync_routes_confirmation_to_linked_whatsapp_number(monkeypatch,
     data = response.json()
     confirmations = outbox.json()["confirmations"]
     assert data["whatsapp_confirmation"]["status"] == "queued"
+    assert outbox.json()["pending_count"] == 1
+    assert outbox.json()["pending"][0]["id"] == outbox.json()["confirmations"][0]["id"]
     assert confirmations[0]["to"] == "254711111111@s.whatsapp.net"
     assert "Panadol x2 cash recorded" in confirmations[0]["message"]
 
@@ -820,6 +822,29 @@ def test_debug_offline_confirmation_test_queue_ack_and_fail(monkeypatch, tmp_pat
     assert acked.json()["acked"] == 1
     assert after_ack.json()["pending_count"] == 0
     assert after_ack.json()["sent_count"] == 1
+
+
+def test_offline_confirmation_queue_persists_pending_between_memory_resets(monkeypatch, tmp_path):
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    main.offline_whatsapp_outbox.clear()
+    main.offline_whatsapp_confirmation_history.clear()
+
+    with TestClient(main.app) as client:
+        client.post(
+            "/debug/offline-confirmations/test",
+            json={"to": "+254757637709", "message": "Persistent offline confirmation test"},
+        )
+
+    main.offline_whatsapp_outbox.clear()
+    main.offline_whatsapp_confirmation_history.clear()
+
+    with TestClient(main.app) as client:
+        outbox = client.get("/offline/whatsapp-confirmations")
+
+    data = outbox.json()
+    assert data["pending_count"] == 1
+    assert data["confirmations"][0]["to"] == "254757637709@s.whatsapp.net"
+    assert data["pending"][0]["message"] == "Persistent offline confirmation test"
 
 
 def test_offline_sync_returns_per_item_results_for_sale_stock_and_report(monkeypatch, tmp_path):

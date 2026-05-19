@@ -76,8 +76,45 @@ PHOTO_QUOTA_REPLY = "📷 Photo received safely. Saved for review."
 DEFAULT_PUBLIC_BASE_URL = "https://pharmareen-1--pal895.replit.app"
 
 
+def offline_confirmation_state_path() -> Path:
+    return PROJECT_ROOT / "data" / "offline_whatsapp_confirmations.json"
+
+
+def load_offline_confirmation_state() -> None:
+    if offline_whatsapp_outbox or offline_whatsapp_confirmation_history:
+        return
+    path = offline_confirmation_state_path()
+    if not path.exists():
+        return
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        logger.warning("Offline confirmation state could not be loaded", exc_info=True)
+        return
+    pending = data.get("pending") if isinstance(data, dict) else []
+    history = data.get("history") if isinstance(data, dict) else []
+    if isinstance(pending, list):
+        offline_whatsapp_outbox.extend(item for item in pending if isinstance(item, dict))
+    if isinstance(history, list):
+        offline_whatsapp_confirmation_history.extend(item for item in history if isinstance(item, dict))
+
+
+def save_offline_confirmation_state() -> None:
+    try:
+        path = offline_confirmation_state_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        data = {
+            "pending": offline_whatsapp_outbox,
+            "history": offline_whatsapp_confirmation_history[-100:],
+        }
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        logger.warning("Offline confirmation state could not be saved", exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    load_offline_confirmation_state()
     print_startup_console_status()
     print("PHASE6_ROUTES_LOADED /offline-app /debug/offline-app")
     try:
@@ -587,6 +624,7 @@ def has_explicit_offline_confirmation_recipient(payload: dict[str, Any]) -> bool
 def queue_offline_whatsapp_confirmation(recipient: str, message: str) -> dict[str, Any] | None:
     if not recipient or not message.strip():
         return None
+    load_offline_confirmation_state()
     item = {
         "id": f"offline-confirm-{int(time.time() * 1000)}-{len(offline_whatsapp_outbox) + 1}",
         "to": recipient,
@@ -597,17 +635,26 @@ def queue_offline_whatsapp_confirmation(recipient: str, message: str) -> dict[st
         "last_error": "",
     }
     offline_whatsapp_outbox.append(item)
+    save_offline_confirmation_state()
     print(f"offline confirmation queued for {mask_phone(recipient)}", flush=True)
     return {"status": "queued", "id": item["id"], "to": mask_phone(recipient)}
 
 
 @app.get("/offline/whatsapp-confirmations")
 def offline_whatsapp_confirmations(limit: int = Query(default=10, ge=1, le=50)) -> dict[str, Any]:
-    return {"status": "ok", "confirmations": offline_whatsapp_outbox[:limit]}
+    load_offline_confirmation_state()
+    pending = offline_whatsapp_outbox[:limit]
+    return {
+        "status": "ok",
+        "pending_count": len(offline_whatsapp_outbox),
+        "confirmations": pending,
+        "pending": pending,
+    }
 
 
 @app.get("/debug/offline-confirmations")
 def debug_offline_confirmations() -> dict[str, Any]:
+    load_offline_confirmation_state()
     return {
         "status": "ok",
         "pending_count": len(offline_whatsapp_outbox),
@@ -656,6 +703,7 @@ async def offline_whatsapp_confirmations_ack(request: Request) -> dict[str, Any]
         item["status"] = "sent"
         item["updated_at"] = updated_at
         offline_whatsapp_confirmation_history.append(item)
+    save_offline_confirmation_state()
     return {"status": "ok", "acked": before - len(offline_whatsapp_outbox)}
 
 
@@ -669,6 +717,7 @@ async def offline_whatsapp_confirmations_fail(request: Request) -> dict[str, Any
     error = sanitize_error_message(payload.get("error") or "send_failed") if isinstance(payload, dict) else "send_failed"
     if not item_id:
         return {"status": "error", "updated": 0, "error": "Missing id."}
+    load_offline_confirmation_state()
     updated = 0
     updated_at = now_in_timezone(get_settings().timezone).isoformat(timespec="seconds")
     for item in offline_whatsapp_outbox:
@@ -681,6 +730,8 @@ async def offline_whatsapp_confirmations_fail(request: Request) -> dict[str, Any
             offline_whatsapp_confirmation_history.append(failed_record)
             updated += 1
             break
+    if updated:
+        save_offline_confirmation_state()
     return {"status": "ok", "updated": updated}
 
 
@@ -812,11 +863,16 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
     has_new_synced_records = any(str(item.get("status") or "") != "already_synced" for item in synced)
     explicit_confirmation_recipient = has_explicit_offline_confirmation_recipient(payload if isinstance(payload, dict) else {})
     confirmation_recipient = offline_confirmation_recipient(payload if isinstance(payload, dict) else {})
-    confirmation_status = (
-        queue_offline_whatsapp_confirmation(confirmation_recipient, message)
-        if message and confirmation_recipient and (has_new_synced_records or explicit_confirmation_recipient)
-        else None
-    )
+    confirmation_status = None
+    if message and confirmation_recipient and (has_new_synced_records or explicit_confirmation_recipient):
+        confirmation_status = queue_offline_whatsapp_confirmation(confirmation_recipient, message)
+    else:
+        reason = "missing_message" if not message else "missing_recipient" if not confirmation_recipient else "already_synced_without_explicit_recipient"
+        print(
+            "offline confirmation not queued "
+            f"reason={reason} synced={len(synced)} explicit_recipient={explicit_confirmation_recipient}",
+            flush=True,
+        )
     return {
         "status": "ok",
         "message": message,

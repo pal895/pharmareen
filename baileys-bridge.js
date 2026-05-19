@@ -312,7 +312,14 @@ async function sendOfflineConfirmation(sock, target, text, itemId) {
 async function pollOfflineConfirmations(sock) {
   try {
     const response = await axios.get(`${backendUrl}/offline/whatsapp-confirmations`, { timeout: 10000 });
-    const confirmations = response.data && Array.isArray(response.data.confirmations) ? response.data.confirmations : [];
+    const payload = response.data || {};
+    const confirmations = Array.isArray(payload.confirmations)
+      ? payload.confirmations
+      : (Array.isArray(payload.pending) ? payload.pending : []);
+    const pendingCount = Number(payload.pending_count || confirmations.length || 0);
+    if (pendingCount && !confirmations.length) {
+      console.log(`OFFLINE_CONFIRMATION_FORMAT_EMPTY pending_count=${pendingCount}`);
+    }
     if (!confirmations.length) return;
     const sentIds = [];
     for (const item of confirmations) {
