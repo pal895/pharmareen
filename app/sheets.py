@@ -285,31 +285,33 @@ class GoogleSheetsStore:
         if not wanted:
             return None
 
-        inventory_record = self._find_inventory_stock_record(wanted)
+        inventory_records = self._find_inventory_stock_records(wanted)
         for record, row_number in self._master_records_with_rows():
             name = str(record.get("Drug Name") or "").strip()
             if normalize_key(name) != wanted:
                 continue
-            inventory = inventory_record[0] if inventory_record else {}
+            inventory = inventory_records[0][1] if inventory_records else {}
             master_stock = parse_int(record.get("Current Stock"), default=None)
-            inventory_stock = parse_int(inventory.get("Stock") or inventory.get("Current Stock"), default=None)
+            inventory_stocks = [
+                parse_int(item.get("Stock") or item.get("Current Stock"), default=None)
+                for _title, item, _row in inventory_records
+            ]
+            inventory_stocks = [value for value in inventory_stocks if value is not None]
+            stock_values = ([master_stock] if master_stock is not None else []) + inventory_stocks
+            reorder_level = parse_int(record.get("Reorder Level"), default=None)
 
             return StockItem(
                 drug_name=name,
                 selling_price=parse_money(record.get("Selling Price")) or parse_money(inventory.get("Selling Price")),
                 cost_price=parse_money(record.get("Cost Price")) or parse_money(inventory.get("Cost Price")),
-                current_stock=min(
-                    value for value in [master_stock, inventory_stock] if value is not None
-                )
-                if master_stock is not None or inventory_stock is not None
-                else None,
-                reorder_level=parse_int(record.get("Reorder Level"), default=None)
-                if parse_int(record.get("Reorder Level"), default=None) is not None
+                current_stock=min(stock_values) if stock_values else None,
+                reorder_level=reorder_level
+                if reorder_level is not None
                 else parse_int(inventory.get("Low Stock Alert Level") or inventory.get("Reorder Level"), default=None),
                 row_number=row_number,
             )
-        if inventory_record:
-            record, _row_number = inventory_record
+        if inventory_records:
+            _title, record, _row_number = inventory_records[0]
             name = str(record.get("Drug") or record.get("Drug Name") or "").strip()
             return StockItem(
                 drug_name=name,
@@ -568,32 +570,75 @@ class GoogleSheetsStore:
     def _master_records_with_rows(self) -> list[tuple[dict[str, Any], int]]:
         return self._records_with_rows(MASTER_STOCK, MASTER_STOCK_HEADERS)
 
-    def _inventory_records_with_rows(self) -> list[tuple[dict[str, Any], int]]:
-        try:
-            return self._records_with_rows(INVENTORY, INVENTORY_HEADERS)
-        except WorksheetNotFound:
-            return []
+    def _inventory_titles(self) -> list[str]:
+        titles: list[str] = []
+        pharmacy_id = str(getattr(self.settings, "pharmareen_default_pharmacy_id", "") or "").strip()
+        if pharmacy_id:
+            titles.append(f"{pharmacy_id}_inventory")
+        titles.append(INVENTORY)
+        unique: list[str] = []
+        seen: set[str] = set()
+        for title in titles:
+            if title not in seen:
+                seen.add(title)
+                unique.append(title)
+        return unique
 
-    def _find_inventory_stock_record(self, wanted_key: str) -> tuple[dict[str, Any], int] | None:
-        for record, row_number in self._inventory_records_with_rows():
+    def _inventory_records_with_rows(self) -> list[tuple[str, dict[str, Any], int]]:
+        records: list[tuple[str, dict[str, Any], int]] = []
+        for title in self._inventory_titles():
+            try:
+                worksheet = self._worksheet(title)
+                values = worksheet.get_all_values()
+            except WorksheetNotFound:
+                continue
+            if not values:
+                continue
+            headers = [str(header or "").strip() for header in values[0]]
+            for row_number, row in enumerate(values[1:], start=2):
+                if not any(str(cell).strip() for cell in row):
+                    continue
+                record = {
+                    header: row[index] if index < len(row) else ""
+                    for index, header in enumerate(headers)
+                    if header
+                }
+                record.setdefault("Drug", record.get("Drug Name", ""))
+                record.setdefault("Drug Name", record.get("Drug", ""))
+                record.setdefault("Cost Price", record.get("Default Cost Price", ""))
+                record.setdefault("Selling Price", record.get("Default Selling Price", ""))
+                record.setdefault("Low Stock Alert Level", record.get("Reorder Level", ""))
+                records.append((title, record, row_number))
+        return records
+
+    def _find_inventory_stock_records(self, wanted_key: str) -> list[tuple[str, dict[str, Any], int]]:
+        matches: list[tuple[str, dict[str, Any], int]] = []
+        for title, record, row_number in self._inventory_records_with_rows():
             name = str(record.get("Drug") or record.get("Drug Name") or "").strip()
             if normalize_key(name) == wanted_key:
-                return record, row_number
-        return None
+                matches.append((title, record, row_number))
+        return matches
 
     def _update_inventory_columns(self, drug_name: str, updates: dict[str, Any]) -> None:
         wanted = normalize_key(drug_name)
         if not wanted:
             return
-        match = self._find_inventory_stock_record(wanted)
-        if not match:
+        matches = self._find_inventory_stock_records(wanted)
+        if not matches:
             return
-        _record, row_number = match
-        worksheet = self._worksheet(INVENTORY)
-        for header, value in updates.items():
-            if header not in INVENTORY_HEADERS:
-                continue
-            worksheet.update_cell(row_number, INVENTORY_HEADERS.index(header) + 1, value)
+        header_aliases = {
+            "Stock": ["Stock", "Current Stock"],
+            "Cost Price": ["Cost Price", "Default Cost Price"],
+            "Selling Price": ["Selling Price", "Default Selling Price"],
+        }
+        for title, _record, row_number in matches:
+            worksheet = self._worksheet(title)
+            headers = [str(header or "").strip() for header in worksheet.row_values(1)]
+            for header, value in updates.items():
+                aliases = header_aliases.get(header, [header])
+                column = next((headers.index(alias) + 1 for alias in aliases if alias in headers), None)
+                if column:
+                    worksheet.update_cell(row_number, column, value)
 
     def _records(self, title: str, headers: list[str]) -> list[dict[str, Any]]:
         return [record for record, _row_number in self._records_with_rows(title, headers)]

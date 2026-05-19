@@ -224,7 +224,7 @@ function normalizeConfirmationJid(value) {
 
 async function resolveOfflineConfirmationTarget(sock, rawTarget, itemId) {
   const normalized = normalizeConfirmationJid(rawTarget);
-  console.log(`normalized jid=${maskSender(normalized)} ${jidDebug(normalized)}`);
+  console.log(`normalized jid=${normalized} ${jidDebug(normalized)}`);
   if (!normalized) {
     console.log(`offline confirmation send failed id=${itemId || 'unknown'} reason=missing_target`);
     return '';
@@ -285,7 +285,7 @@ async function sendOfflineConfirmation(sock, target, text, itemId) {
   }
 
   console.log(`sending offline confirmation id=${itemId || 'unknown'} to=${maskSender(target)} length=${body.length}`);
-  console.log(`WHATSAPP_CONFIRMATION_SEND_TARGET id=${itemId || 'unknown'} jid=${maskSender(target)} ${jidDebug(target)} length=${body.length}`);
+  console.log(`WHATSAPP_CONFIRMATION_SEND_TARGET id=${itemId || 'unknown'} jid=${target} ${jidDebug(target)} length=${body.length}`);
   console.log(`WHATSAPP_SEND_TARGET jid=${maskSender(target)} ${jidDebug(target)} length=${body.length}`);
   try {
     const result = await sock.sendMessage(target, { text: body });

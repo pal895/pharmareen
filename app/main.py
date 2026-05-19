@@ -703,6 +703,7 @@ async def offline_whatsapp_confirmations_ack(request: Request) -> dict[str, Any]
         item["status"] = "sent"
         item["updated_at"] = updated_at
         offline_whatsapp_confirmation_history.append(item)
+        print(f"OFFLINE_CONFIRMATION_ACKED id={item.get('id', '')} to={mask_phone(str(item.get('to') or ''))}", flush=True)
     save_offline_confirmation_state()
     return {"status": "ok", "acked": before - len(offline_whatsapp_outbox)}
 
@@ -728,6 +729,11 @@ async def offline_whatsapp_confirmations_fail(request: Request) -> dict[str, Any
             failed_record = dict(item)
             failed_record["status"] = "failed"
             offline_whatsapp_confirmation_history.append(failed_record)
+            print(
+                f"OFFLINE_CONFIRMATION_FAILED id={item_id} "
+                f"to={mask_phone(str(item.get('to') or ''))} reason={error}",
+                flush=True,
+            )
             updated += 1
             break
     if updated:
@@ -758,6 +764,25 @@ async def debug_queue_test_offline_confirmation(request: Request) -> dict[str, A
     return {"status": "ok" if queued else "error", "queued": queued or {"status": "not_queued"}}
 
 
+@app.post("/debug/offline-confirmations/send-test")
+async def debug_send_test_offline_confirmation(request: Request) -> dict[str, Any]:
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    raw_recipient = str((payload.get("to") if isinstance(payload, dict) else "") or "").strip() or "+254708061426"
+    recipient = offline_confirmation_recipient({"confirmation_whatsapp": raw_recipient})
+    message = str((payload.get("message") if isinstance(payload, dict) else "") or "").strip()
+    if not message:
+        message = "✅ PharMareen bridge delivery test. If you see this, offline confirmations can reach WhatsApp."
+    queued = queue_offline_whatsapp_confirmation(recipient, message)
+    return {
+        "status": "queued_for_bridge" if queued else "error",
+        "queued": queued or {"status": "not_queued"},
+        "next_step": "Watch bridge.log for BRIDGE_PICKED_OFFLINE_CONFIRMATION and WHATSAPP_CONFIRMATION_SEND_RESULT.",
+    }
+
+
 @app.post("/offline/sync")
 async def offline_sync_entries(request: Request) -> dict[str, Any]:
     try:
@@ -765,10 +790,11 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
     except Exception:
         payload = {}
     entries = payload.get("entries") if isinstance(payload, dict) else None
+    confirmation_whatsapp_present = has_explicit_offline_confirmation_recipient(payload if isinstance(payload, dict) else {})
     print(
         "REAL_OFFLINE_SYNC_RECEIVED "
         f"entries={len(entries) if isinstance(entries, list) else 0} "
-        f"confirmation_present={has_explicit_offline_confirmation_recipient(payload if isinstance(payload, dict) else {})}",
+        f"confirmation_whatsapp_present={confirmation_whatsapp_present}",
         flush=True,
     )
     if not isinstance(entries, list):

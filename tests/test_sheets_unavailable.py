@@ -33,6 +33,7 @@ class FailingReportService:
 class FakeSettings:
     timezone = "Africa/Nairobi"
     report_trigger_token = None
+    pharmareen_default_pharmacy_id = ""
 
 
 class FakeWorksheet:
@@ -42,6 +43,11 @@ class FakeWorksheet:
 
     def get_all_values(self):
         return self.values
+
+    def row_values(self, row):
+        if row <= 0 or row > len(self.values):
+            return []
+        return self.values[row - 1]
 
     def update_cell(self, row, column, value):
         self.updated_cells.append((row, column, value))
@@ -166,6 +172,40 @@ def test_find_stock_prefers_inventory_zero_for_stock_safety():
     assert stock.reorder_level == 10
 
 
+def test_find_stock_prefers_default_pharmacy_inventory_zero_for_stock_safety():
+    class DefaultPharmacySettings(FakeSettings):
+        pharmareen_default_pharmacy_id = "abc_pharmacy"
+
+    master = FakeWorksheet(
+        [
+            ["Drug Name", "Selling Price", "Cost Price", "Current Stock", "Reorder Level"],
+            ["ORS", "80", "50", "2", "10"],
+        ]
+    )
+    global_inventory = FakeWorksheet(
+        [
+            ["Drug", "Stock", "Cost Price", "Selling Price", "Average Cost", "Low Stock Alert Level", "Last Updated"],
+            ["ORS", "2", "50", "80", "", "10", ""],
+        ]
+    )
+    pharmacy_inventory = FakeWorksheet(
+        [
+            ["Drug Name", "Stock", "Default Cost Price", "Default Selling Price", "Reorder Level", "Default Supplier", "Expiry", "Notes", "Updated At"],
+            ["ORS", "0", "50", "80", "10", "", "", "", ""],
+        ]
+    )
+    store = make_fake_sheet_store(
+        {MASTER_STOCK: master, INVENTORY: global_inventory, "abc_pharmacy_inventory": pharmacy_inventory}
+    )
+    store.settings = DefaultPharmacySettings()
+
+    stock = store.find_stock("ORS")
+
+    assert stock is not None
+    assert stock.current_stock == 0
+    assert stock.reorder_level == 10
+
+
 def test_update_current_stock_updates_master_stock_and_inventory_tabs():
     master = FakeWorksheet(
         [
@@ -186,6 +226,41 @@ def test_update_current_stock_updates_master_stock_and_inventory_tabs():
 
     assert master.updated_cells == [(2, 4, 0)]
     assert inventory.updated_cells == [(2, 2, 0)]
+
+
+def test_update_current_stock_updates_default_pharmacy_inventory_tab():
+    class DefaultPharmacySettings(FakeSettings):
+        pharmareen_default_pharmacy_id = "abc_pharmacy"
+
+    master = FakeWorksheet(
+        [
+            ["Drug Name", "Selling Price", "Cost Price", "Current Stock", "Reorder Level"],
+            ["ORS", "80", "50", "2", "10"],
+        ]
+    )
+    global_inventory = FakeWorksheet(
+        [
+            ["Drug", "Stock", "Cost Price", "Selling Price", "Average Cost", "Low Stock Alert Level", "Last Updated"],
+            ["ORS", "2", "50", "80", "", "10", ""],
+        ]
+    )
+    pharmacy_inventory = FakeWorksheet(
+        [
+            ["Drug Name", "Stock", "Default Cost Price", "Default Selling Price", "Reorder Level", "Default Supplier", "Expiry", "Notes", "Updated At"],
+            ["ORS", "0", "50", "80", "10", "", "", "", ""],
+        ]
+    )
+    store = make_fake_sheet_store(
+        {MASTER_STOCK: master, INVENTORY: global_inventory, "abc_pharmacy_inventory": pharmacy_inventory}
+    )
+    store.settings = DefaultPharmacySettings()
+    stock = store.find_stock("ORS")
+
+    store.update_current_stock(stock, 0)
+
+    assert master.updated_cells == [(2, 4, 0)]
+    assert pharmacy_inventory.updated_cells == [(2, 2, 0)]
+    assert global_inventory.updated_cells == [(2, 2, 0)]
 
 
 def test_health_and_test_endpoint_work_when_sheets_are_unavailable(monkeypatch):

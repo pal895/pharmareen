@@ -618,8 +618,12 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "REAL_OFFLINE_SYNC_RECEIVED" in backend_source
     assert "REAL_OFFLINE_RESULT_SUMMARY" in backend_source
     assert "OFFLINE_CONFIRMATION_QUEUED_REAL_SYNC" in backend_source
+    assert "confirmation_whatsapp_present" in backend_source
+    assert "OFFLINE_CONFIRMATION_ACKED" in backend_source
+    assert "OFFLINE_CONFIRMATION_FAILED" in backend_source
     assert "/debug/offline-confirmations" in backend_source
     assert "/debug/offline-confirmations/test" in backend_source
+    assert "/debug/offline-confirmations/send-test" in backend_source
     assert "downloadMediaMessage" in source
     assert "VOICE_MESSAGE_RECEIVED" in source
     assert "VOICE_MESSAGE_DOWNLOADED" in source

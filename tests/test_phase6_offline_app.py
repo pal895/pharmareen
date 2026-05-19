@@ -951,6 +951,22 @@ def test_debug_offline_confirmation_test_queue_ack_and_fail(monkeypatch, tmp_pat
     assert after_ack.json()["sent_count"] == 1
 
 
+def test_debug_offline_confirmation_send_test_defaults_to_live_verification_number(monkeypatch, tmp_path):
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    main.offline_whatsapp_outbox.clear()
+    main.offline_whatsapp_confirmation_history.clear()
+
+    with TestClient(main.app) as client:
+        queued = client.post("/debug/offline-confirmations/send-test", json={})
+        outbox = client.get("/offline/whatsapp-confirmations")
+
+    assert queued.json()["status"] == "queued_for_bridge"
+    assert queued.json()["queued"]["status"] == "queued"
+    assert outbox.json()["pending_count"] == 1
+    assert outbox.json()["confirmations"][0]["to"] == "254708061426@s.whatsapp.net"
+    assert "PharMareen bridge delivery test" in outbox.json()["confirmations"][0]["message"]
+
+
 def test_offline_confirmation_queue_persists_pending_between_memory_resets(monkeypatch, tmp_path):
     monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
     main.offline_whatsapp_outbox.clear()
