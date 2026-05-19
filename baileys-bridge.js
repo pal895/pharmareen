@@ -224,7 +224,7 @@ function normalizeConfirmationJid(value) {
 
 async function resolveOfflineConfirmationTarget(sock, rawTarget, itemId) {
   const normalized = normalizeConfirmationJid(rawTarget);
-  console.log(`normalized jid: ${maskSender(normalized)} ${jidDebug(normalized)}`);
+  console.log(`normalized jid=${maskSender(normalized)} ${jidDebug(normalized)}`);
   if (!normalized) {
     console.log(`offline confirmation send failed id=${itemId || 'unknown'} reason=missing_target`);
     return '';
@@ -326,6 +326,17 @@ async function pollOfflineConfirmations(sock) {
         sentIds.push(item.id);
       } else {
         console.log(`offline confirmation send failed id=${item.id || 'unknown'} to=${maskSender(target)}`);
+        if (item.id) {
+          try {
+            await axios.post(
+              `${backendUrl}/offline/whatsapp-confirmations/fail`,
+              { id: item.id, error: delivery.error || 'send_failed' },
+              { timeout: 10000 }
+            );
+          } catch (error) {
+            console.log(`offline confirmation failure report skipped id=${item.id} reason=${error.message}`);
+          }
+        }
       }
     }
     if (sentIds.length) {

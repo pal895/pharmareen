@@ -59,6 +59,7 @@ processed_message_sids: set[str] = set()
 offline_synced_entry_ids: set[str] = set()
 offline_synced_entry_results: dict[str, dict[str, Any]] = {}
 offline_whatsapp_outbox: list[dict[str, Any]] = []
+offline_whatsapp_confirmation_history: list[dict[str, Any]] = []
 pending_voice_confirmations: dict[str, tuple[str, float]] = {}
 pending_invoice_reviews: dict[str, dict[str, Any]] = {}
 PENDING_VOICE_TTL_SECONDS = 600
@@ -566,6 +567,23 @@ def offline_confirmation_recipient(payload: dict[str, Any]) -> str:
     return f"{digits}@s.whatsapp.net" if digits else raw
 
 
+def has_explicit_offline_confirmation_recipient(payload: dict[str, Any]) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    if str(
+        payload.get("confirmation_whatsapp")
+        or payload.get("confirmation_whatsapp_number")
+        or payload.get("linked_whatsapp")
+        or ""
+    ).strip():
+        return True
+    entries = payload.get("entries") if isinstance(payload.get("entries"), list) else []
+    return any(
+        isinstance(entry, dict) and str(entry.get("confirmation_whatsapp") or "").strip()
+        for entry in entries
+    )
+
+
 def queue_offline_whatsapp_confirmation(recipient: str, message: str) -> dict[str, Any] | None:
     if not recipient or not message.strip():
         return None
@@ -574,6 +592,9 @@ def queue_offline_whatsapp_confirmation(recipient: str, message: str) -> dict[st
         "to": recipient,
         "message": message.strip(),
         "created_at": now_in_timezone(get_settings().timezone).isoformat(timespec="seconds"),
+        "status": "pending",
+        "attempts": 0,
+        "last_error": "",
     }
     offline_whatsapp_outbox.append(item)
     print(f"offline confirmation queued for {mask_phone(recipient)}", flush=True)
@@ -596,8 +617,24 @@ def debug_offline_confirmations() -> dict[str, Any]:
                 "to": mask_phone(str(item.get("to") or "")),
                 "message_preview": str(item.get("message") or "")[:120],
                 "created_at": str(item.get("created_at") or ""),
+                "attempts": int(item.get("attempts") or 0),
+                "last_error": str(item.get("last_error") or ""),
             }
             for item in offline_whatsapp_outbox[:20]
+        ],
+        "sent_count": len([item for item in offline_whatsapp_confirmation_history if item.get("status") == "sent"]),
+        "failed_count": len([item for item in offline_whatsapp_confirmation_history if item.get("status") == "failed"]),
+        "recent": [
+            {
+                "id": str(item.get("id") or ""),
+                "to": mask_phone(str(item.get("to") or "")),
+                "status": str(item.get("status") or ""),
+                "message_preview": str(item.get("message") or "")[:120],
+                "created_at": str(item.get("created_at") or ""),
+                "updated_at": str(item.get("updated_at") or ""),
+                "last_error": str(item.get("last_error") or ""),
+            }
+            for item in offline_whatsapp_confirmation_history[-20:]
         ],
     }
 
@@ -612,8 +649,62 @@ async def offline_whatsapp_confirmations_ack(request: Request) -> dict[str, Any]
     if not ids:
         return {"status": "ok", "acked": 0}
     before = len(offline_whatsapp_outbox)
+    acked_items = [dict(item) for item in offline_whatsapp_outbox if str(item.get("id")) in ids]
     offline_whatsapp_outbox[:] = [item for item in offline_whatsapp_outbox if str(item.get("id")) not in ids]
+    updated_at = now_in_timezone(get_settings().timezone).isoformat(timespec="seconds")
+    for item in acked_items:
+        item["status"] = "sent"
+        item["updated_at"] = updated_at
+        offline_whatsapp_confirmation_history.append(item)
     return {"status": "ok", "acked": before - len(offline_whatsapp_outbox)}
+
+
+@app.post("/offline/whatsapp-confirmations/fail")
+async def offline_whatsapp_confirmations_fail(request: Request) -> dict[str, Any]:
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    item_id = str(payload.get("id") or "").strip() if isinstance(payload, dict) else ""
+    error = sanitize_error_message(payload.get("error") or "send_failed") if isinstance(payload, dict) else "send_failed"
+    if not item_id:
+        return {"status": "error", "updated": 0, "error": "Missing id."}
+    updated = 0
+    updated_at = now_in_timezone(get_settings().timezone).isoformat(timespec="seconds")
+    for item in offline_whatsapp_outbox:
+        if str(item.get("id")) == item_id:
+            item["attempts"] = int(item.get("attempts") or 0) + 1
+            item["last_error"] = error
+            item["updated_at"] = updated_at
+            failed_record = dict(item)
+            failed_record["status"] = "failed"
+            offline_whatsapp_confirmation_history.append(failed_record)
+            updated += 1
+            break
+    return {"status": "ok", "updated": updated}
+
+
+@app.post("/debug/offline-confirmations/test")
+async def debug_queue_test_offline_confirmation(request: Request) -> dict[str, Any]:
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    raw_recipient = ""
+    if isinstance(payload, dict):
+        raw_recipient = str(payload.get("to") or payload.get("confirmation_whatsapp") or "").strip()
+    recipient = offline_confirmation_recipient(
+        {
+            "confirmation_whatsapp": raw_recipient
+        }
+    )
+    message = str(
+        payload.get("message")
+        if isinstance(payload, dict)
+        else ""
+    ).strip() or "✅ Offline confirmation test from PharMareen."
+    queued = queue_offline_whatsapp_confirmation(recipient, message)
+    return {"status": "ok" if queued else "error", "queued": queued or {"status": "not_queued"}}
 
 
 @app.post("/offline/sync")
@@ -719,9 +810,11 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
             append_offline_sync_log(entry_for_log, "pending", "", reason)
     message = offline_sync_success_message(entries, synced) if synced else ""
     has_new_synced_records = any(str(item.get("status") or "") != "already_synced" for item in synced)
+    explicit_confirmation_recipient = has_explicit_offline_confirmation_recipient(payload if isinstance(payload, dict) else {})
+    confirmation_recipient = offline_confirmation_recipient(payload if isinstance(payload, dict) else {})
     confirmation_status = (
-        queue_offline_whatsapp_confirmation(offline_confirmation_recipient(payload if isinstance(payload, dict) else {}), message)
-        if message and has_new_synced_records
+        queue_offline_whatsapp_confirmation(confirmation_recipient, message)
+        if message and confirmation_recipient and (has_new_synced_records or explicit_confirmation_recipient)
         else None
     )
     return {

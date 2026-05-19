@@ -675,6 +675,36 @@ def test_offline_sync_routes_confirmation_to_linked_whatsapp_number(monkeypatch,
     assert "Panadol x2 cash recorded" in confirmations[0]["message"]
 
 
+def test_offline_sync_with_explicit_confirmation_queues_even_if_already_synced(monkeypatch, tmp_path):
+    class ReplyingIntake:
+        def process_text(self, text: str) -> str:
+            return "Panadol x2 cash recorded\nStock left: 721"
+
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(main, "get_intake_service", lambda: ReplyingIntake())
+    main.offline_synced_entry_ids.clear()
+    main.offline_synced_entry_results.clear()
+    main.offline_whatsapp_outbox.clear()
+    main.offline_whatsapp_confirmation_history.clear()
+
+    payload = {
+        "confirmation_whatsapp": "+254711111111",
+        "entries": [{"id": "offline-explicit-repeat", "command_text": "Panadol 2 cash", "sync_status": "pending"}],
+    }
+
+    with TestClient(main.app) as client:
+        first = client.post("/offline/sync", json=payload)
+        second = client.post("/offline/sync", json=payload)
+        outbox = client.get("/offline/whatsapp-confirmations")
+
+    assert first.json()["whatsapp_confirmation"]["status"] == "queued"
+    assert second.json()["whatsapp_confirmation"]["status"] == "queued"
+    confirmations = outbox.json()["confirmations"]
+    assert len(confirmations) == 2
+    assert all(item["to"] == "254711111111@s.whatsapp.net" for item in confirmations)
+    assert "Panadol x2 cash recorded" in confirmations[-1]["message"]
+
+
 def test_offline_sync_accepts_entry_level_confirmation_whatsapp(monkeypatch, tmp_path):
     class ReplyingIntake:
         def process_text(self, text: str) -> str:
@@ -762,6 +792,34 @@ def test_debug_offline_confirmations_exposes_masked_pending_queue(monkeypatch, t
     assert data["pending_count"] == 1
     assert "2547******44" in data["pending"][0]["to"]
     assert "Panadol x2 cash recorded" in data["pending"][0]["message_preview"]
+
+
+def test_debug_offline_confirmation_test_queue_ack_and_fail(monkeypatch, tmp_path):
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    main.offline_whatsapp_outbox.clear()
+    main.offline_whatsapp_confirmation_history.clear()
+
+    with TestClient(main.app) as client:
+        queued = client.post(
+            "/debug/offline-confirmations/test",
+            json={"to": "+254755555555", "message": "Offline confirmation test"},
+        )
+        outbox = client.get("/offline/whatsapp-confirmations")
+        item_id = outbox.json()["confirmations"][0]["id"]
+        failed = client.post("/offline/whatsapp-confirmations/fail", json={"id": item_id, "error": "unit test send failed"})
+        after_fail = client.get("/debug/offline-confirmations")
+        acked = client.post("/offline/whatsapp-confirmations/ack", json={"ids": [item_id]})
+        after_ack = client.get("/debug/offline-confirmations")
+
+    assert queued.json()["queued"]["status"] == "queued"
+    assert outbox.json()["confirmations"][0]["to"] == "254755555555@s.whatsapp.net"
+    assert failed.json()["updated"] == 1
+    assert after_fail.json()["pending_count"] == 1
+    assert after_fail.json()["pending"][0]["attempts"] == 1
+    assert after_fail.json()["failed_count"] == 1
+    assert acked.json()["acked"] == 1
+    assert after_ack.json()["pending_count"] == 0
+    assert after_ack.json()["sent_count"] == 1
 
 
 def test_offline_sync_returns_per_item_results_for_sale_stock_and_report(monkeypatch, tmp_path):
