@@ -48,6 +48,7 @@ def test_offline_app_routes_return_html():
     assert followed_response.headers["content-type"].startswith("text/html")
     assert "PharMareen Offline Mode" in followed_response.text
     assert "PharMareen Pharmacy Assistant" in followed_response.text
+    assert "Confirmation WhatsApp Number" in followed_response.text
     assert "Scan Barcode" in followed_response.text
     assert "Scan Invoice" in followed_response.text
     assert "Tap & Talk" in followed_response.text
@@ -601,6 +602,8 @@ def test_offline_frontend_history_uses_synced_safely_not_sent_successfully():
     assert "Nothing synced safely yet." in script
     assert "Remove before sync" in script
     assert "item.reply || item.result_summary || item.message" in script
+    assert "CONFIRMATION_WHATSAPP_KEY" in script
+    assert "confirmation_whatsapp" in script
 
 
 
@@ -642,6 +645,65 @@ def test_offline_sync_preserves_backend_result_for_duplicate_and_queues_whatsapp
     assert "Panadol x2 cash recorded" in outbox.json()["confirmations"][0]["message"]
     assert ack.json()["acked"] == 1
     assert after_ack.json()["confirmations"] == []
+
+
+def test_offline_sync_routes_confirmation_to_linked_whatsapp_number(monkeypatch, tmp_path):
+    class ReplyingIntake:
+        def process_text(self, text: str) -> str:
+            return "Panadol x2 cash recorded\nStock left: 721"
+
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(main, "get_intake_service", lambda: ReplyingIntake())
+    main.offline_synced_entry_ids.clear()
+    main.offline_synced_entry_results.clear()
+    main.offline_whatsapp_outbox.clear()
+
+    payload = {
+        "sender": "offline_app",
+        "confirmation_whatsapp": "+254711111111",
+        "entries": [{"id": "offline-linked-confirmation", "command_text": "Panadol 2 cash", "sync_status": "pending"}],
+    }
+
+    with TestClient(main.app) as client:
+        response = client.post("/offline/sync", json=payload)
+        outbox = client.get("/offline/whatsapp-confirmations")
+
+    data = response.json()
+    confirmations = outbox.json()["confirmations"]
+    assert data["whatsapp_confirmation"]["status"] == "queued"
+    assert confirmations[0]["to"] == "254711111111@s.whatsapp.net"
+    assert "Panadol x2 cash recorded" in confirmations[0]["message"]
+
+
+def test_offline_sync_accepts_entry_level_confirmation_whatsapp(monkeypatch, tmp_path):
+    class ReplyingIntake:
+        def process_text(self, text: str) -> str:
+            return "Panadol x1 M-Pesa recorded\nStock left: 720"
+
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(main, "get_intake_service", lambda: ReplyingIntake())
+    main.offline_synced_entry_ids.clear()
+    main.offline_synced_entry_results.clear()
+    main.offline_whatsapp_outbox.clear()
+
+    payload = {
+        "entries": [
+            {
+                "id": "offline-entry-linked-confirmation",
+                "command_text": "Panadol 1 mpesa",
+                "confirmation_whatsapp": "+254722222222",
+                "sync_status": "pending",
+            }
+        ],
+    }
+
+    with TestClient(main.app) as client:
+        client.post("/offline/sync", json=payload)
+        outbox = client.get("/offline/whatsapp-confirmations")
+
+    confirmations = outbox.json()["confirmations"]
+    assert confirmations[0]["to"] == "254722222222@s.whatsapp.net"
+    assert "Panadol x1 M-Pesa recorded" in confirmations[0]["message"]
 
 
 def test_offline_sync_returns_per_item_results_for_sale_stock_and_report(monkeypatch, tmp_path):

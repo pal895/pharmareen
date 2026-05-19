@@ -1,6 +1,7 @@
 ﻿const LEGACY_QUEUE_KEY = "pharmareen_phase6_offline_queue";
 const LEGACY_HISTORY_KEY = "pharmareen_phase6_synced_history";
 const PAYMENT_MODE_KEY = "pharmareen_payment_mode";
+const CONFIRMATION_WHATSAPP_KEY = "pharmareen_confirmation_whatsapp";
 const SHORTCUTS_KEY = "pharmareen_medicine_shortcuts";
 const SHORTCUT_USAGE_KEY = "pharmareen_medicine_shortcut_usage";
 const DB_NAME = "pharmareen_phase6_offline_db";
@@ -26,6 +27,7 @@ const examples = {
 const statusBanner = document.getElementById("statusBanner");
 const commandText = document.getElementById("commandText");
 const pharmacyId = document.getElementById("pharmacyId");
+const confirmationWhatsapp = document.getElementById("confirmationWhatsapp");
 const queueCount = document.getElementById("queueCount");
 const pendingEntries = document.getElementById("pendingEntries");
 const syncedEntries = document.getElementById("syncedEntries");
@@ -64,6 +66,19 @@ function loadJson(key, fallback) {
 
 function saveJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
+}
+
+function getConfirmationWhatsapp() {
+  const value = confirmationWhatsapp ? confirmationWhatsapp.value.trim() : "";
+  return value || (localStorage.getItem(CONFIRMATION_WHATSAPP_KEY) || "").trim();
+}
+
+function saveConfirmationWhatsapp() {
+  if (!confirmationWhatsapp) return "";
+  const value = confirmationWhatsapp.value.trim();
+  if (value) localStorage.setItem(CONFIRMATION_WHATSAPP_KEY, value);
+  else localStorage.removeItem(CONFIRMATION_WHATSAPP_KEY);
+  return value;
 }
 
 function loadMedicineShortcuts() {
@@ -809,6 +824,8 @@ async function entryForSync(item) {
   const copy = { ...item };
   if (copy.blob && !copy.data_url) copy.data_url = await blobToDataUrl(copy.blob);
   delete copy.blob;
+  const confirmation = getConfirmationWhatsapp();
+  if (confirmation) copy.confirmation_whatsapp = confirmation;
   return copy;
 }
 
@@ -865,10 +882,11 @@ async function syncQueue() {
       entries.push(await entryForSync(item));
     }
     await renderQueue();
+    const confirmation = saveConfirmationWhatsapp();
     const response = await fetch("/offline/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entries })
+      body: JSON.stringify({ entries, confirmation_whatsapp: confirmation })
     });
     const data = await response.json();
     await mergeResults(toSync, data);
@@ -1002,6 +1020,11 @@ async function registerFreshServiceWorker() {
 
 async function boot() {
   disableNativeRequiredValidation();
+  if (confirmationWhatsapp) {
+    confirmationWhatsapp.value = localStorage.getItem(CONFIRMATION_WHATSAPP_KEY) || "";
+    confirmationWhatsapp.addEventListener("change", saveConfirmationWhatsapp);
+    confirmationWhatsapp.addEventListener("blur", saveConfirmationWhatsapp);
+  }
   setPaymentMode(currentPaymentMode);
   renderMedicineShortcuts();
   await initializeStorage();

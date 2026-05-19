@@ -539,7 +539,23 @@ def remember_offline_synced_result(entry_id: str, record: dict[str, Any]) -> dic
 
 def offline_confirmation_recipient(payload: dict[str, Any]) -> str:
     settings = get_settings()
-    raw = str(payload.get("sender") or payload.get("whatsapp_sender") or settings.owner_whatsapp_to or "").strip()
+    entries = payload.get("entries") if isinstance(payload.get("entries"), list) else []
+    entry_confirmation = ""
+    for entry in entries:
+        if isinstance(entry, dict):
+            entry_confirmation = str(entry.get("confirmation_whatsapp") or "").strip()
+            if entry_confirmation:
+                break
+    raw = str(
+        payload.get("confirmation_whatsapp")
+        or payload.get("confirmation_whatsapp_number")
+        or payload.get("linked_whatsapp")
+        or entry_confirmation
+        or payload.get("sender")
+        or payload.get("whatsapp_sender")
+        or settings.owner_whatsapp_to
+        or ""
+    ).strip()
     if not raw and settings.allowed_whatsapp_numbers.strip():
         raw = settings.allowed_whatsapp_numbers.split(",", 1)[0].strip()
     if not raw:
