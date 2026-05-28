@@ -1,6 +1,9 @@
 ﻿from pathlib import Path
 
+import json
+
 from app.ai import AI_USAGE_LOG
+from app.domain import ParseResult
 from app.services.operational_intelligence import (
     AdaptiveAliasLearner,
     OperationalMemory,
@@ -44,6 +47,9 @@ def test_token_policy_keeps_core_pharmacy_work_local():
         "receipt ya mwisho",
         "badilisha payment iwe mpesa",
         "show low stock",
+        "undo last sale",
+        "cancel TX-1046",
+        "cash total today",
         "barcode 9789914441314",
     ]
 
@@ -55,6 +61,23 @@ def test_token_policy_keeps_core_pharmacy_work_local():
     assert decide_ai_route(message_type="voice", text="Panadol mbili cash").use_ai is True
     assert decide_ai_route(message_type="photo", text="invoice", explicit_ai_request=False).use_ai is False
     assert decide_ai_route(message_type="photo", text="scan invoice", explicit_ai_request=True).use_ai is True
+
+
+def test_ai_usage_snapshot_exposes_cost_guardrails():
+    from app.ai import ai_usage_snapshot, log_ai_call
+
+    AI_USAGE_LOG.clear()
+    snapshot = ai_usage_snapshot()
+    assert snapshot["total_logged"] == 0
+    assert "sale" in snapshot["zero_token_layer1_routes"]
+    assert "offline_typed_sync" in snapshot["zero_token_layer1_routes"]
+
+    log_ai_call("voice_transcription", "audio/transcriptions", "voice note transcription")
+    snapshot = ai_usage_snapshot()
+    assert snapshot["total_logged"] == 1
+    assert snapshot["by_route"]["audio/transcriptions"] == 1
+    assert snapshot["last_reason"] == "voice_transcription"
+    AI_USAGE_LOG.clear()
 
 
 def test_safe_alias_learning_requires_repeated_confirmations_and_respects_ambiguity():
@@ -119,6 +142,26 @@ def test_pharmacy_facing_stock_wording_says_stock_left():
     assert "Saved safely" not in sale_reply  # sale confirmations stay short, not verbose
 
 
+def test_unclear_pharmacy_phrase_logs_edge_case_for_future_training(tmp_path, monkeypatch):
+    class ClarifyingParser:
+        def parse_events(self, text, master_drug_names):
+            return ParseResult(events=[], needs_clarification=True, clarification_question="Which medicine and quantity?")
+
+    log_path = tmp_path / "edge_cases.jsonl"
+    monkeypatch.setenv("PHARMAREEN_EDGE_CASE_LOG", str(log_path))
+    service = IntakeService(ClarifyingParser(), SimulationStore())
+
+    reply = service.process_text("hiyo ingine ya jana", conversation_id="owner-254")
+
+    assert reply == "Which medicine and quantity?"
+    record = json.loads(log_path.read_text(encoding="utf-8").strip())
+    assert record["text"] == "hiyo ingine ya jana"
+    assert record["sender"] == "owner-254"
+    assert record["guessed_intent"] in {"unknown", "memory"}
+    assert record["ai_fallback_used"] is False
+    assert record["final_outcome"] == "clarification"
+
+
 def test_expanded_training_examples_teach_current_friction():
     cases = load_training_cases(Path("datasets/pharmacy_training"))
     texts = {case.text.lower() for case in cases}
@@ -126,15 +169,26 @@ def test_expanded_training_examples_teach_current_friction():
     for required in [
         "p2cash",
         "pan2mpesa",
+        "piriton1mpesa",
+        "amox2cash",
         "nimeuza panadol mbili cash",
+        "nilikosea ilikuwa 5",
         "badilisha payment iwe mpesa",
+        "undo last sale",
+        "cancel tx-1046",
+        "ors 2 cash when stock is zero",
         "supplier invoice",
+        "edit item paracetamol qty 20 cost 1500",
         "random non pharmacy image",
         "blurry invoice poor lighting",
+        "shelf photo vs invoice photo",
         "nimeuza panadol mbili cash noisy",
+        "voice transcript: anadol mbili kash",
         "supplier receipt partial payment",
         "best seller leo",
+        "how much mpesa imeingia leo",
         "offline save panadol 1 cash",
+        "offline sync grouped whatsapp confirmation",
     ]:
         assert required in texts
 

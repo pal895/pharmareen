@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
+import os
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Iterable
 
 from app.utils import normalize_key
@@ -11,11 +14,11 @@ from app.utils import normalize_key
 
 LOCAL_FIRST_PATTERNS: tuple[tuple[str, str], ...] = (
     ("conversation", r"^(hello|hi|hey|habari|morning|good morning|mambo|sasa|help|menu|commands|guide|tutorial|how do i use this|what can you do)$"),
-    ("memory", r"\b(same kama jana|same again|same as yesterday|repeat last|nilikosea quantity|wrong quantity|ile ya mwisho|hiyo ya mwisho|ya mwisho)\b"),
+    ("memory", r"\b(same as last|same kama jana|same again|same as yesterday|repeat last|nilikosea quantity|wrong quantity|ile ya mwisho|hiyo ya mwisho|ya mwisho)\b"),
     ("clarification", r"\b(sell|sold|sale|restock|add|received|check stock|stock)\b"),
-    ("analytics", r"\b(best seller|sold most|sell most|imeuza sana|imeuzwa sana|dawa gani imeuza sana|fastest moving|fast moving|peak hours?|busiest|cash|mpesa|payment breakdown|top payment|low stock|missed demand|no stock|hakuna|out of stock)\b"),
+    ("analytics", r"\b(best seller|sold most|sell most|imeuza sana|imeuzwa sana|dawa gani imeuza sana|fastest moving|fast moving|peak hours?|busiest|cash total|cash today|mpesa total|mpesa today|payment breakdown|top payment|low stock|missed demand|no stock|hakuna|out of stock)\b"),
     ("receipt", r"\b(receipt|risiti|print)\b"),
-    ("correction", r"\b(undo|void|badilisha|change|update|punguza|ongeza|fanya|wrong quantity|payment iwe)\b"),
+    ("correction", r"\b(undo|void|cancel\s+[a-z]{2,8}-?[a-z0-9]{3,}|badilisha|change|update|punguza|ongeza|fanya|wrong quantity|payment iwe)\b"),
     ("report", r"\b(report|summary|profit today|sales today|daily report)\b"),
     ("stock", r"\b(stock|remaining|expiry|expiring|trace|history)\b|stock$"),
     ("restock", r"(^\s*\+|\b(restock|received|bought|bonus|supplier|invoice|batch|expiry)\b)"),
@@ -26,6 +29,8 @@ LOCAL_FIRST_PATTERNS: tuple[tuple[str, str], ...] = (
 AI_ONLY_MEDIA_TYPES = {"voice", "audio", "photo", "image", "invoice_photo", "supplier_receipt", "stock_photo"}
 DANGEROUS_ALIAS_THRESHOLD = 3
 MEMORY_TTL_MINUTES = 30
+EDGE_CASE_LOG_ENV = "PHARMAREEN_EDGE_CASE_LOG"
+DEFAULT_EDGE_CASE_LOG = Path("data") / "edge_case_log.jsonl"
 
 
 @dataclass(frozen=True)
@@ -46,6 +51,50 @@ class MediaClassification:
     extraction_target: str = ""
     needs_ai: bool = False
     evidence: tuple[str, ...] = ()
+
+
+def edge_case_log_path() -> Path:
+    configured = os.getenv(EDGE_CASE_LOG_ENV, "").strip()
+    return Path(configured) if configured else DEFAULT_EDGE_CASE_LOG
+
+
+def log_edge_case(
+    *,
+    text: str,
+    sender: str = "",
+    pharmacy_id: str = "",
+    guessed_intent: str = "",
+    confidence: float = 0,
+    context: dict[str, Any] | None = None,
+    expected_correction: str = "",
+    ai_fallback_used: bool = False,
+    final_outcome: str = "",
+) -> None:
+    """Record confusing real-world phrases for future local training.
+
+    This is internal-only logging. It never changes the reply sent to the pharmacist
+    and it deliberately stores only operational context, not secrets.
+    """
+
+    record = {
+        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "text": str(text or "")[:500],
+        "sender": str(sender or "")[:120],
+        "pharmacy_id": str(pharmacy_id or "")[:120],
+        "guessed_intent": str(guessed_intent or "")[:80],
+        "confidence": round(float(confidence or 0), 3),
+        "context": context or {},
+        "expected_correction": str(expected_correction or "")[:300],
+        "ai_fallback_used": bool(ai_fallback_used),
+        "final_outcome": str(final_outcome or "")[:160],
+    }
+    try:
+        path = edge_case_log_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, ensure_ascii=True) + "\n")
+    except Exception:
+        return
 
 
 @dataclass

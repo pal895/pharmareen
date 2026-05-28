@@ -1,0 +1,55 @@
+{"id":"onboard_001","category":"rush_hour","text":"panadol2cash","expect_contains":["Panadol x2","Cash","Stock left"],"ai_allowed":false,"simulate":true}
+{"id":"onboard_002","category":"rush_hour","text":"piriton1mpesa","expected":"Piriton x1 M-Pesa sale if stock exists","ai_allowed":false,"simulate":false}
+{"id":"onboard_003","category":"rush_hour","text":"amox2cash","expected":"safe alias check then Amoxyl/Amoxicillin if approved","ai_allowed":false,"simulate":false}
+{"id":"onboard_004","category":"rush_hour","text":"PCM2","expected":"approved alias only or short clarification","ai_allowed":false,"simulate":false}
+{"id":"onboard_005","category":"rush_hour","text":"P2cash","expected":"approved alias only or ask Which P","ai_allowed":false,"simulate":false}
+{"id":"onboard_006","category":"rush_hour","text":"Panadol2Piriton1ORS3","expected":"split fast continuous sales safely","ai_allowed":false,"simulate":false}
+{"id":"onboard_007","category":"rush_hour","text":"Panadol stock","expect_contains":["Panadol stock left"],"ai_allowed":false,"simulate":true}
+{"id":"onboard_008","category":"rush_hour","text":"Panadolstock","expect_contains":["Panadol stock left"],"ai_allowed":false,"simulate":true}
+{"id":"onboard_009","category":"rush_hour","text":"Panadol+20","expect_contains":["Panadol +20 added"],"ai_allowed":false,"simulate":true}
+{"id":"onboard_010","category":"rush_hour","text":"latepanadol5cash","expect_contains":["Late sale saved","Panadol x5","Cash"],"ai_allowed":false,"simulate":true}
+{"id":"onboard_011","category":"swahili","text":"nimeuza panadol mbili cash","expect_contains":["Panadol x2","Cash","Stock left"],"ai_allowed":false,"simulate":true}
+{"id":"onboard_012","category":"swahili","text":"Panadol tatu mpesa","expect_contains":["Panadol x3","M-Pesa"],"ai_allowed":false,"simulate":true}
+{"id":"onboard_013","category":"swahili","text":"Ongeza amox moja","expected":"restock/add Amox only if unambiguous or ask short clarification","ai_allowed":false,"simulate":false}
+{"id":"onboard_014","category":"swahili","text":"Hii dawa imeisha","expected":"ask which medicine is out of stock","ai_allowed":false,"simulate":false}
+{"id":"onboard_015","category":"swahili","text":"customer amesema hakuna insulin","expect_contains":["Insulin","no-stock request logged"],"ai_allowed":false,"simulate":true}
+{"id":"onboard_016","category":"memory","text":"same as last","expected":"repeat recent clear sale or ask medicine/quantity","ai_allowed":false,"simulate":false}
+{"id":"onboard_017","category":"memory","text":"same kama jana","expect_contains":["Repeat Panadol"],"ai_allowed":false,"simulate":true}
+{"id":"onboard_018","category":"memory","text":"hiyo ya mwisho","expected":"resolve recent transaction or ask short clarification","ai_allowed":false,"simulate":false}
+{"id":"onboard_019","category":"memory","text":"ya mwisho ilikuwa 5","expected":"set last sale quantity to 5 when recent sale is clear","ai_allowed":false,"simulate":false}
+{"id":"onboard_020","category":"memory","text":"nilikosea ilikuwa 5","expected":"correct last quantity to 5","ai_allowed":false,"simulate":false}
+{"id":"onboard_021","category":"memory","text":"ongeza 3","expected":"increase last quantity by 3 if recent sale clear","ai_allowed":false,"simulate":false}
+{"id":"onboard_022","category":"memory","text":"punguza 1","expected":"reduce last quantity by 1 if recent sale clear","ai_allowed":false,"simulate":false}
+{"id":"onboard_023","category":"correction","text":"change last to mpesa","expected":"update last sale payment to M-Pesa","ai_allowed":false,"simulate":false}
+{"id":"onboard_024","category":"correction","text":"badilisha payment iwe mpesa","expected":"update last sale payment locally","ai_allowed":false,"simulate":false}
+{"id":"onboard_025","category":"correction","text":"undo last sale","expected":"ask void reason or confirm depending command wording","ai_allowed":false,"simulate":false}
+{"id":"onboard_026","category":"correction","text":"undo hiyo ya mwisho","expected":"short YES confirmation for last sale","ai_allowed":false,"simulate":false}
+{"id":"onboard_027","category":"correction","text":"cancel TX-1046","expected":"void by transaction number only if matching recent sale or ask details last","ai_allowed":false,"simulate":false}
+{"id":"onboard_028","category":"payments","text":"Panadol 2 cash","expect_contains":["Panadol x2","Cash"],"ai_allowed":false,"simulate":true}
+{"id":"onboard_029","category":"payments","text":"Piriton 1 mpesa","expect_contains":["Piriton"],"ai_allowed":false,"simulate":true}
+{"id":"onboard_030","category":"payments","text":"Amoxyl 1 credit","expect_contains":["Amoxyl x1","Credit"],"ai_allowed":false,"simulate":true}
+{"id":"onboard_031","category":"payments","text":"Glucose 2 mixed cash 100 mpesa 200 discount 50","expected":"mixed payment and discount sale if stock is available; missed demand if stock is already gone","ai_allowed":false,"simulate":false}
+{"id":"onboard_032","category":"payments","text":"customer cleared debt","expected":"credit payment update workflow, no AI unless ambiguous","ai_allowed":false,"simulate":false}
+{"id":"onboard_033","category":"offline","text":"offline save panadol 1 cash","expected":"offline card shows parsed sale result after sync","ai_allowed":false,"simulate":false}
+{"id":"onboard_034","category":"offline","text":"offline sync grouped whatsapp confirmation","expected":"one grouped WhatsApp confirmation with sale/stock/no-stock summaries","ai_allowed":false,"simulate":false}
+{"id":"onboard_035","category":"offline","text":"ors 2 cash when stock is zero","expected":"missed sale saved, sale not recorded, stock left 0","ai_allowed":false,"simulate":false}
+{"id":"onboard_036","category":"offline","text":"sync failure retry calmly","expected":"needs attention without technical wording","ai_allowed":false,"simulate":false}
+{"id":"onboard_037","category":"analytics","text":"best seller leo","expect_contains":["Best seller"],"ai_allowed":false,"simulate":true}
+{"id":"onboard_038","category":"analytics","text":"how much mpesa imeingia leo","expect_contains":["M-Pesa"],"ai_allowed":false,"simulate":true}
+{"id":"onboard_039","category":"analytics","text":"cash total today","expect_contains":["Cash"],"ai_allowed":false,"simulate":true}
+{"id":"onboard_040","category":"analytics","text":"items ambazo hazijauzwa","expected":"missed demand/no-stock insight from records only","ai_allowed":false,"simulate":false}
+{"id":"onboard_041","category":"analytics","text":"peak hours jana","expected":"deterministic peak-hour answer or no reliable data","ai_allowed":false,"simulate":false}
+{"id":"onboard_042","category":"supplier","text":"supplier invoice","expected":"photo/invoice review, not automatic stock update","ai_allowed":true,"simulate":false}
+{"id":"onboard_043","category":"supplier","text":"edit item paracetamol qty 20 cost 1500","expected":"edit pending invoice before normal parser","ai_allowed":false,"simulate":false}
+{"id":"onboard_044","category":"supplier","text":"approve invoice","expected":"approve pending invoice and update stock safely","ai_allowed":false,"simulate":false}
+{"id":"onboard_045","category":"supplier","text":"remove item 2","expected":"remove pending invoice item before approval","ai_allowed":false,"simulate":false}
+{"id":"onboard_046","category":"supplier","text":"partial invoice with bonus stock and discount","expected":"track purchased bonus discount and review before stock update","ai_allowed":true,"simulate":false}
+{"id":"onboard_047","category":"media","text":"shelf photo vs invoice photo","expected":"classify shelf/product photo separately from invoice","ai_allowed":true,"simulate":false}
+{"id":"onboard_048","category":"media","text":"random non pharmacy image","expected":"save safely, needs review, no stock update","ai_allowed":false,"simulate":false}
+{"id":"onboard_049","category":"media","text":"blurry invoice poor lighting","expected":"ask retake closer or send as file","ai_allowed":true,"simulate":false}
+{"id":"onboard_050","category":"media","text":"supplier receipt partial payment","expected":"supplier receipt classification and review","ai_allowed":true,"simulate":false}
+{"id":"onboard_051","category":"voice","text":"voice transcript: anadol mbili kash","expected":"repair Anadol to Panadol and kash to cash if confidence is safe","ai_allowed":true,"simulate":false}
+{"id":"onboard_052","category":"voice","text":"Panadol mbili cash noisy","expected":"voice transcription then local parser records sale","ai_allowed":true,"simulate":false}
+{"id":"onboard_053","category":"voice","text":"nimeuza piriton moja mpesa","expected":"voice transcription then local parser records M-Pesa sale","ai_allowed":true,"simulate":false}
+{"id":"onboard_054","category":"voice","text":"ORS mbili cash voice when stock zero","expected":"voice transcript routes to missed demand if stock is zero","ai_allowed":true,"simulate":false}
+{"id":"onboard_055","category":"trust","text":"fear records lost after offline sync","expected":"show synced safely with exact results and WhatsApp confirmation status","ai_allowed":false,"simulate":false}

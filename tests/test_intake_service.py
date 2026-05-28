@@ -1571,6 +1571,35 @@ def test_quantity_correction_swahili_updates_last_sale_quantity():
     assert store.transactions[-1]["Type"] == "correction"
 
 
+def test_more_human_memory_phrases_use_recent_sale_safely():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    service.process_text("Panadol 2 cash", conversation_id="owner")
+    same_reply = service.process_text("same as last", conversation_id="owner")
+    payment_reply = service.process_text("change last to mpesa", conversation_id="owner")
+    quantity_reply = service.process_text("ya mwisho ilikuwa 5", conversation_id="owner")
+
+    assert "Repeat Panadol x2 Cash" in same_reply
+    assert "Updated last Panadol sale" in payment_reply
+    assert "M-Pesa" in payment_reply
+    assert "Updated last Panadol sale quantity: 2" in quantity_reply
+    assert "5" in quantity_reply
+
+
+def test_transaction_number_undo_is_safe_and_short():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    service.process_text("Panadol 2 cash", conversation_id="owner")
+    last_trace = service.last_sale_by_conversation["owner"]["trace_id"]
+    confirm = service.process_text(f"cancel {last_trace}", conversation_id="owner")
+    mismatch = service.process_text("cancel TX-1046", conversation_id="owner-mismatch")
+
+    assert confirm == "Undo last sale: Panadol x2 Cash?\nReply YES to confirm."
+    assert "No recent sale found" in mismatch
+
+
 def test_swahili_undo_last_sale_asks_short_confirmation_then_reverses_stock():
     store = FakeStore()
     service = IntakeService(FailingParser(), store)

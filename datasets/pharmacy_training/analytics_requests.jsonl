@@ -6,5 +6,5 @@
 {"id": "ana_006", "category": "analytics", "text": "How much cash came in today", "expect_contains": ["Cash received today"], "ai_allowed": false, "simulate": true}
 {"id": "ana_007", "category": "analytics", "text": "Payment breakdown today", "expect_contains": ["Payment breakdown today"], "ai_allowed": false, "simulate": true}
 {"id": "ana_008", "category": "analytics", "text": "missed demand today", "expect_contains": ["No-stock requests today"], "ai_allowed": false, "simulate": true}
-{"id": "ana_009", "category": "analytics", "text": "show low stock", "expect_contains": ["Running low"], "ai_allowed": false, "simulate": true}
+{"id": "ana_009", "category": "analytics", "text": "show low stock", "expect_contains": ["Stock needs attention"], "ai_allowed": false, "simulate": true}
 {"id": "ana_010", "category": "analytics", "text": "stock value", "expect_contains": ["Stock Value"], "ai_allowed": false, "simulate": true}

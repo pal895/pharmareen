@@ -1,7 +1,7 @@
 {"id": "ana2_001", "category": "analytics", "text": "best seller leo", "expect_contains": ["Best seller today"], "ai_allowed": false, "simulate": true}
 {"id": "ana2_002", "category": "analytics", "text": "peak hours jana", "expect_contains": ["No records found for yesterday"], "ai_allowed": false, "simulate": true}
 {"id": "ana2_003", "category": "analytics", "text": "top payment method", "expect_contains": ["Most used payment today"], "ai_allowed": false, "simulate": true}
-{"id": "ana2_004", "category": "analytics", "text": "low stock leo", "expect_contains": ["Running low"], "ai_allowed": false, "simulate": true}
+{"id": "ana2_004", "category": "analytics", "text": "low stock leo", "expect_contains": ["Stock needs attention"], "ai_allowed": false, "simulate": true}
 {"id": "ana2_005", "category": "analytics", "text": "items ambazo hazijauzwa", "simulate": false, "expected": "not sold deterministic analytics", "ai_allowed": false}
 {"id": "ana2_006", "category": "analytics", "text": "fastest moving medicine", "expect_contains": ["Best seller today"], "ai_allowed": false, "simulate": true}
 {"id": "ana2_007", "category": "analytics", "text": "most missed demand", "expect_contains": ["No-stock requests today"], "ai_allowed": false, "simulate": true}

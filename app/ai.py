@@ -58,6 +58,20 @@ RECOMMENDATION_SCHEMA: dict[str, Any] = {
 
 
 AI_USAGE_LOG: list[dict[str, str]] = []
+ZERO_TOKEN_LAYER1_ROUTES = [
+    "sale",
+    "stock_check",
+    "restock",
+    "report",
+    "analytics",
+    "correction",
+    "undo",
+    "barcode",
+    "offline_typed_sync",
+    "low_stock",
+    "missed_demand",
+    "receipt",
+]
 
 
 def log_ai_call(reason: str, route: str, purpose: str) -> None:
@@ -68,7 +82,22 @@ def log_ai_call(reason: str, route: str, purpose: str) -> None:
 
 
 def ai_usage_snapshot() -> dict[str, Any]:
-    return {"total_logged": len(AI_USAGE_LOG), "recent": list(AI_USAGE_LOG[-5:])}
+    by_route: dict[str, int] = {}
+    by_reason: dict[str, int] = {}
+    for record in AI_USAGE_LOG:
+        route = str(record.get("route") or "unknown")
+        reason = str(record.get("reason") or "unknown")
+        by_route[route] = by_route.get(route, 0) + 1
+        by_reason[reason] = by_reason.get(reason, 0) + 1
+    last = AI_USAGE_LOG[-1] if AI_USAGE_LOG else {}
+    return {
+        "total_logged": len(AI_USAGE_LOG),
+        "recent": list(AI_USAGE_LOG[-5:]),
+        "by_route": by_route,
+        "by_reason": by_reason,
+        "last_reason": last.get("reason", ""),
+        "zero_token_layer1_routes": ZERO_TOKEN_LAYER1_ROUTES,
+    }
 
 
 NUMBER_WORDS = {

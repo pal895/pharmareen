@@ -27,7 +27,7 @@ from app.services.pharmacy_engine import (
     trace_id,
     unit_pattern,
 )
-from app.services.operational_intelligence import OperationalMemory
+from app.services.operational_intelligence import OperationalMemory, classify_local_intent, log_edge_case
 from app.sheets import SHEETS_UNAVAILABLE_MESSAGE, SheetsUnavailableError
 from app.utils import format_ksh, normalize_key, now_in_timezone, parse_int, parse_money
 
@@ -550,10 +550,30 @@ class IntakeService:
 
         try:
             parsed = self.parser.parse_events(text, master_drug_names)
-        except Exception:
+        except Exception as exc:
+            guessed_intent, confidence = classify_local_intent(text)
+            log_edge_case(
+                text=text,
+                sender=conversation_key,
+                guessed_intent=guessed_intent,
+                confidence=confidence,
+                context={"parser": self.parser.__class__.__name__, "error": exc.__class__.__name__},
+                ai_fallback_used=self.parser.__class__.__name__ == "AIService",
+                final_outcome="parser_exception",
+            )
             return UNDERSTAND_ERROR
 
         if parsed.needs_clarification or not parsed.events:
+            guessed_intent, confidence = classify_local_intent(text)
+            log_edge_case(
+                text=text,
+                sender=conversation_key,
+                guessed_intent=guessed_intent,
+                confidence=confidence,
+                context={"question": parsed.clarification_question or ""},
+                ai_fallback_used=self.parser.__class__.__name__ == "AIService",
+                final_outcome="clarification",
+            )
             return parsed.clarification_question or AMBIGUOUS_ERROR
 
         results = [self._process_event(event) for event in parsed.events]
@@ -575,7 +595,7 @@ class IntakeService:
 
     def _memory_reference_reply(self, text: str, conversation_key: str) -> str:
         normalized = normalize_key(text)
-        if normalized in {"same kama jana", "same as yesterday", "same again", "rudia ile", "repeat last", "repeat last please"}:
+        if normalized in {"same as last", "same kama jana", "same as yesterday", "same again", "rudia ile", "repeat last", "repeat last please"}:
             last = self.operational_memory.resolve_reference(conversation_key, text)
             if last:
                 drug = str(last.get("drug_name") or "medicine")
@@ -1696,6 +1716,15 @@ class IntakeService:
                 summary_line="No recent sale found to void",
                 category="errors",
             )
+        requested_trace = normalize_key(command.trace_id).replace("-", "")
+        sale_trace = normalize_key(str(sale.get("trace_id") or "")).replace("-", "")
+        if requested_trace and sale_trace and requested_trace != sale_trace:
+            return EntryResult(
+                logged=False,
+                reply=f"I could not find {command.trace_id}. Send details last or undo last sale.",
+                summary_line="Void trace not found",
+                category="errors",
+            )
         reason = command.notes.strip()
         if reason == "__confirm_void__":
             self.pending_void_confirmation[conversation_key] = sale
@@ -2501,12 +2530,26 @@ def parse_payment_correction_command(text: str) -> tuple[str, str] | None:
     )
     if match:
         return "", parse_payment_method(match.group(1))
+    match = re.fullmatch(
+        rf"(?:change|update|badilisha)\s+(?:last|ya\s+mwisho|hiyo\s+ya\s+mwisho)\s+(?:to|iwe)\s+({payment_pattern()})",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return "", parse_payment_method(match.group(1))
     return None
 
 def parse_quantity_correction_command(text: str) -> dict[str, Any] | None:
     clean = normalize_natural_text(replace_number_words(text.strip()))
     match = re.fullmatch(
         r"(?:nilikosea|nimekosea|wrong\s+quantity|nilikosea\s+quantity|ile\s+ya\s+mwisho\s+ilikuwa\s+wrong\s+quantity)\s+(?:ilikuwa|iwe|to)?\s*(\d+)",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return {"mode": "set", "quantity": positive_quantity(match.group(1))}
+    match = re.fullmatch(
+        r"(?:ya\s+mwisho|hiyo\s+ya\s+mwisho|ile\s+ya\s+mwisho|last)\s+(?:ilikuwa|iwe|to)?\s*(\d+)",
         clean,
         flags=re.IGNORECASE,
     )
@@ -3142,6 +3185,19 @@ def parse_single_operating_command(text: str) -> OperatingCommand | None:
     if swahili_void_match:
         return OperatingCommand(kind="void", notes="__confirm_void__", raw_text=text)
 
+    transaction_void_match = re.fullmatch(
+        r"(?:undo|void|cancel)\s+([A-Za-z]{2,8}-?[A-Za-z0-9]{3,})",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    if transaction_void_match:
+        return OperatingCommand(
+            kind="void",
+            trace_id=transaction_void_match.group(1).upper(),
+            notes="__confirm_void__",
+            raw_text=text,
+        )
+
     void_match = re.fullmatch(r"(?:void|undo|correct)\s+(?:last|sale(?:\s+([A-Za-z0-9_-]+))?)(?:\s+(.+))?", clean, flags=re.IGNORECASE)
     if void_match:
         return OperatingCommand(kind="void", trace_id=void_match.group(1) or "", notes=void_match.group(2) or "", raw_text=text)
@@ -3615,7 +3671,11 @@ def expand_compact_pharmacy_text(text: str) -> str:
         return clean
     expanded_lines: list[str] = []
     for line in clean.splitlines():
-        expanded = re.sub(r"(?<=\w)\+(?=\d)", " +", line.strip())
+        stripped = line.strip()
+        if re.fullmatch(r"(?:undo|void|cancel)\s+[A-Za-z]{2,8}-?[A-Za-z0-9]{3,}", stripped, flags=re.IGNORECASE):
+            expanded_lines.append(stripped)
+            continue
+        expanded = re.sub(r"(?<=\w)\+(?=\d)", " +", stripped)
         expanded = re.sub(r"(?<=[A-Za-z])(?=\d)", " ", expanded)
         expanded = re.sub(r"(?<=\d)(?=[A-Za-z])", " ", expanded)
         expanded = re.sub(r"\b(less|discount)(?=\d)", r"\1 ", expanded, flags=re.IGNORECASE)
