@@ -94,6 +94,7 @@ INVENTORY_TITLE_BLOCKLIST = {
     "issued",
     "issuelog",
     "log",
+    "lowstock",
     "offline",
     "report",
     "request",
@@ -140,9 +141,13 @@ def is_inventory_worksheet_title(title: str) -> bool:
     key = normalize_key(clean_title)
     if key == normalize_key(INVENTORY):
         return True
+    if key == normalize_key(MASTER_STOCK):
+        return False
     if key.endswith("inventory"):
         return True
-    if "inventory" not in key:
+    if key in {"stock", "stocks", "stocklist", "currentstock", "pharmacystock"}:
+        return True
+    if "inventory" not in key and "stock" not in key:
         return False
     return not any(blocked in key for blocked in INVENTORY_TITLE_BLOCKLIST)
 
@@ -746,7 +751,7 @@ class GoogleSheetsStore:
         titles: list[str] = []
         for title in candidates:
             clean_title = str(title or "").strip()
-            if is_inventory_worksheet_title(clean_title) and clean_title != INVENTORY:
+            if is_inventory_worksheet_title(clean_title) and clean_title not in {INVENTORY, MASTER_STOCK}:
                 titles.append(clean_title)
         return titles
 

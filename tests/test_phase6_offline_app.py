@@ -123,6 +123,7 @@ def test_offline_app_routes_return_html():
     assert "Take Photo" in followed_response.text
     assert "Save Photo" in followed_response.text
     assert "Save Voice" in followed_response.text
+    assert "PHARMAREEN REAL PATH BUILD realpath-stock-safety-v2026-05-28-1" in followed_response.text
     assert "PHARMAREEN SMOOTH TEST v2026-05-15" in followed_response.text
     assert "🟢 Cash mode active" in followed_response.text
     assert "Common medicines" in followed_response.text
@@ -139,10 +140,20 @@ def test_offline_app_routes_return_html():
     assert "PharMareen Offline Mode" in compat_response.text
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in compat_response.text
     assert "no-store" in compat_response.headers.get("cache-control", "")
-    assert compat_response.headers.get("x-pharmareen-offline-version") == "phase6-smooth-test-v15"
+    assert compat_response.headers.get("x-pharmareen-offline-version") == "realpath-stock-safety-v2026-05-28-1"
     assert parser_response.status_code == 200
     assert manifest_response.status_code == 200
     assert worker_response.status_code == 200
+
+
+def test_debug_version_exposes_realpath_build_marker():
+    with TestClient(main.app) as client:
+        response = client.get("/debug/version")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["offline_build_version"] == "realpath-stock-safety-v2026-05-28-1"
+    assert "PHARMAREEN REAL PATH BUILD" in data["offline_frontend_marker"]
 
 
 def test_offline_sync_accepts_sale_and_restock_entries(monkeypatch, tmp_path):
@@ -349,7 +360,7 @@ def test_debug_offline_app_reports_all_phase6_features(monkeypatch, tmp_path):
     assert data["voice_queue_ready"] is True
     assert data["persistent_storage_ready"] is True
     assert data["auto_sync_ready"] is True
-    assert data["frontend_marker"] == "PHASE 6 FINAL WORKING - SMOOTH TEST v2026-05-15"
+    assert data["frontend_marker"] == "PHARMAREEN REAL PATH BUILD realpath-stock-safety-v2026-05-28-1"
     assert data["served_index_path"].endswith("static/offline_app/index.html") or data["served_index_path"].endswith("static\\offline_app\\index.html")
     assert "offline_log_exists" in data
 
@@ -422,6 +433,7 @@ def test_legacy_local_offline_app_matches_phase6_frontend():
     legacy_parser = root / "local" / "parser.js"
 
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in legacy_html
+    assert "PHARMAREEN REAL PATH BUILD realpath-stock-safety-v2026-05-28-1" in legacy_html
     assert "PHARMAREEN SMOOTH TEST v2026-05-15" in legacy_html
     assert "Choose From Files/Gallery" in legacy_html
     assert "Choose voice/audio files" in legacy_html
@@ -439,6 +451,7 @@ def test_legacy_offline_app_folder_matches_final_frontend():
     legacy_parser = root / "offline_app" / "parser.js"
 
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in legacy_html
+    assert "PHARMAREEN REAL PATH BUILD realpath-stock-safety-v2026-05-28-1" in legacy_html
     assert "PHARMAREEN SMOOTH TEST v2026-05-15" in legacy_html
     assert "Choose From Files/Gallery" in legacy_html
     assert "Choose voice/audio files" in legacy_html
@@ -447,7 +460,7 @@ def test_legacy_offline_app_folder_matches_final_frontend():
     assert " required" not in legacy_html
     assert "disableNativeRequiredValidation" in legacy_app
     assert "queueMediaFiles" in legacy_app
-    assert "pharmareen-offline-v15" in legacy_worker
+    assert "pharmareen-offline-v16-realpath-stock-safety" in legacy_worker
     assert legacy_parser.exists()
 
 
@@ -649,13 +662,14 @@ def test_offline_pwa_assets_contain_auto_sync_media_and_retry_logic():
     assert "parseCommand" in parser
     assert "Save Offline" in html
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in html
+    assert "PHARMAREEN REAL PATH BUILD realpath-stock-safety-v2026-05-28-1" in html
     assert "PHARMAREEN SMOOTH TEST v2026-05-15" in html
     assert "Save Photo" in html
     assert "Save Voice" in html
     assert "Tap & Talk" in html
     assert '"start_url": "/offline-app"' in manifest
     assert "/offline_app/parser.js" in worker
-    assert "pharmareen-offline-v15" in worker
+    assert "pharmareen-offline-v16-realpath-stock-safety" in worker
     assert "caches.open" in worker
 
 
@@ -959,7 +973,7 @@ def test_offline_structured_zero_stock_sale_is_blocked_before_text_router(monkey
     assert "ORS out of stock" in outbox.json()["confirmations"][0]["message"]
 
 
-def test_offline_sync_uses_stock_truth_service_before_stale_master_stock(monkeypatch, tmp_path):
+def test_offline_sync_uses_stock_truth_service_before_stale_master_stock(monkeypatch, tmp_path, capsys):
     store = SplitStockTruthStore()
     service = IntakeService(None, store)
 
@@ -975,7 +989,8 @@ def test_offline_sync_uses_stock_truth_service_before_stale_master_stock(monkeyp
     main.offline_whatsapp_confirmation_history.clear()
 
     payload = {
-        "confirmation_whatsapp": "+254708061426",
+        "confirmation_whatsapp": "+254728571649",
+        "offline_app_build_version": "realpath-stock-safety-v2026-05-28-1",
         "entries": [
             {
                 "id": "offline-ors-split-stock-truth",
@@ -1003,7 +1018,12 @@ def test_offline_sync_uses_stock_truth_service_before_stale_master_stock(monkeyp
     assert "Missed sale saved: ORS x2" in reply
     assert not any(row["Type"] == "sale" and row["Drug"] == "ORS" for row in store.transactions)
     assert store.transactions[-1]["Type"] == "no_stock"
+    assert outbox.json()["confirmations"][0]["to"] == "254728571649@s.whatsapp.net"
     assert "ORS out of stock" in outbox.json()["confirmations"][0]["message"]
+    logs = capsys.readouterr().out
+    assert "REAL_BROWSER_OFFLINE_PAYLOAD_RECEIVED" in logs
+    assert "STOCK_SAFETY_BLOCKED_OFFLINE_SYNC" in logs
+    assert "OFFLINE_CONFIRMATION_QUEUED_REAL_SYNC" in logs
 
 
 def test_debug_offline_confirmations_exposes_masked_pending_queue(monkeypatch, tmp_path):

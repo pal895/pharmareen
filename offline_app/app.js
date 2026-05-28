@@ -1,6 +1,7 @@
 ﻿const LEGACY_QUEUE_KEY = "pharmareen_phase6_offline_queue";
 const LEGACY_HISTORY_KEY = "pharmareen_phase6_synced_history";
 const PAYMENT_MODE_KEY = "pharmareen_payment_mode";
+const CONFIRMATION_WHATSAPP_KEY = "pharmareen_confirmation_whatsapp";
 const SHORTCUTS_KEY = "pharmareen_medicine_shortcuts";
 const SHORTCUT_USAGE_KEY = "pharmareen_medicine_shortcut_usage";
 const DB_NAME = "pharmareen_phase6_offline_db";
@@ -9,8 +10,10 @@ const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
-const SERVICE_WORKER_VERSION = "phase6-smooth-test-v15";
+const OFFLINE_APP_BUILD_VERSION = "realpath-stock-safety-v2026-05-28-1";
+const SERVICE_WORKER_VERSION = "pharmareen-offline-v16-realpath-stock-safety";
 const DEFAULT_MEDICINE_SHORTCUTS = ["Panadol", "Amox", "Piriton", "ORS"];
+console.log(`OFFLINE_APP_BUILD_VERSION=${OFFLINE_APP_BUILD_VERSION}`);
 
 const examples = {
   sale: "Panadol sold 2",
@@ -26,6 +29,7 @@ const examples = {
 const statusBanner = document.getElementById("statusBanner");
 const commandText = document.getElementById("commandText");
 const pharmacyId = document.getElementById("pharmacyId");
+const confirmationWhatsapp = document.getElementById("confirmationWhatsapp");
 const queueCount = document.getElementById("queueCount");
 const pendingEntries = document.getElementById("pendingEntries");
 const syncedEntries = document.getElementById("syncedEntries");
@@ -64,6 +68,19 @@ function loadJson(key, fallback) {
 
 function saveJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
+}
+
+function getConfirmationWhatsapp() {
+  const value = confirmationWhatsapp ? confirmationWhatsapp.value.trim() : "";
+  return value || (localStorage.getItem(CONFIRMATION_WHATSAPP_KEY) || "").trim();
+}
+
+function saveConfirmationWhatsapp() {
+  if (!confirmationWhatsapp) return "";
+  const value = confirmationWhatsapp.value.trim();
+  if (value) localStorage.setItem(CONFIRMATION_WHATSAPP_KEY, value);
+  else localStorage.removeItem(CONFIRMATION_WHATSAPP_KEY);
+  return value;
 }
 
 function loadMedicineShortcuts() {
@@ -719,13 +736,28 @@ function mediaStatusLabel(item) {
   return "⏳ Waiting";
 }
 
+function friendlyReplySummary(value) {
+  const lines = String(value || "")
+    .replace(/\r/g, "\n")
+    .split(/\n+/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .filter(line => !/^Command:/i.test(line) && !/^Result:?$/i.test(line));
+  if (!lines.length) return "";
+  return lines.slice(0, 4).join("\n");
+}
+
 function entryLabel(item) {
+  if (item.sync_status === "synced" && (item.reply || item.result_summary || item.message)) {
+    const summary = friendlyReplySummary(item.reply || item.result_summary || item.message);
+    if (summary) return summary;
+  }
   if (item.type === "photo") {
     const label = item.display_label || mediaDisplayPrefix("photo", item.purpose);
     return `${item.sync_status === "synced" ? "✅" : "📷"} ${label}\n${mediaStatusLabel(item)}`;
   }
   if (item.type === "voice" || item.type === "audio") {
-    return `${item.sync_status === "synced" ? "✅ Voice synced" : "🎤 Voice note saved safely"}\n${mediaStatusLabel(item)}`;
+    return `${item.sync_status === "synced" ? "✅ Voice synced safely" : "🎤 Voice note saved safely"}\n${mediaStatusLabel(item)}`;
   }
   if (item.action === "restock") {
     const bonus = Number(item.bonus_quantity || 0) > 0 ? ` + bonus ${item.bonus_quantity}` : "";
@@ -749,7 +781,11 @@ function renderList(target, items, emptyText) {
   for (const item of items) {
     const li = document.createElement("li");
     const title = document.createElement("div");
-    title.textContent = entryLabel(item);
+    const label = entryLabel(item);
+    title.textContent = label;
+    if (/out of stock|sale not recorded|missed sale|needs review/i.test(label)) {
+      li.classList.add("needs-review-entry");
+    }
     const meta = document.createElement("div");
     meta.className = "entry-meta";
     const kind = item.type === "photo" ? "Photo" : (item.type === "audio" || item.type === "voice" ? "Voice" : "Entry");
@@ -758,6 +794,18 @@ function renderList(target, items, emptyText) {
     const friendlyError = friendlySyncError(item.last_error);
     if (friendlyError) meta.textContent += ` - ${friendlyError}`;
     li.append(title, meta);
+    if (target === pendingEntries && item.sync_status !== "syncing") {
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.className = "secondary small-action";
+      removeButton.textContent = "Remove before sync";
+      removeButton.addEventListener("click", async () => {
+        await deleteQueueEntry(item.id);
+        setStatus(navigator.onLine ? "online" : "offline", "Removed safely before sync");
+        await renderQueue();
+      });
+      li.appendChild(removeButton);
+    }
     target.appendChild(li);
   }
 }
@@ -782,6 +830,8 @@ async function entryForSync(item) {
   const copy = { ...item };
   if (copy.blob && !copy.data_url) copy.data_url = await blobToDataUrl(copy.blob);
   delete copy.blob;
+  const confirmation = getConfirmationWhatsapp();
+  if (confirmation) copy.confirmation_whatsapp = confirmation;
   return copy;
 }
 
@@ -794,7 +844,16 @@ async function mergeResults(queue, data) {
     if (synced.has(item.id)) {
       const result = synced.get(item.id);
       await deleteQueueEntry(item.id);
-      await addHistoryEntry({ ...item, blob: undefined, sync_status: "synced", last_error: "", reply: result.reply || result.message || "Sent successfully" });
+      await addHistoryEntry({
+        ...item,
+        blob: undefined,
+        sync_status: "synced",
+        last_error: "",
+        reply: result.reply || result.result_summary || result.message || entryLabel(item),
+        result_summary: result.result_summary || result.reply || result.message || entryLabel(item),
+        whatsapp_confirmation: result.whatsapp_confirmation || "ready",
+        synced_at: new Date().toISOString()
+      });
       continue;
     }
     if (failed.has(item.id)) {
@@ -829,10 +888,15 @@ async function syncQueue() {
       entries.push(await entryForSync(item));
     }
     await renderQueue();
+    const confirmation = saveConfirmationWhatsapp();
     const response = await fetch("/offline/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entries })
+      body: JSON.stringify({
+        entries,
+        confirmation_whatsapp: confirmation,
+        offline_app_build_version: OFFLINE_APP_BUILD_VERSION
+      })
     });
     const data = await response.json();
     await mergeResults(toSync, data);
@@ -966,6 +1030,11 @@ async function registerFreshServiceWorker() {
 
 async function boot() {
   disableNativeRequiredValidation();
+  if (confirmationWhatsapp) {
+    confirmationWhatsapp.value = localStorage.getItem(CONFIRMATION_WHATSAPP_KEY) || "";
+    confirmationWhatsapp.addEventListener("change", saveConfirmationWhatsapp);
+    confirmationWhatsapp.addEventListener("blur", saveConfirmationWhatsapp);
+  }
   setPaymentMode(currentPaymentMode);
   renderMedicineShortcuts();
   await initializeStorage();

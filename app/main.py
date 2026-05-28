@@ -74,6 +74,30 @@ last_openai_error: dict[str, Any] = {
 VOICE_QUOTA_REPLY = "🎧 Voice received safely. AI transcription is ready but OpenAI credits are not active yet."
 PHOTO_QUOTA_REPLY = "📷 Photo received safely. Saved for review."
 DEFAULT_PUBLIC_BASE_URL = "https://pharmareen-1--pal895.replit.app"
+OFFLINE_BUILD_VERSION = "realpath-stock-safety-v2026-05-28-1"
+OFFLINE_FRONTEND_MARKER = f"PHARMAREEN REAL PATH BUILD {OFFLINE_BUILD_VERSION}"
+OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
+OFFLINE_NO_CACHE_HEADERS = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+    "X-PharMareen-Offline-Version": OFFLINE_BUILD_VERSION,
+}
+
+
+def current_git_commit_short() -> str:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        return result.stdout.strip()
+    except Exception:
+        return ""
 
 
 def offline_confirmation_state_path() -> Path:
@@ -155,14 +179,17 @@ async def debug_offline_app() -> dict[str, Any]:
         "served_index_path": str(OFFLINE_APP_DIR / "index.html"),
     }
 
-OFFLINE_FRONTEND_MARKER = "PHASE 6 FINAL WORKING - SMOOTH TEST v2026-05-15"
-OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
-OFFLINE_NO_CACHE_HEADERS = {
-    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-    "Pragma": "no-cache",
-    "Expires": "0",
-    "X-PharMareen-Offline-Version": "phase6-smooth-test-v15",
-}
+
+@app.get("/debug/version")
+async def debug_version() -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "offline_build_version": OFFLINE_BUILD_VERSION,
+        "offline_frontend_marker": OFFLINE_FRONTEND_MARKER,
+        "git_commit": current_git_commit_short(),
+        "offline_app_index": str(OFFLINE_APP_DIR / "index.html"),
+        "cache_control": OFFLINE_NO_CACHE_HEADERS["Cache-Control"],
+    }
 
 
 @app.get("/offline_app/index.html", include_in_schema=False)
@@ -854,6 +881,12 @@ async def debug_send_test_offline_confirmation(request: Request) -> dict[str, An
     if not message:
         message = "✅ PharMareen bridge delivery test. If you see this, offline confirmations can reach WhatsApp."
     queued = queue_offline_whatsapp_confirmation(recipient, message)
+    print(
+        "OFFLINE_CONFIRMATION_QUEUED_REAL_SYNC "
+        f"status={queued.get('status') if queued else 'not_queued'} "
+        f"to={queued.get('to') if queued else ''} debug_send_test=True",
+        flush=True,
+    )
     return {
         "status": "queued_for_bridge" if queued else "error",
         "queued": queued or {"status": "not_queued"},
@@ -877,6 +910,36 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
     )
     if not isinstance(entries, list):
         return {"status": "error", "synced": [], "failed": [{"id": "", "error": "Send entries as a list."}], "pending": []}
+
+    payload_items: list[dict[str, Any]] = []
+    for entry in entries[:30]:
+        if not isinstance(entry, dict):
+            payload_items.append({"invalid": True})
+            continue
+        payload_items.append(
+            {
+                "id": str(entry.get("id") or entry.get("action_id") or "")[:80],
+                "type": str(entry.get("type") or "")[:40],
+                "action": str(entry.get("action") or "")[:40],
+                "text": str(entry.get("command_text") or entry.get("raw_text") or "")[:160],
+                "drug": str(entry.get("drug_name") or "")[:80],
+                "quantity": entry.get("quantity"),
+                "payment": str(entry.get("payment_method") or "")[:40],
+                "confirmation_whatsapp_present": bool(str(entry.get("confirmation_whatsapp") or "").strip()),
+            }
+        )
+    print(
+        "REAL_BROWSER_OFFLINE_PAYLOAD_RECEIVED "
+        + json.dumps(
+            {
+                "confirmation_whatsapp_present": confirmation_whatsapp_present,
+                "entry_count": len(entries),
+                "items": payload_items,
+            },
+            ensure_ascii=True,
+        ),
+        flush=True,
+    )
 
     synced: list[dict[str, Any]] = []
     failed: list[dict[str, Any]] = []
@@ -988,10 +1051,14 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
             append_offline_sync_log(entry_for_log, "pending", "", reason)
     message = offline_sync_success_message(entries, synced) if synced else ""
     for item in synced:
+        summary_payload = {
+            "id": str(item.get("id") or ""),
+            "status": str(item.get("status") or ""),
+            "summary": compact_offline_reply(str(item.get("reply") or item.get("result_summary") or "")),
+        }
         print(
             "REAL_OFFLINE_RESULT_SUMMARY "
-            f"id={item.get('id', '')} status={item.get('status', '')} "
-            f"summary={compact_offline_reply(str(item.get('reply') or item.get('result_summary') or ''))}",
+            + json.dumps(summary_payload, ensure_ascii=True),
             flush=True,
         )
     has_new_synced_records = any(str(item.get("status") or "") != "already_synced" for item in synced)

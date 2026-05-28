@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0f6b46">
   <title>PharMareen Offline Mode</title>
   <link rel="manifest" href="/offline_app/manifest.json">
-  <link rel="stylesheet" href="/offline_app/styles.css">
+  <link rel="stylesheet" href="/offline_app/styles.css?v=realpath-stock-safety-v2026-05-28-1">
 </head>
 <body>
   <main class="app-shell">
@@ -14,6 +14,7 @@
       <div>
         <p class="eyebrow">PharMareen</p>
         <h1>PharMareen Pharmacy Assistant</h1>
+        <p class="version-pill">PHARMAREEN REAL PATH BUILD realpath-stock-safety-v2026-05-28-1</p>
         <p class="version-pill">PHASE 6 FINAL WORKING - SMOOTH TEST v2026-05-15</p>
         <p class="version-pill">PHARMAREEN SMOOTH TEST v2026-05-15</p>
         <p class="version-pill subtle-marker">PHASE 6 FINAL MEDIA SAVE WORKING</p>
@@ -24,6 +25,14 @@
     <section class="panel intro-panel">
       <h2>Offline Mode</h2>
       <p class="hint">Saved safely on this phone. Record sales, stock, photos, and voice notes when internet is weak. They send automatically when the phone is online again.</p>
+    </section>
+
+    <section class="panel confirmation-panel" aria-label="WhatsApp confirmation settings">
+      <p class="eyebrow">Confirmation WhatsApp</p>
+      <h2>Where should sync confirmations go?</h2>
+      <label for="confirmationWhatsapp">Confirmation WhatsApp Number</label>
+      <input id="confirmationWhatsapp" type="tel" inputmode="tel" placeholder="+2547XXXXXXXX">
+      <p class="hint">Offline sync summaries will be sent to this WhatsApp number after records are saved safely.</p>
     </section>
 
     <section class="panel dashboard-actions" aria-label="Pharmacy dashboard actions">
@@ -151,7 +160,7 @@
     </section>
 
     <section class="panel">
-      <h2>Sent successfully</h2>
+      <h2>Synced safely</h2>
       <ul id="syncedEntries" class="entry-list"></ul>
     </section>
   </main>
@@ -160,7 +169,7 @@
     <li class="empty">Nothing here yet.</li>
   </template>
 
-  <script src="/offline_app/parser.js" defer></script>
-  <script src="/offline_app/app.js" defer></script>
+  <script src="/offline_app/parser.js?v=realpath-stock-safety-v2026-05-28-1" defer></script>
+  <script src="/offline_app/app.js?v=realpath-stock-safety-v2026-05-28-1" defer></script>
 </body>
 </html>

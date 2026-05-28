@@ -10,8 +10,10 @@ const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
-const SERVICE_WORKER_VERSION = "phase6-smooth-test-v15";
+const OFFLINE_APP_BUILD_VERSION = "realpath-stock-safety-v2026-05-28-1";
+const SERVICE_WORKER_VERSION = "pharmareen-offline-v16-realpath-stock-safety";
 const DEFAULT_MEDICINE_SHORTCUTS = ["Panadol", "Amox", "Piriton", "ORS"];
+console.log(`OFFLINE_APP_BUILD_VERSION=${OFFLINE_APP_BUILD_VERSION}`);
 
 const examples = {
   sale: "Panadol sold 2",
@@ -890,7 +892,11 @@ async function syncQueue() {
     const response = await fetch("/offline/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entries, confirmation_whatsapp: confirmation })
+      body: JSON.stringify({
+        entries,
+        confirmation_whatsapp: confirmation,
+        offline_app_build_version: OFFLINE_APP_BUILD_VERSION
+      })
     });
     const data = await response.json();
     await mergeResults(toSync, data);

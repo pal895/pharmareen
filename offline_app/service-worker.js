@@ -1,4 +1,5 @@
-const CACHE_NAME = "pharmareen-offline-v15";
+const CACHE_NAME = "pharmareen-offline-v16-realpath-stock-safety";
+console.log("OFFLINE_APP_BUILD_VERSION=realpath-stock-safety-v2026-05-28-1 service-worker");
 const APP_SHELL = [
   "/offline-app",
   "/offline_app/index.html",

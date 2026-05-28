@@ -66,9 +66,6 @@ class FakeSpreadsheet:
         return self.worksheets[title]
 
 
-LOCAL_TMP = Path(__file__).parent / "_tmp_service_accounts"
-
-
 def make_settings(service_account_path: str) -> Settings:
     return Settings(
         _env_file=None,
@@ -90,9 +87,8 @@ def make_fake_sheet_store(worksheets) -> GoogleSheetsStore:
 
 
 @pytest.mark.parametrize("file_contents", ["", "{not-json"])
-def test_store_starts_unavailable_for_empty_or_invalid_service_account(file_contents):
-    LOCAL_TMP.mkdir(exist_ok=True)
-    service_account = LOCAL_TMP / f"service-account-{uuid4().hex}.json"
+def test_store_starts_unavailable_for_empty_or_invalid_service_account(file_contents, tmp_path):
+    service_account = tmp_path / f"service-account-{uuid4().hex}.json"
     service_account.write_text(file_contents, encoding="utf-8")
 
     store = GoogleSheetsStore(make_settings(str(service_account)))
@@ -103,9 +99,8 @@ def test_store_starts_unavailable_for_empty_or_invalid_service_account(file_cont
     service_account.unlink(missing_ok=True)
 
 
-def test_store_starts_unavailable_for_missing_service_account():
-    LOCAL_TMP.mkdir(exist_ok=True)
-    missing_service_account = LOCAL_TMP / f"missing-service-account-{uuid4().hex}.json"
+def test_store_starts_unavailable_for_missing_service_account(tmp_path):
+    missing_service_account = tmp_path / f"missing-service-account-{uuid4().hex}.json"
 
     store = GoogleSheetsStore(make_settings(str(missing_service_account)))
 
@@ -267,6 +262,28 @@ def test_find_stock_reads_nonstandard_inventory_title_and_headers_for_safety():
     assert stock.reorder_level == 10
     assert safety_stock is not None
     assert safety_stock.current_stock == 0
+
+
+def test_find_stock_reads_legacy_stock_sheet_when_inventory_name_is_missing():
+    master = FakeWorksheet(
+        [
+            ["Drug Name", "Selling Price", "Cost Price", "Current Stock", "Reorder Level"],
+            ["ORS", "80", "50", "2", "10"],
+        ]
+    )
+    stock_sheet = FakeWorksheet(
+        [
+            ["Item Name", "Available Stock", "Unit Cost", "Unit Price", "Minimum Stock"],
+            ["ORS", "0", "50", "80", "10"],
+        ]
+    )
+    store = make_fake_sheet_store({MASTER_STOCK: master, "Stock": stock_sheet})
+
+    stock = store.find_stock_for_safety("ORS")
+
+    assert stock is not None
+    assert stock.current_stock == 0
+    assert stock.selling_price == 80
 
 
 def test_update_current_stock_updates_master_stock_and_inventory_tabs():
