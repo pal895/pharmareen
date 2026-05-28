@@ -678,6 +678,30 @@ def test_string_zero_stock_from_sheets_records_missed_sale_without_deducting_sto
     assert not any(transaction["Type"] == "sale" and transaction["Drug"] == "ORS" for transaction in store.transactions)
 
 
+def test_shared_sale_path_uses_safety_stock_before_recording_sale():
+    class SplitTruthStore(FakeStore):
+        def find_stock(self, drug_name):
+            if str(drug_name).lower() == "ors":
+                return StockItem("ORS", 80, 50, 2, 10, 8)
+            return super().find_stock(drug_name)
+
+        def find_stock_for_safety(self, drug_name, pharmacy_id=None):
+            if str(drug_name).lower() == "ors":
+                return StockItem("ORS", 80, 50, 0, 10, 8)
+            return self.find_stock(drug_name)
+
+    store = SplitTruthStore()
+    service = IntakeService(FailingParser(), store)
+
+    reply = service.process_text("ORS 2 cash")
+
+    assert "ORS out of stock" in reply
+    assert "Sale not recorded" in reply
+    assert "Missed sale saved: ORS x2" in reply
+    assert not any(transaction["Type"] == "sale" and transaction["Drug"] == "ORS" for transaction in store.transactions)
+    assert store.transactions[-1]["Type"] == "no_stock"
+
+
 def test_out_of_stock_missing_from_master_stock_still_logs():
     store = FakeStore()
     service = IntakeService(

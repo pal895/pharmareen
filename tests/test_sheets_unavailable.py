@@ -242,6 +242,33 @@ def test_find_stock_sees_prefixed_inventory_zero_even_without_default_pharmacy_s
     assert safety_stock.current_stock == 0
 
 
+def test_find_stock_reads_nonstandard_inventory_title_and_headers_for_safety():
+    master = FakeWorksheet(
+        [
+            ["Drug Name", "Selling Price", "Cost Price", "Current Stock", "Reorder Level"],
+            ["ORS", "80", "50", "2", "10"],
+        ]
+    )
+    live_inventory = FakeWorksheet(
+        [
+            ["Medicine", "Quantity", "Unit Cost", "Price", "Min Stock"],
+            ["ORS", "0", "50", "80", "10"],
+        ]
+    )
+    store = make_fake_sheet_store({MASTER_STOCK: master, "Main Pharmacy Inventory": live_inventory})
+
+    stock = store.find_stock("ORS")
+    safety_stock = store.find_stock_for_safety("ORS")
+
+    assert stock is not None
+    assert stock.current_stock == 0
+    assert stock.selling_price == 80
+    assert stock.cost_price == 50
+    assert stock.reorder_level == 10
+    assert safety_stock is not None
+    assert safety_stock.current_stock == 0
+
+
 def test_update_current_stock_updates_master_stock_and_inventory_tabs():
     master = FakeWorksheet(
         [
@@ -297,6 +324,28 @@ def test_update_current_stock_updates_default_pharmacy_inventory_tab():
     assert master.updated_cells == [(2, 4, 0)]
     assert pharmacy_inventory.updated_cells == [(2, 2, 0)]
     assert global_inventory.updated_cells == [(2, 2, 0)]
+
+
+def test_update_current_stock_updates_nonstandard_inventory_quantity_column():
+    master = FakeWorksheet(
+        [
+            ["Drug Name", "Selling Price", "Cost Price", "Current Stock", "Reorder Level"],
+            ["ORS", "80", "50", "2", "10"],
+        ]
+    )
+    live_inventory = FakeWorksheet(
+        [
+            ["Medicine", "Quantity", "Unit Cost", "Price", "Min Stock"],
+            ["ORS", "0", "50", "80", "10"],
+        ]
+    )
+    store = make_fake_sheet_store({MASTER_STOCK: master, "Main Pharmacy Inventory": live_inventory})
+    stock = store.find_stock("ORS")
+
+    store.update_current_stock(stock, 0)
+
+    assert master.updated_cells == [(2, 4, 0)]
+    assert live_inventory.updated_cells == [(2, 2, 0)]
 
 
 def test_health_and_test_endpoint_work_when_sheets_are_unavailable(monkeypatch):

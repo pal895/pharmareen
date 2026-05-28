@@ -1097,6 +1097,7 @@ class IntakeService:
         base_quantity = self._to_base_quantity(stock.drug_name, quantity, unit) if unit else (base_quantity or to_base_quantity(quantity, unit))
         payment_method = payment_method or "Cash"
         discount = float(discount or 0)
+        stock = self._stock_with_safety_quantity(stock)
         current_stock_value = parse_int(stock.current_stock, default=None)
         if current_stock_value is not None and current_stock_value < base_quantity:
             return self._record_missed_sale_attempt(
@@ -1782,6 +1783,31 @@ class IntakeService:
             )
         except Exception:
             return
+
+    def _stock_with_safety_quantity(self, stock: StockItem) -> StockItem:
+        """Apply the read-only lowest trusted stock before any sale is saved."""
+        safety_lookup = getattr(self.store, "find_stock_for_safety", None)
+        if not callable(safety_lookup):
+            return stock
+        try:
+            safety_stock = safety_lookup(stock.drug_name)
+        except TypeError:
+            try:
+                safety_stock = safety_lookup(stock.drug_name, pharmacy_id=None)
+            except Exception:
+                safety_stock = None
+        except Exception:
+            safety_stock = None
+        if safety_stock is None:
+            return stock
+        return StockItem(
+            drug_name=stock.drug_name or safety_stock.drug_name,
+            selling_price=stock.selling_price if stock.selling_price is not None else safety_stock.selling_price,
+            cost_price=stock.cost_price if stock.cost_price is not None else safety_stock.cost_price,
+            current_stock=safety_stock.current_stock,
+            reorder_level=stock.reorder_level if stock.reorder_level is not None else safety_stock.reorder_level,
+            row_number=stock.row_number,
+        )
 
     def _resolve_stock(self, drug_name: str) -> StockItem | None:
         stock = self.store.find_stock(drug_name)

@@ -38,6 +38,114 @@ SHEETS_UNAVAILABLE_MESSAGE = (
 
 logger = logging.getLogger(__name__)
 
+STOCK_NAME_HEADERS = [
+    "Drug",
+    "Drug Name",
+    "Medicine",
+    "Medicine Name",
+    "Item",
+    "Item Name",
+    "Product",
+    "Product Name",
+    "Name",
+]
+
+STOCK_QUANTITY_HEADERS = [
+    "Stock",
+    "Current Stock",
+    "Current Stock Level",
+    "Quantity",
+    "Qty",
+    "On Hand",
+    "Available",
+    "Available Stock",
+    "Balance",
+    "Stock Left",
+]
+
+STOCK_COST_HEADERS = [
+    "Cost Price",
+    "Default Cost Price",
+    "Buying Price",
+    "Unit Cost",
+    "Average Cost",
+]
+
+STOCK_SELLING_HEADERS = [
+    "Selling Price",
+    "Default Selling Price",
+    "Price",
+    "Unit Price",
+]
+
+STOCK_REORDER_HEADERS = [
+    "Low Stock Alert Level",
+    "Reorder Level",
+    "Minimum Stock",
+    "Min Stock",
+    "Restock Level",
+]
+
+INVENTORY_TITLE_BLOCKLIST = {
+    "audit",
+    "dailylog",
+    "dailyreports",
+    "importreview",
+    "issued",
+    "issuelog",
+    "log",
+    "offline",
+    "report",
+    "request",
+    "restocklog",
+    "return",
+    "saleslog",
+    "settings",
+    "supplier",
+    "transaction",
+}
+
+
+def record_text_value(record: dict[str, Any], aliases: list[str]) -> str:
+    for alias in aliases:
+        value = record.get(alias)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return ""
+
+
+def record_int_value(record: dict[str, Any], aliases: list[str]) -> int | None:
+    for alias in aliases:
+        value = parse_int(record.get(alias), default=None)
+        if value is not None:
+            return value
+    return None
+
+
+def record_money_value(record: dict[str, Any], aliases: list[str]) -> float | None:
+    for alias in aliases:
+        value = parse_money(record.get(alias))
+        if value is not None:
+            return value
+    return None
+
+
+def is_inventory_worksheet_title(title: str) -> bool:
+    clean_title = str(title or "").strip()
+    if not clean_title:
+        return False
+    key = normalize_key(clean_title)
+    if key == normalize_key(INVENTORY):
+        return True
+    if key.endswith("inventory"):
+        return True
+    if "inventory" not in key:
+        return False
+    return not any(blocked in key for blocked in INVENTORY_TITLE_BLOCKLIST)
+
 
 class SheetsUnavailableError(RuntimeError):
     pass
@@ -320,7 +428,7 @@ class GoogleSheetsStore:
             inventory = inventory_records[0][1] if inventory_records else {}
             master_stock = parse_int(record.get("Current Stock"), default=None)
             inventory_stocks = [
-                parse_int(item.get("Stock") or item.get("Current Stock"), default=None)
+                record_int_value(item, STOCK_QUANTITY_HEADERS)
                 for _title, item, _row in inventory_records
             ]
             inventory_stocks = [value for value in inventory_stocks if value is not None]
@@ -329,23 +437,28 @@ class GoogleSheetsStore:
 
             return StockItem(
                 drug_name=name,
-                selling_price=parse_money(record.get("Selling Price")) or parse_money(inventory.get("Selling Price")),
-                cost_price=parse_money(record.get("Cost Price")) or parse_money(inventory.get("Cost Price")),
+                selling_price=parse_money(record.get("Selling Price")) or record_money_value(inventory, STOCK_SELLING_HEADERS),
+                cost_price=parse_money(record.get("Cost Price")) or record_money_value(inventory, STOCK_COST_HEADERS),
                 current_stock=min(stock_values) if stock_values else None,
                 reorder_level=reorder_level
                 if reorder_level is not None
-                else parse_int(inventory.get("Low Stock Alert Level") or inventory.get("Reorder Level"), default=None),
+                else record_int_value(inventory, STOCK_REORDER_HEADERS),
                 row_number=row_number,
             )
         if inventory_records:
             _title, record, _row_number = inventory_records[0]
-            name = str(record.get("Drug") or record.get("Drug Name") or "").strip()
+            name = record_text_value(record, STOCK_NAME_HEADERS)
+            stock_values = [
+                record_int_value(item, STOCK_QUANTITY_HEADERS)
+                for _title, item, _row in inventory_records
+            ]
+            stock_values = [value for value in stock_values if value is not None]
             return StockItem(
                 drug_name=name,
-                selling_price=parse_money(record.get("Selling Price")),
-                cost_price=parse_money(record.get("Cost Price")),
-                current_stock=parse_int(record.get("Stock") or record.get("Current Stock"), default=None),
-                reorder_level=parse_int(record.get("Low Stock Alert Level") or record.get("Reorder Level"), default=None),
+                selling_price=record_money_value(record, STOCK_SELLING_HEADERS),
+                cost_price=record_money_value(record, STOCK_COST_HEADERS),
+                current_stock=min(stock_values) if stock_values else None,
+                reorder_level=record_int_value(record, STOCK_REORDER_HEADERS),
                 row_number=None,
             )
         return None
@@ -633,7 +746,7 @@ class GoogleSheetsStore:
         titles: list[str] = []
         for title in candidates:
             clean_title = str(title or "").strip()
-            if clean_title and clean_title != INVENTORY and clean_title.lower().endswith("_inventory"):
+            if is_inventory_worksheet_title(clean_title) and clean_title != INVENTORY:
                 titles.append(clean_title)
         return titles
 
@@ -647,7 +760,7 @@ class GoogleSheetsStore:
             try:
                 worksheet = self._worksheet(title)
                 values = worksheet.get_all_values()
-            except WorksheetNotFound:
+            except (WorksheetNotFound, KeyError):
                 continue
             if not values:
                 continue
@@ -660,11 +773,23 @@ class GoogleSheetsStore:
                     for index, header in enumerate(headers)
                     if header
                 }
-                record.setdefault("Drug", record.get("Drug Name", ""))
-                record.setdefault("Drug Name", record.get("Drug", ""))
-                record.setdefault("Cost Price", record.get("Default Cost Price", ""))
-                record.setdefault("Selling Price", record.get("Default Selling Price", ""))
-                record.setdefault("Low Stock Alert Level", record.get("Reorder Level", ""))
+                name = record_text_value(record, STOCK_NAME_HEADERS)
+                if name:
+                    record.setdefault("Drug", name)
+                    record.setdefault("Drug Name", name)
+                stock_value = record_int_value(record, STOCK_QUANTITY_HEADERS)
+                if stock_value is not None:
+                    record.setdefault("Stock", stock_value)
+                    record.setdefault("Current Stock", stock_value)
+                cost_price = record_money_value(record, STOCK_COST_HEADERS)
+                if cost_price is not None:
+                    record.setdefault("Cost Price", cost_price)
+                selling_price = record_money_value(record, STOCK_SELLING_HEADERS)
+                if selling_price is not None:
+                    record.setdefault("Selling Price", selling_price)
+                reorder_level = record_int_value(record, STOCK_REORDER_HEADERS)
+                if reorder_level is not None:
+                    record.setdefault("Low Stock Alert Level", reorder_level)
                 records.append((title, record, row_number))
         return records
 
@@ -679,7 +804,7 @@ class GoogleSheetsStore:
             pharmacy_id=pharmacy_id,
             include_all=include_all,
         ):
-            name = str(record.get("Drug") or record.get("Drug Name") or "").strip()
+            name = record_text_value(record, STOCK_NAME_HEADERS)
             if normalize_key(name) == wanted_key:
                 matches.append((title, record, row_number))
         return matches
@@ -688,13 +813,13 @@ class GoogleSheetsStore:
         wanted = normalize_key(drug_name)
         if not wanted:
             return
-        matches = self._find_inventory_stock_records(wanted)
+        matches = self._find_inventory_stock_records(wanted, include_all=True)
         if not matches:
             return
         header_aliases = {
-            "Stock": ["Stock", "Current Stock"],
-            "Cost Price": ["Cost Price", "Default Cost Price"],
-            "Selling Price": ["Selling Price", "Default Selling Price"],
+            "Stock": STOCK_QUANTITY_HEADERS,
+            "Cost Price": STOCK_COST_HEADERS,
+            "Selling Price": STOCK_SELLING_HEADERS,
         }
         for title, _record, row_number in matches:
             worksheet = self._worksheet(title)

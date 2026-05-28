@@ -1073,7 +1073,7 @@ def test_debug_offline_confirmation_send_test_defaults_to_live_verification_numb
     assert queued.json()["status"] == "queued_for_bridge"
     assert queued.json()["queued"]["status"] == "queued"
     assert outbox.json()["pending_count"] == 1
-    assert outbox.json()["confirmations"][0]["to"] == "254708061426@s.whatsapp.net"
+    assert outbox.json()["confirmations"][0]["to"] == "254728571649@s.whatsapp.net"
     assert "PharMareen bridge delivery test" in outbox.json()["confirmations"][0]["message"]
 
 

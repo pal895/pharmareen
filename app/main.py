@@ -848,7 +848,7 @@ async def debug_send_test_offline_confirmation(request: Request) -> dict[str, An
         payload = await request.json()
     except Exception:
         payload = {}
-    raw_recipient = str((payload.get("to") if isinstance(payload, dict) else "") or "").strip() or "+254708061426"
+    raw_recipient = str((payload.get("to") if isinstance(payload, dict) else "") or "").strip() or "+254728571649"
     recipient = offline_confirmation_recipient({"confirmation_whatsapp": raw_recipient})
     message = str((payload.get("message") if isinstance(payload, dict) else "") or "").strip()
     if not message:
