@@ -1630,6 +1630,30 @@ def test_no_space_report_analytics_and_receipt_commands_are_deterministic():
     assert "PHARMAREEN RECEIPT" in service.process_text("printreceipt", conversation_id="owner")
 
 
+def test_replace_last_sale_with_inventory_medicine_and_undo_number_is_safe():
+    store = FakeStore()
+    store.stocks["glucose"] = StockItem(
+        drug_name="Glucose",
+        selling_price=100,
+        cost_price=70,
+        current_stock=12,
+        reorder_level=4,
+        row_number=10,
+    )
+    service = IntakeService(FailingParser(), store)
+
+    first = service.process_text("Panadol 2 cash", conversation_id="rush")
+    replaced = service.process_text("replace last sale with glucose 5", conversation_id="rush")
+    unsafe_undo = service.process_text("undo3", conversation_id="rush")
+
+    assert "Panadol x2" in first
+    assert "Replaced last sale safely" in replaced
+    assert "Glucose x5" in replaced
+    assert store.stocks["panadol"].current_stock == 20
+    assert store.stocks["glucose"].current_stock == 7
+    assert unsafe_undo == "Which sale should I undo? Send undo last sale or cancel TX-1046."
+
+
 def test_swahili_undo_last_sale_asks_short_confirmation_then_reverses_stock():
     store = FakeStore()
     service = IntakeService(FailingParser(), store)

@@ -82,12 +82,14 @@ def log_ai_call(reason: str, route: str, purpose: str) -> None:
     print(f"AI_CALL route={route} reason={reason} purpose={purpose}", flush=True)
 
 
-def log_ai_route_decision(*, text: str, route: str, used_ai: bool, reason: str) -> None:
+def log_ai_route_decision(*, text: str, route: str, used_ai: bool, reason: str, job_id: str = "", from_cache: bool = False) -> None:
     record = {
         "text": str(text or "")[:160],
         "route": str(route or "unknown"),
         "used_ai": bool(used_ai),
         "reason": str(reason or ""),
+        "job_id": str(job_id or "")[:120],
+        "from_cache": bool(from_cache),
     }
     AI_ROUTE_DECISION_LOG.append(record)
     del AI_ROUTE_DECISION_LOG[:-50]

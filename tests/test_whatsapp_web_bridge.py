@@ -1003,6 +1003,50 @@ def test_whatsapp_voice_repairs_melikas_as_mbili_cash(monkeypatch):
     assert "Panadol x2 cash recorded" in data["reply"]
 
 
+def test_whatsapp_voice_reconstructs_inventory_medicines_without_ai_interpretation(monkeypatch):
+    from app.ai import AI_ROUTE_DECISION_LOG
+
+    class FakeTranscriptionService:
+        is_available = True
+
+        def __init__(self, transcripts: list[str]):
+            self.transcripts = transcripts
+
+        def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
+            return self.transcripts.pop(0)
+
+    transcripts = ["Glucose mbili mpesa", "ORS mbili cash"]
+    transcription = FakeTranscriptionService(transcripts)
+    seen: list[str] = []
+
+    def fake_process_intake_text_for_sender(text: str, sender: str) -> str:
+        seen.append(text)
+        if text.startswith("Glucose"):
+            return "Glucose x2 M-Pesa recorded\nStock left: 44"
+        return "⚠️ ORS out of stock. Sale not recorded. Missed sale saved: ORS x2. Stock left: 0"
+
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_transcription_service", lambda: transcription)
+    monkeypatch.setattr(main, "process_intake_text_for_sender", fake_process_intake_text_for_sender)
+    AI_ROUTE_DECISION_LOG.clear()
+
+    with TestClient(main.app) as client:
+        for _ in range(2):
+            payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+            payload["media_base64"] = base64.b64encode(b"fake voice bytes").decode("ascii")
+            payload["media_mime_type"] = "audio/ogg"
+            response = client.post("/bridge/whatsapp-web", json=payload)
+            assert response.status_code == 200
+
+    assert seen == ["Glucose 2 mpesa", "ORS 2 cash"]
+    assert all(item["route"] == "audio/transcriptions" for item in AI_ROUTE_DECISION_LOG)
+    assert all(item["reason"] == "voice_transcription" for item in AI_ROUTE_DECISION_LOG)
+
+
 def test_invoice_review_approve_updates_stock_after_ai_extraction(monkeypatch, tmp_path):
     class FakeAIService:
         client = object()

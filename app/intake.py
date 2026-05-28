@@ -447,6 +447,9 @@ class IntakeService:
         if is_process_batch_command(text):
             return "No saved offline entries yet.\n\nSend sales together like:\nPanadol 2\nAmoxil 1"
 
+        if is_unsafe_undo_number_command(text):
+            return "Which sale should I undo? Send undo last sale or cancel TX-1046."
+
         if is_details_last_command(text):
             return self._details_last_reply(conversation_key)
 
@@ -475,6 +478,10 @@ class IntakeService:
         quantity_correction = parse_quantity_correction_command(text)
         if quantity_correction is not None:
             return self._quantity_correction_reply(quantity_correction, conversation_key)
+
+        replacement = parse_replace_last_sale_command(text)
+        if replacement is not None:
+            return self._replace_last_sale_reply(replacement, conversation_key)
 
         conversion = parse_conversion_command(text)
         if conversion is not None:
@@ -2016,6 +2023,38 @@ class IntakeService:
         sale["quantity"] = new_base
         return f"✅ Updated last {drug_name} sale quantity: {old_display} → {new_display}"
 
+    def _replace_last_sale_reply(self, instruction: dict[str, Any], conversation_key: str) -> str:
+        sale = self.last_sale_by_conversation.get(conversation_key)
+        if not sale:
+            return "No recent sale found to replace."
+        drug_name = str(instruction.get("drug_name") or "")
+        resolution = self._resolve_drug_name(drug_name)
+        if resolution.question:
+            return resolution.question
+        if not resolution.drug_name:
+            return f"⚠ {title_drug_name(drug_name)} is not yet in your inventory. Add it during restock first."
+        old_drug = str(sale.get("drug_name") or "last sale")
+        old_display = parse_int(sale.get("display_quantity"), default=parse_int(sale.get("quantity"), default=0)) or 0
+        old_payment = str(sale.get("payment_method") or "Cash")
+        payment = str(instruction.get("payment_method") or old_payment or "Cash")
+        quantity = positive_quantity(instruction.get("quantity") or 1)
+        self._commit_void(sale, "Replaced by user", conversation_key)
+        result = self._record_sale(
+            resolution.drug_name,
+            quantity,
+            payment_method=payment,
+            conversation_key=conversation_key,
+        )
+        if not result.logged:
+            return result.reply
+        return "\n".join(
+            [
+                "✅ Replaced last sale safely",
+                f"{old_drug} x{old_display} removed",
+                result.reply,
+            ]
+        )
+
 
     def _best_seller_reply(self, text: str) -> str:
         now = now_in_timezone(self.timezone)
@@ -2595,6 +2634,24 @@ def parse_quantity_correction_command(text: str) -> dict[str, Any] | None:
         amount = re.search(r"\d+", clean)
         return {"mode": "increase", "quantity": positive_quantity(amount.group(0) if amount else 1)}
     return None
+
+def parse_replace_last_sale_command(text: str) -> dict[str, Any] | None:
+    clean = normalize_natural_text(replace_number_words(text.strip()))
+    match = re.fullmatch(
+        rf"(?:replace|badilisha)\s+(?:last\s+sale|last|ya\s+mwisho|ile\s+ya\s+mwisho|hiyo\s+ya\s+mwisho)\s+(?:with|to|iwe)\s+(.+?)\s+(\d+)(?:\s+({payment_pattern()}))?",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return None
+    return {
+        "drug_name": title_drug_name(match.group(1)),
+        "quantity": positive_quantity(match.group(2)),
+        "payment_method": parse_payment_method(match.group(3) or "") if match.group(3) else "",
+    }
+
+def is_unsafe_undo_number_command(text: str) -> bool:
+    return re.fullmatch(r"(?:undo|void|cancel)\s+\d+", normalize_natural_text(text.strip()), flags=re.IGNORECASE) is not None
 
 def is_best_seller_command(text: str) -> bool:
     key = normalize_key(text)

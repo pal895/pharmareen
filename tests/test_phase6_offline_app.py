@@ -763,7 +763,7 @@ def test_offline_sync_routes_confirmation_to_linked_whatsapp_number(monkeypatch,
     assert "Panadol x2 cash recorded" in confirmations[0]["message"]
 
 
-def test_offline_sync_with_explicit_confirmation_queues_even_if_already_synced(monkeypatch, tmp_path):
+def test_offline_sync_with_explicit_confirmation_dedupes_already_synced_confirmation(monkeypatch, tmp_path):
     class ReplyingIntake:
         def process_text(self, text: str) -> str:
             return "Panadol x2 cash recorded\nStock left: 721"
@@ -786,9 +786,10 @@ def test_offline_sync_with_explicit_confirmation_queues_even_if_already_synced(m
         outbox = client.get("/offline/whatsapp-confirmations")
 
     assert first.json()["whatsapp_confirmation"]["status"] == "queued"
-    assert second.json()["whatsapp_confirmation"]["status"] == "queued"
+    assert second.json()["whatsapp_confirmation"]["status"] == "not_queued"
+    assert second.json()["whatsapp_confirmation"]["reason"] == "duplicate"
     confirmations = outbox.json()["confirmations"]
-    assert len(confirmations) == 2
+    assert len(confirmations) == 1
     assert all(item["to"] == "254711111111@s.whatsapp.net" for item in confirmations)
     assert "Panadol x2 cash recorded" in confirmations[-1]["message"]
 
@@ -1220,3 +1221,52 @@ def test_offline_sync_media_results_are_preserved_and_grouped(monkeypatch, tmp_p
     assert "Paracetamol x20" in replies_by_id["offline-invoice-result"]
     assert "Piriton x1 M-Pesa recorded" in data["whatsapp_reply"]
     assert "Invoice processed" in data["whatsapp_reply"]
+
+
+def test_offline_media_sync_reuses_job_result_and_dedupes_confirmation(monkeypatch, tmp_path):
+    calls: list[str] = []
+
+    async def fake_process_whatsapp_web_payload(**kwargs):
+        calls.append(str(kwargs.get("message_id") or ""))
+        return main.WhatsAppProcessResult(
+            reply="🎙 Voice synced: Glucose x2 M-Pesa recorded\nStock left: 44",
+            message_type="voice",
+            success=True,
+            command_handler="voice_note_processed",
+        )
+
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(main, "process_whatsapp_web_payload", fake_process_whatsapp_web_payload)
+    main.offline_synced_entry_ids.clear()
+    main.offline_synced_entry_results.clear()
+    main.offline_media_job_results.clear()
+    main.offline_whatsapp_outbox.clear()
+    main.offline_whatsapp_confirmation_history.clear()
+
+    payload = {
+        "sender": "254700000000@s.whatsapp.net",
+        "confirmation_whatsapp": "+254711111111",
+        "entries": [
+            {
+                "id": "offline-voice-retry-a",
+                "job_id": "voice-job-44",
+                "action": "voice",
+                "file_type": "audio/ogg",
+                "data_url": "data:audio/ogg;base64," + base64.b64encode(b"voice").decode("ascii"),
+                "sync_status": "pending",
+            }
+        ],
+    }
+
+    with TestClient(main.app) as client:
+        first = client.post("/offline/sync", json=payload)
+        payload["entries"][0]["id"] = "offline-voice-retry-b"
+        second = client.post("/offline/sync", json=payload)
+        outbox = client.get("/offline/whatsapp-confirmations")
+
+    assert first.json()["synced"][0]["reply"].startswith("🎙 Voice synced")
+    assert second.json()["synced"][0]["reply"].startswith("🎙 Voice synced")
+    assert second.json()["synced"][0]["status"] == "already_synced"
+    assert calls == ["offline-voice-retry-a"]
+    assert len(outbox.json()["confirmations"]) == 1
+    assert "Glucose x2 M-Pesa" in outbox.json()["confirmations"][0]["message"]

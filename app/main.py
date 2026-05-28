@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import logging
 import os
@@ -29,7 +30,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.ai import AIService, ai_usage_snapshot
+from app.ai import AIService, ai_usage_snapshot, log_ai_route_decision
 from app.config import Settings, get_settings
 from app.demo_store import DemoPharmacyStore
 from app.intake import IntakeService, normalize_key, normalize_spoken_command_text, parse_operating_commands
@@ -58,6 +59,7 @@ logger = logging.getLogger(__name__)
 processed_message_sids: set[str] = set()
 offline_synced_entry_ids: set[str] = set()
 offline_synced_entry_results: dict[str, dict[str, Any]] = {}
+offline_media_job_results: dict[str, dict[str, Any]] = {}
 offline_whatsapp_outbox: list[dict[str, Any]] = []
 offline_whatsapp_confirmation_history: list[dict[str, Any]] = []
 pending_voice_confirmations: dict[str, tuple[str, float]] = {}
@@ -590,7 +592,26 @@ def apply_voice_medicine_aliases(text: str) -> str:
     return clean
 
 
-def repair_voice_medicine_tokens(text: str) -> str:
+def voice_medicine_names_from_inventory() -> list[str]:
+    names: list[str] = []
+    try:
+        names.extend(str(name).strip() for name in get_intake_service().store.list_master_drug_names())
+    except Exception:
+        pass
+    names.extend(VOICE_MEDICINE_NAMES)
+    seen: set[str] = set()
+    unique: list[str] = []
+    for name in names:
+        key = re.sub(r"[^a-z0-9]+", "", name.lower())
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        unique.append(name)
+    return unique
+
+
+def repair_voice_medicine_tokens(text: str, medicine_names: list[str] | None = None) -> str:
+    names = medicine_names or VOICE_MEDICINE_NAMES
     tokens = text.split()
     repaired: list[str] = []
     for token in tokens:
@@ -598,7 +619,7 @@ def repair_voice_medicine_tokens(text: str) -> str:
         if len(bare) < 5 or bare.lower() in VOICE_NON_MEDICINE_WORDS:
             repaired.append(token)
             continue
-        best = max(VOICE_MEDICINE_NAMES, key=lambda name: voice_token_similarity(bare, name))
+        best = max(names, key=lambda name: voice_token_similarity(bare, name)) if names else token
         score = voice_token_similarity(bare, best)
         if score >= 0.80:
             repaired.append(best)
@@ -607,7 +628,7 @@ def repair_voice_medicine_tokens(text: str) -> str:
     return " ".join(repaired)
 
 
-def clean_voice_transcript_for_intake(transcript: str) -> str:
+def clean_voice_transcript_for_intake(transcript: str, medicine_names: list[str] | None = None) -> str:
     clean = " ".join(str(transcript or "").replace("\n", " ").split())
     if not clean:
         return ""
@@ -626,7 +647,7 @@ def clean_voice_transcript_for_intake(transcript: str) -> str:
     clean = re.sub(r"\bmpessa\b", "mpesa", clean, flags=re.IGNORECASE)
     clean = re.sub(r"^nimetoa\s+", "sold ", clean, flags=re.IGNORECASE)
     clean = apply_voice_medicine_aliases(clean)
-    clean = repair_voice_medicine_tokens(clean)
+    clean = repair_voice_medicine_tokens(clean, medicine_names=medicine_names)
     comma_parts = [part.strip() for part in clean.split(",") if part.strip()]
     if len(comma_parts) > 1 and all(len(part.split()) == 1 for part in comma_parts):
         clean = " ".join(comma_parts)
@@ -705,6 +726,25 @@ def remember_offline_synced_result(entry_id: str, record: dict[str, Any]) -> dic
     return stored
 
 
+def offline_media_job_id(entry: dict[str, Any]) -> str:
+    for key in ("job_id", "event_id", "media_job_id", "upload_id", "id", "action_id"):
+        value = str(entry.get(key) or "").strip()
+        if value:
+            return value
+    raw = "|".join(
+        str(entry.get(key) or "")
+        for key in ("file_name", "file_type", "purpose", "size", "timestamp")
+    )
+    return f"media-{hashlib.sha256(raw.encode('utf-8')).hexdigest()[:16]}" if raw.strip("|") else ""
+
+
+def cache_offline_media_result(job_id: str, record: dict[str, Any]) -> dict[str, Any]:
+    cached = dict(record)
+    cached["job_id"] = job_id
+    offline_media_job_results[job_id] = cached
+    return cached
+
+
 def offline_confirmation_recipient(payload: dict[str, Any]) -> str:
     settings = get_settings()
     entries = payload.get("entries") if isinstance(payload.get("entries"), list) else []
@@ -751,10 +791,14 @@ def has_explicit_offline_confirmation_recipient(payload: dict[str, Any]) -> bool
     )
 
 
-def queue_offline_whatsapp_confirmation(recipient: str, message: str) -> dict[str, Any] | None:
+def queue_offline_whatsapp_confirmation(recipient: str, message: str, *, dedupe_key: str = "") -> dict[str, Any] | None:
     if not recipient or not message.strip():
         return None
     load_offline_confirmation_state()
+    if dedupe_key:
+        for existing in [*offline_whatsapp_outbox, *offline_whatsapp_confirmation_history]:
+            if existing.get("dedupe_key") == dedupe_key and existing.get("to") == recipient:
+                return {"status": "not_queued", "reason": "duplicate", "id": existing.get("id", ""), "to": mask_phone(recipient)}
     item = {
         "id": f"offline-confirm-{int(time.time() * 1000)}-{len(offline_whatsapp_outbox) + 1}",
         "to": recipient,
@@ -763,6 +807,7 @@ def queue_offline_whatsapp_confirmation(recipient: str, message: str) -> dict[st
         "status": "pending",
         "attempts": 0,
         "last_error": "",
+        "dedupe_key": dedupe_key,
     }
     offline_whatsapp_outbox.append(item)
     save_offline_confirmation_state()
@@ -988,6 +1033,22 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
             append_offline_sync_log(entry, "already_synced", str(previous.get("reply") or previous.get("result_summary") or "Synced safely"), "")
             continue
         if action in {"photo", "image", "voice", "audio"}:
+            job_id = offline_media_job_id(entry)
+            if job_id and job_id in offline_media_job_results and not boolish(entry.get("force_reprocess")):
+                cached = dict(offline_media_job_results[job_id])
+                cached["id"] = entry_id
+                cached["status"] = "already_synced"
+                synced.append(cached)
+                log_ai_route_decision(
+                    text=job_id,
+                    route=str(cached.get("message_type") or action),
+                    used_ai=False,
+                    reason="offline_media_result_cache",
+                    job_id=job_id,
+                    from_cache=True,
+                )
+                append_offline_sync_log(entry, "already_synced", str(cached.get("reply") or cached.get("result_summary") or "Synced safely"), "")
+                continue
             media_base64, media_mime_type = media_base64_from_offline_entry(entry)
             if media_base64 and media_mime_type:
                 try:
@@ -1010,21 +1071,46 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
                         "message_type": result.message_type,
                         "command_handler": result.command_handler,
                         "whatsapp_confirmation": "ready",
+                        "job_id": job_id,
                     }
                     if result.success:
                         record = remember_offline_synced_result(entry_id, record)
+                        if job_id:
+                            cache_offline_media_result(job_id, record)
                         synced.append(record)
                         append_offline_sync_log(entry, "synced", result.reply, "")
                     else:
-                        pending.append({"id": entry_id, "status": "pending", "reason": result.reply or result.error_reason})
+                        reason = result.reply or result.error_reason or "Could not process this item. Try again or remove before sync."
+                        record["status"] = "failed"
+                        record["reply"] = reason
+                        record["result_summary"] = compact_offline_reply(reason)
+                        if job_id:
+                            cache_offline_media_result(job_id, record)
+                        failed.append({"id": entry_id, "status": "failed", "error": reason, "job_id": job_id})
                         append_offline_sync_log(entry, "pending", result.reply, result.error_reason)
                 except Exception as exc:
                     reason = sanitize_error_message(exc)
-                    pending.append({"id": entry_id, "status": "pending", "reason": reason})
+                    if not reason or "doctype" in reason.lower() or "unexpected token" in reason.lower():
+                        reason = "Could not process this item. Try again or remove before sync."
+                    record = {
+                        "id": entry_id,
+                        "status": "failed",
+                        "reply": reason,
+                        "result_summary": compact_offline_reply(reason),
+                        "message_type": action,
+                        "command_handler": "offline_media_failed",
+                        "whatsapp_confirmation": "ready",
+                        "job_id": job_id,
+                    }
+                    if job_id:
+                        cache_offline_media_result(job_id, record)
+                    failed.append({"id": entry_id, "status": "failed", "error": reason, "job_id": job_id})
                     append_offline_sync_log(entry, "pending", "", reason)
                 continue
             reply = offline_media_reply(entry)
-            record = remember_offline_synced_result(entry_id, {"id": entry_id, "status": "media_logged", "reply": reply, "result_summary": compact_offline_reply(reply), "whatsapp_confirmation": "ready"})
+            record = remember_offline_synced_result(entry_id, {"id": entry_id, "status": "media_logged", "reply": reply, "result_summary": compact_offline_reply(reply), "whatsapp_confirmation": "ready", "job_id": job_id})
+            if job_id:
+                cache_offline_media_result(job_id, record)
             synced.append(record)
             append_offline_sync_log(entry, "media_logged", reply, "")
             continue
@@ -1091,7 +1177,11 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
     confirmation_recipient = offline_confirmation_recipient(payload if isinstance(payload, dict) else {})
     confirmation_status = None
     if message and confirmation_recipient and (has_new_synced_records or explicit_confirmation_recipient):
-        confirmation_status = queue_offline_whatsapp_confirmation(confirmation_recipient, message)
+        synced_ids = ",".join(
+            sorted(str(item.get("job_id") or item.get("id") or "") for item in synced if item.get("job_id") or item.get("id"))
+        )
+        confirmation_dedupe_key = hashlib.sha256(f"{confirmation_recipient}|{synced_ids}|{message}".encode("utf-8")).hexdigest()
+        confirmation_status = queue_offline_whatsapp_confirmation(confirmation_recipient, message, dedupe_key=confirmation_dedupe_key)
         print(
             "OFFLINE_CONFIRMATION_QUEUED_REAL_SYNC "
             f"status={confirmation_status.get('status') if confirmation_status else 'not_queued'} "
@@ -1722,6 +1812,10 @@ def debug_system_status() -> dict[str, Any]:
                 "vision_ai_enabled": boolish(os.getenv("ENABLE_VISION_AI")),
                 "voice_ai_enabled": boolish(os.getenv("ENABLE_VOICE_INPUT")) or bool(settings.openai_api_key.strip()),
                 "usage": ai_usage_snapshot(),
+                "offline_media_job_cache": {
+                    "count": len(offline_media_job_results),
+                    "recent_job_ids": list(offline_media_job_results.keys())[-5:],
+                },
             },
             "app": {
                 "app_base_url": effective_app_base_url(settings),
@@ -2014,9 +2108,16 @@ async def process_whatsapp_web_payload(
             )
         try:
             audio_bytes = base64.b64decode(media_base64)
+            log_ai_route_decision(
+                text=message_id or media_caption or "voice",
+                route="audio/transcriptions",
+                used_ai=True,
+                reason="voice_transcription",
+                job_id=message_id,
+            )
             raw_transcript = transcription_service.transcribe_audio(audio_bytes, media_mime_type)
             clear_last_openai_error("voice")
-            transcript = clean_voice_transcript_for_intake(raw_transcript)
+            transcript = clean_voice_transcript_for_intake(raw_transcript, medicine_names=voice_medicine_names_from_inventory())
             if voice_transcribe_only:
                 clean_transcript = transcript.strip()
                 if not clean_transcript:
@@ -2101,6 +2202,13 @@ async def process_whatsapp_web_payload(
                 ai_reply = "Photo received safely. AI reading is switched off for now."
             else:
                 try:
+                    log_ai_route_decision(
+                        text=message_id or media_caption or media_filename or "photo",
+                        route="chat/completions",
+                        used_ai=True,
+                        reason="photo_invoice_extraction",
+                        job_id=message_id,
+                    )
                     extraction_result = get_ai_service().extract_restock_from_image(image_bytes, media_mime_type)
                     clear_last_openai_error("photo")
                     extraction_status = "needs_review"
@@ -2732,7 +2840,17 @@ async def incoming_text_from_form(
                 )
             try:
                 audio_bytes = await whatsapp.download_media(media_url)
-                transcript = clean_voice_transcript_for_intake(transcription_service.transcribe_audio(audio_bytes, content_type))
+                log_ai_route_decision(
+                    text=str(form_values.get("MessageSid") or media_url or "voice"),
+                    route="audio/transcriptions",
+                    used_ai=True,
+                    reason="voice_transcription",
+                    job_id=str(form_values.get("MessageSid") or ""),
+                )
+                transcript = clean_voice_transcript_for_intake(
+                    transcription_service.transcribe_audio(audio_bytes, content_type),
+                    medicine_names=voice_medicine_names_from_inventory(),
+                )
             except TranscriptionUnavailableError as exc:
                 raise UnsupportedInputError(voice_transcription_failed_message()) from exc
             except Exception as exc:
