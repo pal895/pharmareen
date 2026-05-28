@@ -73,6 +73,20 @@ class OfflineSafetyStore:
         )
 
 
+class SplitStockTruthStore(OfflineSafetyStore):
+    """Simulates live sheets where Master_Stock is stale but Inventory is zero."""
+
+    def find_stock(self, drug_name):
+        if str(drug_name).lower() == "ors":
+            return StockItem("ORS", 80, 50, 2, 10, 3)
+        return super().find_stock(drug_name)
+
+    def find_stock_for_safety(self, drug_name, pharmacy_id=None):
+        if str(drug_name).lower() == "ors":
+            return StockItem("ORS", 80, 50, 0, 10, 3)
+        return super().find_stock(drug_name)
+
+
 def run_parser_case(script: str) -> dict:
     root = Path(__file__).resolve().parents[1]
     result = subprocess.run(
@@ -942,6 +956,53 @@ def test_offline_structured_zero_stock_sale_is_blocked_before_text_router(monkey
     assert store.transactions[-1]["Type"] == "no_stock"
     assert not any(row["Type"] == "sale" and row["Drug"] == "ORS" for row in store.transactions)
     assert outbox.json()["pending_count"] == 1
+    assert "ORS out of stock" in outbox.json()["confirmations"][0]["message"]
+
+
+def test_offline_sync_uses_stock_truth_service_before_stale_master_stock(monkeypatch, tmp_path):
+    store = SplitStockTruthStore()
+    service = IntakeService(None, store)
+
+    def fail_if_called(text: str, sender: str) -> str:
+        raise AssertionError(f"stale Master_Stock must not reach text router: {text}")
+
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(main, "get_intake_service", lambda: service)
+    monkeypatch.setattr(main, "process_intake_text_for_sender", fail_if_called)
+    main.offline_synced_entry_ids.clear()
+    main.offline_synced_entry_results.clear()
+    main.offline_whatsapp_outbox.clear()
+    main.offline_whatsapp_confirmation_history.clear()
+
+    payload = {
+        "confirmation_whatsapp": "+254708061426",
+        "entries": [
+            {
+                "id": "offline-ors-split-stock-truth",
+                "raw_text": "ORS 2 cash",
+                "command_text": "ORS 2 cash",
+                "action": "sale",
+                "type": "sale",
+                "drug_name": "ORS",
+                "quantity": 2,
+                "payment_method": "Cash",
+                "pharmacy_id": "real_pharmacy",
+                "sync_status": "pending",
+            }
+        ],
+    }
+
+    with TestClient(main.app) as client:
+        response = client.post("/offline/sync", json=payload)
+        outbox = client.get("/offline/whatsapp-confirmations")
+
+    data = response.json()
+    reply = data["synced"][0]["reply"]
+    assert "ORS out of stock" in reply
+    assert "Sale not recorded" in reply
+    assert "Missed sale saved: ORS x2" in reply
+    assert not any(row["Type"] == "sale" and row["Drug"] == "ORS" for row in store.transactions)
+    assert store.transactions[-1]["Type"] == "no_stock"
     assert "ORS out of stock" in outbox.json()["confirmations"][0]["message"]
 
 

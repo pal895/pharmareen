@@ -206,6 +206,42 @@ def test_find_stock_prefers_default_pharmacy_inventory_zero_for_stock_safety():
     assert stock.reorder_level == 10
 
 
+def test_find_stock_sees_prefixed_inventory_zero_even_without_default_pharmacy_setting():
+    master = FakeWorksheet(
+        [
+            ["Drug Name", "Selling Price", "Cost Price", "Current Stock", "Reorder Level"],
+            ["ORS", "80", "50", "2", "10"],
+        ]
+    )
+    global_inventory = FakeWorksheet(
+        [
+            ["Drug", "Stock", "Cost Price", "Selling Price", "Average Cost", "Low Stock Alert Level", "Last Updated"],
+            ["ORS", "2", "50", "80", "", "10", ""],
+        ]
+    )
+    live_pharmacy_inventory = FakeWorksheet(
+        [
+            ["Drug Name", "Stock", "Default Cost Price", "Default Selling Price", "Reorder Level"],
+            ["ORS", "0", "50", "80", "10"],
+        ]
+    )
+    store = make_fake_sheet_store(
+        {
+            MASTER_STOCK: master,
+            INVENTORY: global_inventory,
+            "real_pharmacy_inventory": live_pharmacy_inventory,
+        }
+    )
+
+    stock = store.find_stock("ORS")
+    safety_stock = store.find_stock_for_safety("ORS")
+
+    assert stock is not None
+    assert stock.current_stock == 0
+    assert safety_stock is not None
+    assert safety_stock.current_stock == 0
+
+
 def test_update_current_stock_updates_master_stock_and_inventory_tabs():
     master = FakeWorksheet(
         [

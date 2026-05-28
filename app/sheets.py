@@ -281,11 +281,38 @@ class GoogleSheetsStore:
         ]
 
     def find_stock(self, drug_name: str) -> StockItem | None:
+        return self._find_stock_from_sources(drug_name, include_all_inventory=True)
+
+    def find_stock_for_safety(self, drug_name: str, pharmacy_id: str | None = None) -> StockItem | None:
+        """Read stock using the safest known value across trusted stock tabs.
+
+        This is intentionally read-only. Live offline sync can include a
+        pharmacy_id, but deployed phones can also have stale or blank IDs; we
+        include every *_inventory tab so stale Master_Stock cannot override a
+        newer pharmacy inventory showing zero stock.
+        """
+        return self._find_stock_from_sources(
+            drug_name,
+            pharmacy_id=pharmacy_id,
+            include_all_inventory=True,
+        )
+
+    def _find_stock_from_sources(
+        self,
+        drug_name: str,
+        *,
+        pharmacy_id: str | None = None,
+        include_all_inventory: bool = False,
+    ) -> StockItem | None:
         wanted = normalize_key(drug_name)
         if not wanted:
             return None
 
-        inventory_records = self._find_inventory_stock_records(wanted)
+        inventory_records = self._find_inventory_stock_records(
+            wanted,
+            pharmacy_id=pharmacy_id,
+            include_all=include_all_inventory,
+        )
         for record, row_number in self._master_records_with_rows():
             name = str(record.get("Drug Name") or "").strip()
             if normalize_key(name) != wanted:
@@ -570,12 +597,16 @@ class GoogleSheetsStore:
     def _master_records_with_rows(self) -> list[tuple[dict[str, Any], int]]:
         return self._records_with_rows(MASTER_STOCK, MASTER_STOCK_HEADERS)
 
-    def _inventory_titles(self) -> list[str]:
+    def _inventory_titles(self, pharmacy_id: str | None = None, include_all: bool = False) -> list[str]:
         titles: list[str] = []
-        pharmacy_id = str(getattr(self.settings, "pharmareen_default_pharmacy_id", "") or "").strip()
-        if pharmacy_id:
-            titles.append(f"{pharmacy_id}_inventory")
+        requested_pharmacy_id = str(pharmacy_id or "").strip()
+        default_pharmacy_id = str(getattr(self.settings, "pharmareen_default_pharmacy_id", "") or "").strip()
+        for candidate in [requested_pharmacy_id, default_pharmacy_id]:
+            if candidate:
+                titles.append(f"{candidate}_inventory")
         titles.append(INVENTORY)
+        if include_all:
+            titles.extend(self._all_inventory_worksheet_titles())
         unique: list[str] = []
         seen: set[str] = set()
         for title in titles:
@@ -584,9 +615,35 @@ class GoogleSheetsStore:
                 unique.append(title)
         return unique
 
-    def _inventory_records_with_rows(self) -> list[tuple[str, dict[str, Any], int]]:
+    def _all_inventory_worksheet_titles(self) -> list[str]:
+        try:
+            spreadsheet = self._require_spreadsheet()
+        except SheetsUnavailableError:
+            return []
+        worksheets_attr = getattr(spreadsheet, "worksheets", None)
+        if isinstance(worksheets_attr, dict):
+            candidates = worksheets_attr.keys()
+        elif callable(worksheets_attr):
+            try:
+                candidates = [getattr(worksheet, "title", "") for worksheet in worksheets_attr()]
+            except Exception:
+                candidates = []
+        else:
+            candidates = []
+        titles: list[str] = []
+        for title in candidates:
+            clean_title = str(title or "").strip()
+            if clean_title and clean_title != INVENTORY and clean_title.lower().endswith("_inventory"):
+                titles.append(clean_title)
+        return titles
+
+    def _inventory_records_with_rows(
+        self,
+        pharmacy_id: str | None = None,
+        include_all: bool = False,
+    ) -> list[tuple[str, dict[str, Any], int]]:
         records: list[tuple[str, dict[str, Any], int]] = []
-        for title in self._inventory_titles():
+        for title in self._inventory_titles(pharmacy_id=pharmacy_id, include_all=include_all):
             try:
                 worksheet = self._worksheet(title)
                 values = worksheet.get_all_values()
@@ -611,9 +668,17 @@ class GoogleSheetsStore:
                 records.append((title, record, row_number))
         return records
 
-    def _find_inventory_stock_records(self, wanted_key: str) -> list[tuple[str, dict[str, Any], int]]:
+    def _find_inventory_stock_records(
+        self,
+        wanted_key: str,
+        pharmacy_id: str | None = None,
+        include_all: bool = False,
+    ) -> list[tuple[str, dict[str, Any], int]]:
         matches: list[tuple[str, dict[str, Any], int]] = []
-        for title, record, row_number in self._inventory_records_with_rows():
+        for title, record, row_number in self._inventory_records_with_rows(
+            pharmacy_id=pharmacy_id,
+            include_all=include_all,
+        ):
             name = str(record.get("Drug") or record.get("Drug Name") or "").strip()
             if normalize_key(name) == wanted_key:
                 matches.append((title, record, row_number))

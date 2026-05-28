@@ -354,11 +354,16 @@ def offline_sale_stock_safety_reply(entry: dict[str, Any], command_text: str, se
         return None
 
     store = getattr(service, "store", None)
-    find_stock = getattr(store, "find_stock", None)
+    safety_stock_lookup = getattr(store, "find_stock_for_safety", None)
+    find_stock = safety_stock_lookup if callable(safety_stock_lookup) else getattr(store, "find_stock", None)
     if not callable(find_stock):
         return None
     try:
-        stock = find_stock(drug_name)
+        pharmacy_id = str(entry.get("pharmacy_id") or "").strip()
+        if callable(safety_stock_lookup):
+            stock = find_stock(drug_name, pharmacy_id=pharmacy_id)
+        else:
+            stock = find_stock(drug_name)
     except Exception:
         return None
     if stock is None:
@@ -372,6 +377,13 @@ def offline_sale_stock_safety_reply(entry: dict[str, Any], command_text: str, se
     current_stock = parse_int(getattr(stock, "current_stock", None), default=None)
     if current_stock is None or base_quantity is None or current_stock >= base_quantity:
         return None
+
+    print(
+        "STOCK_SAFETY_BLOCKED_OFFLINE_SYNC "
+        f"drug={stock.drug_name} requested={base_quantity} available={current_stock} "
+        f"pharmacy_id={entry.get('pharmacy_id') or ''}",
+        flush=True,
+    )
 
     record_missed = getattr(service, "_record_missed_sale_attempt", None)
     if callable(record_missed):
@@ -616,13 +628,13 @@ def offline_result_summary(entry: dict[str, Any], result: dict[str, Any]) -> str
 
 def offline_sync_success_message(entries: list[dict[str, Any]], synced: list[dict[str, Any]]) -> str:
     synced_by_id = {str(item.get("id") or ""): item for item in synced}
-    lines = ["Offline records synced safely"]
+    lines = ["✅ Offline records synced safely"]
     for entry in entries:
         entry_id = str(entry.get("id") or entry.get("action_id") or "").strip()
         result = synced_by_id.get(entry_id)
         if not result:
             continue
-        lines.append(f"- {offline_result_summary(entry, result)}")
+        lines.append(f"• {offline_result_summary(entry, result)}")
     time_format = "%#I:%M %p" if os.name == "nt" else "%-I:%M %p"
     lines.append(f"Synced at {now_in_timezone(get_settings().timezone).strftime(time_format)}")
     return "\n".join(lines)
