@@ -172,6 +172,7 @@ def test_offline_sync_accepts_sale_and_restock_entries(monkeypatch, tmp_path):
         response = client.post("/offline/sync", json=payload)
 
     assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
     data = response.json()
     assert data["status"] == "ok"
     assert [item["id"] for item in data["synced"]] == ["sale-1", "restock-1"]
@@ -658,6 +659,9 @@ def test_offline_pwa_assets_contain_auto_sync_media_and_retry_logic():
     assert "queueMedia" in script
     assert "queuePhotoInputIfPresent" in script
     assert "queueAudioInputIfPresent" in script
+    assert "readOfflineSyncJson" in script
+    assert "content-type" in script
+    assert "Could not process this item. Try again or remove before sync." in script
     assert "splitCommands" in parser
     assert "parseCommand" in parser
     assert "Save Offline" in html

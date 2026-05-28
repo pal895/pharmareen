@@ -27,7 +27,8 @@ from app.services.pharmacy_engine import (
     trace_id,
     unit_pattern,
 )
-from app.services.operational_intelligence import OperationalMemory, classify_local_intent, log_edge_case
+from app.ai import log_ai_route_decision
+from app.services.operational_intelligence import OperationalMemory, classify_local_intent, decide_ai_route, log_edge_case
 from app.sheets import SHEETS_UNAVAILABLE_MESSAGE, SheetsUnavailableError
 from app.utils import format_ksh, normalize_key, now_in_timezone, parse_int, parse_money
 
@@ -366,6 +367,7 @@ class IntakeService:
         self.last_sale_by_conversation: dict[str, dict[str, Any]] = {}
         self.pending_void_reason: dict[str, dict[str, Any]] = {}
         self.pending_void_confirmation: dict[str, dict[str, Any]] = {}
+        self.pending_repeat_confirmation: dict[str, str] = {}
         self.conversions_by_drug: dict[str, dict[str, int]] = {}
         self.aliases_by_key = self._load_pharmacy_aliases()
         self.receipt_printing_enabled = False
@@ -375,8 +377,27 @@ class IntakeService:
         text = text.strip()
         if not text:
             return "Please send a short text message or voice note."
+        text = expand_compact_pharmacy_text(text)
 
         conversation_key = conversation_id or "__default__"
+        route_decision = decide_ai_route(text=text)
+        log_ai_route_decision(
+            text=text,
+            route=route_decision.route,
+            used_ai=route_decision.use_ai,
+            reason=route_decision.reason,
+        )
+
+        pending_repeat = self.pending_repeat_confirmation.get(conversation_key)
+        if pending_repeat is not None:
+            response_key = normalize_key(text)
+            if response_key in {"yes", "y", "confirm", "ndio", "sawa"}:
+                self.pending_repeat_confirmation.pop(conversation_key, None)
+                return self.process_text(pending_repeat, conversation_id=conversation_key)
+            if response_key in {"cancel", "stop", "no", "hapana"}:
+                self.pending_repeat_confirmation.pop(conversation_key, None)
+                return "No problem. Nothing was saved."
+            self.pending_repeat_confirmation.pop(conversation_key, None)
         pending_void_confirmation = self.pending_void_confirmation.get(conversation_key)
         if pending_void_confirmation is not None:
             response_key = normalize_key(text)
@@ -601,7 +622,8 @@ class IntakeService:
                 drug = str(last.get("drug_name") or "medicine")
                 quantity = parse_int(last.get("display_quantity"), default=parse_int(last.get("quantity"), default=1)) or 1
                 payment = str(last.get("payment_method") or "Cash")
-                return f"Repeat {drug} x{quantity} {payment}? Reply YES to save, or type the correct medicine and quantity."
+                self.pending_repeat_confirmation[conversation_key] = f"{drug} {quantity} {payment}"
+                return f"Repeat {drug} x{quantity} {payment}? Reply YES."
             return "Which medicine and quantity should I repeat?"
         if normalized in {"nilikosea quantity", "wrong quantity", "ile ya mwisho ilikuwa wrong quantity"}:
             if self.operational_memory.resolve_reference(conversation_key, "last"):
@@ -1751,12 +1773,16 @@ class IntakeService:
     def _commit_void(self, sale: dict[str, Any], reason: str, conversation_key: str) -> str:
         drug_name = str(sale.get("drug_name") or "")
         quantity = parse_int(sale.get("quantity"), default=0) or 0
+        display_quantity = parse_int(sale.get("display_quantity"), default=quantity) or quantity
+        payment = str(sale.get("payment_method") or "Cash")
         original_trace_id = str(sale.get("trace_id") or "")
         void_trace_id = trace_id("VOID")
+        stock_left: int | None = None
         try:
             stock = self._resolve_stock(drug_name)
             if stock and stock.current_stock is not None:
-                self.store.update_current_stock(stock, stock.current_stock + quantity)
+                stock_left = stock.current_stock + quantity
+                self.store.update_current_stock(stock, stock_left)
             self._append_transaction(
                 "void",
                 drug_name,
@@ -1771,12 +1797,13 @@ class IntakeService:
         except Exception:
             return "I could not void the sale right now. Please check the connection."
         self.last_sale_by_conversation.pop(conversation_key, None)
+        stock_line = f"Stock left: {stock_left}" if stock_left is not None else "Stock restored safely"
         return "\n".join(
             [
-                "✅ Sale voided",
-                f"{drug_name} x{quantity}",
-                f"Reason: {reason}",
-                f"Trace: {void_trace_id}",
+                "✅ Last sale removed safely",
+                f"{drug_name} x{display_quantity} {payment} restored to stock",
+                stock_line,
+                f"{payment} total adjusted.",
             ]
         )
 
@@ -3670,8 +3697,25 @@ def expand_compact_pharmacy_text(text: str) -> str:
     if not clean:
         return clean
     expanded_lines: list[str] = []
+    compact_aliases = {
+        "reporttoday": "report today",
+        "dailyreport": "daily report",
+        "cashtoday": "cash today",
+        "mpesatoday": "mpesa today",
+        "bestsellertoday": "best seller today",
+        "topsellertoday": "best seller today",
+        "sameaslast": "same as last",
+        "printreceipt": "print receipt",
+        "printlastreceipt": "print last receipt",
+        "stockvalue": "stock value",
+        "lowstock": "low stock",
+    }
     for line in clean.splitlines():
         stripped = line.strip()
+        compact_key = normalize_key(stripped).replace(" ", "")
+        if compact_key in compact_aliases:
+            expanded_lines.append(compact_aliases[compact_key])
+            continue
         if re.fullmatch(r"(?:undo|void|cancel)\s+[A-Za-z]{2,8}-?[A-Za-z0-9]{3,}", stripped, flags=re.IGNORECASE):
             expanded_lines.append(stripped)
             continue

@@ -868,6 +868,20 @@ async function mergeResults(queue, data) {
   }
 }
 
+async function readOfflineSyncJson(response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const data = await response.json();
+    if (!response.ok) {
+      const message = data.detail || data.error || "Could not process this item. Try again or remove before sync.";
+      throw new Error(message);
+    }
+    return data;
+  }
+  await response.text().catch(() => "");
+  throw new Error("Could not process this item. Try again or remove before sync.");
+}
+
 async function syncQueue() {
   if (!navigator.onLine) {
     setStatus("offline", "📡 Offline mode active — saving safely");
@@ -898,7 +912,7 @@ async function syncQueue() {
         offline_app_build_version: OFFLINE_APP_BUILD_VERSION
       })
     });
-    const data = await response.json();
+    const data = await readOfflineSyncJson(response);
     await mergeResults(toSync, data);
     await renderQueue();
     const failedCount = (data.failed || []).length + (data.pending || []).length;
@@ -906,7 +920,7 @@ async function syncQueue() {
     if (!failedCount) gentleFeedback();
   } catch (error) {
     for (const item of toSync) {
-      await updateQueueEntry({ ...item, sync_status: "failed", retry_count: (item.retry_count || 0) + 1, last_error: String(error) });
+      await updateQueueEntry({ ...item, sync_status: "failed", retry_count: (item.retry_count || 0) + 1, last_error: "Could not process this item. Try again or remove before sync." });
     }
     await renderQueue();
     setStatus("error", "⚠️ Needs attention");

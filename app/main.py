@@ -480,6 +480,7 @@ VOICE_MEDICINE_NAMES = [
 VOICE_MEDICINE_ALIASES = {
     "anadol": "Panadol",
     "panado": "Panadol",
+    "pandol": "Panadol",
     "panadol": "Panadol",
     "piritone": "Piriton",
     "piraton": "Piriton",
@@ -516,8 +517,15 @@ VOICE_NON_MEDICINE_WORDS = {
     "mbili",
     "bili",
     "billi",
+    "melikas",
+    "melikash",
+    "mbilikas",
+    "mbilikash",
     "tukas",
     "cash",
+    "cashi",
+    "kash",
+    "pesa",
     "mpesa",
     "m-pesa",
     "credit",
@@ -525,9 +533,23 @@ VOICE_NON_MEDICINE_WORDS = {
     "mixed",
     "moja",
     "tatu",
+    "nne",
+    "tano",
+    "sita",
+    "saba",
+    "nane",
+    "tisa",
+    "kumi",
     "one",
     "two",
     "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
     "ongeza",
     "niliuza",
     "nimeuza",
@@ -545,8 +567,8 @@ def voice_token_similarity(left: str, right: str) -> float:
 
 def split_joined_voice_words(text: str) -> str:
     clean = text
-    quantity_words = "moja|mbili|bili|billi|tatu|one|two|too|to|three|1|2|3"
-    payment_words = "cash|kash|mpesa|m-pesa|credit|card"
+    quantity_words = "moja|mbili|bili|billi|tatu|nne|tano|sita|saba|nane|tisa|kumi|one|two|too|to|three|four|five|six|seven|eight|nine|ten|1|2|3|4|5|6|7|8|9|10"
+    payment_words = "cash|cashi|kash|mpesa|m-pesa|pesa|credit|card"
     clean = re.sub(r"\b([A-Za-z]{3,})one(mpesa|cash|kash)\b", r"\1 one \2", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\b([A-Za-z]{3,})moja(mpesa|cash|kash)\b", r"\1 moja \2", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\b([A-Za-z]{3,})mbili(mpesa|cash|kash)\b", r"\1 mbili \2", clean, flags=re.IGNORECASE)
@@ -590,6 +612,8 @@ def clean_voice_transcript_for_intake(transcript: str) -> str:
     if not clean:
         return ""
     clean = re.sub(r"[,;]+", ",", clean)
+    clean = re.sub(r"\b(?:melikas|melikash|melicash|mbelikas|mbelikash|mbilikas|mbilikash)\b", "mbili cash", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\b([A-Za-z]{3,})(?:melikas|melikash|melicash|mbelikas|mbelikash|mbilikas|mbilikash)\b", r"\1 mbili cash", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\b(?:mbe?le|mbele|mbeli|mbili|mbil|mbil[iy]?|billi|bili|billy)\s*(?:kash|cash)\b", "mbili cash", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\b(?:mbe?le|mbele|mbeli)(?=cash|kash)\b", "mbili ", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\b(?:tukas|tukash|two\s*kash|two\s*cash|too\s*cash|to\s*cash)\b", "two cash", clean, flags=re.IGNORECASE)
@@ -597,7 +621,8 @@ def clean_voice_transcript_for_intake(transcript: str) -> str:
     clean = re.sub(r"\b(?:tatu|tattoo)\s*(?:kash|cash|mpesa|m-pesa)\b", lambda m: m.group(0).replace("kash", "cash"), clean, flags=re.IGNORECASE)
     clean = split_joined_voice_words(clean)
     clean = re.sub(r"\b(?:billi|bili|billy|mbil|mbilii|mbele|mbeli)\b", "mbili", clean, flags=re.IGNORECASE)
-    clean = re.sub(r"\bkash\b", "cash", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\b(?:kash|cashi)\b", "cash", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\bpesa\b", "mpesa", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\bmpessa\b", "mpesa", clean, flags=re.IGNORECASE)
     clean = re.sub(r"^nimetoa\s+", "sold ", clean, flags=re.IGNORECASE)
     clean = apply_voice_medicine_aliases(clean)
@@ -1383,10 +1408,15 @@ def report_public_base_url(settings: Settings) -> str:
         configured.startswith("https://")
         and not is_local_base_url(configured)
         and not is_placeholder_base_url(configured)
-        and "riker.replit.dev" not in configured.lower()
-        and "zriker.replit.dev" not in configured.lower()
     ):
         return configured
+    replit_dev_domain = (os.getenv("REPLIT_DEV_DOMAIN") or "").strip().strip("/")
+    if replit_dev_domain:
+        if not replit_dev_domain.startswith(("http://", "https://")):
+            replit_dev_domain = f"https://{replit_dev_domain}"
+        replit_dev_domain = replit_dev_domain.rstrip("/")
+        if replit_dev_domain.startswith("https://") and not is_placeholder_base_url(replit_dev_domain):
+            return replit_dev_domain
     return DEFAULT_PUBLIC_BASE_URL
 
 
@@ -2213,7 +2243,7 @@ def store_pending_invoice_review(sender: str, extraction_result: dict[str, Any])
 
 
 def invoice_review_actions_text() -> str:
-    return "Review needed before stock update.\nReply: approve, add to stock, edit item name/quantity/cost, or cancel."
+    return "Review needed before stock update.\nReply: approve, add all, edit 1 qty 20, edit 1 cost 250, remove 2, or cancel."
 
 
 def extraction_has_invoice_structure(extraction_result: dict[str, Any], classification: dict[str, Any]) -> bool:
@@ -2239,7 +2269,7 @@ def format_shelf_photo_reply_from_extraction(extraction_result: dict[str, Any]) 
     lines = ["\U0001F4F7 Shelf photo analyzed"]
     if items:
         lines.append("Products seen:")
-        for item in items[:8]:
+        for index, item in enumerate(items[:8], start=1):
             lines.append(f"- {invoice_item_name(item)}")
     else:
         lines.append("No clear invoice data detected.")
@@ -2270,12 +2300,12 @@ def format_invoice_extraction_reply(extraction_result: dict[str, Any]) -> str:
     if items:
         lines.append("Items found:")
         missing_quantity: list[str] = []
-        for item in items[:8]:
+        for index, item in enumerate(items[:8], start=1):
             name = invoice_item_name(item)
             quantity = invoice_item_quantity(item)
             unit = invoice_item_unit(item)
             cost = invoice_item_cost(item)
-            detail = f"- {name}"
+            detail = f"{index}. {name}"
             if quantity:
                 detail += f" x{quantity}"
             else:
@@ -2307,10 +2337,25 @@ def process_pending_invoice_review_message(sender: str, message: str) -> str | N
         pending_invoice_reviews.pop(key, None)
         return "Invoice review cancelled. No stock updated."
 
+    items = pending.get("items") or []
+
+    def find_invoice_item(target_text: str) -> tuple[int, dict[str, Any] | None]:
+        target_clean = str(target_text or "").strip()
+        if target_clean.isdigit():
+            index = int(target_clean) - 1
+            if 0 <= index < len(items):
+                return index, items[index]
+            return -1, None
+        target_lower = target_clean.lower()
+        for index, item in enumerate(items):
+            name = invoice_item_name(item)
+            if target_lower in name.lower() or name.lower() in target_lower:
+                return index, item
+        return -1, None
+
     remove_match = re.fullmatch(r"remove\s+(?:item\s+)?(\d+)", lower)
     if remove_match:
         index = int(remove_match.group(1)) - 1
-        items = pending.get("items") or []
         if 0 <= index < len(items):
             removed = invoice_item_name(items.pop(index))
             return f"Removed {removed} from invoice review. Reply approve to add the remaining stock."
@@ -2318,60 +2363,72 @@ def process_pending_invoice_review_message(sender: str, message: str) -> str | N
 
     remove_name_match = re.fullmatch(r"remove\s+(.+)", text, flags=re.IGNORECASE)
     if remove_name_match:
-        target = remove_name_match.group(1).strip().lower()
-        items = pending.get("items") or []
-        for index, item in enumerate(list(items)):
+        index, item = find_invoice_item(remove_name_match.group(1))
+        if item is not None:
             name = invoice_item_name(item)
-            if target in name.lower() or name.lower() in target:
-                items.pop(index)
-                return f"Removed {name} from invoice review. Reply approve to add the remaining stock."
+            items.pop(index)
+            return f"Removed {name} from invoice review. Reply approve to add the remaining stock."
         return "I could not find that invoice item. Try: remove item 1."
 
     rename_match = re.fullmatch(r"rename\s+(.+?)\s+to\s+(.+)", text, flags=re.IGNORECASE)
     if rename_match:
-        target = rename_match.group(1).strip().lower()
+        target = rename_match.group(1).strip()
         value = rename_match.group(2).strip()
-        for item in pending.get("items") or []:
+        _, item = find_invoice_item(target)
+        if item is not None:
             name = invoice_item_name(item)
-            if target in name.lower() or name.lower() in target:
-                item["drug_name"] = value
-                return f"Renamed {name} to {value}. Reply approve to add stock."
+            item["drug_name"] = value
+            return f"Renamed {name} to {value}. Reply approve to add stock."
         return "I could not find that invoice item. Try: rename old name to new name."
+
+    indexed_add_match = re.fullmatch(
+        r"add\s+(\d+)\s+price\s+(\d+(?:\.\d+)?)\s+stock\s+(\d+(?:\.\d+)?)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if indexed_add_match:
+        _, item = find_invoice_item(indexed_add_match.group(1))
+        if item is not None:
+            name = invoice_item_name(item)
+            item["cost"] = indexed_add_match.group(2)
+            item["quantity"] = indexed_add_match.group(3)
+            return f"Updated {name}: quantity {indexed_add_match.group(3)}, cost {indexed_add_match.group(2)}. Reply approve."
+        return "That item number was not found. Reply add 1 price 250 stock 10."
 
     quick_quantity_match = re.fullmatch(r"edit\s+(.+?)\s+(?:x\s*)?(\d+(?:\.\d+)?)", text, flags=re.IGNORECASE)
     if quick_quantity_match:
-        target = quick_quantity_match.group(1).strip().lower()
+        target = quick_quantity_match.group(1).strip()
         value = quick_quantity_match.group(2).strip()
-        for item in pending.get("items") or []:
-            name = invoice_item_name(item)
-            if target in name.lower() or name.lower() in target:
+        if normalize_key(target).split()[-1:] not in (["qty"], ["quantity"], ["cost"], ["price"], ["name"]):
+            _, item = find_invoice_item(target)
+            if item is not None:
+                name = invoice_item_name(item)
                 item["quantity"] = value
                 return f"Updated {name} quantity to {value}. Reply approve to add stock."
-        return "I could not find that invoice item. Try: edit Panadol quantity 20."
+            return "I could not find that invoice item. Try: edit Panadol quantity 20."
 
     edit_match = re.fullmatch(r"edit\s+(.+?)\s+(quantity|qty|cost|price|name)\s+(.+)", text, flags=re.IGNORECASE)
     if edit_match:
-        target = edit_match.group(1).strip().lower()
+        target = edit_match.group(1).strip()
         field = edit_match.group(2).lower()
         value = edit_match.group(3).strip()
-        for item in pending.get("items") or []:
+        _, item = find_invoice_item(target)
+        if item is not None:
             name = invoice_item_name(item)
-            if target in name.lower() or name.lower() in target:
-                if field in {"quantity", "qty"}:
-                    item["quantity"] = value
-                    return f"Updated {name} quantity to {value}. Reply approve to add stock."
-                if field in {"cost", "price"}:
-                    item["cost"] = value
-                    return f"Updated {name} cost to {value}. Reply approve to add stock."
-                item["drug_name"] = value
-                return f"Updated item name to {value}. Reply approve to add stock."
+            if field in {"quantity", "qty"}:
+                item["quantity"] = value
+                return f"Updated {name} quantity to {value}. Reply approve to add stock."
+            if field in {"cost", "price"}:
+                item["cost"] = value
+                return f"Updated {name} cost to {value}. Reply approve to add stock."
+            item["drug_name"] = value
+            return f"Updated item name to {value}. Reply approve to add stock."
         return "I could not find that invoice item. Try: edit Panadol quantity 20."
 
-    approve_phrases = {"approve", "approved", "review approved", "add to stock", "approve invoice", "save invoice"}
+    approve_phrases = {"approve", "approved", "review approved", "add to stock", "approve invoice", "save invoice", "add all", "skip unknown"}
     if lower not in approve_phrases:
         return None
 
-    items = pending.get("items") or []
     missing = [invoice_item_name(item) for item in items if invoice_item_quantity(item) is None]
     if missing:
         return "I found item names but not quantities. Please reply like:\n" + "\n".join(f"{name} 10" for name in missing[:3])

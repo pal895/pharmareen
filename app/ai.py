@@ -58,6 +58,7 @@ RECOMMENDATION_SCHEMA: dict[str, Any] = {
 
 
 AI_USAGE_LOG: list[dict[str, str]] = []
+AI_ROUTE_DECISION_LOG: list[dict[str, Any]] = []
 ZERO_TOKEN_LAYER1_ROUTES = [
     "sale",
     "stock_check",
@@ -81,6 +82,17 @@ def log_ai_call(reason: str, route: str, purpose: str) -> None:
     print(f"AI_CALL route={route} reason={reason} purpose={purpose}", flush=True)
 
 
+def log_ai_route_decision(*, text: str, route: str, used_ai: bool, reason: str) -> None:
+    record = {
+        "text": str(text or "")[:160],
+        "route": str(route or "unknown"),
+        "used_ai": bool(used_ai),
+        "reason": str(reason or ""),
+    }
+    AI_ROUTE_DECISION_LOG.append(record)
+    del AI_ROUTE_DECISION_LOG[:-50]
+
+
 def ai_usage_snapshot() -> dict[str, Any]:
     by_route: dict[str, int] = {}
     by_reason: dict[str, int] = {}
@@ -90,12 +102,22 @@ def ai_usage_snapshot() -> dict[str, Any]:
         by_route[route] = by_route.get(route, 0) + 1
         by_reason[reason] = by_reason.get(reason, 0) + 1
     last = AI_USAGE_LOG[-1] if AI_USAGE_LOG else {}
+    last_decision = AI_ROUTE_DECISION_LOG[-1] if AI_ROUTE_DECISION_LOG else {}
+    unexpected_ai = [
+        record
+        for record in AI_USAGE_LOG
+        if str(record.get("route") or "").lower() in {route.lower() for route in ZERO_TOKEN_LAYER1_ROUTES}
+    ]
     return {
         "total_logged": len(AI_USAGE_LOG),
         "recent": list(AI_USAGE_LOG[-5:]),
         "by_route": by_route,
         "by_reason": by_reason,
         "last_reason": last.get("reason", ""),
+        "unexpected_ai": len(unexpected_ai),
+        "recent_route_decisions": list(AI_ROUTE_DECISION_LOG[-5:]),
+        "last_command_ai_flag": bool(last_decision.get("used_ai")) if last_decision else False,
+        "last_command_ai_reason": str(last_decision.get("reason") or "") if last_decision else "",
         "zero_token_layer1_routes": ZERO_TOKEN_LAYER1_ROUTES,
     }
 

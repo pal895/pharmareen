@@ -968,6 +968,41 @@ def test_whatsapp_voice_repairs_tukas_as_two_cash(monkeypatch):
     assert "Panadol x2 cash recorded" in data["reply"]
 
 
+def test_whatsapp_voice_repairs_melikas_as_mbili_cash(monkeypatch):
+    class FakeTranscriptionService:
+        is_available = True
+
+        def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
+            return "Panadol melikas"
+
+    seen: dict[str, str] = {}
+
+    def fake_process_intake_text_for_sender(text: str, sender: str) -> str:
+        seen["text"] = text
+        return "Panadol x2 cash recorded\nStock left: 18"
+
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_transcription_service", lambda: FakeTranscriptionService())
+    monkeypatch.setattr(main, "process_intake_text_for_sender", fake_process_intake_text_for_sender)
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"fake voice bytes").decode("ascii")
+    payload["media_mime_type"] = "audio/ogg"
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=payload)
+
+    data = response.json()
+    assert response.status_code == 200
+    assert seen["text"] == "Panadol 2 cash"
+    assert "Heard: Panadol mbili cash" in data["reply"]
+    assert "Panadol x2 cash recorded" in data["reply"]
+
+
 def test_invoice_review_approve_updates_stock_after_ai_extraction(monkeypatch, tmp_path):
     class FakeAIService:
         client = object()
@@ -1187,6 +1222,8 @@ def test_unknown_product_photo_with_no_invoice_metadata_returns_shelf_review(mon
 def test_voice_cleanup_supports_many_medicines_and_messy_phrases():
     cases = [
         ("Panadol mbili cash", "Panadol 2 cash"),
+        ("Panadol melikas", "Panadol 2 cash"),
+        ("Panadolmelikash", "Panadol 2 cash"),
         ("Anadol Mbelekash", "Panadol 2 cash"),
         ("Panadol Tukas", "Panadol 2 cash"),
         ("Panadol billi cash", "Panadol 2 cash"),
@@ -1253,6 +1290,43 @@ def test_invoice_review_edit_x_quantity_and_cancel_win_before_inventory_parser(m
     assert "Invoice review cancelled" in cancel.json()["reply"]
     assert calls == []
     assert main.pending_invoice_reviews == {}
+
+
+def test_invoice_review_item_number_edits_are_bound_to_pending_invoice(monkeypatch):
+    calls: list[str] = []
+    sender = "254700000000@s.whatsapp.net"
+    main.pending_invoice_reviews.clear()
+    main.pending_invoice_reviews[main.invoice_review_key(sender)] = {
+        "supplier": "MedCare",
+        "invoice_number": "INV779",
+        "items": [
+            {"drug_name": "Thermometer", "quantity": 1, "cost": 150},
+            {"drug_name": "Syringe/Needle", "quantity": 1, "cost": 150},
+        ],
+    }
+
+    def fake_process(text: str, sender_value: str) -> str:
+        calls.append(text)
+        return text
+
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000"),
+    )
+    monkeypatch.setattr(main, "process_intake_text_for_sender", fake_process)
+
+    with TestClient(main.app) as client:
+        qty = client.post("/bridge/whatsapp-web", json=bridge_payload("edit 1 qty 20", sender=sender))
+        cost = client.post("/bridge/whatsapp-web", json=bridge_payload("edit 1 cost 250", sender=sender))
+        remove = client.post("/bridge/whatsapp-web", json=bridge_payload("remove 2", sender=sender))
+        approve = client.post("/bridge/whatsapp-web", json=bridge_payload("add all", sender=sender))
+
+    assert "Updated Thermometer quantity to 20" in qty.json()["reply"]
+    assert "Updated Thermometer cost to 250" in cost.json()["reply"]
+    assert "Removed Syringe/Needle" in remove.json()["reply"]
+    assert "Invoice approved and stock updated" in approve.json()["reply"]
+    assert calls == ["Thermometer restock 20 cost 250 supplier MedCare invoice INV779"]
 
 
 def test_invoice_approval_guides_add_new_item_when_stock_update_reports_missing(monkeypatch):

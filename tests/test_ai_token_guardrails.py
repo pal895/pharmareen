@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 import app.main as main
-from app.ai import AI_USAGE_LOG, ai_usage_snapshot
+from app.ai import AI_ROUTE_DECISION_LOG, AI_USAGE_LOG, ai_usage_snapshot
 from app.intake import IntakeService
 from app.services.operational_intelligence import decide_ai_route
 from app.services.pharmacy_simulation import SimulationParser, SimulationStore
@@ -9,6 +9,7 @@ from app.services.pharmacy_simulation import SimulationParser, SimulationStore
 
 def test_layer1_commands_do_not_log_ai_calls():
     AI_USAGE_LOG.clear()
+    AI_ROUTE_DECISION_LOG.clear()
     service = IntakeService(SimulationParser(), SimulationStore())
 
     commands = [
@@ -27,7 +28,10 @@ def test_layer1_commands_do_not_log_ai_calls():
 
     assert all(reply for reply in replies)
     assert AI_USAGE_LOG == []
-    assert ai_usage_snapshot()["total_logged"] == 0
+    snapshot = ai_usage_snapshot()
+    assert snapshot["total_logged"] == 0
+    assert snapshot["unexpected_ai"] == 0
+    assert snapshot["last_command_ai_flag"] is False
 
 
 def test_layer1_routing_policy_blocks_ai_for_normal_work():
@@ -50,6 +54,7 @@ def test_layer1_routing_policy_blocks_ai_for_normal_work():
 
 def test_offline_typed_sync_stays_zero_token(monkeypatch, tmp_path):
     AI_USAGE_LOG.clear()
+    AI_ROUTE_DECISION_LOG.clear()
     service = IntakeService(SimulationParser(), SimulationStore())
     monkeypatch.setattr(main, "get_intake_service", lambda: service)
     monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
@@ -72,6 +77,7 @@ def test_offline_typed_sync_stays_zero_token(monkeypatch, tmp_path):
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
     assert AI_USAGE_LOG == []
+    assert ai_usage_snapshot()["unexpected_ai"] == 0
 
 
 def test_media_routes_are_the_only_ai_allowed_shortcuts():

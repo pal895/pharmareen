@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from app.config import Settings
 from app.intake import parse_operating_commands
-from app.main import DEFAULT_PUBLIC_BASE_URL, report_public_base_url
+from app.main import report_public_base_url
 from fastapi.testclient import TestClient
 import app.main as main
 
@@ -30,11 +30,19 @@ def test_low_typing_shortcuts_parse_to_panadol_actions():
     assert stock[0].drug_name == "Panadol"
 
 
-def test_report_links_use_stable_public_replit_domain_for_temporary_runtime_urls(monkeypatch):
+def test_report_links_use_configured_app_base_url_even_for_runtime_urls(monkeypatch):
     monkeypatch.delenv("PUBLIC_BASE_URL", raising=False)
     settings = Settings(_env_file=None, public_base_url="https://temporary.riker.replit.dev")
 
-    assert report_public_base_url(settings) == DEFAULT_PUBLIC_BASE_URL
+    assert report_public_base_url(settings) == "https://temporary.riker.replit.dev"
+
+
+def test_report_links_use_replit_dev_domain_when_no_app_base_url(monkeypatch):
+    monkeypatch.delenv("PUBLIC_BASE_URL", raising=False)
+    monkeypatch.setenv("REPLIT_DEV_DOMAIN", "pharmareen-dev.riker.replit.dev")
+    settings = Settings(_env_file=None, public_base_url="")
+
+    assert report_public_base_url(settings) == "https://pharmareen-dev.riker.replit.dev"
 
 
 def test_report_links_honor_explicit_public_base_url(monkeypatch):

@@ -383,7 +383,8 @@ def test_staff_session_payment_summary_and_void_flow():
 
     assert "Why are you voiding this sale?" in service.process_text("void last", conversation_id="phone-1")
     void_reply = service.process_text("wrong item", conversation_id="phone-1")
-    assert "Sale voided" in void_reply
+    assert "Last sale removed safely" in void_reply
+    assert "M-Pesa total adjusted" in void_reply
     assert store.stocks["panadol"].current_stock == 20
     assert store.transactions[-1]["Type"] == "void"
     assert "original_trace_id=SALE-" in store.transactions[-1]["Note"]
@@ -1600,6 +1601,35 @@ def test_transaction_number_undo_is_safe_and_short():
     assert "No recent sale found" in mismatch
 
 
+def test_no_space_commands_and_same_as_last_sequence_keep_context_local():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    first = service.process_text("Panadol 2 cash", conversation_id="rush")
+    report = service.process_text("reporttoday", conversation_id="rush")
+    same = service.process_text("sameaslast", conversation_id="rush")
+    repeated = service.process_text("yes", conversation_id="rush")
+    receipt = service.process_text("printreceipt", conversation_id="rush")
+
+    assert "Panadol x2" in first
+    assert "Daily Report" in report
+    assert same == "Repeat Panadol x2 Cash? Reply YES."
+    assert "Panadol x2" in repeated
+    assert "PHARMAREEN RECEIPT" in receipt
+    assert "Medicine: Panadol" in receipt
+
+
+def test_no_space_report_analytics_and_receipt_commands_are_deterministic():
+    store = FakeStore()
+    service = IntakeService(FailingParser(), store)
+
+    service.process_text("Panadol 2 cash", conversation_id="owner")
+    assert "Daily Report" in service.process_text("reporttoday", conversation_id="owner")
+    assert "Cash received today" in service.process_text("cashtoday", conversation_id="owner")
+    assert "Best seller today" in service.process_text("bestsellertoday", conversation_id="owner")
+    assert "PHARMAREEN RECEIPT" in service.process_text("printreceipt", conversation_id="owner")
+
+
 def test_swahili_undo_last_sale_asks_short_confirmation_then_reverses_stock():
     store = FakeStore()
     service = IntakeService(FailingParser(), store)
@@ -1609,7 +1639,8 @@ def test_swahili_undo_last_sale_asks_short_confirmation_then_reverses_stock():
     final = service.process_text("YES", conversation_id="owner")
 
     assert confirm == "Undo last sale: Panadol x2 Cash?\nReply YES to confirm."
-    assert "Sale voided" in final
+    assert "Last sale removed safely" in final
+    assert "Cash total adjusted" in final
     assert store.stocks["panadol"].current_stock == 20
     assert store.transactions[-1]["Type"] == "void"
 
