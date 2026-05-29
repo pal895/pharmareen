@@ -497,6 +497,44 @@ class GoogleSheetsStore:
             inventory_updates["Cost Price"] = new_cost_price
         self._update_inventory_columns(stock.drug_name, inventory_updates)
 
+    def add_stock_item(
+        self,
+        drug_name: str,
+        selling_price: float | None = None,
+        cost_price: float | None = None,
+        current_stock: int = 0,
+        reorder_level: int = 5,
+    ) -> None:
+        name = " ".join(str(drug_name or "").strip().split())
+        if not name:
+            raise ValueError("Missing medicine name")
+        existing = self.find_stock(name)
+        if existing is not None:
+            self.update_current_stock_and_cost(existing, int(current_stock or existing.current_stock or 0), cost_price)
+            return
+        self._worksheet(MASTER_STOCK).append_row(
+            [
+                name,
+                "" if selling_price is None else selling_price,
+                "" if cost_price is None else cost_price,
+                int(current_stock or 0),
+                int(reorder_level or 5),
+            ],
+            value_input_option="USER_ENTERED",
+        )
+        self._worksheet(INVENTORY).append_row(
+            [
+                name,
+                int(current_stock or 0),
+                "" if cost_price is None else cost_price,
+                "" if selling_price is None else selling_price,
+                "" if cost_price is None else cost_price,
+                int(reorder_level or 5),
+                now_in_timezone(self.settings.timezone).strftime("%Y-%m-%d %H:%M:%S"),
+            ],
+            value_input_option="USER_ENTERED",
+        )
+
     def list_low_stock_items(self) -> list[StockItem]:
         low_stock: list[StockItem] = []
         for record, row_number in self._master_records_with_rows():

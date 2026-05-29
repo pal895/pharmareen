@@ -240,9 +240,9 @@ def decide_ai_route(
     confidence = inferred_confidence if local_confidence is None else local_confidence
     if intent != "unknown" or confidence >= 0.72:
         return AIRoutingDecision(False, "local", f"deterministic {intent}", confidence)
-    if confidence >= 0.45:
-        return AIRoutingDecision(False, "clarify", "medium confidence needs short clarification", confidence)
-    return AIRoutingDecision(True, "chat/completions", "messy text after local parser fails", confidence)
+    if explicit_ai_request:
+        return AIRoutingDecision(True, "chat/completions", "explicit advanced assistant request", confidence)
+    return AIRoutingDecision(False, "clarify", "local safe clarification before AI", confidence)
 
 
 MEDIA_KEYWORDS: tuple[tuple[str, str, tuple[str, ...], str, str], ...] = (

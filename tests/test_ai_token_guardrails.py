@@ -84,3 +84,4 @@ def test_media_routes_are_the_only_ai_allowed_shortcuts():
     assert decide_ai_route(message_type="voice", text="Panadol mbili cash").use_ai is True
     assert decide_ai_route(message_type="photo", text="scan invoice", explicit_ai_request=True).use_ai is True
     assert decide_ai_route(message_type="photo", text="invoice", explicit_ai_request=False).use_ai is False
+    assert decide_ai_route(text="unclear non pharmacy chat").use_ai is False

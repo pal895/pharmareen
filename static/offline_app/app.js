@@ -10,8 +10,8 @@ const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
-const OFFLINE_APP_BUILD_VERSION = "launch-usability-v2026-05-29-1";
-const SERVICE_WORKER_VERSION = "pharmareen-offline-v17-launch-usability";
+const OFFLINE_APP_BUILD_VERSION = "pharmacy-owner-usability-v2026-05-30-1";
+const SERVICE_WORKER_VERSION = "pharmareen-offline-v18-owner-usability";
 const DEFAULT_MEDICINE_SHORTCUTS = ["Panadol", "Amox", "Piriton", "ORS", "Glucose"];
 console.log(`OFFLINE_APP_BUILD_VERSION=${OFFLINE_APP_BUILD_VERSION}`);
 
@@ -62,6 +62,9 @@ let barcodeTorchEnabled = false;
 let currentBarcodeMedicine = "";
 let mediaRecorder = null;
 let recordedChunks = [];
+let voiceRecognition = null;
+let voiceRecognitionTimeout = null;
+let voiceRecognitionActive = false;
 let currentPaymentMode = localStorage.getItem(PAYMENT_MODE_KEY) || "Cash";
 let lastBarcodeScan = { code: "", at: 0 };
 let pendingBarcodeScan = { code: "", count: 0, at: 0 };
@@ -806,37 +809,72 @@ async function stopVoiceRecording() {
   }
 }
 
+function resetVoiceRecognition() {
+  if (voiceRecognitionTimeout) clearTimeout(voiceRecognitionTimeout);
+  voiceRecognitionTimeout = null;
+  voiceRecognitionActive = false;
+  voiceRecognition = null;
+}
+
 function startLocalVoiceSelector() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) return false;
   try {
     const recognition = new SpeechRecognition();
+    voiceRecognition = recognition;
+    voiceRecognitionActive = true;
     recognition.lang = "en-KE";
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     recognition.onstart = () => {
       voiceStatus.textContent = "Listening for medicine name...";
     };
-    recognition.onerror = () => {
-      voiceStatus.textContent = "I could not hear the medicine clearly. Type it or use Save Voice.";
+    recognition.onerror = event => {
+      resetVoiceRecognition();
+      if (event && (event.error === "not-allowed" || event.error === "service-not-allowed")) {
+        voiceStatus.textContent = "Please allow microphone to use Tap & Talk.";
+        return;
+      }
+      voiceStatus.textContent = "Medicine not clear. Recording a voice note instead...";
+      startVoiceRecording({ skipSelector: true });
     };
     recognition.onresult = event => {
+      resetVoiceRecognition();
       const transcript = event.results && event.results[0] && event.results[0][0]
         ? event.results[0][0].transcript
         : "";
       const medicine = detectLocalMedicineFromSpeech(transcript);
       if (medicine) showVoiceSelector(medicine);
-      else voiceStatus.textContent = "Medicine not clear. Type it or use Save Voice.";
+      else {
+        voiceStatus.textContent = "Medicine not clear. Recording a voice note instead...";
+        startVoiceRecording({ skipSelector: true });
+      }
+    };
+    recognition.onend = () => {
+      voiceRecognitionActive = false;
     };
     recognition.start();
+    voiceRecognitionTimeout = setTimeout(() => {
+      try { recognition.abort(); } catch {}
+      resetVoiceRecognition();
+      voiceStatus.textContent = "Medicine not clear. Recording a voice note instead...";
+      startVoiceRecording({ skipSelector: true });
+    }, 6000);
     return true;
   } catch {
+    resetVoiceRecognition();
     return false;
   }
 }
 
-async function startVoiceRecording() {
-  if (startLocalVoiceSelector()) return;
+async function startVoiceRecording(options = {}) {
+  if (voiceRecognitionActive && voiceRecognition) {
+    try { voiceRecognition.abort(); } catch {}
+    resetVoiceRecognition();
+    voiceStatus.textContent = "Tap & Talk cancelled.";
+    return;
+  }
+  if (!options.skipSelector && startLocalVoiceSelector()) return;
   if (!navigator.mediaDevices || !window.MediaRecorder) {
     voiceStatus.textContent = "Recording is not available here. Use More options to choose an audio file.";
     voiceInput.click();

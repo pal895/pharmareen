@@ -1670,11 +1670,39 @@ def test_known_medicine_selector_is_local_and_accepts_quantity_payment_reply():
     prompt = service.process_text("Glucose", conversation_id="voice")
     saved = service.process_text("2 mpesa", conversation_id="voice")
 
-    assert prompt == "Glucose selected.\nReply 1 cash, 2 mpesa, 3 credit, or type quantity/payment."
+    assert "Sale approval" in prompt
+    assert "Medicine: Glucose" in prompt
+    assert "Quantity: 1, 2, 3, 5, 10, +, -" in prompt
+    assert "Payment: Cash, M-Pesa, Credit, Mixed" in prompt
     assert "Glucose x2" in saved
     assert "M-Pesa" in saved
     assert store.stocks["glucose"].current_stock == 10
     assert parser.called is False
+
+
+def test_typo_sale_and_payment_stay_local_without_ai_parser():
+    store = FakeStore()
+    parser = FailingParser()
+    service = IntakeService(parser, store)
+
+    reply = service.process_text("pnadol 1 cahs", conversation_id="typo")
+
+    assert "Panadol x1" in reply
+    assert "Cash" in reply
+    assert store.stocks["panadol"].current_stock == 19
+    assert parser.called is False
+
+
+def test_unknown_text_with_ai_parser_gets_local_clarification_without_ai_call():
+    class AIService:
+        def parse_events(self, text, master_drug_names):  # pragma: no cover - should not be reached
+            raise AssertionError("AI parser should not be called for unclear local text")
+
+    service = IntakeService(AIService(), FakeStore())
+
+    reply = service.process_text("random customer story not pharmacy", conversation_id="unknown")
+
+    assert "Did you want to:" in reply
 
 
 def test_swahili_undo_last_sale_asks_short_confirmation_then_reverses_stock():

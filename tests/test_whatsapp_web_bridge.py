@@ -1400,3 +1400,145 @@ def test_invoice_approval_guides_add_new_item_when_stock_update_reports_missing(
     assert "PEP Lime Cordial x10" in reply
     assert "add new item PEP Lime Cordial price 250 stock 10" in reply
     assert main.invoice_review_key(sender) in main.pending_invoice_reviews
+
+
+def test_same_whatsapp_invoice_image_uses_media_hash_cache_once(monkeypatch, tmp_path):
+    calls = {"count": 0}
+
+    class FakeAIService:
+        client = object()
+
+        def extract_restock_from_image(self, image_bytes: bytes, content_type: str | None = None):
+            calls["count"] += 1
+            return {
+                "supplier": "MedCare",
+                "invoice_number": "INV-CACHE",
+                "confidence": 0.9,
+                "items": [{"drug_name": "Panadol", "quantity": 20}],
+            }
+
+    main.offline_media_job_results.clear()
+    main.pending_invoice_reviews.clear()
+    monkeypatch.setenv("ENABLE_INVOICE_AI", "true")
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_ai_service", lambda: FakeAIService())
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"same invoice bytes").decode("ascii")
+    payload["media_mime_type"] = "image/jpeg"
+    payload["caption"] = "supplier invoice"
+
+    with TestClient(main.app) as client:
+        first = client.post("/bridge/whatsapp-web", json={**payload, "message_id": "waweb-cache-a"})
+        second = client.post("/bridge/whatsapp-web", json={**payload, "message_id": "waweb-cache-b"})
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert "Invoice processed" in first.json()["reply"]
+    assert second.json()["reply"] == first.json()["reply"]
+    assert calls["count"] == 1
+
+
+def test_same_shelf_photo_uses_cache_and_never_updates_stock(monkeypatch, tmp_path):
+    calls = {"count": 0}
+
+    class FakeAIService:
+        client = object()
+
+        def extract_restock_from_image(self, image_bytes: bytes, content_type: str | None = None):
+            calls["count"] += 1
+            return {
+                "photo_type": "stock shelf photo",
+                "items": [{"drug_name": "Glucose"}, {"drug_name": "ORS"}],
+            }
+
+    commands: list[str] = []
+
+    main.offline_media_job_results.clear()
+    main.pending_invoice_reviews.clear()
+    monkeypatch.setenv("ENABLE_VISION_AI", "true")
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_ai_service", lambda: FakeAIService())
+    monkeypatch.setattr(main, "process_intake_text_for_sender", lambda text, sender: commands.append(text) or text)
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"same shelf bytes").decode("ascii")
+    payload["media_mime_type"] = "image/jpeg"
+    payload["caption"] = "analyze shelf photo"
+
+    with TestClient(main.app) as client:
+        first = client.post("/bridge/whatsapp-web", json={**payload, "message_id": "waweb-shelf-a"})
+        second = client.post("/bridge/whatsapp-web", json={**payload, "message_id": "waweb-shelf-b"})
+
+    assert "Shelf photo analyzed" in first.json()["reply"]
+    assert second.json()["reply"] == first.json()["reply"]
+    assert calls["count"] == 1
+    assert commands == []
+    assert main.pending_invoice_reviews == {}
+
+
+def test_invoice_add_new_item_setup_then_approve_updates_stock_locally(monkeypatch):
+    sender = "254700000000@s.whatsapp.net"
+    created: list[dict[str, object]] = []
+    commands: list[str] = []
+
+    class FakeStore:
+        def add_stock_item(self, drug_name, selling_price=None, cost_price=None, current_stock=0, reorder_level=5):
+            created.append(
+                {
+                    "drug_name": drug_name,
+                    "selling_price": selling_price,
+                    "cost_price": cost_price,
+                    "current_stock": current_stock,
+                    "reorder_level": reorder_level,
+                }
+            )
+
+    class FakeService:
+        store = FakeStore()
+
+    main.pending_invoice_reviews.clear()
+    main.pending_invoice_reviews[main.invoice_review_key(sender)] = {
+        "supplier": "MedCare",
+        "invoice_number": "INV-NEW",
+        "items": [{"drug_name": "PEP Lime Cordial", "quantity": 10}],
+    }
+
+    monkeypatch.setattr(main, "get_intake_service", lambda: FakeService())
+    monkeypatch.setattr(main, "process_intake_text_for_sender", lambda text, sender_value: commands.append(text) or f"restocked: {text}")
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000"),
+    )
+
+    with TestClient(main.app) as client:
+        response = client.post(
+            "/bridge/whatsapp-web",
+            json=bridge_payload("add new item PEP Lime Cordial price 250 stock 10", sender=sender),
+        )
+
+    reply = response.json()["reply"]
+    assert "Item setup saved." in reply
+    assert "Invoice approved and stock updated" in reply
+    assert created == [
+        {
+            "drug_name": "PEP Lime Cordial",
+            "selling_price": 250.0,
+            "cost_price": None,
+            "current_stock": 0,
+            "reorder_level": 5,
+        }
+    ]
+    assert commands == ["PEP Lime Cordial restock 10 supplier MedCare invoice INV-NEW"]
+    assert main.pending_invoice_reviews == {}

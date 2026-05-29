@@ -36,9 +36,14 @@ UNIT_ALIASES = {
 
 PAYMENT_ALIASES = {
     "cash": "Cash",
+    "cahs": "Cash",
+    "cashi": "Cash",
+    "kash": "Cash",
     "mpesa": "M-Pesa",
     "m-pesa": "M-Pesa",
     "m pesa": "M-Pesa",
+    "pesa": "M-Pesa",
+    "mpessa": "M-Pesa",
     "card": "Card",
     "credit": "Credit",
     "mixed": "Mixed",

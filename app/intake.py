@@ -169,6 +169,16 @@ class StockStore(Protocol):
     ) -> None:
         ...
 
+    def add_stock_item(
+        self,
+        drug_name: str,
+        selling_price: float | None = None,
+        cost_price: float | None = None,
+        current_stock: int = 0,
+        reorder_level: int = 5,
+    ) -> None:
+        ...
+
     def append_transaction(
         self,
         transaction_type: str,
@@ -580,6 +590,19 @@ class IntakeService:
         except Exception:
             return SAVE_ERROR
 
+        if route_decision.route == "clarify" and self.parser.__class__.__name__ == "AIService":
+            guessed_intent, confidence = classify_local_intent(text)
+            log_edge_case(
+                text=text,
+                sender=conversation_key,
+                guessed_intent=guessed_intent,
+                confidence=confidence,
+                context={"route": route_decision.route, "reason": route_decision.reason},
+                ai_fallback_used=False,
+                final_outcome="local_safe_clarification",
+            )
+            return AMBIGUOUS_ERROR
+
         try:
             parsed = self.parser.parse_events(text, master_drug_names)
         except Exception as exc:
@@ -698,7 +721,15 @@ class IntakeService:
             payment_method="Cash",
             raw_text=resolution.drug_name,
         )
-        return f"{resolution.drug_name} selected.\nReply 1 cash, 2 mpesa, 3 credit, or type quantity/payment."
+        return "\n".join(
+            [
+                "Sale approval",
+                f"Medicine: {resolution.drug_name}",
+                "Quantity: 1, 2, 3, 5, 10, +, -",
+                "Payment: Cash, M-Pesa, Credit, Mixed",
+                "Reply: 1 cash, 2 mpesa, yes, or cancel.",
+            ]
+        )
 
     def _share_reply(self) -> str:
         return "\n".join(

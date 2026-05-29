@@ -60,6 +60,7 @@ processed_message_sids: set[str] = set()
 offline_synced_entry_ids: set[str] = set()
 offline_synced_entry_results: dict[str, dict[str, Any]] = {}
 offline_media_job_results: dict[str, dict[str, Any]] = {}
+approved_invoice_job_ids: set[str] = set()
 offline_whatsapp_outbox: list[dict[str, Any]] = []
 offline_whatsapp_confirmation_history: list[dict[str, Any]] = []
 pending_voice_confirmations: dict[str, tuple[str, float]] = {}
@@ -76,7 +77,7 @@ last_openai_error: dict[str, Any] = {
 VOICE_QUOTA_REPLY = "🎧 Voice received safely. AI transcription is ready but OpenAI credits are not active yet."
 PHOTO_QUOTA_REPLY = "📷 Photo received safely. Saved for review."
 DEFAULT_PUBLIC_BASE_URL = "https://pharmareen-1--pal895.replit.app"
-OFFLINE_BUILD_VERSION = "launch-usability-v2026-05-29-1"
+OFFLINE_BUILD_VERSION = "pharmacy-owner-usability-v2026-05-30-1"
 OFFLINE_FRONTEND_MARKER = f"PHARMAREEN REAL PATH BUILD {OFFLINE_BUILD_VERSION}"
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
 OFFLINE_NO_CACHE_HEADERS = {
@@ -763,11 +764,67 @@ def offline_media_job_id(entry: dict[str, Any]) -> str:
     return f"media-{hashlib.sha256(raw.encode('utf-8')).hexdigest()[:16]}" if raw.strip("|") else ""
 
 
+def media_job_id_from_bytes(media_bytes: bytes) -> str:
+    return f"media-{hashlib.sha256(media_bytes or b'').hexdigest()}"
+
+
+def approved_invoice_job_key(job_id: str) -> str:
+    return f"{PROJECT_ROOT}|{job_id}"
+
+
 def cache_offline_media_result(job_id: str, record: dict[str, Any]) -> dict[str, Any]:
     cached = dict(record)
     cached["job_id"] = job_id
+    cached.setdefault("project_root", str(PROJECT_ROOT))
     offline_media_job_results[job_id] = cached
     return cached
+
+
+def cached_media_result(job_id: str, *, sender: str = "", route: str = "") -> WhatsAppProcessResult | None:
+    if not job_id:
+        return None
+    cached = offline_media_job_results.get(job_id)
+    if not cached:
+        return None
+    if str(cached.get("project_root") or "") != str(PROJECT_ROOT):
+        return None
+    log_ai_route_decision(
+        text=job_id,
+        route=route or str(cached.get("message_type") or "media"),
+        used_ai=False,
+        reason="media_result_cache",
+        job_id=job_id,
+        from_cache=True,
+        user_number=mask_phone(sender),
+        media_hash=job_id.removeprefix("media-"),
+    )
+    reply = str(cached.get("reply") or cached.get("result_summary") or "Media processed safely.")
+    return WhatsAppProcessResult(
+        reply=reply,
+        message_type=str(cached.get("message_type") or "media"),
+        success=str(cached.get("status") or "synced") not in {"failed", "pending"},
+        error_reason=str(cached.get("error_reason") or ""),
+        command_handler=str(cached.get("command_handler") or "media_cache"),
+    )
+
+
+def cache_media_process_result(job_id: str, result: WhatsAppProcessResult, *, approved: bool = False) -> None:
+    if not job_id:
+        return
+    cache_offline_media_result(
+        job_id,
+        {
+            "id": job_id,
+            "status": "synced" if result.success else "failed",
+            "reply": result.reply,
+            "result_summary": compact_offline_reply(result.reply),
+            "message_type": result.message_type,
+            "command_handler": result.command_handler,
+            "error_reason": result.error_reason,
+            "whatsapp_confirmation": "ready",
+            "approved": bool(approved),
+        },
+    )
 
 
 def offline_confirmation_recipient(payload: dict[str, Any]) -> str:
@@ -2133,12 +2190,15 @@ async def process_whatsapp_web_payload(
             )
         try:
             audio_bytes = base64.b64decode(media_base64)
+            job_id = media_job_id_from_bytes(audio_bytes)
             log_ai_route_decision(
                 text=message_id or media_caption or "voice",
                 route="audio/transcriptions",
                 used_ai=True,
                 reason="voice_transcription",
-                job_id=message_id,
+                job_id=job_id,
+                user_number=mask_phone(sender),
+                media_hash=job_id.removeprefix("media-"),
             )
             raw_transcript = transcription_service.transcribe_audio(audio_bytes, media_mime_type)
             clear_last_openai_error("voice")
@@ -2155,12 +2215,13 @@ async def process_whatsapp_web_payload(
                 )
             interpreted = normalize_spoken_command_text(transcript)
             reply = process_intake_text_for_sender(interpreted, sender)
-            return WhatsAppProcessResult(
+            result = WhatsAppProcessResult(
                 reply=voice_reply(transcript, interpreted, reply),
                 message_type="voice",
                 success=True,
                 command_handler="voice_note_processed",
             )
+            return result
         except Exception as exc:
             record_openai_error("voice", exc)
             if is_openai_quota_error(exc):
@@ -2190,6 +2251,11 @@ async def process_whatsapp_web_payload(
                 error_reason=str(exc),
                 command_handler="photo_decode_failed",
             )
+
+        job_id = media_job_id_from_bytes(image_bytes)
+        cached = cached_media_result(job_id, sender=sender, route="vision/extraction")
+        if cached is not None:
+            return cached
 
         settings = get_settings()
         upload = save_photo_upload(
@@ -2232,9 +2298,12 @@ async def process_whatsapp_web_payload(
                         route="chat/completions",
                         used_ai=True,
                         reason="photo_invoice_extraction",
-                        job_id=message_id,
+                        job_id=job_id,
+                        user_number=mask_phone(sender),
+                        media_hash=job_id.removeprefix("media-"),
                     )
                     extraction_result = get_ai_service().extract_restock_from_image(image_bytes, media_mime_type)
+                    extraction_result["_job_id"] = job_id
                     clear_last_openai_error("photo")
                     extraction_status = "needs_review"
                     extraction = {
@@ -2293,13 +2362,15 @@ async def process_whatsapp_web_payload(
         elif classification["media_kind"] == "pharmacy_stock_shelf_photo":
             reply = f"{reply}\nReply with quantities or scan barcode."
 
-        return WhatsAppProcessResult(
+        result = WhatsAppProcessResult(
             reply=reply,
             message_type="image",
             success=True,
             error_reason="photo_saved_for_review",
             command_handler="photo_received_saved_safely",
         )
+        cache_media_process_result(job_id, result)
+        return result
 
     return WhatsAppProcessResult(
         reply="Please send text for now, like: Panadol 2",
@@ -2371,6 +2442,7 @@ def store_pending_invoice_review(sender: str, extraction_result: dict[str, Any])
         "invoice_number": str(extraction_result.get("invoice_number") or extraction_result.get("invoice") or "").strip(),
         "date": str(extraction_result.get("date") or extraction_result.get("invoice_date") or "").strip(),
         "items": items,
+        "job_id": str(extraction_result.get("_job_id") or extraction_result.get("job_id") or "").strip(),
         "created_at": now_in_timezone(get_settings().timezone).isoformat(timespec="seconds"),
     }
 
@@ -2472,6 +2544,40 @@ def process_pending_invoice_review_message(sender: str, message: str) -> str | N
 
     items = pending.get("items") or []
 
+    new_item_match = re.fullmatch(
+        r"add\s+new\s+item\s+(.+?)\s+price\s+(\d+(?:\.\d+)?)(?:\s+cost\s+(\d+(?:\.\d+)?))?(?:\s+stock\s+(\d+(?:\.\d+)?))?",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if new_item_match:
+        name = " ".join(new_item_match.group(1).strip().split())
+        selling_price = float(new_item_match.group(2))
+        cost_price = float(new_item_match.group(3)) if new_item_match.group(3) else None
+        invoice_quantity = int(float(new_item_match.group(4))) if new_item_match.group(4) else None
+        try:
+            store = get_intake_service().store
+            add_stock_item = getattr(store, "add_stock_item", None)
+            if not callable(add_stock_item):
+                return "Item setup is not available here yet. Please add it to Master_Stock, then reply approve."
+            add_stock_item(name, selling_price=selling_price, cost_price=cost_price, current_stock=0, reorder_level=5)
+        except Exception:
+            return "I could not save that item setup yet. Please check Google Sheets, then try again."
+        matched = False
+        for item in items:
+            existing_name = invoice_item_name(item)
+            if normalize_key(existing_name) in normalize_key(name) or normalize_key(name) in normalize_key(existing_name):
+                item["drug_name"] = name
+                if invoice_quantity is not None:
+                    item["quantity"] = invoice_quantity
+                if cost_price is not None:
+                    item["cost"] = cost_price
+                matched = True
+                break
+        if not matched:
+            items.append({"drug_name": name, "quantity": invoice_quantity or 1, "cost": cost_price or "", "unit": ""})
+        approve_reply = process_pending_invoice_review_message(sender, "approve")
+        return "Item setup saved.\n" + (approve_reply or "Reply approve to add stock.")
+
     def find_invoice_item(target_text: str) -> tuple[int, dict[str, Any] | None]:
         target_clean = str(target_text or "").strip()
         if target_clean.isdigit():
@@ -2561,6 +2667,10 @@ def process_pending_invoice_review_message(sender: str, message: str) -> str | N
     approve_phrases = {"approve", "approved", "review approved", "add to stock", "approve invoice", "save invoice", "add all", "skip unknown"}
     if lower not in approve_phrases:
         return None
+    job_id = str(pending.get("job_id") or "").strip()
+    if job_id and approved_invoice_job_key(job_id) in approved_invoice_job_ids:
+        pending_invoice_reviews.pop(key, None)
+        return "Invoice already approved safely. No duplicate stock update."
 
     missing = [invoice_item_name(item) for item in items if invoice_item_quantity(item) is None]
     if missing:
@@ -2603,6 +2713,12 @@ def process_pending_invoice_review_message(sender: str, message: str) -> str | N
         ]
         return "\n".join(guidance)
     pending_invoice_reviews.pop(key, None)
+    if job_id:
+        approved_invoice_job_ids.add(approved_invoice_job_key(job_id))
+        cached = offline_media_job_results.get(job_id)
+        if cached:
+            cached["approved"] = True
+            cached["approval_reply"] = "\n".join(lines)
     return "\n".join(lines)
 
 
