@@ -123,13 +123,19 @@ def test_offline_app_routes_return_html():
     assert "Take Photo" in followed_response.text
     assert "Save Photo" in followed_response.text
     assert "Save Voice" in followed_response.text
-    assert "PHARMAREEN REAL PATH BUILD realpath-stock-safety-v2026-05-28-1" in followed_response.text
+    assert "PHARMAREEN REAL PATH BUILD launch-usability-v2026-05-29-1" in followed_response.text
     assert "PHARMAREEN SMOOTH TEST v2026-05-15" in followed_response.text
-    assert "🟢 Cash mode active" in followed_response.text
+    assert "Cash mode active" in followed_response.text
+    assert 'class="bottom-nav"' in followed_response.text
+    assert 'data-mobile-tab="home"' in followed_response.text
+    assert 'data-tab-panel="queue"' in followed_response.text
+    assert 'id="queueCountTop"' in followed_response.text
+    assert "Local voice selector" in followed_response.text
+    assert "Confirm Sale" in followed_response.text
     assert "Common medicines" in followed_response.text
     assert "medicineGrid" in followed_response.text
     assert "Edit these to match the medicines your pharmacy sells most." in followed_response.text
-    assert "Type or paste pharmacy command" in followed_response.text
+    assert "Manual Entry" in followed_response.text
     assert "Save Offline" in followed_response.text
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in followed_response.text
     assert "Saved Offline" in followed_response.text
@@ -140,7 +146,7 @@ def test_offline_app_routes_return_html():
     assert "PharMareen Offline Mode" in compat_response.text
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in compat_response.text
     assert "no-store" in compat_response.headers.get("cache-control", "")
-    assert compat_response.headers.get("x-pharmareen-offline-version") == "realpath-stock-safety-v2026-05-28-1"
+    assert compat_response.headers.get("x-pharmareen-offline-version") == "launch-usability-v2026-05-29-1"
     assert parser_response.status_code == 200
     assert manifest_response.status_code == 200
     assert worker_response.status_code == 200
@@ -152,8 +158,27 @@ def test_debug_version_exposes_realpath_build_marker():
 
     assert response.status_code == 200
     data = response.json()
-    assert data["offline_build_version"] == "realpath-stock-safety-v2026-05-28-1"
+    assert data["offline_build_version"] == "launch-usability-v2026-05-29-1"
     assert "PHARMAREEN REAL PATH BUILD" in data["offline_frontend_marker"]
+
+
+def test_offline_medicine_names_route_is_local_and_zero_ai(monkeypatch):
+    class NameStore:
+        def list_master_drug_names(self):
+            return ["Panadol", "Glucose", "ORS", "Panadol"]
+
+    class NameService:
+        store = NameStore()
+
+    monkeypatch.setattr(main, "get_intake_service", lambda: NameService())
+
+    with TestClient(main.app) as client:
+        response = client.get("/offline/medicine-names")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ai_used"] is False
+    assert data["medicines"] == ["Panadol", "Glucose", "ORS"]
 
 
 def test_offline_sync_accepts_sale_and_restock_entries(monkeypatch, tmp_path):
@@ -361,7 +386,7 @@ def test_debug_offline_app_reports_all_phase6_features(monkeypatch, tmp_path):
     assert data["voice_queue_ready"] is True
     assert data["persistent_storage_ready"] is True
     assert data["auto_sync_ready"] is True
-    assert data["frontend_marker"] == "PHARMAREEN REAL PATH BUILD realpath-stock-safety-v2026-05-28-1"
+    assert data["frontend_marker"] == "PHARMAREEN REAL PATH BUILD launch-usability-v2026-05-29-1"
     assert data["served_index_path"].endswith("static/offline_app/index.html") or data["served_index_path"].endswith("static\\offline_app\\index.html")
     assert "offline_log_exists" in data
 
@@ -469,10 +494,11 @@ def test_offline_media_inputs_allow_multiple_files_without_required_command():
     root = Path(__file__).resolve().parents[1]
     html = (root / "static" / "offline_app" / "index.html").read_text(encoding="utf-8")
 
-    assert "Cash Sale" in html
-    assert "M-Pesa Sale" in html
-    assert "Credit Sale" in html
-    assert "🟢 Cash mode active" in html
+    assert ">Sell<" in html
+    assert ">Camera<" in html
+    assert 'class="bottom-nav"' in html
+    assert 'data-tab-panel="home"' in html
+    assert "Cash mode active" in html
     assert ">Cash<" in html
     assert ">M-Pesa<" in html
     assert ">Credit<" in html
@@ -497,6 +523,8 @@ def test_offline_media_inputs_allow_multiple_files_without_required_command():
     assert "Save Photo" in html
     assert "Save Voice" in html
     assert "Manual Entry" in html
+    assert "Local voice selector" in html
+    assert "Confirm Sale" in html
     assert 'id="barcodeInput"' in html
     assert 'id="saveBarcodeMapping"' in html
     assert 'id="commandText" required' not in html
@@ -527,6 +555,26 @@ def test_offline_app_uses_pharmacy_owner_language_not_technical_queue_terms():
     assert "Pending queue" not in html
     assert "indexeddb" not in html.lower()
     assert "retries" not in html.lower()
+
+
+def test_mobile_layout_and_local_voice_selector_hooks_are_present():
+    root = Path(__file__).resolve().parents[1]
+    html = (root / "static" / "offline_app" / "index.html").read_text(encoding="utf-8")
+    css = (root / "static" / "offline_app" / "styles.css").read_text(encoding="utf-8")
+    script = (root / "static" / "offline_app" / "app.js").read_text(encoding="utf-8")
+
+    assert 'class="bottom-nav"' in html
+    assert 'data-mobile-tab="home"' in html
+    assert 'data-tab-panel="media"' in html
+    assert 'id="queueCountTop"' in html
+    assert 'data-local-voice-selector' in html
+    assert "Confirm Sale" in html
+    assert "@media (max-width: 679px)" in css
+    assert "active-tab-panel" in css
+    assert "detectLocalMedicineFromSpeech" in script
+    assert "/offline/medicine-names" in script
+    assert "crypto.subtle.digest" in script
+    assert "job_id" in script
 
 
 def test_offline_save_offline_queues_photo_and_audio_without_command_text():
@@ -666,14 +714,14 @@ def test_offline_pwa_assets_contain_auto_sync_media_and_retry_logic():
     assert "parseCommand" in parser
     assert "Save Offline" in html
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in html
-    assert "PHARMAREEN REAL PATH BUILD realpath-stock-safety-v2026-05-28-1" in html
+    assert "PHARMAREEN REAL PATH BUILD launch-usability-v2026-05-29-1" in html
     assert "PHARMAREEN SMOOTH TEST v2026-05-15" in html
     assert "Save Photo" in html
     assert "Save Voice" in html
     assert "Tap & Talk" in html
     assert '"start_url": "/offline-app"' in manifest
     assert "/offline_app/parser.js" in worker
-    assert "pharmareen-offline-v16-realpath-stock-safety" in worker
+    assert "pharmareen-offline-v17-launch-usability" in worker
     assert "caches.open" in worker
 
 
@@ -1249,7 +1297,6 @@ def test_offline_media_sync_reuses_job_result_and_dedupes_confirmation(monkeypat
         "entries": [
             {
                 "id": "offline-voice-retry-a",
-                "job_id": "voice-job-44",
                 "action": "voice",
                 "file_type": "audio/ogg",
                 "data_url": "data:audio/ogg;base64," + base64.b64encode(b"voice").decode("ascii"),

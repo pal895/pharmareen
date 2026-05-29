@@ -450,6 +450,10 @@ class IntakeService:
         if is_unsafe_undo_number_command(text):
             return "Which sale should I undo? Send undo last sale or cancel TX-1046."
 
+        selector_reply = self._medicine_selector_reply(text, conversation_key)
+        if selector_reply:
+            return selector_reply
+
         if is_details_last_command(text):
             return self._details_last_reply(conversation_key)
 
@@ -637,6 +641,64 @@ class IntakeService:
                 return "Ni quantity gani sahihi?"
             return "Which medicine quantity should I correct?"
         return ""
+
+    def _medicine_selector_reply(self, text: str, conversation_key: str) -> str:
+        clean = normalize_natural_text(replace_number_words(text.strip()))
+        if not clean or len(clean.split()) > 3:
+            return ""
+        key = normalize_key(clean)
+        blocked = {
+            "help",
+            "hello",
+            "hi",
+            "stock",
+            "report",
+            "trace",
+            "expiry",
+            "expiring",
+            "cash",
+            "mpesa",
+            "credit",
+            "receipt",
+            "undo",
+            "yes",
+            "no",
+        }
+        if key in blocked or any(character.isdigit() for character in clean) or "+" in clean:
+            return ""
+        command_words = [
+            "stock",
+            "report",
+            "restock",
+            "sell",
+            "sold",
+            "cash",
+            "mpesa",
+            "credit",
+            "receipt",
+            "undo",
+            "trace",
+            "expiry",
+            "expiring",
+            "supplier",
+            "invoice",
+            "batch",
+        ]
+        if any(word in key for word in command_words):
+            return ""
+        resolution = self._resolve_drug_name(clean)
+        if resolution.question:
+            return resolution.question
+        if not resolution.drug_name:
+            return ""
+        self.pending_followups[conversation_key] = OperatingCommand(
+            kind="sale",
+            drug_name=resolution.drug_name,
+            quantity=0,
+            payment_method="Cash",
+            raw_text=resolution.drug_name,
+        )
+        return f"{resolution.drug_name} selected.\nReply 1 cash, 2 mpesa, 3 credit, or type quantity/payment."
 
     def _share_reply(self) -> str:
         return "\n".join(
@@ -2674,6 +2736,18 @@ def complete_followup_command(text: str, pending: OperatingCommand) -> Operating
     if not clean:
         return None
     if pending.kind in {"sale", "late_sale", "restock"}:
+        response_key = normalize_key(clean)
+        if response_key in {"yes", "y", "confirm", "ndio", "sawa"} and pending.drug_name:
+            return replace(pending, quantity=1, raw_text=f"{pending.raw_text} 1".strip())
+        quantity_payment = re.fullmatch(rf"(\d+)(?:\s+({payment_pattern()}))?", clean, flags=re.IGNORECASE)
+        if quantity_payment and pending.drug_name:
+            payment = parse_payment_method(quantity_payment.group(2) or pending.payment_method or "Cash")
+            return replace(
+                pending,
+                quantity=positive_quantity(quantity_payment.group(1)),
+                payment_method=payment,
+                raw_text=f"{pending.raw_text} {quantity_payment.group(1)} {payment}".strip(),
+            )
         quantity = parse_int(clean, default=None)
         if quantity is not None and quantity > 0 and pending.drug_name:
             return replace(pending, quantity=quantity, raw_text=f"{pending.raw_text} {quantity}".strip())

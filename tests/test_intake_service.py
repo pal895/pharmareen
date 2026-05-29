@@ -1654,6 +1654,29 @@ def test_replace_last_sale_with_inventory_medicine_and_undo_number_is_safe():
     assert unsafe_undo == "Which sale should I undo? Send undo last sale or cancel TX-1046."
 
 
+def test_known_medicine_selector_is_local_and_accepts_quantity_payment_reply():
+    store = FakeStore()
+    store.stocks["glucose"] = StockItem(
+        drug_name="Glucose",
+        selling_price=100,
+        cost_price=70,
+        current_stock=12,
+        reorder_level=4,
+        row_number=10,
+    )
+    parser = FailingParser()
+    service = IntakeService(parser, store)
+
+    prompt = service.process_text("Glucose", conversation_id="voice")
+    saved = service.process_text("2 mpesa", conversation_id="voice")
+
+    assert prompt == "Glucose selected.\nReply 1 cash, 2 mpesa, 3 credit, or type quantity/payment."
+    assert "Glucose x2" in saved
+    assert "M-Pesa" in saved
+    assert store.stocks["glucose"].current_stock == 10
+    assert parser.called is False
+
+
 def test_swahili_undo_last_sale_asks_short_confirmation_then_reverses_stock():
     store = FakeStore()
     service = IntakeService(FailingParser(), store)

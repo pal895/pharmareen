@@ -76,7 +76,7 @@ last_openai_error: dict[str, Any] = {
 VOICE_QUOTA_REPLY = "🎧 Voice received safely. AI transcription is ready but OpenAI credits are not active yet."
 PHOTO_QUOTA_REPLY = "📷 Photo received safely. Saved for review."
 DEFAULT_PUBLIC_BASE_URL = "https://pharmareen-1--pal895.replit.app"
-OFFLINE_BUILD_VERSION = "realpath-stock-safety-v2026-05-28-1"
+OFFLINE_BUILD_VERSION = "launch-usability-v2026-05-29-1"
 OFFLINE_FRONTEND_MARKER = f"PHARMAREEN REAL PATH BUILD {OFFLINE_BUILD_VERSION}"
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
 OFFLINE_NO_CACHE_HEADERS = {
@@ -192,6 +192,24 @@ async def debug_version() -> dict[str, Any]:
         "offline_app_index": str(OFFLINE_APP_DIR / "index.html"),
         "cache_control": OFFLINE_NO_CACHE_HEADERS["Cache-Control"],
     }
+
+
+@app.get("/offline/medicine-names")
+async def offline_medicine_names() -> dict[str, Any]:
+    try:
+        names = get_intake_service().store.list_master_drug_names()
+    except Exception:
+        names = []
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for name in names:
+        text = str(name or "").strip()
+        key = normalize_key(text)
+        if not text or key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(text)
+    return {"status": "ok", "medicines": cleaned[:200], "ai_used": False}
 
 
 @app.get("/offline_app/index.html", include_in_schema=False)
@@ -727,7 +745,14 @@ def remember_offline_synced_result(entry_id: str, record: dict[str, Any]) -> dic
 
 
 def offline_media_job_id(entry: dict[str, Any]) -> str:
-    for key in ("job_id", "event_id", "media_job_id", "upload_id", "id", "action_id"):
+    for key in ("job_id", "event_id", "media_job_id", "upload_id", "content_hash"):
+        value = str(entry.get(key) or "").strip()
+        if value:
+            return value if value.startswith("media-") else f"media-{value}" if key == "content_hash" else value
+    data_url = str(entry.get("data_url") or entry.get("dataUrl") or "").strip()
+    if data_url:
+        return f"media-{hashlib.sha256(data_url.encode('utf-8')).hexdigest()}"
+    for key in ("id", "action_id"):
         value = str(entry.get(key) or "").strip()
         if value:
             return value

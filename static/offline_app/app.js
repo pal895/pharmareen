@@ -10,9 +10,9 @@ const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
-const OFFLINE_APP_BUILD_VERSION = "realpath-stock-safety-v2026-05-28-1";
-const SERVICE_WORKER_VERSION = "pharmareen-offline-v16-realpath-stock-safety";
-const DEFAULT_MEDICINE_SHORTCUTS = ["Panadol", "Amox", "Piriton", "ORS"];
+const OFFLINE_APP_BUILD_VERSION = "launch-usability-v2026-05-29-1";
+const SERVICE_WORKER_VERSION = "pharmareen-offline-v17-launch-usability";
+const DEFAULT_MEDICINE_SHORTCUTS = ["Panadol", "Amox", "Piriton", "ORS", "Glucose"];
 console.log(`OFFLINE_APP_BUILD_VERSION=${OFFLINE_APP_BUILD_VERSION}`);
 
 const examples = {
@@ -31,6 +31,7 @@ const commandText = document.getElementById("commandText");
 const pharmacyId = document.getElementById("pharmacyId");
 const confirmationWhatsapp = document.getElementById("confirmationWhatsapp");
 const queueCount = document.getElementById("queueCount");
+const queueCountTop = document.getElementById("queueCountTop");
 const pendingEntries = document.getElementById("pendingEntries");
 const syncedEntries = document.getElementById("syncedEntries");
 const emptyTemplate = document.getElementById("emptyTemplate");
@@ -48,6 +49,10 @@ const torchToggle = document.getElementById("torchToggle");
 const voiceStatus = document.getElementById("voiceStatus");
 const paymentModeLabel = document.getElementById("paymentModeLabel");
 const medicineGrid = document.getElementById("medicineGrid");
+const voiceSaleCard = document.getElementById("voiceSaleCard");
+const voiceSelectedMedicine = document.getElementById("voiceSelectedMedicine");
+const voiceQuantity = document.getElementById("voiceQuantity");
+const confirmVoiceSale = document.getElementById("confirmVoiceSale");
 
 let dbPromise = null;
 let persistentStorageReady = false;
@@ -60,6 +65,8 @@ let recordedChunks = [];
 let currentPaymentMode = localStorage.getItem(PAYMENT_MODE_KEY) || "Cash";
 let lastBarcodeScan = { code: "", at: 0 };
 let pendingBarcodeScan = { code: "", count: 0, at: 0 };
+let inventoryMedicines = [];
+let selectedVoiceSale = { medicine: "", quantity: 1, payment: currentPaymentMode };
 
 function loadJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
@@ -142,6 +149,125 @@ function renderMedicineShortcuts() {
     card.append(title, actions, edit);
     medicineGrid.appendChild(card);
   });
+}
+
+async function loadInventoryMedicines() {
+  try {
+    const response = await fetch("/offline/medicine-names", { cache: "no-store" });
+    if (!response.ok) return;
+    const data = await response.json();
+    if (Array.isArray(data.medicines)) {
+      inventoryMedicines = data.medicines.map(name => String(name || "").trim()).filter(Boolean).slice(0, 200);
+    }
+  } catch {
+    inventoryMedicines = [];
+  }
+}
+
+function normalizeMedicineToken(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function voiceMedicineCandidates() {
+  const aliases = {
+    amox: "Amoxyl",
+    amoxil: "Amoxyl",
+    pcm: "Paracetamol",
+    paracet: "Paracetamol",
+    watergard: "WaterGuard",
+    waterguard: "WaterGuard",
+    peplime: "PEP Lime Cordial"
+  };
+  const names = [...inventoryMedicines, ...loadMedicineShortcuts(), ...DEFAULT_MEDICINE_SHORTCUTS];
+  const unique = [];
+  const seen = new Set();
+  for (const name of names) {
+    const clean = String(name || "").trim();
+    const key = normalizeMedicineToken(clean);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push(clean);
+  }
+  return { names: unique, aliases };
+}
+
+function similarity(left, right) {
+  const a = normalizeMedicineToken(left);
+  const b = normalizeMedicineToken(right);
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  if (a.includes(b) || b.includes(a)) return Math.min(a.length, b.length) / Math.max(a.length, b.length);
+  const rows = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j += 1) rows[0][j] = j;
+  for (let i = 1; i <= a.length; i += 1) {
+    for (let j = 1; j <= b.length; j += 1) {
+      rows[i][j] = Math.min(
+        rows[i - 1][j] + 1,
+        rows[i][j - 1] + 1,
+        rows[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+  }
+  return 1 - rows[a.length][b.length] / Math.max(a.length, b.length);
+}
+
+function detectLocalMedicineFromSpeech(transcript) {
+  const clean = String(transcript || "").toLowerCase();
+  const { names, aliases } = voiceMedicineCandidates();
+  for (const [alias, medicine] of Object.entries(aliases)) {
+    if (normalizeMedicineToken(clean).includes(normalizeMedicineToken(alias))) return medicine;
+  }
+  let best = { name: "", score: 0 };
+  for (const medicine of names) {
+    const score = Math.max(
+      similarity(clean, medicine),
+      ...clean.split(/\s+/).filter(Boolean).map(token => similarity(token, medicine))
+    );
+    if (score > best.score) best = { name: medicine, score };
+  }
+  return best.score >= 0.78 ? best.name : "";
+}
+
+function renderVoiceSaleCard() {
+  if (!voiceSaleCard) return;
+  voiceSaleCard.hidden = !selectedVoiceSale.medicine;
+  if (voiceSelectedMedicine) voiceSelectedMedicine.textContent = selectedVoiceSale.medicine || "Medicine selected";
+  if (voiceQuantity) voiceQuantity.textContent = String(selectedVoiceSale.quantity || 1);
+  document.querySelectorAll("[data-voice-payment]").forEach(button => {
+    button.classList.toggle("active-mode", button.dataset.voicePayment === selectedVoiceSale.payment);
+  });
+}
+
+function showVoiceSelector(medicine) {
+  selectedVoiceSale = { medicine, quantity: 1, payment: currentPaymentMode };
+  recordMedicineUse(medicine);
+  renderMedicineShortcuts();
+  renderVoiceSaleCard();
+  if (voiceStatus) voiceStatus.textContent = `✅ ${medicine} selected locally`;
+}
+
+async function confirmLocalVoiceSale() {
+  if (!selectedVoiceSale.medicine) return;
+  const entry = applyPaymentMode({
+    id: `voice-selector-${Date.now()}`,
+    type: "sale",
+    action: "sale",
+    drug_name: selectedVoiceSale.medicine,
+    quantity: selectedVoiceSale.quantity,
+    payment_method: selectedVoiceSale.payment,
+    command_text: `${selectedVoiceSale.medicine} ${selectedVoiceSale.quantity} ${selectedVoiceSale.payment}`,
+    raw_text: "local voice selector",
+    source: "offline_voice_selector",
+    sync_status: "pending",
+    timestamp: new Date().toISOString(),
+    confirmation_whatsapp: getConfirmationWhatsapp(),
+    offline_app_build_version: OFFLINE_APP_BUILD_VERSION
+  });
+  await addEntries([entry]);
+  selectedVoiceSale.medicine = "";
+  renderVoiceSaleCard();
+  setStatus(navigator.onLine ? "online" : "offline", "✅ Voice sale saved safely");
+  await renderQueue();
 }
 
 function barcodeMap() {
@@ -545,11 +671,13 @@ function applyPaymentMode(entry) {
 
 function setPaymentMode(mode) {
   currentPaymentMode = mode || "Cash";
+  if (selectedVoiceSale && selectedVoiceSale.medicine) selectedVoiceSale.payment = currentPaymentMode;
   localStorage.setItem(PAYMENT_MODE_KEY, currentPaymentMode);
   if (paymentModeLabel) paymentModeLabel.textContent = `🟢 ${currentPaymentMode} mode active`;
   document.querySelectorAll("[data-payment-mode]").forEach(button => {
     button.classList.toggle("active-mode", button.dataset.paymentMode === currentPaymentMode);
   });
+  renderVoiceSaleCard();
 }
 
 function appendCommandLine(line) {
@@ -572,17 +700,31 @@ function mediaDisplayPrefix(kind, purpose) {
   return "Invoice photo";
 }
 
+async function fileHash(file) {
+  if (!file || !window.crypto || !crypto.subtle || !file.arrayBuffer) return "";
+  try {
+    const buffer = await file.arrayBuffer();
+    const digest = await crypto.subtle.digest("SHA-256", buffer);
+    return Array.from(new Uint8Array(digest)).map(value => value.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return "";
+  }
+}
+
 async function queueMedia(file, kind, purpose, options = {}) {
   if (!file) return null;
   const originalSignature = mediaSignature(file, kind);
   let storedFile = file;
   if (kind === "photo") storedFile = await compressPhoto(file);
+  const contentHash = await fileHash(storedFile);
   if (!(await storageHasRoom(storedFile))) {
     setStatus("error", "Phone storage is low. Please sync or free space.");
     return null;
   }
   const entry = {
     id: `${kind}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    job_id: contentHash ? `media-${contentHash}` : "",
+    content_hash: contentHash,
     timestamp: new Date().toISOString(),
     pharmacy_id: pharmacyId.value.trim(),
     action: kind,
@@ -664,7 +806,37 @@ async function stopVoiceRecording() {
   }
 }
 
+function startLocalVoiceSelector() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return false;
+  try {
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-KE";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onstart = () => {
+      voiceStatus.textContent = "Listening for medicine name...";
+    };
+    recognition.onerror = () => {
+      voiceStatus.textContent = "I could not hear the medicine clearly. Type it or use Save Voice.";
+    };
+    recognition.onresult = event => {
+      const transcript = event.results && event.results[0] && event.results[0][0]
+        ? event.results[0][0].transcript
+        : "";
+      const medicine = detectLocalMedicineFromSpeech(transcript);
+      if (medicine) showVoiceSelector(medicine);
+      else voiceStatus.textContent = "Medicine not clear. Type it or use Save Voice.";
+    };
+    recognition.start();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function startVoiceRecording() {
+  if (startLocalVoiceSelector()) return;
   if (!navigator.mediaDevices || !window.MediaRecorder) {
     voiceStatus.textContent = "Recording is not available here. Use More options to choose an audio file.";
     voiceInput.click();
@@ -822,6 +994,7 @@ async function renderQueue() {
   const pending = queue.filter(item => item.sync_status !== "synced");
   const history = await loadHistory();
   queueCount.textContent = String(pending.length);
+  if (queueCountTop) queueCountTop.textContent = String(pending.length);
   renderList(pendingEntries, pending.slice(-12).reverse(), "Nothing saved offline yet.");
   renderList(syncedEntries, history.slice(0, 10), "Nothing synced safely yet.");
 }
@@ -970,22 +1143,63 @@ function disableBriefly(button, replacementText) {
   }, 1200);
 }
 
-document.getElementById("takePhoto").addEventListener("click", () => (cameraPhotoInput || photoInput).click());
-document.getElementById("scanBarcode").addEventListener("click", () => startBarcodeScanner());
-document.getElementById("scanInvoice").addEventListener("click", () => photoInput.click());
-document.getElementById("voiceEntry").addEventListener("click", () => startVoiceRecording());
-document.getElementById("tapTalk").addEventListener("click", () => startVoiceRecording());
-document.getElementById("manualEntry").addEventListener("click", () => commandText.focus());
-document.getElementById("saveBarcodeMapping").addEventListener("click", saveBarcodeMapping);
-document.getElementById("barcodeSell").addEventListener("click", () => barcodeAction("sale"));
-document.getElementById("barcodeRestock").addEventListener("click", () => barcodeAction("restock"));
-document.getElementById("barcodeCheck").addEventListener("click", () => barcodeAction("stock"));
-document.getElementById("stopBarcodeScan").addEventListener("click", () => stopBarcodeScanner());
-document.getElementById("torchToggle").addEventListener("click", () => toggleTorch());
+function bindClick(id, handler) {
+  const element = document.getElementById(id);
+  if (element) element.addEventListener("click", handler);
+}
+
+function switchMobileTab(tabName) {
+  const selected = tabName || "home";
+  document.querySelectorAll("[data-tab-panel]").forEach(panel => {
+    panel.classList.toggle("active-tab-panel", panel.dataset.tabPanel === selected);
+  });
+  document.querySelectorAll("[data-mobile-tab]").forEach(button => {
+    button.classList.toggle("active-tab", button.dataset.mobileTab === selected);
+  });
+}
+
+document.querySelectorAll("[data-mobile-tab]").forEach(button => {
+  button.addEventListener("click", () => switchMobileTab(button.dataset.mobileTab));
+});
+
+document.querySelectorAll("[data-voice-qty]").forEach(button => {
+  button.addEventListener("click", () => {
+    selectedVoiceSale.quantity = Number(button.dataset.voiceQty || 1);
+    renderVoiceSaleCard();
+  });
+});
+
+document.querySelectorAll("[data-voice-adjust]").forEach(button => {
+  button.addEventListener("click", () => {
+    selectedVoiceSale.quantity = Math.max(1, Number(selectedVoiceSale.quantity || 1) + Number(button.dataset.voiceAdjust || 0));
+    renderVoiceSaleCard();
+  });
+});
+
+document.querySelectorAll("[data-voice-payment]").forEach(button => {
+  button.addEventListener("click", () => {
+    selectedVoiceSale.payment = button.dataset.voicePayment || "Cash";
+    renderVoiceSaleCard();
+  });
+});
+
+bindClick("confirmVoiceSale", () => confirmLocalVoiceSale());
+bindClick("takePhoto", () => (cameraPhotoInput || photoInput).click());
+bindClick("scanBarcode", () => startBarcodeScanner());
+bindClick("scanInvoice", () => photoInput.click());
+bindClick("voiceEntry", () => startVoiceRecording());
+bindClick("tapTalk", () => startVoiceRecording());
+bindClick("manualEntry", () => commandText.focus());
+bindClick("saveBarcodeMapping", saveBarcodeMapping);
+bindClick("barcodeSell", () => barcodeAction("sale"));
+bindClick("barcodeRestock", () => barcodeAction("restock"));
+bindClick("barcodeCheck", () => barcodeAction("stock"));
+bindClick("stopBarcodeScan", () => stopBarcodeScanner());
+bindClick("torchToggle", () => toggleTorch());
 barcodeInput.addEventListener("input", updateBarcodeResult);
-document.getElementById("saveEntry").addEventListener("click", () => saveOfflineEntries());
-document.getElementById("syncNow").addEventListener("click", () => syncQueue());
-document.getElementById("queuePhoto").addEventListener("click", async event => {
+bindClick("saveEntry", () => saveOfflineEntries());
+bindClick("syncNow", () => syncQueue());
+bindClick("queuePhoto", async event => {
   const button = event.currentTarget;
   const originalText = button.textContent;
   button.disabled = true;
@@ -1001,7 +1215,7 @@ document.getElementById("queuePhoto").addEventListener("click", async event => {
     }, 1200);
   }
 });
-document.getElementById("queueVoice").addEventListener("click", async event => {
+bindClick("queueVoice", async event => {
   const button = event.currentTarget;
   const originalText = button.textContent;
   button.disabled = true;
@@ -1050,10 +1264,12 @@ async function boot() {
     confirmationWhatsapp.addEventListener("blur", saveConfirmationWhatsapp);
   }
   setPaymentMode(currentPaymentMode);
+  await loadInventoryMedicines();
   renderMedicineShortcuts();
   await initializeStorage();
   updateConnectionStatus();
   await renderQueue();
+  switchMobileTab("home");
   await registerFreshServiceWorker();
 }
 
@@ -1068,7 +1284,10 @@ window.PharMareenOffline = {
   queueMedia,
   queueMediaFiles,
   saveOfflineEntries,
-  syncQueue
+  syncQueue,
+  detectLocalMedicineFromSpeech,
+  showVoiceSelector,
+  confirmLocalVoiceSale
 };
 
 boot();
