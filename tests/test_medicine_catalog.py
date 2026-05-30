@@ -3,7 +3,9 @@ from __future__ import annotations
 from app.services.medicine_catalog import (
     catalog_entries_payload,
     catalog_unique_aliases,
+    load_catalog_metadata,
     match_local_medicine,
+    search_catalog_entries,
 )
 
 
@@ -13,7 +15,63 @@ def test_catalog_is_repo_backed_and_contains_expandable_pharmacy_metadata():
     assert {"Panadol", "Paracetamol", "Piriton", "Amoxyl", "Amoxicillin", "ORS", "Glucose", "Belladonna", "Vitcobin", "Milk"} <= set(entries)
     assert "pnadol" in entries["Panadol"]["misspellings"]
     assert "strip" in entries["Panadol"]["units"]
-    assert entries["Panadol"]["category"] == "pain relief"
+    assert entries["Panadol"]["category"] == "pain/fever"
+
+
+def test_kenya_catalog_has_official_product_scale_and_required_schema():
+    entries = catalog_entries_payload()
+    metadata = load_catalog_metadata()
+    required_categories = {
+        "pain/fever",
+        "antibiotics",
+        "malaria",
+        "cough/cold",
+        "allergy",
+        "stomach/ulcer",
+        "diarrhea/ORS",
+        "vitamins",
+        "antifungals",
+        "skin creams",
+        "eye/ear medicines",
+        "diabetes",
+        "hypertension",
+        "asthma",
+        "antiseptics",
+        "dewormers",
+        "pregnancy supplements",
+        "baby medicines",
+        "family planning",
+        "emergency medicines",
+        "nutrition",
+        "injections",
+        "OTC/common counter medicines",
+    }
+
+    assert len(entries) >= 2000
+    assert metadata["ppb_registered_product_count"] >= 2000
+    assert metadata["catalog_entry_count"] == len(entries)
+    assert required_categories <= set(metadata["categories"])
+    assert any("products.pharmacyboardkenya.org" in source.get("url", "") for source in metadata["sources"])
+    assert any("kemsa.go.ke" in source.get("url", "") for source in metadata["sources"])
+    for entry in entries:
+        assert {
+            "canonical_name",
+            "generic_name",
+            "aliases",
+            "brand_names",
+            "misspellings",
+            "shorthand",
+            "units",
+            "category",
+            "dosage_forms",
+        } <= set(entry)
+
+
+def test_catalog_search_finds_registered_kenyan_brand_locally():
+    matches = search_catalog_entries("Paralife", limit=10)
+
+    assert any(match["canonical_name"].lower().startswith("paralife") for match in matches)
+    assert all(match["ai_used"] is False for match in matches)
 
 
 def test_catalog_matcher_prioritizes_inventory_and_corrects_typos_locally():

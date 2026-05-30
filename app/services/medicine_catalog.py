@@ -10,6 +10,7 @@ from typing import Iterable, Mapping
 
 
 CATALOG_PATH = Path(__file__).resolve().parents[1] / "data" / "universal_medicines.json"
+CATALOG_METADATA_PATH = Path(__file__).resolve().parents[1] / "data" / "universal_medicines.metadata.json"
 
 
 def medicine_key(value: str | None) -> str:
@@ -25,17 +26,29 @@ def _clean_list(value: object) -> tuple[str, ...]:
 @dataclass(frozen=True)
 class MedicineCatalogEntry:
     canonical_name: str
+    generic_name: str = ""
     aliases: tuple[str, ...] = ()
+    brand_names: tuple[str, ...] = ()
     misspellings: tuple[str, ...] = ()
     shorthands: tuple[str, ...] = ()
     units: tuple[str, ...] = ()
     category: str = ""
+    dosage_forms: tuple[str, ...] = ()
+    sources: tuple[str, ...] = ()
+    registration_numbers: tuple[str, ...] = ()
 
     @property
     def terms(self) -> tuple[str, ...]:
         seen: set[str] = set()
         terms: list[str] = []
-        for term in (self.canonical_name, *self.aliases, *self.misspellings, *self.shorthands):
+        for term in (
+            self.canonical_name,
+            self.generic_name,
+            *self.aliases,
+            *self.brand_names,
+            *self.misspellings,
+            *self.shorthands,
+        ):
             key = str(term or "").strip().lower()
             if key and key not in seen:
                 seen.add(key)
@@ -77,14 +90,28 @@ def load_medicine_catalog() -> tuple[MedicineCatalogEntry, ...]:
         entries.append(
             MedicineCatalogEntry(
                 canonical_name=canonical_name,
+                generic_name=str(raw.get("generic_name") or "").strip(),
                 aliases=_clean_list(raw.get("aliases")),
+                brand_names=_clean_list(raw.get("brand_names")),
                 misspellings=_clean_list(raw.get("misspellings")),
-                shorthands=_clean_list(raw.get("shorthands")),
+                shorthands=_clean_list(raw.get("shorthand") or raw.get("shorthands")),
                 units=_clean_list(raw.get("units")),
                 category=str(raw.get("category") or "").strip(),
+                dosage_forms=_clean_list(raw.get("dosage_forms")),
+                sources=_clean_list(raw.get("sources")),
+                registration_numbers=_clean_list(raw.get("registration_numbers")),
             )
         )
     return tuple(entries)
+
+
+@lru_cache(maxsize=1)
+def load_catalog_metadata() -> dict[str, object]:
+    try:
+        data = json.loads(CATALOG_METADATA_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def catalog_medicine_names() -> list[str]:
@@ -103,6 +130,7 @@ def _ordered_unique(values: Iterable[str]) -> list[str]:
     return unique
 
 
+@lru_cache(maxsize=1)
 def _catalog_term_index() -> dict[str, list[str]]:
     terms: dict[str, list[str]] = {}
     for entry in load_medicine_catalog():
@@ -114,26 +142,36 @@ def _catalog_term_index() -> dict[str, list[str]]:
     return terms
 
 
+@lru_cache(maxsize=1)
+def _entries_by_key() -> dict[str, tuple[MedicineCatalogEntry, ...]]:
+    grouped: dict[str, list[MedicineCatalogEntry]] = {}
+    for entry in load_medicine_catalog():
+        grouped.setdefault(medicine_key(entry.canonical_name), []).append(entry)
+    return {key: tuple(entries) for key, entries in grouped.items()}
+
+
 def _inventory_canonical_map(inventory_names: Iterable[str]) -> tuple[list[str], dict[str, str]]:
     names = _ordered_unique(inventory_names)
     return names, {medicine_key(name): name for name in names}
 
 
 def _available_choices(canonical_names: Iterable[str], inventory_by_key: Mapping[str, str]) -> list[str]:
-    entries_by_key = {medicine_key(entry.canonical_name): entry for entry in load_medicine_catalog()}
+    if not inventory_by_key:
+        return _ordered_unique(canonical_names)
     inventory_choices: list[str] = []
     for canonical_name in canonical_names:
         canonical_key = medicine_key(canonical_name)
-        entry = entries_by_key.get(canonical_key)
-        candidate_keys = [canonical_key, *(medicine_key(term) for term in entry.terms)] if entry else [canonical_key]
+        entries = _entries_by_key().get(canonical_key, ())
+        candidate_keys = [canonical_key, *(medicine_key(term) for entry in entries for term in entry.terms)]
         for key in candidate_keys:
             if key in inventory_by_key:
                 inventory_choices.append(inventory_by_key[key])
     return _ordered_unique(inventory_choices or canonical_names)
 
 
-def catalog_unique_aliases(inventory_names: Iterable[str] | None = None, *, compact_keys: bool = True) -> dict[str, str]:
-    _, inventory_by_key = _inventory_canonical_map(inventory_names or ())
+@lru_cache(maxsize=128)
+def _catalog_unique_aliases_cached(inventory_names: tuple[str, ...], compact_keys: bool) -> tuple[tuple[str, str], ...]:
+    _, inventory_by_key = _inventory_canonical_map(inventory_names)
     restrict_to_inventory = bool(inventory_by_key)
     result: dict[str, str] = {}
     term_index = _catalog_term_index()
@@ -145,21 +183,67 @@ def catalog_unique_aliases(inventory_names: Iterable[str] | None = None, *, comp
                 choices = [choice for choice in choices if medicine_key(choice) in inventory_by_key]
             if len(choices) == 1:
                 result[alias_key if compact_keys else alias] = choices[0]
-    return result
+    return tuple(result.items())
+
+
+def catalog_unique_aliases(inventory_names: Iterable[str] | None = None, *, compact_keys: bool = True) -> dict[str, str]:
+    names = tuple(_ordered_unique(inventory_names or ()))
+    return dict(_catalog_unique_aliases_cached(names, compact_keys))
 
 
 def catalog_entries_payload() -> list[dict[str, object]]:
     return [
         {
             "canonical_name": entry.canonical_name,
+            "generic_name": entry.generic_name,
             "aliases": list(entry.aliases),
+            "brand_names": list(entry.brand_names),
             "misspellings": list(entry.misspellings),
+            "shorthand": list(entry.shorthands),
             "shorthands": list(entry.shorthands),
             "units": list(entry.units),
             "category": entry.category,
+            "dosage_forms": list(entry.dosage_forms),
+            "sources": list(entry.sources),
+            "registration_numbers": list(entry.registration_numbers),
         }
         for entry in load_medicine_catalog()
     ]
+
+
+def search_catalog_entries(query: str, *, limit: int = 20) -> list[dict[str, object]]:
+    query_key = medicine_key(query)
+    if not query_key:
+        return []
+    scored: list[tuple[float, MedicineCatalogEntry]] = []
+    for entry in load_medicine_catalog():
+        term_keys = [medicine_key(term) for term in entry.terms if medicine_key(term)]
+        if query_key in term_keys:
+            score = 1
+        elif any(query_key in term_key or term_key in query_key for term_key in term_keys):
+            score = 0.96
+        else:
+            score = max((SequenceMatcher(None, query_key, term_key).ratio() for term_key in term_keys), default=0)
+        if score >= 0.62:
+            scored.append((score, entry))
+    scored.sort(key=lambda item: (-item[0], item[1].canonical_name.lower(), item[1].generic_name.lower()))
+    payload_by_key: dict[str, dict[str, object]] = {}
+    for score, entry in scored:
+        key = "|".join((medicine_key(entry.canonical_name), medicine_key(entry.generic_name), ",".join(entry.dosage_forms)))
+        if key not in payload_by_key:
+            payload_by_key[key] = {
+                "canonical_name": entry.canonical_name,
+                "generic_name": entry.generic_name,
+                "brand_names": list(entry.brand_names),
+                "units": list(entry.units),
+                "category": entry.category,
+                "dosage_forms": list(entry.dosage_forms),
+                "confidence": round(score, 3),
+                "ai_used": False,
+            }
+        if len(payload_by_key) >= max(1, min(limit, 100)):
+            break
+    return list(payload_by_key.values())
 
 
 def match_local_medicine(
@@ -209,10 +293,15 @@ def match_local_medicine(
     fuzzy_scores: dict[str, float] = {}
     for inventory_name in inventory:
         fuzzy_scores[inventory_name] = max(fuzzy_scores.get(inventory_name, 0), SequenceMatcher(None, text_key, medicine_key(inventory_name)).ratio())
-    for alias_key, canonical_names in term_index.items():
-        score = SequenceMatcher(None, text_key, alias_key).ratio()
-        for choice in _available_choices(canonical_names, inventory_by_key):
+    if inventory_by_key:
+        for alias_key, choice in catalog_unique_aliases(inventory, compact_keys=True).items():
+            score = SequenceMatcher(None, text_key, alias_key).ratio()
             fuzzy_scores[choice] = max(fuzzy_scores.get(choice, 0), score)
+    else:
+        for alias_key, canonical_names in term_index.items():
+            score = SequenceMatcher(None, text_key, alias_key).ratio()
+            for choice in canonical_names:
+                fuzzy_scores[choice] = max(fuzzy_scores.get(choice, 0), score)
     scored = sorted(((score, name) for name, score in fuzzy_scores.items()), reverse=True)
     if not scored:
         return MedicineMatch()

@@ -95,7 +95,7 @@
       .replace(/^\+/, "")
       .replace(/\b(sold|sale|sell|restock|received|bought|add|stock|cost|paid|discount|bonus|supplier|expiry|cash|mpesa|m-pesa|card|credit)\b.*$/i, "")
       .replace(/\s+\d+(?:\.\d+)?\s*$/i, "")
-      .replace(/\b(tablets?|tabs?|strips?|boxes?|box|bottles?|pieces?|units?)\b/gi, "")
+      .replace(/\b(eye drops?|ear drops?|tablets?|tabs?|capsules?|caps?|strips?|boxes?|box|bottles?|vials?|ampoules?|ampules?|syrups?|creams?|ointments?|gels?|drops?|sachets?|packs?|tubes?|inhalers?|injections?|suspensions?|pieces?|units?)\b/gi, "")
       .trim()
       .split(" ")
       .filter(Boolean)
@@ -118,7 +118,7 @@
     if (/\b(restock|received|bought|bonus|discount|cost|supplier|expiry|invoice|batch|barcode|no stock|report|summary|stock)\b/i.test(text)) {
       return [text];
     }
-    const pattern = /([A-Za-z][A-Za-z' -]*?)\s+(?:x\s*)?(\d+(?:\.\d+)?)(?:\s+(tablets?|tabs?|strips?|boxes?|box|bottles?|pieces?|units?))?(?:\s+(cash|mpesa|m-pesa|card|credit))?(?=\s+[A-Za-z][A-Za-z' -]*?\s+(?:x\s*)?\d|$)/gi;
+    const pattern = /([A-Za-z][A-Za-z' -]*?)\s+(?:x\s*)?(\d+(?:\.\d+)?)(?:\s+(eye drops?|ear drops?|tablets?|tabs?|capsules?|caps?|strips?|boxes?|box|bottles?|vials?|ampoules?|ampules?|syrups?|creams?|ointments?|gels?|drops?|sachets?|packs?|tubes?|inhalers?|injections?|suspensions?|pieces?|units?))?(?:\s+(cash|mpesa|m-pesa|card|credit))?(?=\s+[A-Za-z][A-Za-z' -]*?\s+(?:x\s*)?\d|$)/gi;
     const matches = Array.from(text.matchAll(pattern));
     if (matches.length <= 1) return [text];
     const commands = matches
@@ -152,10 +152,20 @@
     if (/^bottles?$/.test(unit)) return "bottle";
     if (/^packs?$/.test(unit)) return "pack";
     if (/^vials?$/.test(unit)) return "vial";
+    if (/^ampoules?$|^ampules?$/.test(unit)) return "ampoule";
     if (/^creams?$/.test(unit)) return "cream";
     if (/^tubes?$/.test(unit)) return "tube";
     if (/^syrups?$/.test(unit)) return "syrup";
     if (/^capsules?$/.test(unit)) return "capsule";
+    if (/^caps?$/.test(unit)) return "capsule";
+    if (/^ointments?$/.test(unit)) return "ointment";
+    if (/^gels?$/.test(unit)) return "gel";
+    if (/^eye drops?$/.test(unit)) return "eye drops";
+    if (/^ear drops?$/.test(unit)) return "ear drops";
+    if (/^drops?$/.test(unit)) return "drops";
+    if (/^inhalers?$/.test(unit)) return "inhaler";
+    if (/^injections?$/.test(unit)) return "injection";
+    if (/^suspensions?$/.test(unit)) return "suspension";
     if (/^sachets?$/.test(unit)) return "sachet";
     if (/^pieces?$/.test(unit)) return "piece";
     if (/^units?$/.test(unit)) return "unit";
@@ -170,7 +180,7 @@
   }
 
   function extractUnit(text) {
-    const match = String(text || "").match(/\b(tablets?|tabs?|strips?|boxes?|box|bottles?|packs?|vials?|creams?|tubes?|syrups?|capsules?|sachets?|pieces?|units?)\b/i);
+    const match = String(text || "").match(/\b(eye drops?|ear drops?|tablets?|tabs?|capsules?|caps?|strips?|boxes?|box|bottles?|packs?|vials?|ampoules?|ampules?|creams?|ointments?|gels?|drops?|tubes?|syrups?|sachets?|inhalers?|injections?|suspensions?|pieces?|units?)\b/i);
     return match ? canonicalUnit(match[1]) : "";
   }
 

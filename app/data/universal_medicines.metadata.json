@@ -1,0 +1,82 @@
+{
+  "generated_at": "2026-05-30T19:08:46.471288+00:00",
+  "catalog_entry_count": 2350,
+  "ppb_registered_product_count": 2495,
+  "curated_seed_count": 30,
+  "categories": {
+    "OTC/common counter medicines": 4,
+    "allergy": 43,
+    "antibiotics": 206,
+    "antifungals": 39,
+    "antiseptics": 5,
+    "asthma": 36,
+    "baby medicines": 3,
+    "cough/cold": 14,
+    "dewormers": 7,
+    "diabetes": 101,
+    "diarrhea/ORS": 9,
+    "emergency medicines": 7,
+    "eye/ear medicines": 61,
+    "family planning": 19,
+    "hypertension": 127,
+    "injections": 288,
+    "malaria": 32,
+    "nutrition": 15,
+    "other registered medicine": 1062,
+    "pain/fever": 150,
+    "pregnancy supplements": 1,
+    "skin creams": 57,
+    "stomach/ulcer": 55,
+    "vitamins": 9
+  },
+  "required_unit_vocabulary": [
+    "tablet",
+    "tab",
+    "capsule",
+    "cap",
+    "strip",
+    "box",
+    "bottle",
+    "vial",
+    "ampoule",
+    "syrup",
+    "cream",
+    "ointment",
+    "gel",
+    "drops",
+    "eye drops",
+    "ear drops",
+    "sachet",
+    "pack",
+    "tube",
+    "inhaler",
+    "injection",
+    "suspension"
+  ],
+  "sources": [
+    {
+      "name": "PPB registered products public registry",
+      "url": "https://products.pharmacyboardkenya.org/ppb_admin/pages/public_view_retention_products.php",
+      "imported_rows": 2495
+    },
+    {
+      "name": "Kenya Essential Medicines List 2023",
+      "url": "https://kemsa.go.ke/download/file/8e7d9c438ecc1a468d9d7615a87688df.pdf",
+      "sha256": "a31ee93022d6f73ae5e2b6f94b4f1a427090ade50ba733aa7acb427f1c88fa5f"
+    },
+    {
+      "name": "WHO KEML 2023 publication page",
+      "url": "https://www.who.int/publications/m/item/kenya--essential-medicines-list-2023-%28english%29"
+    },
+    {
+      "name": "Curated Kenyan retail pharmacy aliases",
+      "path": "app\\data\\kenya_common_medicine_seeds.json",
+      "entries": 30
+    }
+  ],
+  "notes": [
+    "Runtime medicine matching is local-only and does not call OpenAI.",
+    "The PPB public registry supplies registered product trade names, APIs, and dosage forms.",
+    "KEML 2023 is recorded as the official essential-medicines baseline; PPB API names provide the importable product-level generic coverage."
+  ]
+}

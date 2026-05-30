@@ -39,7 +39,13 @@ from app.reports import LowStockWarning, ReportMetrics, ReportService, build_rep
 from app.routes.admin import router as admin_router
 from app.routes.meta_webhook import meta_callback_router, router as meta_whatsapp_router
 from app.routes.offline_sync import router as offline_sync_router
-from app.services.medicine_catalog import catalog_entries_payload, catalog_medicine_names, catalog_unique_aliases
+from app.services.medicine_catalog import (
+    catalog_entries_payload,
+    catalog_medicine_names,
+    catalog_unique_aliases,
+    load_catalog_metadata,
+    search_catalog_entries,
+)
 from app.services.photo_intake import (
     append_photo_intake_log,
     build_invoice_extraction_placeholder,
@@ -78,7 +84,7 @@ last_openai_error: dict[str, Any] = {
 VOICE_QUOTA_REPLY = "🎧 Voice received safely. AI transcription is ready but OpenAI credits are not active yet."
 PHOTO_QUOTA_REPLY = "📷 Photo received safely. Saved for review."
 DEFAULT_PUBLIC_BASE_URL = "https://pharmareen-1--pal895.replit.app"
-OFFLINE_BUILD_VERSION = "universal-medicine-brain-v2026-05-30-1"
+OFFLINE_BUILD_VERSION = "kenya-medicine-brain-v2026-05-30-1"
 OFFLINE_FRONTEND_MARKER = f"PHARMAREEN REAL PATH BUILD {OFFLINE_BUILD_VERSION}"
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
 OFFLINE_NO_CACHE_HEADERS = {
@@ -197,7 +203,7 @@ async def debug_version() -> dict[str, Any]:
 
 
 @app.get("/offline/medicine-names")
-async def offline_medicine_names() -> dict[str, Any]:
+async def offline_medicine_names(include_catalog: bool = Query(default=False)) -> dict[str, Any]:
     try:
         names = get_intake_service().store.list_master_drug_names()
     except Exception:
@@ -211,11 +217,34 @@ async def offline_medicine_names() -> dict[str, Any]:
             continue
         seen.add(key)
         cleaned.append(text)
-    return {
+    metadata = load_catalog_metadata()
+    result: dict[str, Any] = {
         "status": "ok",
         "medicines": cleaned[:200],
         "aliases": catalog_unique_aliases(cleaned[:200]),
-        "universal_catalog": catalog_entries_payload(),
+        "universal_catalog_count": int(metadata.get("catalog_entry_count") or len(catalog_medicine_names())),
+        "ai_used": False,
+    }
+    if include_catalog:
+        result["universal_catalog"] = catalog_entries_payload()
+    return result
+
+
+@app.get("/offline/medicine-catalog/search")
+async def offline_medicine_catalog_search(q: str = Query(min_length=1), limit: int = Query(default=20, ge=1, le=100)) -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "query": q,
+        "matches": search_catalog_entries(q, limit=limit),
+        "ai_used": False,
+    }
+
+
+@app.get("/offline/medicine-catalog/metadata")
+async def offline_medicine_catalog_metadata() -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "catalog": load_catalog_metadata(),
         "ai_used": False,
     }
 
@@ -494,6 +523,8 @@ VOICE_MEDICINE_ALIASES = {
     **catalog_unique_aliases(compact_keys=False),
     # Backward-compatible fallback when no live inventory list is available.
     "amox": "Amoxyl",
+    "water guard": "WaterGuard",
+    "watergard": "WaterGuard",
 }
 
 VOICE_NON_MEDICINE_WORDS = {

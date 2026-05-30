@@ -16,7 +16,24 @@ class FakeParser:
 
 
 def test_pharmacy_unit_forms_support_common_onboarding_items():
-    for unit in ["pack", "vial", "cream", "tube", "syrup", "capsule", "sachet"]:
+    for unit in [
+        "pack",
+        "vial",
+        "ampoule",
+        "cream",
+        "tube",
+        "syrup",
+        "capsule",
+        "ointment",
+        "gel",
+        "drops",
+        "eye drops",
+        "ear drops",
+        "inhaler",
+        "injection",
+        "suspension",
+        "sachet",
+    ]:
         assert canonical_unit(unit) == unit
         assert to_base_quantity(2, unit) == 2
 

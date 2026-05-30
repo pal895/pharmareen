@@ -1,0 +1,251 @@
+[
+  {
+    "canonical_name": "Panadol",
+    "aliases": ["panadol", "pan"],
+    "misspellings": ["pnadol", "pandol", "panado", "anadol"],
+    "shorthands": [],
+    "units": ["tablet", "tab", "strip", "box"],
+    "category": "pain relief"
+  },
+  {
+    "canonical_name": "Paracetamol",
+    "aliases": ["paracetamol", "pcm", "paracet"],
+    "misspellings": ["paracetmol", "paracitamol"],
+    "shorthands": ["para"],
+    "units": ["tablet", "tab", "strip", "box", "syrup"],
+    "category": "pain relief"
+  },
+  {
+    "canonical_name": "Piriton",
+    "aliases": ["piriton"],
+    "misspellings": ["piritone", "piraton"],
+    "shorthands": [],
+    "units": ["tablet", "tab", "strip", "box", "syrup"],
+    "category": "allergy"
+  },
+  {
+    "canonical_name": "Amoxyl",
+    "aliases": ["amoxyl", "amoxil", "amox"],
+    "misspellings": ["amoxl"],
+    "shorthands": [],
+    "units": ["capsule", "tablet", "tab", "strip", "box", "bottle", "syrup"],
+    "category": "antibiotic"
+  },
+  {
+    "canonical_name": "Amoxicillin",
+    "aliases": ["amoxicillin", "amox"],
+    "misspellings": ["amoxicilin", "amoxycillin"],
+    "shorthands": [],
+    "units": ["capsule", "tablet", "tab", "strip", "box", "bottle", "syrup"],
+    "category": "antibiotic"
+  },
+  {
+    "canonical_name": "ORS",
+    "aliases": ["ors", "oral rehydration salts"],
+    "misspellings": ["oral rehidration salts"],
+    "shorthands": [],
+    "units": ["sachet", "pack", "box"],
+    "category": "rehydration"
+  },
+  {
+    "canonical_name": "Glucose",
+    "aliases": ["glucose"],
+    "misspellings": ["glucos"],
+    "shorthands": [],
+    "units": ["pack", "bottle", "box"],
+    "category": "nutrition"
+  },
+  {
+    "canonical_name": "Antacid",
+    "aliases": ["antacid"],
+    "misspellings": ["antacide"],
+    "shorthands": ["ant"],
+    "units": ["tablet", "tab", "strip", "box", "bottle", "syrup"],
+    "category": "digestive health"
+  },
+  {
+    "canonical_name": "Insulin",
+    "aliases": ["insulin"],
+    "misspellings": ["insuline"],
+    "shorthands": ["ins"],
+    "units": ["vial", "pack", "box"],
+    "category": "diabetes care"
+  },
+  {
+    "canonical_name": "Cetirizine",
+    "aliases": ["cetirizine"],
+    "misspellings": ["cetrizine"],
+    "shorthands": ["cet"],
+    "units": ["tablet", "tab", "strip", "box", "syrup"],
+    "category": "allergy"
+  },
+  {
+    "canonical_name": "Cough Syrup",
+    "aliases": ["cough syrup"],
+    "misspellings": ["cough sirup", "coughsirup"],
+    "shorthands": [],
+    "units": ["bottle", "syrup"],
+    "category": "cough and cold"
+  },
+  {
+    "canonical_name": "Antibiotic Cream",
+    "aliases": ["antibiotic cream"],
+    "misspellings": ["antibioticcream"],
+    "shorthands": [],
+    "units": ["cream", "tube", "box"],
+    "category": "topical"
+  },
+  {
+    "canonical_name": "WaterGuard",
+    "aliases": ["waterguard", "water guard"],
+    "misspellings": ["watergard"],
+    "shorthands": [],
+    "units": ["bottle", "pack"],
+    "category": "water treatment"
+  },
+  {
+    "canonical_name": "PEP Lime Cordial",
+    "aliases": ["pep lime cordial", "pep lime"],
+    "misspellings": ["peplimecordial", "peplime"],
+    "shorthands": [],
+    "units": ["bottle", "pack"],
+    "category": "general retail"
+  },
+  {
+    "canonical_name": "Belladonna",
+    "aliases": ["belladonna"],
+    "misspellings": ["belladona", "beladonna"],
+    "shorthands": [],
+    "units": ["bottle", "syrup"],
+    "category": "digestive health"
+  },
+  {
+    "canonical_name": "Vitcobin",
+    "aliases": ["vitcobin", "vit cobin"],
+    "misspellings": ["vitcobine", "vit kobin"],
+    "shorthands": [],
+    "units": ["tablet", "tab", "strip", "box", "bottle"],
+    "category": "vitamins"
+  },
+  {
+    "canonical_name": "Vitamin C",
+    "aliases": ["vitamin c", "vit c", "ascorbic acid"],
+    "misspellings": ["vitaminc"],
+    "shorthands": [],
+    "units": ["tablet", "tab", "strip", "box", "bottle"],
+    "category": "vitamins"
+  },
+  {
+    "canonical_name": "Milk",
+    "aliases": ["milk"],
+    "misspellings": [],
+    "shorthands": [],
+    "units": ["bottle", "pack"],
+    "category": "general retail"
+  },
+  {
+    "canonical_name": "Milk of Magnesia",
+    "aliases": ["milk of magnesia"],
+    "misspellings": ["milk magnesia"],
+    "shorthands": ["mom"],
+    "units": ["bottle", "syrup"],
+    "category": "digestive health"
+  },
+  {
+    "canonical_name": "Iron and Folic Acid",
+    "aliases": ["iron folic acid", "ifa", "pregnancy supplements"],
+    "misspellings": ["iron folic", "iron and folate"],
+    "shorthands": ["ifa"],
+    "units": ["tablet", "tab", "strip", "box"],
+    "category": "pregnancy supplements",
+    "dosage_forms": ["Tablet"]
+  },
+  {
+    "canonical_name": "Zinc Sulphate",
+    "aliases": ["zinc sulphate", "zinc sulfate", "zinc"],
+    "misspellings": ["zink"],
+    "shorthands": [],
+    "units": ["tablet", "tab", "strip", "box", "syrup", "bottle"],
+    "category": "diarrhea/ORS",
+    "dosage_forms": ["Tablet", "Syrup"]
+  },
+  {
+    "canonical_name": "Albendazole",
+    "aliases": ["albendazole", "dewormer"],
+    "misspellings": ["albendazol"],
+    "shorthands": [],
+    "units": ["tablet", "tab", "strip", "box", "syrup", "bottle"],
+    "category": "dewormers",
+    "dosage_forms": ["Tablet", "Suspension"]
+  },
+  {
+    "canonical_name": "Artemether Lumefantrine",
+    "aliases": ["artemether lumefantrine", "al", "malaria tabs"],
+    "misspellings": ["artemether lumefantrin"],
+    "shorthands": ["al"],
+    "units": ["tablet", "tab", "strip", "box"],
+    "category": "malaria",
+    "dosage_forms": ["Tablet"]
+  },
+  {
+    "canonical_name": "Salbutamol Inhaler",
+    "aliases": ["salbutamol inhaler", "salbutamol", "asthma inhaler"],
+    "misspellings": ["salbutamol inhala"],
+    "shorthands": [],
+    "units": ["inhaler", "pack", "box"],
+    "category": "asthma",
+    "dosage_forms": ["Inhaler"]
+  },
+  {
+    "canonical_name": "Ciprofloxacin Eye Drops",
+    "aliases": ["ciprofloxacin eye drops", "cipro eye drops"],
+    "misspellings": ["cipro eyedrops"],
+    "shorthands": [],
+    "units": ["eye drops", "drops", "bottle"],
+    "category": "eye/ear medicines",
+    "dosage_forms": ["Eye Drops"]
+  },
+  {
+    "canonical_name": "Hydrocortisone Cream",
+    "aliases": ["hydrocortisone cream", "hydrocortisone"],
+    "misspellings": ["hydrocortizone cream"],
+    "shorthands": [],
+    "units": ["cream", "tube", "box"],
+    "category": "skin creams",
+    "dosage_forms": ["Cream"]
+  },
+  {
+    "canonical_name": "Povidone Iodine",
+    "aliases": ["povidone iodine", "iodine antiseptic"],
+    "misspellings": ["providone iodine"],
+    "shorthands": [],
+    "units": ["bottle", "pack"],
+    "category": "antiseptics",
+    "dosage_forms": ["Solution"]
+  },
+  {
+    "canonical_name": "Levonorgestrel",
+    "aliases": ["levonorgestrel", "emergency pill"],
+    "misspellings": ["levonogestrel"],
+    "shorthands": [],
+    "units": ["tablet", "tab", "strip", "box"],
+    "category": "family planning",
+    "dosage_forms": ["Tablet"]
+  },
+  {
+    "canonical_name": "Thermometer",
+    "aliases": ["thermometer"],
+    "misspellings": ["thermometre"],
+    "shorthands": [],
+    "units": ["piece", "unit"],
+    "category": "medical supplies"
+  },
+  {
+    "canonical_name": "Syringe Needle",
+    "aliases": ["syringe needle", "syringe", "needle"],
+    "misspellings": ["syringe/needle"],
+    "shorthands": [],
+    "units": ["piece", "unit", "pack", "box"],
+    "category": "medical supplies"
+  }
+]

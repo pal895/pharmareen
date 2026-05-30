@@ -16,3 +16,8 @@
 {"id":"brain_016","category":"media","text":"same shelf photo uploaded twice","expected":"Reuse cached review result and never update stock automatically","ai_allowed":true,"simulate":false}
 {"id":"brain_017","category":"supplier","text":"add new item Vitcobin price 250 stock 10","expected":"Create item and approve invoice locally after extraction","ai_allowed":false,"simulate":false}
 {"id":"brain_018","category":"trust","text":"unknown customer story","expected":"Ask a short local clarification without spending AI tokens","ai_allowed":false,"simulate":false}
+{"id":"brain_019","category":"onboarding","text":"search Kenya catalog for Paralife","expected":"Find the PPB-registered product locally with generic, dosage form, category, and units; do not call AI","ai_allowed":false,"simulate":false}
+{"id":"brain_020","category":"onboarding","text":"match shelf extraction zinc sulphate","expected":"Reuse the Kenya catalog locally during onboarding and offer deterministic item setup","ai_allowed":false,"simulate":false}
+{"id":"brain_021","category":"supplier","text":"invoice item ciprofloxacin eye drops","expected":"Reuse local catalog units eye drops, drops, and bottle during invoice review; do not call AI after extraction","ai_allowed":false,"simulate":false}
+{"id":"brain_022","category":"supplier","text":"salbutamol inhaler restock 2 inhalers","expected":"Resolve locally and restock with inhaler units","ai_allowed":false,"simulate":false}
+{"id":"brain_023","category":"supplier","text":"iron and folic acid restock 10 strips","expected":"Resolve pregnancy supplement locally with tablet and strip units","ai_allowed":false,"simulate":false}

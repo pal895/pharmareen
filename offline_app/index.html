@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0f6b46">
   <title>PharMareen Offline Mode</title>
   <link rel="manifest" href="/offline_app/manifest.json">
-  <link rel="stylesheet" href="/offline_app/styles.css?v=realpath-stock-safety-v2026-05-28-1">
+  <link rel="stylesheet" href="/offline_app/styles.css?v=kenya-medicine-brain-v2026-05-30-1">
 </head>
 <body>
   <main class="app-shell">
@@ -14,20 +14,31 @@
       <div>
         <p class="eyebrow">PharMareen</p>
         <h1>PharMareen Pharmacy Assistant</h1>
-        <p class="version-pill">PHARMAREEN REAL PATH BUILD realpath-stock-safety-v2026-05-28-1</p>
+        <p class="version-pill">PHARMAREEN REAL PATH BUILD kenya-medicine-brain-v2026-05-30-1</p>
         <p class="version-pill">PHASE 6 FINAL WORKING - SMOOTH TEST v2026-05-15</p>
         <p class="version-pill">PHARMAREEN SMOOTH TEST v2026-05-15</p>
         <p class="version-pill subtle-marker">PHASE 6 FINAL MEDIA SAVE WORKING</p>
       </div>
-      <div id="statusBanner" class="status online" role="status">Online</div>
+      <div class="status-stack">
+        <div id="statusBanner" class="status online" role="status">Online</div>
+        <div class="queue-chip"><span id="queueCountTop">0</span> saved</div>
+      </div>
     </header>
 
-    <section class="panel intro-panel">
+    <nav class="bottom-nav" aria-label="Offline app sections">
+      <button type="button" class="active-tab" data-mobile-tab="home">Home</button>
+      <button type="button" data-mobile-tab="queue">Queue</button>
+      <button type="button" data-mobile-tab="media">Media</button>
+      <button type="button" data-mobile-tab="reports">Reports</button>
+      <button type="button" data-mobile-tab="settings">Settings</button>
+    </nav>
+
+    <section class="panel intro-panel mobile-compact-panel" data-tab-panel="home">
       <h2>Offline Mode</h2>
       <p class="hint">Saved safely on this phone. Record sales, stock, photos, and voice notes when internet is weak. They send automatically when the phone is online again.</p>
     </section>
 
-    <section class="panel confirmation-panel" aria-label="WhatsApp confirmation settings">
+    <section class="panel confirmation-panel" data-tab-panel="settings" aria-label="WhatsApp confirmation settings">
       <p class="eyebrow">Confirmation WhatsApp</p>
       <h2>Where should sync confirmations go?</h2>
       <label for="confirmationWhatsapp">Confirmation WhatsApp Number</label>
@@ -35,19 +46,16 @@
       <p class="hint">Offline sync summaries will be sent to this WhatsApp number after records are saved safely.</p>
     </section>
 
-    <section class="panel dashboard-actions" aria-label="Pharmacy dashboard actions">
-      <button type="button" data-action="cash-sale">Cash Sale</button>
-      <button type="button" data-action="mpesa-sale">M-Pesa Sale</button>
-      <button type="button" data-action="credit-sale">Credit Sale</button>
+    <section class="panel dashboard-actions" data-tab-panel="home" aria-label="Pharmacy dashboard actions">
+      <button type="button" data-action="sale">Sell</button>
       <button type="button" data-action="stock">Stock</button>
       <button type="button" data-action="restock">Restock</button>
-      <button id="scanBarcode" type="button">Scan Barcode</button>
       <button id="voiceEntry" type="button">Voice</button>
+      <button id="scanBarcode" type="button" aria-label="Scan Barcode">Camera</button>
       <button type="button" data-action="report">Report</button>
-      <button id="manualEntry" type="button">Manual Entry</button>
     </section>
 
-    <section class="panel payment-panel" aria-label="Payment mode">
+    <section class="panel payment-panel sale-mode-panel" data-tab-panel="home" aria-label="Payment mode">
       <p class="eyebrow">Payment mode</p>
       <h2 id="paymentModeLabel">🟢 Cash mode active</h2>
       <p class="hint">Choose once, then type sales normally. Example: Panadol 2.</p>
@@ -59,14 +67,14 @@
       </div>
     </section>
 
-    <section class="panel medicine-shortcuts" aria-label="Quick medicine shortcuts">
+    <section class="panel medicine-shortcuts" data-tab-panel="home" aria-label="Quick medicine shortcuts">
       <p class="eyebrow">Common medicines</p>
       <h2>Tap during rush hour</h2>
       <p class="hint">Edit these to match the medicines your pharmacy sells most.</p>
       <div id="medicineGrid" class="medicine-grid"></div>
     </section>
 
-    <section id="barcodePanel" class="panel barcode-panel" aria-label="Barcode lookup">
+    <section id="barcodePanel" class="panel barcode-panel" data-tab-panel="media" aria-label="Barcode lookup">
       <h2>Barcode lookup</h2>
       <p class="hint">Use the phone camera, type the barcode, or use an external scanner. Unknown barcodes can be saved to a medicine name.</p>
       <div id="barcodeCameraBox" class="camera-box" hidden>
@@ -88,7 +96,7 @@
       <p id="lastScanned" class="hint">Last scanned: none</p>
     </section>
 
-    <section class="panel quick-actions" aria-label="Quick actions">
+    <section class="panel quick-actions advanced-panel" data-tab-panel="home" aria-label="Quick actions">
       <button id="takePhoto" type="button">Take Photo</button>
       <button id="scanInvoice" type="button">Scan Invoice</button>
       <button type="button" data-action="sale">Sell</button>
@@ -97,8 +105,8 @@
       <button type="button" data-action="stock">Stock Check</button>
     </section>
 
-    <section class="panel command-panel">
-      <h2>Type or paste pharmacy command</h2>
+    <section class="panel command-panel advanced-panel" data-tab-panel="home">
+      <h2>Manual Entry</h2>
       <label for="commandText">Command</label>
       <textarea id="commandText" rows="6" placeholder="Type sale, restock, report, stock check...&#10;Panadol 2&#10;+Panadol 20&#10;Panadol 1 strip mpesa&#10;report today"></textarea>
       <div class="examples" aria-label="Examples">
@@ -111,11 +119,35 @@
       <button id="saveEntry" class="primary" type="button">Save Offline</button>
     </section>
 
-    <section class="panel talk-panel">
+    <section class="panel talk-panel" data-tab-panel="media">
       <h2>Tap & Talk</h2>
       <p class="hint">Record a quick voice note like WhatsApp. It will send when online.</p>
       <button id="tapTalk" class="primary" type="button">Tap & Talk</button>
       <p id="voiceStatus" class="hint">Ready.</p>
+      <div id="voiceSaleCard" class="voice-sale-card" data-local-voice-selector hidden>
+        <p class="eyebrow">Local voice selector</p>
+        <h2 id="voiceSelectedMedicine">Medicine selected</h2>
+        <p class="hint">No OpenAI token needed. Choose quantity and payment, then confirm.</p>
+        <div class="quantity-row" aria-label="Quantity">
+          <button type="button" data-voice-adjust="-1">-</button>
+          <strong id="voiceQuantity">1</strong>
+          <button type="button" data-voice-adjust="1">+</button>
+        </div>
+        <div class="quantity-buttons">
+          <button type="button" data-voice-qty="1">1</button>
+          <button type="button" data-voice-qty="2">2</button>
+          <button type="button" data-voice-qty="3">3</button>
+          <button type="button" data-voice-qty="5">5</button>
+          <button type="button" data-voice-qty="10">10</button>
+        </div>
+        <div class="payment-modes compact-payments">
+          <button type="button" data-voice-payment="Cash">Cash</button>
+          <button type="button" data-voice-payment="M-Pesa">M-Pesa</button>
+          <button type="button" data-voice-payment="Credit">Credit</button>
+          <button type="button" data-voice-payment="Mixed">Mixed</button>
+        </div>
+        <button id="confirmVoiceSale" class="primary" type="button">Confirm Sale</button>
+      </div>
       <details>
         <summary>More options: Save Voice</summary>
         <p class="hint">Use files only when recording here is not available.</p>
@@ -125,7 +157,7 @@
       </details>
     </section>
 
-    <section class="panel media-grid">
+    <section class="panel media-grid" data-tab-panel="media">
       <div class="media-card">
         <h2>Photos</h2>
         <p class="hint">Save invoice or receipt photos. They will send when online.</p>
@@ -139,14 +171,25 @@
         <input id="photoInput" type="file" accept="image/*" multiple>
         <button id="queuePhoto" type="button">Save Photo</button>
       </div>
-      <div class="media-card">
-        <h2>Install PharMareen on phone</h2>
-        <p class="hint">Android Chrome: menu, then Add to Home screen.</p>
-        <p class="hint">iPhone Safari: Share, then Add to Home Screen.</p>
+    </section>
+
+    <section class="panel reports-panel" data-tab-panel="reports">
+      <p class="eyebrow">Reports</p>
+      <h2>Quick reports</h2>
+      <div class="report-actions">
+        <button type="button" data-action="report">Today Report</button>
+        <button type="button" data-action="stock">Stock Check</button>
+        <button type="button" data-action="nostock">No Stock</button>
       </div>
     </section>
 
-    <section class="panel queue-head">
+    <section class="panel install-panel" data-tab-panel="settings">
+      <h2>Install PharMareen on phone</h2>
+      <p class="hint">Android Chrome: menu, then Add to Home screen.</p>
+      <p class="hint">iPhone Safari: Share, then Add to Home Screen.</p>
+    </section>
+
+    <section class="panel queue-head" data-tab-panel="queue">
       <div>
         <p class="eyebrow">Saved Offline</p>
         <h2><span id="queueCount">0</span> waiting</h2>
@@ -154,12 +197,12 @@
       <button id="syncNow" type="button">Sync Now</button>
     </section>
 
-    <section class="panel">
+    <section class="panel" data-tab-panel="queue">
       <h2>Saved Offline</h2>
       <ul id="pendingEntries" class="entry-list"></ul>
     </section>
 
-    <section class="panel">
+    <section class="panel" data-tab-panel="queue">
       <h2>Synced safely</h2>
       <ul id="syncedEntries" class="entry-list"></ul>
     </section>
@@ -169,7 +212,7 @@
     <li class="empty">Nothing here yet.</li>
   </template>
 
-  <script src="/offline_app/parser.js?v=realpath-stock-safety-v2026-05-28-1" defer></script>
-  <script src="/offline_app/app.js?v=realpath-stock-safety-v2026-05-28-1" defer></script>
+  <script src="/offline_app/parser.js?v=kenya-medicine-brain-v2026-05-30-1" defer></script>
+  <script src="/offline_app/app.js?v=kenya-medicine-brain-v2026-05-30-1" defer></script>
 </body>
 </html>

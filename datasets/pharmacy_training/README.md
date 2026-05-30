@@ -5,3 +5,5 @@ These JSONL files are deterministic simulation examples for the local-first phar
 Normal sales, restocks, reports, analytics, receipts, corrections, stock checks, barcode lookup, and offline typed sync should stay local and must not call OpenAI. Media/voice/photo rows document where AI is allowed later after safe capture, local classification, and owner confirmation.
 
 Media intelligence cases teach PharMareen to classify photos before extraction: supplier invoice, supplier receipt, stock shelf, medicine pack, barcode image, handwritten note, delivery note, blurry/unclear image, mixed photo, and non-pharmacy photo. Stock is never updated from media until the owner confirms.
+
+The Kenya-first medicine brain is generated from PPB's public registered-products registry and retains curated retail aliases for rush-hour typing. Inventory matching, onboarding catalog search, typo correction, invoice item setup, units, and selector opening stay local and zero-token.
