@@ -150,6 +150,13 @@
     if (/^strips?$/.test(unit)) return "strip";
     if (unit === "box" || unit === "boxes") return "box";
     if (/^bottles?$/.test(unit)) return "bottle";
+    if (/^packs?$/.test(unit)) return "pack";
+    if (/^vials?$/.test(unit)) return "vial";
+    if (/^creams?$/.test(unit)) return "cream";
+    if (/^tubes?$/.test(unit)) return "tube";
+    if (/^syrups?$/.test(unit)) return "syrup";
+    if (/^capsules?$/.test(unit)) return "capsule";
+    if (/^sachets?$/.test(unit)) return "sachet";
     if (/^pieces?$/.test(unit)) return "piece";
     if (/^units?$/.test(unit)) return "unit";
     return "";
@@ -163,7 +170,7 @@
   }
 
   function extractUnit(text) {
-    const match = String(text || "").match(/\b(tablets?|tabs?|strips?|boxes?|box|bottles?|pieces?|units?)\b/i);
+    const match = String(text || "").match(/\b(tablets?|tabs?|strips?|boxes?|box|bottles?|packs?|vials?|creams?|tubes?|syrups?|capsules?|sachets?|pieces?|units?)\b/i);
     return match ? canonicalUnit(match[1]) : "";
   }
 

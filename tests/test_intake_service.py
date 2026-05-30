@@ -2,6 +2,7 @@
 
 from app.domain import Action, ParsedEvent, ParseResult, StockItem
 from app.intake import IntakeService, normalize_spoken_command_text
+from app.services.pharmacy_engine import canonical_unit, to_base_quantity
 
 
 class FakeParser:
@@ -12,6 +13,12 @@ class FakeParser:
     def parse_events(self, text, master_drug_names):
         self.called = True
         return ParseResult(events=self.events)
+
+
+def test_pharmacy_unit_forms_support_common_onboarding_items():
+    for unit in ["pack", "vial", "cream", "tube", "syrup", "capsule", "sachet"]:
+        assert canonical_unit(unit) == unit
+        assert to_base_quantity(2, unit) == 2
 
 
 class FailingParser:
@@ -1703,6 +1710,16 @@ def test_unknown_text_with_ai_parser_gets_local_clarification_without_ai_call():
     reply = service.process_text("random customer story not pharmacy", conversation_id="unknown")
 
     assert "Did you want to:" in reply
+
+
+def test_unstocked_catalog_medicine_gets_local_setup_guidance_without_ai_parser():
+    parser = FailingParser()
+    service = IntakeService(parser, FakeStore())
+
+    reply = service.process_text("Vit kobin", conversation_id="setup")
+
+    assert reply == "⚠ Vitcobin is not yet in your inventory. Add it during restock first."
+    assert parser.called is False
 
 
 def test_swahili_undo_last_sale_asks_short_confirmation_then_reverses_stock():

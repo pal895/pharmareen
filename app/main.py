@@ -39,6 +39,7 @@ from app.reports import LowStockWarning, ReportMetrics, ReportService, build_rep
 from app.routes.admin import router as admin_router
 from app.routes.meta_webhook import meta_callback_router, router as meta_whatsapp_router
 from app.routes.offline_sync import router as offline_sync_router
+from app.services.medicine_catalog import catalog_entries_payload, catalog_medicine_names, catalog_unique_aliases
 from app.services.photo_intake import (
     append_photo_intake_log,
     build_invoice_extraction_placeholder,
@@ -77,7 +78,7 @@ last_openai_error: dict[str, Any] = {
 VOICE_QUOTA_REPLY = "🎧 Voice received safely. AI transcription is ready but OpenAI credits are not active yet."
 PHOTO_QUOTA_REPLY = "📷 Photo received safely. Saved for review."
 DEFAULT_PUBLIC_BASE_URL = "https://pharmareen-1--pal895.replit.app"
-OFFLINE_BUILD_VERSION = "pharmacy-owner-usability-v2026-05-30-1"
+OFFLINE_BUILD_VERSION = "universal-medicine-brain-v2026-05-30-1"
 OFFLINE_FRONTEND_MARKER = f"PHARMAREEN REAL PATH BUILD {OFFLINE_BUILD_VERSION}"
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
 OFFLINE_NO_CACHE_HEADERS = {
@@ -210,7 +211,13 @@ async def offline_medicine_names() -> dict[str, Any]:
             continue
         seen.add(key)
         cleaned.append(text)
-    return {"status": "ok", "medicines": cleaned[:200], "ai_used": False}
+    return {
+        "status": "ok",
+        "medicines": cleaned[:200],
+        "aliases": catalog_unique_aliases(cleaned[:200]),
+        "universal_catalog": catalog_entries_payload(),
+        "ai_used": False,
+    }
 
 
 @app.get("/offline_app/index.html", include_in_schema=False)
@@ -481,57 +488,12 @@ def media_base64_from_offline_entry(entry: dict[str, Any]) -> tuple[str, str]:
     return media_base64, mime_type
 
 
-VOICE_MEDICINE_NAMES = [
-    "Panadol",
-    "Paracetamol",
-    "Amoxyl",
-    "Amoxicillin",
-    "Cetirizine",
-    "ORS",
-    "Insulin",
-    "Antacid",
-    "Piriton",
-    "Glucose",
-    "Cough Syrup",
-    "Antibiotic Cream",
-    "WaterGuard",
-    "PEP Lime Cordial",
-]
+VOICE_MEDICINE_NAMES = catalog_medicine_names()
 
 VOICE_MEDICINE_ALIASES = {
-    "anadol": "Panadol",
-    "panado": "Panadol",
-    "pandol": "Panadol",
-    "panadol": "Panadol",
-    "piritone": "Piriton",
-    "piraton": "Piriton",
-    "piriton": "Piriton",
-    "pcm": "Paracetamol",
-    "paracet": "Paracetamol",
-    "paracetmol": "Paracetamol",
-    "paracetamol": "Paracetamol",
+    **catalog_unique_aliases(compact_keys=False),
+    # Backward-compatible fallback when no live inventory list is available.
     "amox": "Amoxyl",
-    "amoxil": "Amoxyl",
-    "amoxyl": "Amoxyl",
-    "amoxicilin": "Amoxicillin",
-    "amoxicillin": "Amoxicillin",
-    "cet": "Cetirizine",
-    "cetrizine": "Cetirizine",
-    "cetirizine": "Cetirizine",
-    "ors": "ORS",
-    "glucose": "Glucose",
-    "insulin": "Insulin",
-    "antacid": "Antacid",
-    "cough syrup": "Cough Syrup",
-    "coughsirup": "Cough Syrup",
-    "antibiotic cream": "Antibiotic Cream",
-    "antibioticcream": "Antibiotic Cream",
-    "water guard": "WaterGuard",
-    "waterguard": "WaterGuard",
-    "watergard": "WaterGuard",
-    "pep lime": "PEP Lime Cordial",
-    "pep lime cordial": "PEP Lime Cordial",
-    "peplimecordial": "PEP Lime Cordial",
 }
 
 VOICE_NON_MEDICINE_WORDS = {
@@ -600,9 +562,10 @@ def split_joined_voice_words(text: str) -> str:
     return clean
 
 
-def apply_voice_medicine_aliases(text: str) -> str:
+def apply_voice_medicine_aliases(text: str, medicine_names: list[str] | None = None) -> str:
     clean = text
-    for alias, medicine in sorted(VOICE_MEDICINE_ALIASES.items(), key=lambda item: len(item[0]), reverse=True):
+    aliases = VOICE_MEDICINE_ALIASES if medicine_names is None else catalog_unique_aliases(medicine_names, compact_keys=False)
+    for alias, medicine in sorted(aliases.items(), key=lambda item: len(item[0]), reverse=True):
         if alias == "pep lime":
             pattern = r"\bpep\s+lime\b(?!\s+cordial)"
         else:
@@ -617,7 +580,8 @@ def voice_medicine_names_from_inventory() -> list[str]:
         names.extend(str(name).strip() for name in get_intake_service().store.list_master_drug_names())
     except Exception:
         pass
-    names.extend(VOICE_MEDICINE_NAMES)
+    if not names:
+        names.extend(VOICE_MEDICINE_NAMES)
     seen: set[str] = set()
     unique: list[str] = []
     for name in names:
@@ -665,7 +629,7 @@ def clean_voice_transcript_for_intake(transcript: str, medicine_names: list[str]
     clean = re.sub(r"\bpesa\b", "mpesa", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\bmpessa\b", "mpesa", clean, flags=re.IGNORECASE)
     clean = re.sub(r"^nimetoa\s+", "sold ", clean, flags=re.IGNORECASE)
-    clean = apply_voice_medicine_aliases(clean)
+    clean = apply_voice_medicine_aliases(clean, medicine_names=medicine_names)
     clean = repair_voice_medicine_tokens(clean, medicine_names=medicine_names)
     comma_parts = [part.strip() for part in clean.split(",") if part.strip()]
     if len(comma_parts) > 1 and all(len(part.split()) == 1 for part in comma_parts):
@@ -1902,6 +1866,8 @@ def debug_system_status() -> dict[str, Any]:
             "app": {
                 "app_base_url": effective_app_base_url(settings),
                 "report_base_url": report_public_base_url(settings),
+                "medicine_catalog_count": len(catalog_medicine_names()),
+                "medicine_matching": "inventory-first local catalog",
             },
             "startup": {
                 "backend_pid_file_exists": backend_pid_file.exists(),

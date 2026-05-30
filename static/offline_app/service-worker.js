@@ -1,5 +1,5 @@
-const CACHE_NAME = "pharmareen-offline-v18-owner-usability";
-console.log("OFFLINE_APP_BUILD_VERSION=pharmacy-owner-usability-v2026-05-30-1 service-worker");
+const CACHE_NAME = "pharmareen-offline-v19-universal-medicine-brain";
+console.log("OFFLINE_APP_BUILD_VERSION=universal-medicine-brain-v2026-05-30-1 service-worker");
 const APP_SHELL = [
   "/offline-app",
   "/offline_app/index.html",

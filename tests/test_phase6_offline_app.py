@@ -123,7 +123,7 @@ def test_offline_app_routes_return_html():
     assert "Take Photo" in followed_response.text
     assert "Save Photo" in followed_response.text
     assert "Save Voice" in followed_response.text
-    assert "PHARMAREEN REAL PATH BUILD pharmacy-owner-usability-v2026-05-30-1" in followed_response.text
+    assert "PHARMAREEN REAL PATH BUILD universal-medicine-brain-v2026-05-30-1" in followed_response.text
     assert "PHARMAREEN SMOOTH TEST v2026-05-15" in followed_response.text
     assert "Cash mode active" in followed_response.text
     assert 'class="bottom-nav"' in followed_response.text
@@ -146,7 +146,7 @@ def test_offline_app_routes_return_html():
     assert "PharMareen Offline Mode" in compat_response.text
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in compat_response.text
     assert "no-store" in compat_response.headers.get("cache-control", "")
-    assert compat_response.headers.get("x-pharmareen-offline-version") == "pharmacy-owner-usability-v2026-05-30-1"
+    assert compat_response.headers.get("x-pharmareen-offline-version") == "universal-medicine-brain-v2026-05-30-1"
     assert parser_response.status_code == 200
     assert manifest_response.status_code == 200
     assert worker_response.status_code == 200
@@ -158,7 +158,7 @@ def test_debug_version_exposes_realpath_build_marker():
 
     assert response.status_code == 200
     data = response.json()
-    assert data["offline_build_version"] == "pharmacy-owner-usability-v2026-05-30-1"
+    assert data["offline_build_version"] == "universal-medicine-brain-v2026-05-30-1"
     assert "PHARMAREEN REAL PATH BUILD" in data["offline_frontend_marker"]
 
 
@@ -179,6 +179,9 @@ def test_offline_medicine_names_route_is_local_and_zero_ai(monkeypatch):
     data = response.json()
     assert data["ai_used"] is False
     assert data["medicines"] == ["Panadol", "Glucose", "ORS"]
+    assert data["aliases"]["pnadol"] == "Panadol"
+    assert data["aliases"]["ors"] == "ORS"
+    assert any(item["canonical_name"] == "Vitcobin" for item in data["universal_catalog"])
 
 
 def test_offline_sync_accepts_sale_and_restock_entries(monkeypatch, tmp_path):
@@ -386,7 +389,7 @@ def test_debug_offline_app_reports_all_phase6_features(monkeypatch, tmp_path):
     assert data["voice_queue_ready"] is True
     assert data["persistent_storage_ready"] is True
     assert data["auto_sync_ready"] is True
-    assert data["frontend_marker"] == "PHARMAREEN REAL PATH BUILD pharmacy-owner-usability-v2026-05-30-1"
+    assert data["frontend_marker"] == "PHARMAREEN REAL PATH BUILD universal-medicine-brain-v2026-05-30-1"
     assert data["served_index_path"].endswith("static/offline_app/index.html") or data["served_index_path"].endswith("static\\offline_app\\index.html")
     assert "offline_log_exists" in data
 
@@ -402,6 +405,8 @@ const cases = {
   discount: parser.parseCommand('Amoxicillin received 30 paid 2500 discount 300'),
   unitSale: parser.parseCommand('Panadol 1 strip mpesa'),
   unitRestock: parser.parseCommand('Panadol +1 box'),
+  vialSale: parser.parseCommand('Insulin 1 vial cash'),
+  packRestock: parser.parseCommand('ORS restock 2 packs'),
   shortcutSale: parser.parseCommand('p2'),
   shortcutRestock: parser.parseCommand('p +20'),
   shortcutStock: parser.parseCommand('stock p'),
@@ -433,6 +438,10 @@ console.log(JSON.stringify(cases));
     assert data["unitSale"]["base_quantity"] == 10
     assert data["unitRestock"]["unit"] == "box"
     assert data["unitRestock"]["base_quantity"] == 100
+    assert data["vialSale"]["unit"] == "vial"
+    assert data["vialSale"]["base_quantity"] == 1
+    assert data["packRestock"]["unit"] == "pack"
+    assert data["packRestock"]["base_quantity"] == 2
     assert data["shortcutSale"]["action"] == "sale"
     assert data["shortcutSale"]["drug_name"] == "Panadol"
     assert data["shortcutSale"]["quantity"] == 2
@@ -579,6 +588,11 @@ def test_mobile_layout_and_local_voice_selector_hooks_are_present():
     assert "setTimeout" in script
     assert "skipSelector" in script
     assert "Recording a voice note instead" in script
+    assert "INVENTORY_MEDICINES_KEY" in script
+    assert "INVENTORY_ALIASES_KEY" in script
+    assert "maybeShowTypedMedicineSelector" in script
+    assert "startLocalVoiceSelector" in script
+    assert "startVoiceRecording" in script
 
 
 def test_offline_save_offline_queues_photo_and_audio_without_command_text():
@@ -718,14 +732,14 @@ def test_offline_pwa_assets_contain_auto_sync_media_and_retry_logic():
     assert "parseCommand" in parser
     assert "Save Offline" in html
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in html
-    assert "PHARMAREEN REAL PATH BUILD pharmacy-owner-usability-v2026-05-30-1" in html
+    assert "PHARMAREEN REAL PATH BUILD universal-medicine-brain-v2026-05-30-1" in html
     assert "PHARMAREEN SMOOTH TEST v2026-05-15" in html
     assert "Save Photo" in html
     assert "Save Voice" in html
     assert "Tap & Talk" in html
     assert '"start_url": "/offline-app"' in manifest
     assert "/offline_app/parser.js" in worker
-    assert "pharmareen-offline-v18-owner-usability" in worker
+    assert "pharmareen-offline-v19-universal-medicine-brain" in worker
     assert "caches.open" in worker
 
 

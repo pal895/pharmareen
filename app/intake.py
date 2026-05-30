@@ -5,7 +5,6 @@ import re
 from collections import Counter
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
-from difflib import SequenceMatcher, get_close_matches
 from typing import Any, Protocol
 from urllib.parse import quote
 
@@ -28,6 +27,7 @@ from app.services.pharmacy_engine import (
     unit_pattern,
 )
 from app.ai import log_ai_route_decision
+from app.services.medicine_catalog import match_local_medicine
 from app.services.operational_intelligence import OperationalMemory, classify_local_intent, decide_ai_route, log_edge_case
 from app.sheets import SHEETS_UNAVAILABLE_MESSAGE, SheetsUnavailableError
 from app.utils import format_ksh, normalize_key, now_in_timezone, parse_int, parse_money
@@ -714,6 +714,8 @@ class IntakeService:
             return resolution.question
         if not resolution.drug_name:
             return ""
+        if self._resolve_stock(resolution.drug_name) is None:
+            return f"⚠ {resolution.drug_name} is not yet in your inventory. Add it during restock first."
         self.pending_followups[conversation_key] = OperatingCommand(
             kind="sale",
             drug_name=resolution.drug_name,
@@ -1093,7 +1095,7 @@ class IntakeService:
             )
         if command.drug_name and command.kind in {"sale", "late_sale", "restock", "stock_check", "no_stock"}:
             resolution = self._resolve_drug_name(command.drug_name)
-            if resolution.question:
+            if resolution.question and command.kind != "no_stock":
                 self.operational_memory.remember_clarification(conversation_key, resolution.question)
                 return EntryResult(
                     logged=False,
@@ -1970,18 +1972,14 @@ class IntakeService:
         if stock is not None:
             return stock
 
-        alias = self.aliases_by_key.get(normalize_key(drug_name))
-        if alias:
-            stock = self.store.find_stock(alias)
-            if stock is not None:
-                return stock
-
-        names = self.store.list_master_drug_names()
-        normalized_to_name = {normalize_key(name): name for name in names if name.strip()}
-        match = get_close_matches(normalize_key(drug_name), list(normalized_to_name.keys()), n=1, cutoff=0.82)
-        if not match:
+        match = match_local_medicine(
+            drug_name,
+            inventory_names=self.store.list_master_drug_names(),
+            pharmacy_aliases=self.aliases_by_key,
+        )
+        if not match.matched or not match.in_inventory:
             return None
-        return self.store.find_stock(normalized_to_name[match[0]])
+        return self.store.find_stock(match.canonical_name)
 
     def _load_pharmacy_aliases(self) -> dict[str, str]:
         aliases = {normalize_key(key): value for key, value in SHORTCUT_DRUGS.items()}
@@ -2000,47 +1998,19 @@ class IntakeService:
         text_key = normalize_key(drug_name)
         if not text_key:
             return DrugResolution()
-        stock = self.store.find_stock(drug_name)
-        if stock is not None:
-            return DrugResolution(stock.drug_name)
         try:
             names = [name for name in self.store.list_master_drug_names() if str(name).strip()]
         except Exception:
             names = []
-        normalized_to_name = {normalize_key(name): name for name in names}
-        alias = self.aliases_by_key.get(text_key)
-        if alias:
-            prefix_matches = [
-                name
-                for key, name in normalized_to_name.items()
-                if key.startswith(text_key) or text_key.startswith(key)
-            ]
-            if text_key in SHORTCUT_DRUGS and len(prefix_matches) > 1:
-                return DrugResolution(question=medicine_choice_question(drug_name, prefix_matches[:3]))
-            alias_stock = self.store.find_stock(alias)
-            return DrugResolution(alias_stock.drug_name if alias_stock else alias)
-        if text_key in normalized_to_name:
-            return DrugResolution(normalized_to_name[text_key])
-        prefix_matches = [
-            name
-            for key, name in normalized_to_name.items()
-            if key.startswith(text_key) or text_key.startswith(key)
-        ]
-        if len(prefix_matches) == 1 and len(text_key) >= 4:
-            return DrugResolution(prefix_matches[0])
-        if len(prefix_matches) > 1:
-            return DrugResolution(question=medicine_choice_question(drug_name, prefix_matches[:3]))
-        scored = sorted(
-            (
-                (SequenceMatcher(None, text_key, key).ratio(), name)
-                for key, name in normalized_to_name.items()
-            ),
-            reverse=True,
+        match = match_local_medicine(
+            drug_name,
+            inventory_names=names,
+            pharmacy_aliases=self.aliases_by_key,
         )
-        if scored and scored[0][0] >= 0.82 and (len(scored) == 1 or scored[0][0] - scored[1][0] >= 0.08):
-            return DrugResolution(scored[0][1])
-        if scored and scored[0][0] >= 0.62:
-            return DrugResolution(question=medicine_choice_question(drug_name, [name for _, name in scored[:3]]))
+        if match.ambiguous:
+            return DrugResolution(question=medicine_choice_question(drug_name, list(match.choices)))
+        if match.matched:
+            return DrugResolution(match.canonical_name)
         if len(text_key) <= 3:
             return DrugResolution(
                 question=(

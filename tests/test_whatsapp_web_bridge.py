@@ -329,7 +329,7 @@ def test_whatsapp_web_bridge_processes_voice_transcript_through_local_intake(mon
     assert data["status"] == "ok"
     assert data["command_handler"] == "voice_note_processed"
     assert "Heard:" in data["reply"]
-    assert "Heard: Panadol mbili cash, Amoxyl moja mpesa" in data["reply"]
+    assert "Heard: Panadol mbili cash, Amox moja mpesa" in data["reply"]
     assert "Panadol x2 cash" in data["reply"]
     assert seen["sender"] == "254700000000@s.whatsapp.net"
 

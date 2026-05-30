@@ -1,0 +1,18 @@
+{"id":"brain_001","category":"shorthand","text":"pnadol 1 cahs","expect_contains":["Panadol x1","Cash","Stock left"],"ai_allowed":false,"simulate":true}
+{"id":"brain_002","category":"shorthand","text":"pnadol2cash","expected":"Panadol x2 Cash sale from local catalog typo correction","ai_allowed":false,"simulate":false}
+{"id":"brain_003","category":"swahili","text":"glucose mbili mpesa","expect_contains":["Glucose x2","Stock left"],"ai_allowed":false,"simulate":true}
+{"id":"brain_004","category":"swahili","text":"ORS mbili cash","expect_contains":["ORS x2","Stock left"],"ai_allowed":false,"simulate":true}
+{"id":"brain_005","category":"clarification","text":"amox 1 mpesa","expected":"Ask Amoxyl or Amoxicillin when both exist in pharmacy inventory","ai_allowed":false,"simulate":false}
+{"id":"brain_006","category":"conversation","text":"Glucose","expected":"Show local editable sale selector with quantity and payment options","ai_allowed":false,"simulate":false}
+{"id":"brain_007","category":"conversation","text":"Vit kobin","expected":"Recognize Vitcobin locally and ask owner to add during restock because it is not stocked yet","ai_allowed":false,"simulate":false}
+{"id":"brain_008","category":"supplier","text":"Insulin restock 2 vials","expected":"Restock locally using vial units","ai_allowed":false,"simulate":false}
+{"id":"brain_009","category":"supplier","text":"ORS restock 2 packs","expected":"Restock locally using pack units","ai_allowed":false,"simulate":false}
+{"id":"brain_010","category":"supplier","text":"Antibiotic Cream restock 4 tubes","expected":"Restock locally using tube units","ai_allowed":false,"simulate":false}
+{"id":"brain_011","category":"supplier","text":"Cough Syrup restock 3 bottles","expected":"Restock locally using bottle units","ai_allowed":false,"simulate":false}
+{"id":"brain_012","category":"clarification","text":"P2","expected":"Use an approved pharmacy alias only; otherwise ask which P medicine","ai_allowed":false,"simulate":false}
+{"id":"brain_013","category":"offline","text":"offline selector glucose -> choose 2 mpesa -> confirm","expected":"Save structured Glucose x2 M-Pesa sale locally and sync once","ai_allowed":false,"simulate":false}
+{"id":"brain_014","category":"offline","text":"offline tap talk known medicine glucose","expected":"Show local selector; if speech recognition fails, save voice fallback safely without hanging","ai_allowed":false,"simulate":false}
+{"id":"brain_015","category":"media","text":"same invoice photo uploaded twice","expected":"First extraction may use AI; retry reuses media hash cache and approval stays local","ai_allowed":true,"simulate":false}
+{"id":"brain_016","category":"media","text":"same shelf photo uploaded twice","expected":"Reuse cached review result and never update stock automatically","ai_allowed":true,"simulate":false}
+{"id":"brain_017","category":"supplier","text":"add new item Vitcobin price 250 stock 10","expected":"Create item and approve invoice locally after extraction","ai_allowed":false,"simulate":false}
+{"id":"brain_018","category":"trust","text":"unknown customer story","expected":"Ask a short local clarification without spending AI tokens","ai_allowed":false,"simulate":false}

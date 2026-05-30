@@ -81,6 +81,32 @@ class DemoPharmacyStore:
             current.row_number,
         )
 
+    def add_stock_item(
+        self,
+        drug_name: str,
+        selling_price: float | None = None,
+        cost_price: float | None = None,
+        current_stock: int = 0,
+        reorder_level: int = 5,
+    ) -> StockItem:
+        clean_name = " ".join(str(drug_name or "").split())
+        if not clean_name:
+            raise ValueError("Missing medicine name")
+        key = normalize_key(clean_name)
+        existing = self._stock.get(key)
+        if existing:
+            return deepcopy(existing)
+        item = StockItem(
+            clean_name,
+            selling_price,
+            cost_price,
+            max(0, int(current_stock or 0)),
+            max(0, int(reorder_level or 0)),
+            len(self._stock) + 1,
+        )
+        self._stock[key] = item
+        return deepcopy(item)
+
     def append_daily_log(
         self,
         event: ParsedEvent,

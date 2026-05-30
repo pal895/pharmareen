@@ -4,14 +4,16 @@ const PAYMENT_MODE_KEY = "pharmareen_payment_mode";
 const CONFIRMATION_WHATSAPP_KEY = "pharmareen_confirmation_whatsapp";
 const SHORTCUTS_KEY = "pharmareen_medicine_shortcuts";
 const SHORTCUT_USAGE_KEY = "pharmareen_medicine_shortcut_usage";
+const INVENTORY_MEDICINES_KEY = "pharmareen_inventory_medicines";
+const INVENTORY_ALIASES_KEY = "pharmareen_inventory_aliases";
 const DB_NAME = "pharmareen_phase6_offline_db";
 const DB_VERSION = 1;
 const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
-const OFFLINE_APP_BUILD_VERSION = "pharmacy-owner-usability-v2026-05-30-1";
-const SERVICE_WORKER_VERSION = "pharmareen-offline-v18-owner-usability";
+const OFFLINE_APP_BUILD_VERSION = "universal-medicine-brain-v2026-05-30-1";
+const SERVICE_WORKER_VERSION = "pharmareen-offline-v19-universal-medicine-brain";
 const DEFAULT_MEDICINE_SHORTCUTS = ["Panadol", "Amox", "Piriton", "ORS", "Glucose"];
 console.log(`OFFLINE_APP_BUILD_VERSION=${OFFLINE_APP_BUILD_VERSION}`);
 
@@ -68,7 +70,8 @@ let voiceRecognitionActive = false;
 let currentPaymentMode = localStorage.getItem(PAYMENT_MODE_KEY) || "Cash";
 let lastBarcodeScan = { code: "", at: 0 };
 let pendingBarcodeScan = { code: "", count: 0, at: 0 };
-let inventoryMedicines = [];
+let inventoryMedicines = loadJson(INVENTORY_MEDICINES_KEY, []);
+let inventoryMedicineAliases = loadJson(INVENTORY_ALIASES_KEY, {});
 let selectedVoiceSale = { medicine: "", quantity: 1, payment: currentPaymentMode };
 
 function loadJson(key, fallback) {
@@ -161,9 +164,14 @@ async function loadInventoryMedicines() {
     const data = await response.json();
     if (Array.isArray(data.medicines)) {
       inventoryMedicines = data.medicines.map(name => String(name || "").trim()).filter(Boolean).slice(0, 200);
+      saveJson(INVENTORY_MEDICINES_KEY, inventoryMedicines);
+    }
+    if (data.aliases && typeof data.aliases === "object" && !Array.isArray(data.aliases)) {
+      inventoryMedicineAliases = data.aliases;
+      saveJson(INVENTORY_ALIASES_KEY, inventoryMedicineAliases);
     }
   } catch {
-    inventoryMedicines = [];
+    // Keep the last safe inventory list so the selector still works offline.
   }
 }
 
@@ -172,16 +180,9 @@ function normalizeMedicineToken(value) {
 }
 
 function voiceMedicineCandidates() {
-  const aliases = {
-    amox: "Amoxyl",
-    amoxil: "Amoxyl",
-    pcm: "Paracetamol",
-    paracet: "Paracetamol",
-    watergard: "WaterGuard",
-    waterguard: "WaterGuard",
-    peplime: "PEP Lime Cordial"
-  };
-  const names = [...inventoryMedicines, ...loadMedicineShortcuts(), ...DEFAULT_MEDICINE_SHORTCUTS];
+  const aliases = { ...inventoryMedicineAliases };
+  const fallbackNames = inventoryMedicines.length ? [] : DEFAULT_MEDICINE_SHORTCUTS;
+  const names = [...inventoryMedicines, ...loadMedicineShortcuts(), ...fallbackNames];
   const unique = [];
   const seen = new Set();
   for (const name of names) {
@@ -229,6 +230,17 @@ function detectLocalMedicineFromSpeech(transcript) {
     if (score > best.score) best = { name: medicine, score };
   }
   return best.score >= 0.78 ? best.name : "";
+}
+
+function maybeShowTypedMedicineSelector(rawText) {
+  const clean = String(rawText || "").trim();
+  if (!clean || clean.includes("\n") || /\d|\+/.test(clean)) return false;
+  if (/\b(stock|report|restock|sold|sell|cash|mpesa|m-pesa|credit|mixed|receipt|undo|trace|expiry)\b/i.test(clean)) return false;
+  const medicine = detectLocalMedicineFromSpeech(clean);
+  if (!medicine) return false;
+  showVoiceSelector(medicine);
+  if (voiceStatus) voiceStatus.textContent = `✅ ${medicine} selected locally`;
+  return true;
 }
 
 function renderVoiceSaleCard() {
@@ -913,6 +925,10 @@ async function startVoiceRecording(options = {}) {
 }
 
 async function saveOfflineEntries() {
+  if (maybeShowTypedMedicineSelector(commandText.value)) {
+    commandText.value = "";
+    return;
+  }
   const textEntries = createCommandEntries(commandText.value);
   let savedCount = 0;
   if (textEntries.length) {
@@ -1324,6 +1340,9 @@ window.PharMareenOffline = {
   saveOfflineEntries,
   syncQueue,
   detectLocalMedicineFromSpeech,
+  maybeShowTypedMedicineSelector,
+  startLocalVoiceSelector,
+  startVoiceRecording,
   showVoiceSelector,
   confirmLocalVoiceSale
 };
