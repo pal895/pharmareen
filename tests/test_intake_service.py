@@ -1708,12 +1708,16 @@ def test_known_medicine_selector_is_local_and_accepts_quantity_payment_reply():
     service = IntakeService(parser, store)
 
     prompt = service.process_text("Glucose", conversation_id="voice")
-    saved = service.process_text("2 mpesa", conversation_id="voice")
+    selected = service.process_text("2 mpesa", conversation_id="voice")
+    saved = service.process_text("yes", conversation_id="voice")
 
     assert "Sale approval" in prompt
     assert "Medicine: Glucose" in prompt
-    assert "Quantity: 1, 2, 3, 5, 10, +, -" in prompt
-    assert "Payment: Cash, M-Pesa, Credit, Mixed" in prompt
+    assert "Choose quantity: 1, 2, 3, 5, 10, +, -" in prompt
+    assert "Choose payment: Cash, M-Pesa, Credit, Mixed" in prompt
+    assert "Quantity selected: 2" in selected
+    assert "Payment selected: M-Pesa" in selected
+    assert "Reply YES to save" in selected
     assert "Glucose x2" in saved
     assert "M-Pesa" in saved
     assert store.stocks["glucose"].current_stock == 10

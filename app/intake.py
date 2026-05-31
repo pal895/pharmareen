@@ -374,6 +374,7 @@ class IntakeService:
         self.app_base_url = clean_app_base_url(app_base_url)
         self.whatsapp_number = clean_whatsapp_number(whatsapp_number)
         self.pending_followups: dict[str, OperatingCommand] = {}
+        self.pending_selector_confirmations: dict[str, OperatingCommand] = {}
         self.staff_by_conversation: dict[str, str] = {}
         self.last_sale_by_conversation: dict[str, dict[str, Any]] = {}
         self.pending_void_reason: dict[str, dict[str, Any]] = {}
@@ -411,6 +412,20 @@ class IntakeService:
                 self.pending_repeat_confirmation.pop(conversation_key, None)
                 return "No problem. Nothing was saved."
             self.pending_repeat_confirmation.pop(conversation_key, None)
+        pending_selector = self.pending_selector_confirmations.get(conversation_key)
+        if pending_selector is not None:
+            response_key = normalize_key(text)
+            if response_key in {"yes", "y", "confirm", "ndio", "sawa"}:
+                self.pending_selector_confirmations.pop(conversation_key, None)
+                return self._process_commands([pending_selector], conversation_key=conversation_key)
+            if response_key in {"cancel", "stop", "no", "hapana"}:
+                self.pending_selector_confirmations.pop(conversation_key, None)
+                return "No problem. Nothing was saved."
+            updated_selector = self._update_selector_choice(text, pending_selector)
+            if updated_selector is not None:
+                self.pending_selector_confirmations[conversation_key] = updated_selector
+                return self._selector_approval_reply(updated_selector, ready_to_confirm=True)
+            self.pending_selector_confirmations.pop(conversation_key, None)
         pending_void_confirmation = self.pending_void_confirmation.get(conversation_key)
         if pending_void_confirmation is not None:
             response_key = normalize_key(text)
@@ -729,22 +744,48 @@ class IntakeService:
             return ""
         if self._resolve_stock(resolution.drug_name) is None:
             return f"⚠ {resolution.drug_name} is not yet in your inventory. Add it during restock first."
-        self.pending_followups[conversation_key] = OperatingCommand(
+        selector = OperatingCommand(
             kind="sale",
             drug_name=resolution.drug_name,
-            quantity=0,
+            quantity=1,
             payment_method="Cash",
             raw_text=resolution.drug_name,
         )
-        return "\n".join(
-            [
-                "Sale approval",
-                f"Medicine: {resolution.drug_name}",
-                "Quantity: 1, 2, 3, 5, 10, +, -",
-                "Payment: Cash, M-Pesa, Credit, Mixed",
-                "Reply: 1 cash, 2 mpesa, yes, or cancel.",
-            ]
-        )
+        self.pending_selector_confirmations[conversation_key] = selector
+        return self._selector_approval_reply(selector)
+
+    def _selector_approval_reply(self, selector: OperatingCommand, *, ready_to_confirm: bool = False) -> str:
+        lines = [
+            "Sale approval",
+            f"Medicine: {selector.drug_name}",
+            f"Quantity selected: {selector.quantity}",
+            f"Payment selected: {selector.payment_method or 'Cash'}",
+            "Choose quantity: 1, 2, 3, 5, 10, +, -",
+            "Choose payment: Cash, M-Pesa, Credit, Mixed",
+        ]
+        if ready_to_confirm:
+            lines.append("Reply YES to save, or CANCEL.")
+        else:
+            lines.append("Reply: 1 cash, 2 mpesa, or choose quantity/payment. Then reply YES.")
+        return "\n".join(lines)
+
+    def _update_selector_choice(self, text: str, selector: OperatingCommand) -> OperatingCommand | None:
+        clean = normalize_natural_text(replace_number_words(text.strip()))
+        response_key = normalize_key(clean)
+        if clean == "+":
+            return replace(selector, quantity=max(selector.quantity + 1, 1))
+        if clean == "-":
+            return replace(selector, quantity=max(selector.quantity - 1, 1))
+        quantity_payment = re.fullmatch(rf"(\d+)(?:\s+({payment_pattern()}))?", clean, flags=re.IGNORECASE)
+        if quantity_payment:
+            return replace(
+                selector,
+                quantity=positive_quantity(quantity_payment.group(1)),
+                payment_method=parse_payment_method(quantity_payment.group(2) or selector.payment_method or "Cash"),
+            )
+        if re.fullmatch(payment_pattern(), clean, flags=re.IGNORECASE):
+            return replace(selector, payment_method=parse_payment_method(clean))
+        return None
 
     def _share_reply(self) -> str:
         return "\n".join(
