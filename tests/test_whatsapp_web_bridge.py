@@ -803,6 +803,93 @@ def test_whatsapp_voice_random_transcript_is_saved_for_review_without_intake(mon
     assert "Share this video" not in data["reply"]
 
 
+def test_whatsapp_voice_known_medicine_only_opens_local_selector_without_ai_interpretation(monkeypatch):
+    from app.ai import AI_ROUTE_DECISION_LOG
+
+    class FakeTranscriptionService:
+        is_available = True
+
+        def __init__(self, transcripts: list[str]):
+            self.transcripts = transcripts
+
+        def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
+            return self.transcripts.pop(0)
+
+    transcription = FakeTranscriptionService(["Panadol", "Glucose", "ORS", "Belladonna"])
+    selected: list[str] = []
+
+    def fake_process_intake_text_for_sender(text: str, sender: str) -> str:
+        selected.append(text)
+        return "\n".join(
+            [
+                "Sale approval",
+                f"Medicine: {text}",
+                "Quantity: 1, 2, 3, 5, 10, +, -",
+                "Payment: Cash, M-Pesa, Credit, Mixed",
+                "Reply: 1 cash, 2 mpesa, yes, or cancel.",
+            ]
+        )
+
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_transcription_service", lambda: transcription)
+    monkeypatch.setattr(main, "process_intake_text_for_sender", fake_process_intake_text_for_sender)
+    AI_ROUTE_DECISION_LOG.clear()
+
+    with TestClient(main.app) as client:
+        for medicine in ["Panadol", "Glucose", "ORS", "Belladonna"]:
+            payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+            payload["media_base64"] = base64.b64encode(f"{medicine} voice".encode()).decode("ascii")
+            payload["media_mime_type"] = "audio/ogg"
+            response = client.post("/bridge/whatsapp-web", json=payload)
+            data = response.json()
+            assert response.status_code == 200
+            assert data["command_handler"] == "voice_medicine_selector"
+            assert f"Medicine: {medicine}" in data["reply"]
+            assert "Quantity: 1, 2, 3, 5, 10, +, -" in data["reply"]
+
+    assert selected == ["Panadol", "Glucose", "ORS", "Belladonna"]
+    assert len(AI_ROUTE_DECISION_LOG) == 4
+    assert all(item["reason"] == "voice_transcription" for item in AI_ROUTE_DECISION_LOG)
+
+
+def test_whatsapp_voice_amox_asks_local_clarification_before_intake(monkeypatch):
+    class FakeStore:
+        @staticmethod
+        def list_master_drug_names():
+            return ["Amoxyl", "Amoxicillin"]
+
+    class FakeIntakeService:
+        store = FakeStore()
+        aliases_by_key = {}
+
+    monkeypatch.setattr(main, "get_intake_service", lambda: FakeIntakeService())
+    monkeypatch.setattr(
+        main,
+        "process_intake_text_for_sender",
+        lambda text, sender: (_ for _ in ()).throw(AssertionError("ambiguous medicine must not enter intake")),
+    )
+
+    reply = main.local_voice_selector_reply("amox", "254700000000@s.whatsapp.net")
+
+    assert "Which medicine?" in reply
+    assert "Amoxyl" in reply
+    assert "Amoxicillin" in reply
+
+
+def test_whatsapp_voice_random_words_do_not_open_local_selector(monkeypatch):
+    monkeypatch.setattr(
+        main,
+        "process_intake_text_for_sender",
+        lambda text, sender: (_ for _ in ()).throw(AssertionError("random words must not enter intake")),
+    )
+
+    assert main.local_voice_selector_reply("share this video with friends", "254700000000@s.whatsapp.net") == ""
+
+
 def test_offline_voice_sync_transcribes_and_returns_parsed_confirmation(monkeypatch, tmp_path):
     class FakeTranscriptionService:
         is_available = True

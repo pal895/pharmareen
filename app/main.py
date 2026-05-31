@@ -40,10 +40,12 @@ from app.routes.admin import router as admin_router
 from app.routes.meta_webhook import meta_callback_router, router as meta_whatsapp_router
 from app.routes.offline_sync import router as offline_sync_router
 from app.services.medicine_catalog import (
+    MedicineMatch,
     catalog_entries_payload,
     catalog_medicine_names,
     catalog_unique_aliases,
     load_catalog_metadata,
+    match_local_medicine,
     medicine_match_snapshot,
     search_catalog_entries,
 )
@@ -85,7 +87,7 @@ last_openai_error: dict[str, Any] = {
 VOICE_QUOTA_REPLY = "🎧 Voice received safely. AI transcription is ready but OpenAI credits are not active yet."
 PHOTO_QUOTA_REPLY = "📷 Photo received safely. Saved for review."
 DEFAULT_PUBLIC_BASE_URL = "https://pharmareen-1--pal895.replit.app"
-OFFLINE_BUILD_VERSION = "kenya-medicine-brain-v2026-05-31-offline-parity"
+OFFLINE_BUILD_VERSION = "kenya-medicine-brain-v2026-05-31-voice-card"
 OFFLINE_FRONTEND_MARKER = f"PHARMAREEN REAL PATH BUILD {OFFLINE_BUILD_VERSION}"
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
 OFFLINE_NO_CACHE_HEADERS = {
@@ -2270,6 +2272,14 @@ async def process_whatsapp_web_payload(
                     success=True,
                     command_handler="voice_note_transcribed",
                 )
+            selector_reply = local_voice_selector_reply(transcript, sender)
+            if selector_reply:
+                return WhatsAppProcessResult(
+                    reply=voice_selector_reply(transcript, selector_reply),
+                    message_type="voice",
+                    success=True,
+                    command_handler="voice_medicine_selector",
+                )
             interpreted = normalize_spoken_command_text(transcript)
             if not voice_transcript_is_clear(interpreted):
                 return WhatsAppProcessResult(
@@ -2932,7 +2942,11 @@ async def process_whatsapp_form_values(form_values: dict[str, Any]) -> WhatsAppP
             whatsapp = get_whatsapp_client()
             incoming = await incoming_text_from_form(form_values, whatsapp, get_transcription_service())
             message_type = "voice" if incoming.is_voice else "text"
-            if incoming.is_voice and not voice_transcript_is_clear(incoming.text):
+            selector_reply = local_voice_selector_reply(incoming.text, from_number) if incoming.is_voice else ""
+            if selector_reply:
+                command_handler = "voice_medicine_selector"
+                reply = voice_selector_reply(incoming.original_text or incoming.text, selector_reply)
+            elif incoming.is_voice and not voice_transcript_is_clear(incoming.text):
                 command_handler = "voice_note_confirmation_required"
                 reply = voice_needs_correction_reply(incoming.original_text or incoming.text)
             else:
@@ -3127,6 +3141,81 @@ def voice_transcript_is_clear(transcript: str) -> bool:
 
     commands = parse_operating_commands(transcript)
     return bool(commands and all(command.kind != "error" for command in commands))
+
+
+VOICE_SELECTOR_BLOCK_WORDS = {
+    "cash",
+    "credit",
+    "mpesa",
+    "m-pesa",
+    "mixed",
+    "moja",
+    "mbili",
+    "tatu",
+    "nne",
+    "tano",
+    "sita",
+    "saba",
+    "nane",
+    "tisa",
+    "kumi",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "sell",
+    "sold",
+    "sale",
+    "stock",
+    "restock",
+    "report",
+    "receipt",
+    "undo",
+    "maybe",
+    "perhaps",
+    "unsure",
+    "think",
+}
+
+
+def local_voice_selector_match(transcript: str) -> MedicineMatch:
+    """Resolve a medicine-only voice transcript locally before asking for review."""
+    clean = " ".join(str(transcript or "").strip().split())
+    words = {word.lower() for word in re.findall(r"[A-Za-z0-9-]+", clean)}
+    if not clean or any(character.isdigit() for character in clean) or words & VOICE_SELECTOR_BLOCK_WORDS:
+        return MedicineMatch()
+    try:
+        intake_service = get_intake_service()
+        inventory_names = intake_service.store.list_master_drug_names()
+        pharmacy_aliases = getattr(intake_service, "aliases_by_key", {})
+    except Exception:
+        inventory_names = []
+        pharmacy_aliases = {}
+    return match_local_medicine(
+        clean,
+        inventory_names=inventory_names,
+        pharmacy_aliases=pharmacy_aliases,
+    )
+
+
+def local_voice_selector_reply(transcript: str, sender: str) -> str:
+    match = local_voice_selector_match(transcript)
+    if match.ambiguous:
+        choices = "\n".join(f"{index}. {choice}" for index, choice in enumerate(match.choices[:3], start=1))
+        return f"Which medicine?\n{choices}\nReply with the medicine name."
+    if not match.matched:
+        return ""
+    return process_intake_text_for_sender(match.canonical_name, sender)
+
+
+def voice_selector_reply(transcript: str, selector_reply: str) -> str:
+    return f"🎙 Heard: {transcript}\n\n{selector_reply}"
 
 
 def store_pending_voice(sender: str, transcript: str) -> None:

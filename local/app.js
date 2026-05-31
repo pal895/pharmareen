@@ -12,8 +12,8 @@ const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
-const OFFLINE_APP_BUILD_VERSION = "kenya-medicine-brain-v2026-05-31-offline-parity";
-const SERVICE_WORKER_VERSION = "pharmareen-offline-v22-offline-parity";
+const OFFLINE_APP_BUILD_VERSION = "kenya-medicine-brain-v2026-05-31-voice-card";
+const SERVICE_WORKER_VERSION = "pharmareen-offline-v23-voice-card";
 const DEFAULT_MEDICINE_SHORTCUTS = ["Panadol", "Amox", "Piriton", "ORS", "Glucose"];
 console.log(`OFFLINE_APP_BUILD_VERSION=${OFFLINE_APP_BUILD_VERSION}`);
 
@@ -55,6 +55,7 @@ const voiceSaleCard = document.getElementById("voiceSaleCard");
 const voiceSelectedMedicine = document.getElementById("voiceSelectedMedicine");
 const voiceQuantity = document.getElementById("voiceQuantity");
 const confirmVoiceSale = document.getElementById("confirmVoiceSale");
+const voiceMedicineSearch = document.getElementById("voiceMedicineSearch");
 
 let dbPromise = null;
 let persistentStorageReady = false;
@@ -67,6 +68,7 @@ let recordedChunks = [];
 let voiceRecognition = null;
 let voiceRecognitionTimeout = null;
 let voiceRecognitionActive = false;
+let voiceRecognitionHandled = false;
 let voiceRecordingTimeout = null;
 let currentPaymentMode = localStorage.getItem(PAYMENT_MODE_KEY) || "Cash";
 let lastBarcodeScan = { code: "", at: 0 };
@@ -223,27 +225,50 @@ function similarity(left, right) {
   return 1 - rows[a.length][b.length] / Math.max(a.length, b.length);
 }
 
-function detectLocalMedicineFromSpeech(transcript) {
+function resolveLocalMedicineFromSpeech(transcript) {
   const clean = String(transcript || "").toLowerCase();
   const { names, aliases } = voiceMedicineCandidates();
+  const uncertaintyWords = new Set(["maybe", "perhaps", "unsure", "think"]);
+  if (clean.split(/\s+/).some(word => uncertaintyWords.has(word))) return { medicine: "", choices: [] };
   const compactClean = normalizeMedicineToken(clean);
-  if (aliases[compactClean]) return aliases[compactClean];
+  if (!compactClean) return { medicine: "", choices: [] };
+  if (aliases[compactClean]) return { medicine: aliases[compactClean], choices: [] };
+  const exactNames = names.filter(name => normalizeMedicineToken(name) === compactClean);
+  if (exactNames.length === 1) return { medicine: exactNames[0], choices: [] };
+  const prefixNames = names.filter(name => {
+    const key = normalizeMedicineToken(name);
+    return compactClean.length >= 3 && (key.startsWith(compactClean) || compactClean.startsWith(key));
+  });
+  if (prefixNames.length === 1) return { medicine: prefixNames[0], choices: [] };
+  if (prefixNames.length > 1) return { medicine: "", choices: [...new Set(prefixNames)].slice(0, 3) };
   const safeAliases = Object.entries(aliases)
     .map(([alias, medicine]) => [normalizeMedicineToken(alias), medicine])
     .filter(([alias]) => alias.length >= 3)
     .sort((left, right) => right[0].length - left[0].length);
   for (const [alias, medicine] of safeAliases) {
-    if (compactClean.includes(alias)) return medicine;
+    if (compactClean.includes(alias)) return { medicine, choices: [] };
   }
   let best = { name: "", score: 0 };
+  let second = { name: "", score: 0 };
   for (const medicine of names) {
     const score = Math.max(
       similarity(clean, medicine),
       ...clean.split(/\s+/).filter(Boolean).map(token => similarity(token, medicine))
     );
-    if (score > best.score) best = { name: medicine, score };
+    if (score > best.score) {
+      second = best;
+      best = { name: medicine, score };
+    } else if (score > second.score) {
+      second = { name: medicine, score };
+    }
   }
-  return best.score >= 0.78 ? best.name : "";
+  if (best.score >= 0.8 && best.score - second.score >= 0.08) return { medicine: best.name, choices: [] };
+  if (best.score >= 0.68) return { medicine: "", choices: [best.name, second.name].filter(Boolean) };
+  return { medicine: "", choices: [] };
+}
+
+function detectLocalMedicineFromSpeech(transcript) {
+  return resolveLocalMedicineFromSpeech(transcript).medicine;
 }
 
 function maybeShowTypedMedicineSelector(rawText) {
@@ -273,6 +298,21 @@ function showVoiceSelector(medicine) {
   renderMedicineShortcuts();
   renderVoiceSaleCard();
   if (voiceStatus) voiceStatus.textContent = `✅ ${medicine} selected locally`;
+}
+
+function chooseVoiceMedicineFromSearch() {
+  const resolution = resolveLocalMedicineFromSpeech(voiceMedicineSearch ? voiceMedicineSearch.value : "");
+  if (resolution.medicine) {
+    showVoiceSelector(resolution.medicine);
+    if (voiceMedicineSearch) voiceMedicineSearch.value = "";
+    return true;
+  }
+  if (voiceStatus) {
+    voiceStatus.textContent = resolution.choices.length
+      ? `Which medicine? ${resolution.choices.join(" or ")}. Type the full name.`
+      : "I didn't find that medicine. Type the full medicine name.";
+  }
+  return false;
 }
 
 async function confirmLocalVoiceSale() {
@@ -833,6 +873,8 @@ function resetVoiceRecognition() {
   voiceRecognitionTimeout = null;
   voiceRecognitionActive = false;
   voiceRecognition = null;
+  const button = document.getElementById("tapTalk");
+  if (button) button.textContent = "Tap & Talk";
 }
 
 function startLocalVoiceSelector() {
@@ -842,13 +884,17 @@ function startLocalVoiceSelector() {
     const recognition = new SpeechRecognition();
     voiceRecognition = recognition;
     voiceRecognitionActive = true;
+    voiceRecognitionHandled = false;
     recognition.lang = "en-KE";
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     recognition.onstart = () => {
-      voiceStatus.textContent = "Listening for medicine name...";
+      voiceStatus.textContent = "Listening... tap again to stop.";
+      const button = document.getElementById("tapTalk");
+      if (button) button.textContent = "Stop Listening";
     };
     recognition.onerror = event => {
+      voiceRecognitionHandled = true;
       resetVoiceRecognition();
       if (event && (event.error === "not-allowed" || event.error === "service-not-allowed")) {
         voiceStatus.textContent = "Please allow microphone to use Tap & Talk.";
@@ -857,6 +903,7 @@ function startLocalVoiceSelector() {
       voiceStatus.textContent = "I didn't catch the medicine. Tap again or choose from search.";
     };
     recognition.onresult = event => {
+      voiceRecognitionHandled = true;
       resetVoiceRecognition();
       const transcript = event.results && event.results[0] && event.results[0][0]
         ? event.results[0][0].transcript
@@ -864,13 +911,13 @@ function startLocalVoiceSelector() {
       handleLocalVoiceTranscript(transcript);
     };
     recognition.onend = () => {
-      voiceRecognitionActive = false;
+      const handled = voiceRecognitionHandled;
+      resetVoiceRecognition();
+      if (!handled) voiceStatus.textContent = "I didn't catch the medicine. Tap again or choose from search.";
     };
     recognition.start();
     voiceRecognitionTimeout = setTimeout(() => {
-      try { recognition.abort(); } catch {}
-      resetVoiceRecognition();
-      voiceStatus.textContent = "I didn't catch the medicine. Tap again or choose from search.";
+      try { recognition.stop(); } catch {}
     }, 6000);
     return true;
   } catch {
@@ -880,23 +927,29 @@ function startLocalVoiceSelector() {
 }
 
 function handleLocalVoiceTranscript(transcript) {
-  const medicine = detectLocalMedicineFromSpeech(transcript);
-  if (medicine) {
-    showVoiceSelector(medicine);
+  const resolution = resolveLocalMedicineFromSpeech(transcript);
+  if (resolution.medicine) {
+    showVoiceSelector(resolution.medicine);
     return true;
   }
-  voiceStatus.textContent = "I didn't catch the medicine. Tap again or choose from search.";
+  voiceStatus.textContent = resolution.choices.length
+    ? `Which medicine? ${resolution.choices.join(" or ")}. Type the full name.`
+    : "I didn't catch the medicine. Tap again or choose from search.";
   return false;
 }
 
 async function startVoiceRecording(options = {}) {
   if (voiceRecognitionActive && voiceRecognition) {
-    try { voiceRecognition.abort(); } catch {}
-    resetVoiceRecognition();
-    voiceStatus.textContent = "Tap & Talk cancelled.";
+    voiceStatus.textContent = "Checking medicine...";
+    try { voiceRecognition.stop(); } catch { resetVoiceRecognition(); }
     return;
   }
   if (!options.skipSelector && startLocalVoiceSelector()) return;
+  if (!options.skipSelector) {
+    voiceStatus.textContent = "Speech recognition is not available here. Choose medicine from search.";
+    if (voiceMedicineSearch) voiceMedicineSearch.focus();
+    return;
+  }
   if (!navigator.mediaDevices || !window.MediaRecorder) {
     voiceStatus.textContent = "Recording is not available here. Use More options to choose an audio file.";
     voiceInput.click();
@@ -1251,6 +1304,7 @@ document.querySelectorAll("[data-voice-payment]").forEach(button => {
 });
 
 bindClick("confirmVoiceSale", () => confirmLocalVoiceSale());
+bindClick("chooseVoiceMedicine", () => chooseVoiceMedicineFromSearch());
 bindClick("takePhoto", () => (cameraPhotoInput || photoInput).click());
 bindClick("scanBarcode", () => startBarcodeScanner());
 bindClick("scanInvoice", () => photoInput.click());
@@ -1352,12 +1406,14 @@ window.PharMareenOffline = {
   queueMediaFiles,
   saveOfflineEntries,
   syncQueue,
+  resolveLocalMedicineFromSpeech,
   detectLocalMedicineFromSpeech,
   maybeShowTypedMedicineSelector,
   startLocalVoiceSelector,
   handleLocalVoiceTranscript,
   startVoiceRecording,
   showVoiceSelector,
+  chooseVoiceMedicineFromSearch,
   confirmLocalVoiceSale
 };
 

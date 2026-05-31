@@ -291,6 +291,17 @@ textarea {
   padding: 12px;
 }
 
+.voice-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.voice-search-row input {
+  min-width: 0;
+}
+
 .quantity-row {
   display: grid;
   grid-template-columns: 44px 1fr 44px;
