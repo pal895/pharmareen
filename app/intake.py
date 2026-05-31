@@ -762,9 +762,10 @@ class IntakeService:
             "Pay: Cash | M-Pesa | Credit | Mixed",
         ]
         if ready_to_confirm:
-            lines.append("Reply YES to save, or CANCEL.")
+            lines.append("Confirm | Cancel")
         else:
-            lines.append("Choose quantity and payment, then reply YES.")
+            lines.append("Choose quantity and payment.")
+            lines.append("Confirm | Cancel")
         return "\n".join(lines)
 
     def prepare_sale_selector(

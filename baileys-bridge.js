@@ -96,6 +96,7 @@ function isAllowedDirectChat(jid) {
 }
 
 async function safeSendReply(sock, jid, text) {
+  const startedAt = Date.now();
   const safety = isAllowedDirectChat(jid);
   if (!safety.allowed) {
     console.log(`Reply blocked to ${maskSender(jid)} reason=${safety.reason}`);
@@ -108,6 +109,7 @@ async function safeSendReply(sock, jid, text) {
     const result = await sock.sendMessage(jid, { text: body });
     const messageId = result && result.key ? result.key.id : '';
     console.log(`WHATSAPP_REPLY_SENT to ${maskSender(jid)} ${jidDebug(jid)} message_id=${messageId || 'unknown'} length=${body.length}`);
+    console.log(`WHATSAPP_SEND_TIMING jid=${maskSender(jid)} elapsed_ms=${Date.now() - startedAt}`);
     reportRuntimeStatus({ state: 'connected', connected: true, last_reply_sent: new Date().toISOString(), last_error: '' });
     return true;
   } catch (error) {
@@ -115,6 +117,15 @@ async function safeSendReply(sock, jid, text) {
     reportRuntimeStatus({ last_error: `reply_send_failed: ${error.message || error}` });
     return false;
   }
+}
+
+function logSelectorCardFallback(data, sender) {
+  const card = data && data.selector_card;
+  if (!card || card.type !== 'sale_selector') return;
+  console.log(
+    `SELECTOR_CARD_FALLBACK sender=${maskSender(sender)} medicine=${card.medicine || ''} ` +
+    `quantity=${card.quantity || 1} payment=${card.payment || 'Cash'} interactive=false`
+  );
 }
 
 function extractText(message) {
@@ -564,6 +575,7 @@ async function startBaileys(options = {}) {
             media_caption: text
           });
           console.log(`BACKEND_REPLY_RECEIVED from ${maskSender(sender)} status=${data.status || 'unknown'} handler=${data.command_handler || 'unknown'} reason=${data.error_reason || 'none'}`);
+          logSelectorCardFallback(data, sender);
           const reply = extractBackendReply(data);
           console.log(`EXTRACTED_REPLY_TEXT ${reply}`);
           await safeSendReply(sock, sender, reply);
@@ -587,6 +599,7 @@ async function startBaileys(options = {}) {
             voice_transcribe_only: false
           });
           console.log(`BACKEND_REPLY_RECEIVED from ${maskSender(sender)} status=${data.status || 'unknown'} handler=${data.command_handler || 'unknown'} reason=${data.error_reason || 'none'}`);
+          logSelectorCardFallback(data, sender);
           const reply = extractBackendReply(data);
           console.log(`EXTRACTED_REPLY_TEXT ${reply}`);
           await safeSendReply(sock, sender, reply);
@@ -609,6 +622,7 @@ async function startBaileys(options = {}) {
       try {
         const data = await sendToBackend(text, sender, messageId);
         console.log(`BACKEND_REPLY_RECEIVED from ${maskSender(sender)} status=${data.status || 'unknown'} handler=${data.command_handler || 'unknown'} reason=${data.error_reason || 'none'}`);
+        logSelectorCardFallback(data, sender);
         if (data.status === 'ignored') {
           console.log(`Backend ignored message from ${maskSender(sender)} reason=${data.error_reason || 'unknown'}`);
           continue;

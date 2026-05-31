@@ -88,7 +88,7 @@ last_openai_error: dict[str, Any] = {
 VOICE_QUOTA_REPLY = "🎧 Voice received safely. Voice reading is unavailable right now. Please choose the medicine or type it."
 PHOTO_QUOTA_REPLY = "📷 Photo received safely. Saved for review."
 DEFAULT_PUBLIC_BASE_URL = "https://pharmareen-1--pal895.replit.app"
-OFFLINE_BUILD_VERSION = "kenya-medicine-brain-v2026-05-31-mobile-selector"
+OFFLINE_BUILD_VERSION = "kenya-medicine-brain-v2026-05-31-phone-ready"
 OFFLINE_FRONTEND_MARKER = f"PHARMAREEN REAL PATH BUILD {OFFLINE_BUILD_VERSION}"
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
 OFFLINE_NO_CACHE_HEADERS = {
@@ -842,6 +842,7 @@ def cached_media_result(job_id: str, *, sender: str = "", route: str = "") -> Wh
         success=str(cached.get("status") or "synced") not in {"failed", "pending"},
         error_reason=str(cached.get("error_reason") or ""),
         command_handler=str(cached.get("command_handler") or "media_cache"),
+        selector_card=cached.get("selector_card") if isinstance(cached.get("selector_card"), dict) else None,
     )
 
 
@@ -858,6 +859,7 @@ def cache_media_process_result(job_id: str, result: WhatsAppProcessResult, *, ap
             "message_type": result.message_type,
             "command_handler": result.command_handler,
             "error_reason": result.error_reason,
+            "selector_card": result.selector_card,
             "whatsapp_confirmation": "ready",
             "approved": bool(approved),
         },
@@ -2256,6 +2258,7 @@ async def process_whatsapp_web_payload(
         )
 
     if media_base64 and media_mime_type.lower().startswith("audio/"):
+        voice_started = time.perf_counter()
         transcription_service = get_transcription_service()
         if not transcription_service.is_available:
             return WhatsAppProcessResult(
@@ -2268,6 +2271,14 @@ async def process_whatsapp_web_payload(
         try:
             audio_bytes = base64.b64decode(media_base64)
             job_id = media_job_id_from_bytes(audio_bytes)
+            cached = None if voice_transcribe_only else cached_media_result(job_id, sender=sender, route="audio/transcriptions")
+            if cached is not None:
+                logger.info(
+                    "VOICE_TIMING job_id=%s total_ms=%.1f from_cache=true",
+                    job_id,
+                    (time.perf_counter() - voice_started) * 1000,
+                )
+                return cached
             log_ai_route_decision(
                 text=message_id or media_caption or "voice",
                 route="audio/transcriptions",
@@ -2277,41 +2288,64 @@ async def process_whatsapp_web_payload(
                 user_number=mask_phone(sender),
                 media_hash=job_id.removeprefix("media-"),
             )
+            transcription_started = time.perf_counter()
             raw_transcript = transcription_service.transcribe_audio(audio_bytes, media_mime_type)
+            logger.info(
+                "VOICE_TRANSCRIPTION_TIMING job_id=%s elapsed_ms=%.1f",
+                job_id,
+                (time.perf_counter() - transcription_started) * 1000,
+            )
             clear_last_openai_error("voice")
             transcript = clean_voice_transcript_for_intake(raw_transcript, medicine_names=voice_medicine_names_from_inventory())
             if voice_transcribe_only:
                 clean_transcript = transcript.strip()
                 if not clean_transcript:
                     raise ValueError("OpenAI returned an empty transcription")
-                return WhatsAppProcessResult(
+                result = WhatsAppProcessResult(
                     reply=f"🎧 Voice received: {clean_transcript}",
                     message_type="voice",
                     success=True,
                     command_handler="voice_note_transcribed",
                 )
+                return result
+            selector_started = time.perf_counter()
             selector_result = (
                 local_sale_selector_result(transcript, sender, message_type="voice", heard=transcript)
                 if not media_purpose
                 else None
             )
             if selector_result is not None:
+                cache_media_process_result(job_id, selector_result)
+                logger.info(
+                    "VOICE_TIMING job_id=%s selector_ms=%.1f total_ms=%.1f from_cache=false",
+                    job_id,
+                    (time.perf_counter() - selector_started) * 1000,
+                    (time.perf_counter() - voice_started) * 1000,
+                )
                 return selector_result
             interpreted = normalize_spoken_command_text(transcript)
             if not voice_transcript_is_clear(interpreted):
-                return WhatsAppProcessResult(
+                result = WhatsAppProcessResult(
                     reply=voice_saved_for_review_reply(),
                     message_type="voice",
                     success=True,
                     error_reason="voice_needs_review",
                     command_handler="voice_note_needs_review",
                 )
+                cache_media_process_result(job_id, result)
+                return result
             reply = process_intake_text_for_sender(interpreted, sender)
             result = WhatsAppProcessResult(
                 reply=voice_reply(transcript, interpreted, reply),
                 message_type="voice",
                 success=True,
                 command_handler="voice_note_processed",
+            )
+            cache_media_process_result(job_id, result)
+            logger.info(
+                "VOICE_TIMING job_id=%s total_ms=%.1f from_cache=false",
+                job_id,
+                (time.perf_counter() - voice_started) * 1000,
             )
             return result
         except Exception as exc:
@@ -3269,7 +3303,7 @@ def prepare_local_sale_selector_reply(drug_name: str, quantity: int, payment_met
             f"{drug_name} x{quantity} - {payment_method}",
             "Qty: 1 | 2 | 3 | 5 | 10 | + | -",
             "Pay: Cash | M-Pesa | Credit | Mixed",
-            "Reply YES to save, or CANCEL.",
+            "Confirm | Cancel",
         ]
     )
 
@@ -3281,6 +3315,7 @@ def local_sale_selector_result(
     message_type: str = "text",
     heard: str = "",
 ) -> WhatsAppProcessResult | None:
+    selector_started = time.perf_counter()
     interpreted = normalize_spoken_command_text(
         clean_voice_transcript_for_intake(text, medicine_names=voice_medicine_names_from_inventory())
     )
@@ -3323,13 +3358,21 @@ def local_sale_selector_result(
     reply = prepare_local_sale_selector_reply(drug_name, quantity, payment_method, sender)
     if heard:
         reply = voice_selector_reply(heard, reply)
-    return WhatsAppProcessResult(
+    result = WhatsAppProcessResult(
         reply=reply,
         message_type=message_type,
         success=True,
         command_handler="voice_medicine_selector" if message_type == "voice" else "text_medicine_selector",
         selector_card=sale_selector_card(drug_name, quantity, payment_method),
     )
+    logger.info(
+        "LOCAL_SELECTOR_TIMING sender=%s medicine=%s message_type=%s elapsed_ms=%.1f ai_used=false",
+        mask_phone(sender),
+        drug_name,
+        message_type,
+        (time.perf_counter() - selector_started) * 1000,
+    )
+    return result
 
 
 def local_text_sale_selector_result(text: str, sender: str) -> WhatsAppProcessResult | None:

@@ -6,10 +6,18 @@ import logging
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 import app.main as main
 from app.config import Settings
+
+
+@pytest.fixture(autouse=True)
+def clear_bridge_media_cache():
+    main.offline_media_job_results.clear()
+    yield
+    main.offline_media_job_results.clear()
 
 
 def bridge_payload(message: str, sender: str = "254700000000@s.whatsapp.net") -> dict[str, str]:
@@ -826,7 +834,7 @@ def test_whatsapp_voice_known_medicine_only_opens_local_selector_without_ai_inte
                 f"{text} x{quantity} - {payment}",
                 "Qty: 1 | 2 | 3 | 5 | 10 | + | -",
                 "Pay: Cash | M-Pesa | Credit | Mixed",
-                "Reply YES to save, or CANCEL.",
+                "Confirm | Cancel",
             ]
         )
 
@@ -994,6 +1002,45 @@ def test_whatsapp_voice_spoken_quantity_payment_returns_one_prefilled_selector_c
     assert transcription.calls == 1
     assert len(AI_ROUTE_DECISION_LOG) == 1
     assert AI_ROUTE_DECISION_LOG[0]["reason"] == "voice_transcription"
+
+
+def test_whatsapp_voice_same_audio_reuses_selector_result_without_second_transcription(monkeypatch):
+    from app.ai import AI_ROUTE_DECISION_LOG
+
+    class FakeTranscriptionService:
+        is_available = True
+        calls = 0
+
+        def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
+            self.calls += 1
+            return "Glucose mbili mpesa"
+
+    transcription = FakeTranscriptionService()
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, DEMO_MODE=True, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_transcription_service", lambda: transcription)
+    AI_ROUTE_DECISION_LOG.clear()
+    first_payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    first_payload["media_base64"] = base64.b64encode(b"same glucose voice bytes").decode("ascii")
+    first_payload["media_mime_type"] = "audio/ogg"
+    second_payload = {**first_payload, "message_id": "same-audio-new-whatsapp-id"}
+
+    with TestClient(main.app) as client:
+        first = client.post("/bridge/whatsapp-web", json=first_payload)
+        second = client.post("/bridge/whatsapp-web", json=second_payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["selector_card"]["medicine"] == "Glucose"
+    assert second.json()["selector_card"]["medicine"] == "Glucose"
+    assert second.json()["selector_card"]["quantity"] == 2
+    assert second.json()["selector_card"]["payment"] == "M-Pesa"
+    assert transcription.calls == 1
+    assert [item["reason"] for item in AI_ROUTE_DECISION_LOG] == ["voice_transcription", "media_result_cache"]
+    assert AI_ROUTE_DECISION_LOG[-1]["from_cache"] is True
 
 
 def test_whatsapp_voice_amox_asks_local_clarification_before_intake(monkeypatch):
@@ -1332,9 +1379,9 @@ def test_whatsapp_voice_reconstructs_inventory_medicines_without_ai_interpretati
     AI_ROUTE_DECISION_LOG.clear()
 
     with TestClient(main.app) as client:
-        for _ in range(2):
+        for index in range(2):
             payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
-            payload["media_base64"] = base64.b64encode(b"fake voice bytes").decode("ascii")
+            payload["media_base64"] = base64.b64encode(f"fake voice bytes {index}".encode()).decode("ascii")
             payload["media_mime_type"] = "audio/ogg"
             response = client.post("/bridge/whatsapp-web", json=payload)
             assert response.status_code == 200

@@ -12,8 +12,8 @@ const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
-const OFFLINE_APP_BUILD_VERSION = "kenya-medicine-brain-v2026-05-31-mobile-selector";
-const SERVICE_WORKER_VERSION = "pharmareen-offline-v24-mobile-selector";
+const OFFLINE_APP_BUILD_VERSION = "kenya-medicine-brain-v2026-05-31-phone-ready";
+const SERVICE_WORKER_VERSION = "pharmareen-offline-v25-phone-ready";
 const DEFAULT_MEDICINE_SHORTCUTS = ["Panadol", "Amox", "Piriton", "ORS", "Glucose"];
 console.log(`OFFLINE_APP_BUILD_VERSION=${OFFLINE_APP_BUILD_VERSION}`);
 
@@ -56,6 +56,8 @@ const voiceSelectedMedicine = document.getElementById("voiceSelectedMedicine");
 const voiceQuantity = document.getElementById("voiceQuantity");
 const confirmVoiceSale = document.getElementById("confirmVoiceSale");
 const voiceMedicineSearch = document.getElementById("voiceMedicineSearch");
+const tapTalk = document.getElementById("tapTalk");
+const voiceEntry = document.getElementById("voiceEntry");
 
 let dbPromise = null;
 let persistentStorageReady = false;
@@ -76,6 +78,7 @@ let pendingBarcodeScan = { code: "", count: 0, at: 0 };
 let inventoryMedicines = loadJson(INVENTORY_MEDICINES_KEY, []);
 let inventoryMedicineAliases = loadJson(INVENTORY_ALIASES_KEY, {});
 let selectedVoiceSale = { medicine: "", quantity: 1, payment: currentPaymentMode };
+let medicineMatcherReady = false;
 
 function loadJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
@@ -182,6 +185,18 @@ async function loadInventoryMedicines() {
     }
   } catch {
     // Keep the last safe inventory list so the selector still works offline.
+  }
+}
+
+function setMedicineMatcherReady(ready) {
+  medicineMatcherReady = Boolean(ready);
+  for (const button of [tapTalk, voiceEntry]) {
+    if (button) button.disabled = !medicineMatcherReady;
+  }
+  if (voiceStatus && !medicineMatcherReady) {
+    voiceStatus.textContent = "Getting medicines ready...";
+  } else if (voiceStatus && voiceStatus.textContent === "Getting medicines ready...") {
+    voiceStatus.textContent = "Ready.";
   }
 }
 
@@ -308,7 +323,7 @@ function maybeShowTypedMedicineSelector(rawText) {
   const medicine = detectLocalMedicineFromSpeech(clean);
   if (!medicine) return false;
   showVoiceSelector(medicine);
-  if (voiceStatus) voiceStatus.textContent = `✅ ${medicine} selected locally`;
+  if (voiceStatus) voiceStatus.textContent = `✅ ${medicine} selected`;
   return true;
 }
 
@@ -331,7 +346,7 @@ function showVoiceSelector(medicine, options = {}) {
   recordMedicineUse(medicine);
   renderMedicineShortcuts();
   renderVoiceSaleCard();
-  if (voiceStatus) voiceStatus.textContent = `✅ ${medicine} selected locally`;
+  if (voiceStatus) voiceStatus.textContent = `✅ ${medicine} selected`;
 }
 
 function chooseVoiceMedicineFromSearch() {
@@ -916,6 +931,10 @@ function focusVoiceMedicineSearch() {
 }
 
 function startLocalVoiceSelector() {
+  if (!medicineMatcherReady) {
+    voiceStatus.textContent = "Getting medicines ready...";
+    return true;
+  }
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) return false;
   try {
@@ -983,6 +1002,10 @@ function handleLocalVoiceTranscript(transcript) {
 }
 
 async function startVoiceRecording(options = {}) {
+  if (!medicineMatcherReady) {
+    voiceStatus.textContent = "Getting medicines ready...";
+    return;
+  }
   if (voiceRecognitionActive && voiceRecognition) {
     voiceStatus.textContent = "Checking medicine...";
     try { voiceRecognition.stop(); } catch { resetVoiceRecognition(); }
@@ -1422,6 +1445,7 @@ async function registerFreshServiceWorker() {
 }
 
 async function boot() {
+  setMedicineMatcherReady(false);
   disableNativeRequiredValidation();
   if (confirmationWhatsapp) {
     confirmationWhatsapp.value = localStorage.getItem(CONFIRMATION_WHATSAPP_KEY) || "";
@@ -1430,6 +1454,7 @@ async function boot() {
   }
   setPaymentMode(currentPaymentMode);
   await loadInventoryMedicines();
+  setMedicineMatcherReady(true);
   renderMedicineShortcuts();
   await initializeStorage();
   updateConnectionStatus();
@@ -1446,6 +1471,7 @@ window.PharMareenOffline = {
   initializeStorage,
   loadQueue,
   persistentStorageReady: () => persistentStorageReady,
+  medicineMatcherReady: () => medicineMatcherReady,
   queueMedia,
   queueMediaFiles,
   saveOfflineEntries,
