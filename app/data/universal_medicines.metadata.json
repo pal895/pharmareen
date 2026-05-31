@@ -1,33 +1,33 @@
 {
-  "generated_at": "2026-05-30T19:08:46.471288+00:00",
-  "catalog_entry_count": 2350,
-  "ppb_registered_product_count": 2495,
+  "generated_at": "2026-05-31T04:17:17.732100+00:00",
+  "catalog_entry_count": 2362,
+  "ppb_registered_product_count": 2508,
   "curated_seed_count": 30,
   "categories": {
     "OTC/common counter medicines": 4,
     "allergy": 43,
-    "antibiotics": 206,
+    "antibiotics": 205,
     "antifungals": 39,
     "antiseptics": 5,
-    "asthma": 36,
+    "asthma": 37,
     "baby medicines": 3,
-    "cough/cold": 14,
+    "cough/cold": 16,
     "dewormers": 7,
-    "diabetes": 101,
+    "diabetes": 103,
     "diarrhea/ORS": 9,
     "emergency medicines": 7,
-    "eye/ear medicines": 61,
+    "eye/ear medicines": 59,
     "family planning": 19,
-    "hypertension": 127,
-    "injections": 288,
+    "hypertension": 128,
+    "injections": 289,
     "malaria": 32,
     "nutrition": 15,
-    "other registered medicine": 1062,
-    "pain/fever": 150,
+    "other registered medicine": 1068,
+    "pain/fever": 149,
     "pregnancy supplements": 1,
-    "skin creams": 57,
+    "skin creams": 59,
     "stomach/ulcer": 55,
-    "vitamins": 9
+    "vitamins": 10
   },
   "required_unit_vocabulary": [
     "tablet",
@@ -57,7 +57,7 @@
     {
       "name": "PPB registered products public registry",
       "url": "https://products.pharmacyboardkenya.org/ppb_admin/pages/public_view_retention_products.php",
-      "imported_rows": 2495
+      "imported_rows": 2508
     },
     {
       "name": "Kenya Essential Medicines List 2023",
@@ -77,6 +77,7 @@
   "notes": [
     "Runtime medicine matching is local-only and does not call OpenAI.",
     "The PPB public registry supplies registered product trade names, APIs, and dosage forms.",
-    "KEML 2023 is recorded as the official essential-medicines baseline; PPB API names provide the importable product-level generic coverage."
+    "KEML 2023 is recorded as the official essential-medicines baseline; PPB API names provide the importable product-level generic coverage.",
+    "Catalog rows include normalized strengths, packaging, source dates, manufacturer/importer metadata, human/veterinary classification, and cautious OTC hints where determinable."
   ]
 }

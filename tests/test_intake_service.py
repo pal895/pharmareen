@@ -36,6 +36,22 @@ def test_pharmacy_unit_forms_support_common_onboarding_items():
     ]:
         assert canonical_unit(unit) == unit
         assert to_base_quantity(2, unit) == 2
+    assert canonical_unit("inj") == "injection"
+    assert canonical_unit("amp") == "ampoule"
+    assert canonical_unit("syr") == "syrup"
+    assert canonical_unit("susp") == "suspension"
+
+
+def test_intake_service_reloads_owner_approved_pharmacy_shortcut(monkeypatch, tmp_path):
+    monkeypatch.setenv("PHARMAREEN_ALIAS_STORE_PATH", str(tmp_path / "aliases.json"))
+    store = FakeStore()
+
+    first = IntakeService(FakeParser([]), store, pharmacy_name="Demo Pharmacy")
+    learned = first.learn_pharmacy_alias("pd", "Panadol", confirmed=True, owner_approved=True)
+    second = IntakeService(FakeParser([]), store, pharmacy_name="Demo Pharmacy")
+
+    assert learned["accepted"] is True
+    assert second.aliases_by_key["pd"] == "Panadol"
 
 
 class FailingParser:

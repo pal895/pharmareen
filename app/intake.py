@@ -29,6 +29,7 @@ from app.services.pharmacy_engine import (
 from app.ai import log_ai_route_decision
 from app.services.medicine_catalog import match_local_medicine
 from app.services.operational_intelligence import OperationalMemory, classify_local_intent, decide_ai_route, log_edge_case
+from app.services.pharmacy_alias_store import PharmacyAliasStore
 from app.sheets import SHEETS_UNAVAILABLE_MESSAGE, SheetsUnavailableError
 from app.utils import format_ksh, normalize_key, now_in_timezone, parse_int, parse_money
 
@@ -379,6 +380,8 @@ class IntakeService:
         self.pending_void_confirmation: dict[str, dict[str, Any]] = {}
         self.pending_repeat_confirmation: dict[str, str] = {}
         self.conversions_by_drug: dict[str, dict[str, int]] = {}
+        self.pharmacy_alias_store = PharmacyAliasStore()
+        self.pharmacy_learning_key = normalize_key(pharmacy_name) or "default"
         self.aliases_by_key = self._load_pharmacy_aliases()
         self.receipt_printing_enabled = False
         self.operational_memory = OperationalMemory()
@@ -1993,6 +1996,7 @@ class IntakeService:
 
     def _load_pharmacy_aliases(self) -> dict[str, str]:
         aliases = {normalize_key(key): value for key, value in SHORTCUT_DRUGS.items()}
+        aliases.update(self.pharmacy_alias_store.accepted_aliases(self.pharmacy_learning_key))
         raw_aliases = os.getenv("PHARMAREEN_DRUG_ALIASES", "")
         for pair in raw_aliases.split(","):
             if "=" not in pair:
@@ -2003,6 +2007,30 @@ class IntakeService:
             if alias_key and drug_name:
                 aliases[alias_key] = drug_name
         return aliases
+
+    def learn_pharmacy_alias(
+        self,
+        alias: str,
+        drug_name: str,
+        *,
+        confirmed: bool,
+        owner_approved: bool = False,
+    ) -> dict[str, Any]:
+        try:
+            inventory_names = self.store.list_master_drug_names()
+        except Exception:
+            inventory_names = []
+        result = self.pharmacy_alias_store.observe(
+            self.pharmacy_learning_key,
+            alias,
+            drug_name,
+            confirmed=confirmed,
+            owner_approved=owner_approved,
+            inventory_names=inventory_names,
+        )
+        if result.get("accepted"):
+            self.aliases_by_key[normalize_key(alias)] = title_drug_name(drug_name)
+        return result
 
     def _resolve_drug_name(self, drug_name: str) -> DrugResolution:
         text_key = normalize_key(drug_name)

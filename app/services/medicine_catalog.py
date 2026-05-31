@@ -2,15 +2,46 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter, deque
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from functools import lru_cache
 from pathlib import Path
-from typing import Iterable, Mapping
+from typing import Any, Iterable, Mapping
 
 
 CATALOG_PATH = Path(__file__).resolve().parents[1] / "data" / "universal_medicines.json"
 CATALOG_METADATA_PATH = Path(__file__).resolve().parents[1] / "data" / "universal_medicines.metadata.json"
+MEDICINE_MATCH_LOG: deque[dict[str, object]] = deque(maxlen=200)
+
+UNIT_ALIASES = {
+    "tabs": "tablet",
+    "tab": "tablet",
+    "caps": "capsule",
+    "cap": "capsule",
+    "amp": "ampoule",
+    "amps": "ampoule",
+    "ampule": "ampoule",
+    "ampules": "ampoule",
+    "inj": "injection",
+    "injs": "injection",
+    "syr": "syrup",
+    "susp": "suspension",
+}
+
+CATEGORY_ALIASES = {
+    "pain relief": "pain/fever",
+    "antibiotic": "antibiotics",
+    "rehydration": "diarrhea/ORS",
+    "digestive health": "stomach/ulcer",
+    "diabetes care": "diabetes",
+    "cough and cold": "cough/cold",
+    "topical": "skin creams",
+    "water treatment": "antiseptics",
+    "general retail": "OTC/common counter medicines",
+    "medical supplies": "OTC/common counter medicines",
+}
 
 
 def medicine_key(value: str | None) -> str:
@@ -21,6 +52,49 @@ def _clean_list(value: object) -> tuple[str, ...]:
     if not isinstance(value, list):
         return ()
     return tuple(text for item in value if (text := str(item or "").strip()))
+
+
+def _clean_scalar(value: object) -> str:
+    return str(value or "").strip()
+
+
+def _normalize_units(value: object) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(UNIT_ALIASES.get(item.lower(), item.lower()) for item in _clean_list(value)))
+
+
+def migrate_catalog_record(raw: Mapping[str, Any]) -> dict[str, Any]:
+    """Upgrade old catalog rows in memory so deployed snapshots stay compatible."""
+    registration_numbers = _clean_list(raw.get("registration_numbers"))
+    ppb_registration_number = _clean_scalar(raw.get("ppb_registration_number"))
+    if ppb_registration_number and ppb_registration_number not in registration_numbers:
+        registration_numbers = (*registration_numbers, ppb_registration_number)
+    sources = _clean_list(raw.get("sources"))
+    source = _clean_scalar(raw.get("source"))
+    if source and source not in sources:
+        sources = (*sources, source)
+    category = _clean_scalar(raw.get("category"))
+    return {
+        "canonical_name": _clean_scalar(raw.get("canonical_name")),
+        "generic_name": _clean_scalar(raw.get("generic_name")),
+        "aliases": _clean_list(raw.get("aliases")),
+        "brand_names": _clean_list(raw.get("brand_names")),
+        "misspellings": _clean_list(raw.get("misspellings")),
+        "shorthands": _clean_list(raw.get("shorthand") or raw.get("shorthands")),
+        "units": _normalize_units(raw.get("units")),
+        "category": CATEGORY_ALIASES.get(category, category),
+        "dosage_forms": _clean_list(raw.get("dosage_forms")),
+        "strengths": _clean_list(raw.get("strengths")),
+        "packaging": _clean_list(raw.get("packaging")),
+        "manufacturer_importer": _clean_list(raw.get("manufacturer_importer")),
+        "sources": sources,
+        "source": source or (sources[0] if sources else ""),
+        "source_last_updated": _clean_scalar(raw.get("source_last_updated")),
+        "registration_numbers": registration_numbers,
+        "ppb_registration_number": ppb_registration_number or (registration_numbers[0] if registration_numbers else ""),
+        "human_or_veterinary": _clean_scalar(raw.get("human_or_veterinary")) or "unknown",
+        "otc_or_prescription": _clean_scalar(raw.get("otc_or_prescription")) or "unknown",
+        "combination_medicine_components": _clean_list(raw.get("combination_medicine_components")),
+    }
 
 
 @dataclass(frozen=True)
@@ -34,8 +108,17 @@ class MedicineCatalogEntry:
     units: tuple[str, ...] = ()
     category: str = ""
     dosage_forms: tuple[str, ...] = ()
+    strengths: tuple[str, ...] = ()
+    packaging: tuple[str, ...] = ()
+    manufacturer_importer: tuple[str, ...] = ()
     sources: tuple[str, ...] = ()
+    source: str = ""
+    source_last_updated: str = ""
     registration_numbers: tuple[str, ...] = ()
+    ppb_registration_number: str = ""
+    human_or_veterinary: str = "unknown"
+    otc_or_prescription: str = "unknown"
+    combination_medicine_components: tuple[str, ...] = ()
 
     @property
     def terms(self) -> tuple[str, ...]:
@@ -48,6 +131,7 @@ class MedicineCatalogEntry:
             *self.brand_names,
             *self.misspellings,
             *self.shorthands,
+            *self.strengths,
         ):
             key = str(term or "").strip().lower()
             if key and key not in seen:
@@ -84,22 +168,32 @@ def load_medicine_catalog() -> tuple[MedicineCatalogEntry, ...]:
     for raw in raw_entries if isinstance(raw_entries, list) else []:
         if not isinstance(raw, dict):
             continue
-        canonical_name = str(raw.get("canonical_name") or "").strip()
+        migrated = migrate_catalog_record(raw)
+        canonical_name = migrated["canonical_name"]
         if not canonical_name:
             continue
         entries.append(
             MedicineCatalogEntry(
                 canonical_name=canonical_name,
-                generic_name=str(raw.get("generic_name") or "").strip(),
-                aliases=_clean_list(raw.get("aliases")),
-                brand_names=_clean_list(raw.get("brand_names")),
-                misspellings=_clean_list(raw.get("misspellings")),
-                shorthands=_clean_list(raw.get("shorthand") or raw.get("shorthands")),
-                units=_clean_list(raw.get("units")),
-                category=str(raw.get("category") or "").strip(),
-                dosage_forms=_clean_list(raw.get("dosage_forms")),
-                sources=_clean_list(raw.get("sources")),
-                registration_numbers=_clean_list(raw.get("registration_numbers")),
+                generic_name=migrated["generic_name"],
+                aliases=migrated["aliases"],
+                brand_names=migrated["brand_names"],
+                misspellings=migrated["misspellings"],
+                shorthands=migrated["shorthands"],
+                units=migrated["units"],
+                category=migrated["category"],
+                dosage_forms=migrated["dosage_forms"],
+                strengths=migrated["strengths"],
+                packaging=migrated["packaging"],
+                manufacturer_importer=migrated["manufacturer_importer"],
+                sources=migrated["sources"],
+                source=migrated["source"],
+                source_last_updated=migrated["source_last_updated"],
+                registration_numbers=migrated["registration_numbers"],
+                ppb_registration_number=migrated["ppb_registration_number"],
+                human_or_veterinary=migrated["human_or_veterinary"],
+                otc_or_prescription=migrated["otc_or_prescription"],
+                combination_medicine_components=migrated["combination_medicine_components"],
             )
         )
     return tuple(entries)
@@ -204,8 +298,17 @@ def catalog_entries_payload() -> list[dict[str, object]]:
             "units": list(entry.units),
             "category": entry.category,
             "dosage_forms": list(entry.dosage_forms),
+            "strengths": list(entry.strengths),
+            "packaging": list(entry.packaging),
+            "manufacturer_importer": list(entry.manufacturer_importer),
             "sources": list(entry.sources),
+            "source": entry.source,
+            "source_last_updated": entry.source_last_updated,
             "registration_numbers": list(entry.registration_numbers),
+            "ppb_registration_number": entry.ppb_registration_number,
+            "human_or_veterinary": entry.human_or_veterinary,
+            "otc_or_prescription": entry.otc_or_prescription,
+            "combination_medicine_components": list(entry.combination_medicine_components),
         }
         for entry in load_medicine_catalog()
     ]
@@ -234,10 +337,20 @@ def search_catalog_entries(query: str, *, limit: int = 20) -> list[dict[str, obj
             payload_by_key[key] = {
                 "canonical_name": entry.canonical_name,
                 "generic_name": entry.generic_name,
+                "aliases": list(entry.aliases),
                 "brand_names": list(entry.brand_names),
                 "units": list(entry.units),
                 "category": entry.category,
                 "dosage_forms": list(entry.dosage_forms),
+                "strengths": list(entry.strengths),
+                "packaging": list(entry.packaging),
+                "manufacturer_importer": list(entry.manufacturer_importer),
+                "ppb_registration_number": entry.ppb_registration_number,
+                "source": entry.source,
+                "source_last_updated": entry.source_last_updated,
+                "human_or_veterinary": entry.human_or_veterinary,
+                "otc_or_prescription": entry.otc_or_prescription,
+                "combination_medicine_components": list(entry.combination_medicine_components),
                 "confidence": round(score, 3),
                 "ai_used": False,
             }
@@ -246,7 +359,7 @@ def search_catalog_entries(query: str, *, limit: int = 20) -> list[dict[str, obj
     return list(payload_by_key.values())
 
 
-def match_local_medicine(
+def _match_local_medicine(
     query: str,
     *,
     inventory_names: Iterable[str] = (),
@@ -312,3 +425,44 @@ def match_local_medicine(
     if top_score >= 0.62:
         return MedicineMatch(source="fuzzy_ambiguous", confidence=top_score, choices=tuple(name for _, name in scored[:3]), in_inventory=any(medicine_key(name) in inventory_by_key for _, name in scored[:3]))
     return MedicineMatch()
+
+
+def _log_medicine_match(query: str, match: MedicineMatch) -> None:
+    MEDICINE_MATCH_LOG.append(
+        {
+            "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "query": str(query or "")[:80],
+            "matched": match.matched,
+            "canonical_name": match.canonical_name,
+            "source": match.source or "local_no_match",
+            "confidence": round(float(match.confidence or 0), 3),
+            "ambiguous": match.ambiguous,
+            "choices": list(match.choices[:3]),
+            "ai_used": False,
+        }
+    )
+
+
+def match_local_medicine(
+    query: str,
+    *,
+    inventory_names: Iterable[str] = (),
+    pharmacy_aliases: Mapping[str, str] | None = None,
+) -> MedicineMatch:
+    match = _match_local_medicine(
+        query,
+        inventory_names=inventory_names,
+        pharmacy_aliases=pharmacy_aliases,
+    )
+    _log_medicine_match(query, match)
+    return match
+
+
+def medicine_match_snapshot() -> dict[str, object]:
+    recent = list(MEDICINE_MATCH_LOG)
+    return {
+        "total_logged": len(recent),
+        "by_source": dict(Counter(str(item["source"]) for item in recent)),
+        "recent": recent[-10:],
+        "ai_used": False,
+    }

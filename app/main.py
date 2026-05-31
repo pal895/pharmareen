@@ -44,6 +44,7 @@ from app.services.medicine_catalog import (
     catalog_medicine_names,
     catalog_unique_aliases,
     load_catalog_metadata,
+    medicine_match_snapshot,
     search_catalog_entries,
 )
 from app.services.photo_intake import (
@@ -84,7 +85,7 @@ last_openai_error: dict[str, Any] = {
 VOICE_QUOTA_REPLY = "🎧 Voice received safely. AI transcription is ready but OpenAI credits are not active yet."
 PHOTO_QUOTA_REPLY = "📷 Photo received safely. Saved for review."
 DEFAULT_PUBLIC_BASE_URL = "https://pharmareen-1--pal895.replit.app"
-OFFLINE_BUILD_VERSION = "kenya-medicine-brain-v2026-05-30-1"
+OFFLINE_BUILD_VERSION = "kenya-medicine-brain-v2026-05-31-1"
 OFFLINE_FRONTEND_MARKER = f"PHARMAREEN REAL PATH BUILD {OFFLINE_BUILD_VERSION}"
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
 OFFLINE_NO_CACHE_HEADERS = {
@@ -247,6 +248,27 @@ async def offline_medicine_catalog_metadata() -> dict[str, Any]:
         "catalog": load_catalog_metadata(),
         "ai_used": False,
     }
+
+
+@app.post("/offline/medicine-aliases/learn")
+async def offline_medicine_alias_learn(request: Request) -> dict[str, Any]:
+    """Persist an explicitly confirmed pharmacy shortcut without using AI."""
+    payload = await request.json()
+    alias = str(payload.get("alias") or "").strip()
+    medicine = str(payload.get("medicine") or payload.get("drug_name") or "").strip()
+    if not alias or not medicine:
+        raise HTTPException(status_code=400, detail="Alias and medicine are required.")
+    service = get_intake_service()
+    learn = getattr(service, "learn_pharmacy_alias", None)
+    if not callable(learn):
+        raise HTTPException(status_code=503, detail="Shortcut learning is not available.")
+    result = learn(
+        alias,
+        medicine,
+        confirmed=boolish(payload.get("confirmed")),
+        owner_approved=boolish(payload.get("owner_approved")),
+    )
+    return {"status": "ok", "ai_used": False, "shortcut": result}
 
 
 @app.get("/offline_app/index.html", include_in_schema=False)
@@ -1899,6 +1921,7 @@ def debug_system_status() -> dict[str, Any]:
                 "report_base_url": report_public_base_url(settings),
                 "medicine_catalog_count": len(catalog_medicine_names()),
                 "medicine_matching": "inventory-first local catalog",
+                "medicine_match_telemetry": medicine_match_snapshot(),
             },
             "startup": {
                 "backend_pid_file_exists": backend_pid_file.exists(),

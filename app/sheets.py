@@ -14,6 +14,7 @@ from gspread.exceptions import WorksheetNotFound
 
 from app.config import Settings
 from app.domain import ParsedEvent, StockItem
+from app.services.medicine_catalog import match_local_medicine, search_catalog_entries
 from app.utils import normalize_key, parse_int, parse_money, now_in_timezone
 
 
@@ -31,6 +32,7 @@ RETURNS_LOG = "Returns_Log"
 SUPPLIERS = "Suppliers"
 IMPORT_REVIEW_QUEUE = "Import_Review_Queue"
 OFFLINE_SYNC_LOG = "Offline_Sync_Log"
+MEDICINE_CATALOG_METADATA = "Medicine_Catalog_Metadata"
 
 SHEETS_UNAVAILABLE_MESSAGE = (
     "Google Sheets is not configured. Add a valid service-account.json to enable logging."
@@ -348,6 +350,21 @@ OFFLINE_SYNC_HEADERS = [
     "source",
 ]
 
+MEDICINE_CATALOG_METADATA_HEADERS = [
+    "Drug Name",
+    "Generic Name",
+    "Brand Names",
+    "Aliases",
+    "Category",
+    "Strengths",
+    "Dosage Forms",
+    "Units",
+    "Manufacturer/Importer",
+    "PPB Registration Number",
+    "Source",
+    "Last Updated",
+]
+
 
 class GoogleSheetsStore:
     def __init__(self, settings: Settings):
@@ -385,6 +402,7 @@ class GoogleSheetsStore:
         self._ensure_worksheet(SUPPLIERS, SUPPLIER_HEADERS, rows=1000)
         self._ensure_worksheet(IMPORT_REVIEW_QUEUE, IMPORT_REVIEW_HEADERS, rows=10000)
         self._ensure_worksheet(OFFLINE_SYNC_LOG, OFFLINE_SYNC_HEADERS, rows=10000)
+        self._ensure_worksheet(MEDICINE_CATALOG_METADATA, MEDICINE_CATALOG_METADATA_HEADERS, rows=3000)
 
     def list_master_drug_names(self) -> list[str]:
         return [
@@ -534,6 +552,46 @@ class GoogleSheetsStore:
             ],
             value_input_option="USER_ENTERED",
         )
+        self.upsert_medicine_catalog_metadata(name)
+
+    def upsert_medicine_catalog_metadata(self, drug_name: str) -> None:
+        """Keep onboarding metadata separate so legacy stock columns stay stable."""
+        try:
+            match = match_local_medicine(drug_name)
+            query = match.canonical_name or drug_name
+            matches = search_catalog_entries(query, limit=5)
+            entry = next(
+                (
+                    item for item in matches
+                    if normalize_key(item.get("canonical_name")) == normalize_key(query)
+                ),
+                matches[0] if matches else {},
+            )
+            if not entry:
+                return
+            row = [
+                drug_name,
+                entry.get("generic_name", ""),
+                ", ".join(entry.get("brand_names", [])),
+                ", ".join(entry.get("aliases", [])),
+                entry.get("category", ""),
+                ", ".join(entry.get("strengths", [])),
+                ", ".join(entry.get("dosage_forms", [])),
+                ", ".join(entry.get("units", [])),
+                ", ".join(entry.get("manufacturer_importer", [])),
+                entry.get("ppb_registration_number", ""),
+                entry.get("source", "") or "Local Kenya medicine brain",
+                now_in_timezone(self.settings.timezone).strftime("%Y-%m-%d %H:%M:%S"),
+            ]
+            worksheet = self._worksheet(MEDICINE_CATALOG_METADATA)
+            records = worksheet.get_all_values()
+            for row_number, existing in enumerate(records[1:], start=2):
+                if existing and normalize_key(existing[0]) == normalize_key(drug_name):
+                    worksheet.update(f"A{row_number}", [row])
+                    return
+            worksheet.append_row(row, value_input_option="USER_ENTERED")
+        except Exception:
+            logger.warning("Medicine metadata could not be saved for %s", drug_name, exc_info=True)
 
     def list_low_stock_items(self) -> list[StockItem]:
         low_stock: list[StockItem] = []

@@ -12,8 +12,8 @@ const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
-const OFFLINE_APP_BUILD_VERSION = "kenya-medicine-brain-v2026-05-30-1";
-const SERVICE_WORKER_VERSION = "pharmareen-offline-v20-kenya-medicine-brain";
+const OFFLINE_APP_BUILD_VERSION = "kenya-medicine-brain-v2026-05-31-1";
+const SERVICE_WORKER_VERSION = "pharmareen-offline-v21-kenya-medicine-brain";
 const DEFAULT_MEDICINE_SHORTCUTS = ["Panadol", "Amox", "Piriton", "ORS", "Glucose"];
 console.log(`OFFLINE_APP_BUILD_VERSION=${OFFLINE_APP_BUILD_VERSION}`);
 

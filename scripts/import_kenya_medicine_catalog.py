@@ -94,6 +94,27 @@ LEGACY_CATEGORY_ALIASES = {
     "medical supplies": "OTC/common counter medicines",
 }
 
+STRENGTH_PATTERN = re.compile(
+    r"\b\d+(?:\.\d+)?\s*(?:mcg|micrograms?|mg|grams?|g|kg|ml|iu|units?|%|w/v|v/v)\b",
+    flags=re.IGNORECASE,
+)
+
+OTC_CATEGORY_HINTS = {
+    "pain/fever",
+    "cough/cold",
+    "allergy",
+    "diarrhea/ORS",
+    "vitamins",
+    "antifungals",
+    "skin creams",
+    "antiseptics",
+    "dewormers",
+    "pregnancy supplements",
+    "baby medicines",
+    "nutrition",
+    "OTC/common counter medicines",
+}
+
 
 class TableParser(HTMLParser):
     def __init__(self) -> None:
@@ -232,6 +253,22 @@ def stripped_product_name(value: str) -> str:
     return text
 
 
+def extracted_strengths(*values: str) -> list[str]:
+    return unique(match.group(0) for value in values for match in STRENGTH_PATTERN.finditer(str(value or "")))
+
+
+def combination_components(generic_name: str) -> list[str]:
+    text = clean_text(generic_name)
+    if not re.search(r"\s(?:\+|/|and|with)\s|,", text, flags=re.IGNORECASE):
+        return []
+    components = re.split(r"\s*(?:\+|/|,|\band\b|\bwith\b)\s*", text, flags=re.IGNORECASE)
+    return unique(stripped_product_name(component) for component in components if clean_text(component))
+
+
+def otc_or_prescription(category: str) -> str:
+    return "likely OTC" if category in OTC_CATEGORY_HINTS else "unknown"
+
+
 def inferred_units(dosage_forms: Iterable[str]) -> list[str]:
     text = " ".join(dosage_forms).lower()
     units: list[str] = []
@@ -290,6 +327,8 @@ def ppb_entry(record: dict[str, str]) -> dict[str, Any] | None:
         return None
     dosage_form = clean_text(record["dosage_form"])
     aliases = unique([trade_name, stripped_product_name(trade_name), generic_name, stripped_product_name(generic_name)])
+    category = category_for(trade_name, generic_name, dosage_form)
+    units = inferred_units([dosage_form])
     return {
         "canonical_name": canonical_name,
         "generic_name": generic_name,
@@ -297,25 +336,57 @@ def ppb_entry(record: dict[str, str]) -> dict[str, Any] | None:
         "brand_names": unique([trade_name]),
         "misspellings": [],
         "shorthand": [],
-        "units": inferred_units([dosage_form]),
-        "category": category_for(trade_name, generic_name, dosage_form),
+        "units": units,
+        "category": category,
         "dosage_forms": unique([dosage_form]),
+        "strengths": extracted_strengths(trade_name, generic_name),
+        "packaging": units,
+        "manufacturer_importer": unique([record.get("mah_company", ""), record.get("local_representative", "")]),
         "sources": ["PPB registered products public registry"],
+        "source": "PPB registered products public registry",
+        "source_last_updated": clean_text(record.get("expiry_date") or record.get("registration_date")),
         "registration_numbers": unique([record["registration_number"]]),
+        "ppb_registration_number": clean_text(record["registration_number"]),
+        "human_or_veterinary": "human",
+        # The accessible PPB registry page does not expose legal sale status.
+        # Keep this unknown rather than guessing from category or dosage form.
+        "otc_or_prescription": "unknown",
+        "combination_medicine_components": combination_components(generic_name),
     }
 
 
 def merge_entry(target: dict[str, Any], incoming: dict[str, Any]) -> None:
-    for key in ("aliases", "brand_names", "misspellings", "shorthand", "units", "dosage_forms", "sources", "registration_numbers"):
+    for key in (
+        "aliases",
+        "brand_names",
+        "misspellings",
+        "shorthand",
+        "units",
+        "dosage_forms",
+        "strengths",
+        "packaging",
+        "manufacturer_importer",
+        "sources",
+        "registration_numbers",
+        "combination_medicine_components",
+    ):
         target[key] = unique([*target.get(key, []), *incoming.get(key, [])])
     if not target.get("generic_name") and incoming.get("generic_name"):
         target["generic_name"] = incoming["generic_name"]
     if target.get("category") in {"", "other registered medicine"} and incoming.get("category"):
         target["category"] = incoming["category"]
+    for key in ("source", "source_last_updated", "ppb_registration_number", "human_or_veterinary", "otc_or_prescription"):
+        if not target.get(key) or target.get(key) == "unknown":
+            target[key] = incoming.get(key, target.get(key, ""))
 
 
 def normalize_seed(seed: dict[str, Any]) -> dict[str, Any]:
     dosage_forms = unique(seed.get("dosage_forms", []))
+    category = LEGACY_CATEGORY_ALIASES.get(
+        clean_text(seed.get("category")),
+        clean_text(seed.get("category")) or category_for(seed.get("canonical_name", "")),
+    )
+    sources = unique([*seed.get("sources", []), "Curated Kenyan retail pharmacy seed"])
     return {
         "canonical_name": clean_text(seed.get("canonical_name")),
         "generic_name": clean_text(seed.get("generic_name")),
@@ -324,13 +395,19 @@ def normalize_seed(seed: dict[str, Any]) -> dict[str, Any]:
         "misspellings": unique(seed.get("misspellings", [])),
         "shorthand": unique(seed.get("shorthand", seed.get("shorthands", []))),
         "units": unique(seed.get("units", [])),
-        "category": LEGACY_CATEGORY_ALIASES.get(
-            clean_text(seed.get("category")),
-            clean_text(seed.get("category")) or category_for(seed.get("canonical_name", "")),
-        ),
+        "category": category,
         "dosage_forms": dosage_forms,
-        "sources": unique([*seed.get("sources", []), "Curated Kenyan retail pharmacy seed"]),
+        "strengths": unique(seed.get("strengths", [])),
+        "packaging": unique(seed.get("packaging", seed.get("units", []))),
+        "manufacturer_importer": unique(seed.get("manufacturer_importer", [])),
+        "sources": sources,
+        "source": clean_text(seed.get("source")) or sources[0],
+        "source_last_updated": clean_text(seed.get("source_last_updated")),
         "registration_numbers": unique(seed.get("registration_numbers", [])),
+        "ppb_registration_number": clean_text(seed.get("ppb_registration_number")),
+        "human_or_veterinary": clean_text(seed.get("human_or_veterinary")) or "human",
+        "otc_or_prescription": clean_text(seed.get("otc_or_prescription")) or otc_or_prescription(category),
+        "combination_medicine_components": unique(seed.get("combination_medicine_components", [])),
     }
 
 
@@ -395,6 +472,7 @@ def main() -> int:
             "Runtime medicine matching is local-only and does not call OpenAI.",
             "The PPB public registry supplies registered product trade names, APIs, and dosage forms.",
             "KEML 2023 is recorded as the official essential-medicines baseline; PPB API names provide the importable product-level generic coverage.",
+            "Catalog rows include normalized strengths, packaging, source dates, manufacturer/importer metadata, human/veterinary classification, and cautious OTC hints where determinable.",
         ],
     }
     write_json(args.output, catalog)
