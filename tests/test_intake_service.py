@@ -1712,11 +1712,10 @@ def test_known_medicine_selector_is_local_and_accepts_quantity_payment_reply():
     saved = service.process_text("yes", conversation_id="voice")
 
     assert "Sale approval" in prompt
-    assert "Medicine: Glucose" in prompt
-    assert "Choose quantity: 1, 2, 3, 5, 10, +, -" in prompt
-    assert "Choose payment: Cash, M-Pesa, Credit, Mixed" in prompt
-    assert "Quantity selected: 2" in selected
-    assert "Payment selected: M-Pesa" in selected
+    assert "Glucose x1 - Cash" in prompt
+    assert "Qty: 1 | 2 | 3 | 5 | 10 | + | -" in prompt
+    assert "Pay: Cash | M-Pesa | Credit | Mixed" in prompt
+    assert "Glucose x2 - M-Pesa" in selected
     assert "Reply YES to save" in selected
     assert "Glucose x2" in saved
     assert "M-Pesa" in saved

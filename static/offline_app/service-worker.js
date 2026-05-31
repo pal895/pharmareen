@@ -1,6 +1,6 @@
-const CACHE_NAME = "pharmareen-offline-v23-voice-card";
+const CACHE_NAME = "pharmareen-offline-v24-mobile-selector";
 const OFFLINE_INDEX = "/offline_app/index.html";
-console.log("OFFLINE_APP_BUILD_VERSION=kenya-medicine-brain-v2026-05-31-voice-card service-worker");
+console.log("OFFLINE_APP_BUILD_VERSION=kenya-medicine-brain-v2026-05-31-mobile-selector service-worker");
 const APP_SHELL = [
   OFFLINE_INDEX,
   "/offline_app/parser.js",

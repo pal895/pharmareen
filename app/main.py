@@ -67,6 +67,7 @@ from app.whatsapp import WhatsAppClient, xml_message_response
 
 logger = logging.getLogger(__name__)
 processed_message_sids: set[str] = set()
+processed_whatsapp_web_message_ids: set[str] = set()
 offline_synced_entry_ids: set[str] = set()
 offline_synced_entry_results: dict[str, dict[str, Any]] = {}
 offline_media_job_results: dict[str, dict[str, Any]] = {}
@@ -84,10 +85,10 @@ last_openai_error: dict[str, Any] = {
     "quota_missing": False,
     "timestamp": "",
 }
-VOICE_QUOTA_REPLY = "🎧 Voice received safely. AI transcription is ready but OpenAI credits are not active yet."
+VOICE_QUOTA_REPLY = "🎧 Voice received safely. Voice reading is unavailable right now. Please choose the medicine or type it."
 PHOTO_QUOTA_REPLY = "📷 Photo received safely. Saved for review."
 DEFAULT_PUBLIC_BASE_URL = "https://pharmareen-1--pal895.replit.app"
-OFFLINE_BUILD_VERSION = "kenya-medicine-brain-v2026-05-31-voice-card"
+OFFLINE_BUILD_VERSION = "kenya-medicine-brain-v2026-05-31-mobile-selector"
 OFFLINE_FRONTEND_MARKER = f"PHARMAREEN REAL PATH BUILD {OFFLINE_BUILD_VERSION}"
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
 OFFLINE_NO_CACHE_HEADERS = {
@@ -2178,6 +2179,18 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
     if allow_all_direct_chats_for_test and whatsapp_jid_domain(sender) == "@lid":
         logger.info("BACKEND_TEST_MODE_ACCEPTED_LID sender=%s jid_domain=%s", mask_phone(sender), whatsapp_jid_domain(sender))
 
+    if message_id and message_id in processed_whatsapp_web_message_ids:
+        logger.info("WHATSAPP_WEB_DUPLICATE_SKIPPED sender=%s message_id=%s", mask_phone(sender), message_id)
+        return {
+            "status": "duplicate",
+            "reply": "",
+            "media_url": None,
+            "message_type": "duplicate",
+            "command_handler": "duplicate_message",
+            "error_reason": "",
+            "selector_card": None,
+        }
+
     logger.info(
         "WHATSAPP_WEB_ACCEPTED sender=%s message_length=%s has_media=%s",
         mask_phone(sender),
@@ -2198,6 +2211,10 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
     )
     log_webhook_request(sender, "whatsapp_web", result.success, result.error_reason)
     logger.info("BACKEND_REPLY_TEXT sender=%s reply=%s", mask_phone(sender), result.reply)
+    if message_id:
+        processed_whatsapp_web_message_ids.add(message_id)
+        if len(processed_whatsapp_web_message_ids) > 2000:
+            processed_whatsapp_web_message_ids.pop()
     return {
         "status": "ok" if result.success else "error",
         "reply": result.reply,
@@ -2205,6 +2222,7 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
         "message_type": result.message_type,
         "command_handler": result.command_handler,
         "error_reason": result.error_reason,
+        "selector_card": result.selector_card,
     }
 
 
@@ -2272,14 +2290,13 @@ async def process_whatsapp_web_payload(
                     success=True,
                     command_handler="voice_note_transcribed",
                 )
-            selector_reply = local_voice_selector_reply(transcript, sender)
-            if selector_reply:
-                return WhatsAppProcessResult(
-                    reply=voice_selector_reply(transcript, selector_reply),
-                    message_type="voice",
-                    success=True,
-                    command_handler="voice_medicine_selector",
-                )
+            selector_result = (
+                local_sale_selector_result(transcript, sender, message_type="voice", heard=transcript)
+                if not media_purpose
+                else None
+            )
+            if selector_result is not None:
+                return selector_result
             interpreted = normalize_spoken_command_text(transcript)
             if not voice_transcript_is_clear(interpreted):
                 return WhatsAppProcessResult(
@@ -2360,12 +2377,12 @@ async def process_whatsapp_web_payload(
                 extraction_status = "saved_needs_review_openai_key_missing"
                 media_job["processing_status"] = extraction_status
                 extraction = build_invoice_extraction_placeholder(extraction_status=extraction_status)
-                ai_reply = "📷 Photo received safely. AI reading is not enabled yet."
+                ai_reply = "📷 Photo received safely. Photo review is unavailable right now."
             elif not photo_ai_active_for_request(settings, media_caption, media_purpose, classification):
                 extraction_status = "saved_needs_review_ai_disabled"
                 media_job["processing_status"] = extraction_status
                 extraction = build_invoice_extraction_placeholder(extraction_status=extraction_status)
-                ai_reply = "Photo received safely. AI reading is switched off for now."
+                ai_reply = "📷 Photo received safely. Saved for review."
             else:
                 try:
                     log_ai_route_decision(
@@ -2399,12 +2416,12 @@ async def process_whatsapp_web_payload(
                         extraction_status = "waiting_for_openai_credits"
                         media_job["processing_status"] = extraction_status
                         extraction = build_invoice_extraction_placeholder(extraction_status=extraction_status)
-                        ai_reply = "📷 Photo received safely. AI reading is ready but OpenAI credits are not active yet."
+                        ai_reply = "📷 Photo received safely. Photo review is unavailable right now."
                     else:
                         extraction_status = "failed"
                         media_job["processing_status"] = extraction_status
                         extraction = build_invoice_extraction_placeholder(extraction_status=extraction_status)
-                        ai_reply = "📷 Photo received safely. AI reading needs review."
+                        ai_reply = "📷 Photo received safely. Saved for review."
         intake_record = {
             "sender": mask_phone(sender),
             "timestamp": upload["timestamp"],
@@ -2902,6 +2919,7 @@ class WhatsAppProcessResult:
     success: bool = False
     error_reason: str = ""
     command_handler: str = "unknown"
+    selector_card: dict[str, Any] | None = None
 
 
 async def process_whatsapp_form_values(form_values: dict[str, Any]) -> WhatsAppProcessResult:
@@ -2936,17 +2954,32 @@ async def process_whatsapp_form_values(form_values: dict[str, Any]) -> WhatsAppP
                 if pending:
                     command_handler = "voice_correction_text"
                     clear_pending_voice(from_number)
+                selector_result = local_text_sale_selector_result(body, from_number)
+                if selector_result is not None:
+                    if message_sid:
+                        processed_message_sids.add(message_sid)
+                    return selector_result
                 incoming = IncomingInput(text=body, is_voice=False)
                 reply = process_intake_text_for_sender(incoming.text, from_number)
         else:
             whatsapp = get_whatsapp_client()
             incoming = await incoming_text_from_form(form_values, whatsapp, get_transcription_service())
             message_type = "voice" if incoming.is_voice else "text"
-            selector_reply = local_voice_selector_reply(incoming.text, from_number) if incoming.is_voice else ""
-            if selector_reply:
-                command_handler = "voice_medicine_selector"
-                reply = voice_selector_reply(incoming.original_text or incoming.text, selector_reply)
-            elif incoming.is_voice and not voice_transcript_is_clear(incoming.text):
+            selector_result = (
+                local_sale_selector_result(
+                    incoming.text,
+                    from_number,
+                    message_type="voice",
+                    heard=incoming.original_text or incoming.text,
+                )
+                if incoming.is_voice
+                else None
+            )
+            if selector_result is not None:
+                if message_sid:
+                    processed_message_sids.add(message_sid)
+                return selector_result
+            if incoming.is_voice and not voice_transcript_is_clear(incoming.text):
                 command_handler = "voice_note_confirmation_required"
                 reply = voice_needs_correction_reply(incoming.original_text or incoming.text)
             else:
@@ -3184,12 +3217,7 @@ VOICE_SELECTOR_BLOCK_WORDS = {
 }
 
 
-def local_voice_selector_match(transcript: str) -> MedicineMatch:
-    """Resolve a medicine-only voice transcript locally before asking for review."""
-    clean = " ".join(str(transcript or "").strip().split())
-    words = {word.lower() for word in re.findall(r"[A-Za-z0-9-]+", clean)}
-    if not clean or any(character.isdigit() for character in clean) or words & VOICE_SELECTOR_BLOCK_WORDS:
-        return MedicineMatch()
+def local_selector_match(text: str) -> MedicineMatch:
     try:
         intake_service = get_intake_service()
         inventory_names = intake_service.store.list_master_drug_names()
@@ -3198,10 +3226,119 @@ def local_voice_selector_match(transcript: str) -> MedicineMatch:
         inventory_names = []
         pharmacy_aliases = {}
     return match_local_medicine(
-        clean,
+        text,
         inventory_names=inventory_names,
         pharmacy_aliases=pharmacy_aliases,
     )
+
+
+def local_voice_selector_match(transcript: str) -> MedicineMatch:
+    """Resolve a medicine-only voice transcript locally before asking for review."""
+    clean = " ".join(str(transcript or "").strip().split())
+    words = {word.lower() for word in re.findall(r"[A-Za-z0-9-]+", clean)}
+    if not clean or any(character.isdigit() for character in clean) or words & VOICE_SELECTOR_BLOCK_WORDS:
+        return MedicineMatch()
+    return local_selector_match(clean)
+
+
+def sale_selector_card(drug_name: str, quantity: int, payment_method: str) -> dict[str, Any]:
+    return {
+        "type": "sale_selector",
+        "medicine": drug_name,
+        "quantity": quantity,
+        "payment": payment_method,
+        "quantity_options": [1, 2, 3, 5, 10, "+", "-"],
+        "payment_options": ["Cash", "M-Pesa", "Credit", "Mixed"],
+        "confirm_options": ["YES", "CANCEL"],
+    }
+
+
+def prepare_local_sale_selector_reply(drug_name: str, quantity: int, payment_method: str, sender: str) -> str:
+    intake_service = get_intake_service()
+    prepare = getattr(intake_service, "prepare_sale_selector", None)
+    if callable(prepare):
+        return prepare(
+            drug_name,
+            quantity,
+            payment_method,
+            conversation_id=mask_phone(sender),
+        )
+    return "\n".join(
+        [
+            "Sale approval",
+            f"{drug_name} x{quantity} - {payment_method}",
+            "Qty: 1 | 2 | 3 | 5 | 10 | + | -",
+            "Pay: Cash | M-Pesa | Credit | Mixed",
+            "Reply YES to save, or CANCEL.",
+        ]
+    )
+
+
+def local_sale_selector_result(
+    text: str,
+    sender: str,
+    *,
+    message_type: str = "text",
+    heard: str = "",
+) -> WhatsAppProcessResult | None:
+    interpreted = normalize_spoken_command_text(
+        clean_voice_transcript_for_intake(text, medicine_names=voice_medicine_names_from_inventory())
+    )
+    commands = parse_operating_commands(interpreted)
+    drug_name = ""
+    quantity = 1
+    payment_method = "Cash"
+    if commands and len(commands) == 1 and commands[0].kind == "sale" and commands[0].drug_name:
+        command = commands[0]
+        drug_name = command.drug_name
+        quantity = command.quantity
+        payment_method = command.payment_method or "Cash"
+    elif not any(character.isdigit() for character in interpreted):
+        match = local_voice_selector_match(interpreted)
+        if match.ambiguous:
+            choices = "\n".join(f"{index}. {choice}" for index, choice in enumerate(match.choices[:3], start=1))
+            return WhatsAppProcessResult(
+                reply=f"Which medicine?\n{choices}\nReply with the medicine name.",
+                message_type=message_type,
+                success=True,
+                command_handler="local_medicine_clarification",
+            )
+        if match.matched:
+            drug_name = match.canonical_name
+    if not drug_name:
+        return None
+
+    match = local_selector_match(drug_name)
+    if match.ambiguous:
+        choices = "\n".join(f"{index}. {choice}" for index, choice in enumerate(match.choices[:3], start=1))
+        return WhatsAppProcessResult(
+            reply=f"Which medicine?\n{choices}\nReply with the medicine name.",
+            message_type=message_type,
+            success=True,
+            command_handler="local_medicine_clarification",
+        )
+    if match.matched:
+        drug_name = match.canonical_name
+
+    reply = prepare_local_sale_selector_reply(drug_name, quantity, payment_method, sender)
+    if heard:
+        reply = voice_selector_reply(heard, reply)
+    return WhatsAppProcessResult(
+        reply=reply,
+        message_type=message_type,
+        success=True,
+        command_handler="voice_medicine_selector" if message_type == "voice" else "text_medicine_selector",
+        selector_card=sale_selector_card(drug_name, quantity, payment_method),
+    )
+
+
+def local_text_sale_selector_result(text: str, sender: str) -> WhatsAppProcessResult | None:
+    clean = " ".join(str(text or "").strip().split())
+    if not clean or any(character.isdigit() for character in clean):
+        return None
+    if classify_command_handler(clean) != "natural_or_ai_parser":
+        return None
+    return local_sale_selector_result(clean, sender, message_type="text")
 
 
 def local_voice_selector_reply(transcript: str, sender: str) -> str:

@@ -757,17 +757,34 @@ class IntakeService:
     def _selector_approval_reply(self, selector: OperatingCommand, *, ready_to_confirm: bool = False) -> str:
         lines = [
             "Sale approval",
-            f"Medicine: {selector.drug_name}",
-            f"Quantity selected: {selector.quantity}",
-            f"Payment selected: {selector.payment_method or 'Cash'}",
-            "Choose quantity: 1, 2, 3, 5, 10, +, -",
-            "Choose payment: Cash, M-Pesa, Credit, Mixed",
+            f"{selector.drug_name} x{selector.quantity} - {selector.payment_method or 'Cash'}",
+            "Qty: 1 | 2 | 3 | 5 | 10 | + | -",
+            "Pay: Cash | M-Pesa | Credit | Mixed",
         ]
         if ready_to_confirm:
             lines.append("Reply YES to save, or CANCEL.")
         else:
-            lines.append("Reply: 1 cash, 2 mpesa, or choose quantity/payment. Then reply YES.")
+            lines.append("Choose quantity and payment, then reply YES.")
         return "\n".join(lines)
+
+    def prepare_sale_selector(
+        self,
+        drug_name: str,
+        quantity: int = 1,
+        payment_method: str = "Cash",
+        *,
+        conversation_id: str | None = None,
+    ) -> str:
+        conversation_key = conversation_id or "__default__"
+        selector = OperatingCommand(
+            kind="sale",
+            drug_name=drug_name,
+            quantity=max(int(quantity or 1), 1),
+            payment_method=parse_payment_method(payment_method or "Cash"),
+            raw_text=f"{drug_name} {max(int(quantity or 1), 1)} {payment_method or 'Cash'}",
+        )
+        self.pending_selector_confirmations[conversation_key] = selector
+        return self._selector_approval_reply(selector, ready_to_confirm=True)
 
     def _update_selector_choice(self, text: str, selector: OperatingCommand) -> OperatingCommand | None:
         clean = normalize_natural_text(replace_number_words(text.strip()))

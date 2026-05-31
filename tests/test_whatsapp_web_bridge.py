@@ -361,7 +361,7 @@ def test_whatsapp_web_bridge_voice_quota_fallback(monkeypatch):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert data["reply"] == "🎧 Voice received safely. AI transcription is ready but OpenAI credits are not active yet."
+    assert data["reply"] == "🎧 Voice received safely. Voice reading is unavailable right now. Please choose the medicine or type it."
     assert data["command_handler"] == "voice_note_quota_missing"
     assert status.json()["voice_pipeline_installed"] is True
     assert status.json()["openai_key_present"] is True
@@ -397,7 +397,7 @@ def test_whatsapp_web_bridge_photo_quota_fallback(monkeypatch, tmp_path):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert "AI reading is ready but OpenAI credits are not active yet" in data["reply"]
+    assert "Photo review is unavailable right now" in data["reply"]
     assert data["message_type"] == "image"
     assert data["command_handler"] == "photo_received_saved_safely"
     saved_images = list((tmp_path / "data" / "photo_uploads").glob("*.jpg"))
@@ -736,9 +736,9 @@ def test_whatsapp_voice_cleans_swahili_misheard_number_and_records(monkeypatch):
     data = response.json()
     assert response.status_code == 200
     assert data["status"] == "ok"
-    assert seen["text"] == "Panadol 2 cash"
+    assert seen == {}
     assert "Heard: Panadol mbili cash" in data["reply"]
-    assert "Panadol x2 cash recorded" in data["reply"]
+    assert "Panadol x2 - Cash" in data["reply"]
 
 
 def test_whatsapp_voice_does_not_claim_records_updated_when_parse_fails(monkeypatch):
@@ -765,7 +765,7 @@ def test_whatsapp_voice_does_not_claim_records_updated_when_parse_fails(monkeypa
 
     data = response.json()
     assert response.status_code == 200
-    assert "I could not safely record that" in data["reply"]
+    assert "Panadol x2 - Cash" in data["reply"]
     assert "Records updated safely" not in data["reply"]
 
 
@@ -818,15 +818,15 @@ def test_whatsapp_voice_known_medicine_only_opens_local_selector_without_ai_inte
     transcription = FakeTranscriptionService(["Panadol", "Glucose", "ORS", "Belladonna"])
     selected: list[str] = []
 
-    def fake_process_intake_text_for_sender(text: str, sender: str) -> str:
+    def fake_prepare_local_sale_selector_reply(text: str, quantity: int, payment: str, sender: str) -> str:
         selected.append(text)
         return "\n".join(
             [
                 "Sale approval",
-                f"Medicine: {text}",
-                "Quantity: 1, 2, 3, 5, 10, +, -",
-                "Payment: Cash, M-Pesa, Credit, Mixed",
-                "Reply: 1 cash, 2 mpesa, yes, or cancel.",
+                f"{text} x{quantity} - {payment}",
+                "Qty: 1 | 2 | 3 | 5 | 10 | + | -",
+                "Pay: Cash | M-Pesa | Credit | Mixed",
+                "Reply YES to save, or CANCEL.",
             ]
         )
 
@@ -836,7 +836,7 @@ def test_whatsapp_voice_known_medicine_only_opens_local_selector_without_ai_inte
         lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
     )
     monkeypatch.setattr(main, "get_transcription_service", lambda: transcription)
-    monkeypatch.setattr(main, "process_intake_text_for_sender", fake_process_intake_text_for_sender)
+    monkeypatch.setattr(main, "prepare_local_sale_selector_reply", fake_prepare_local_sale_selector_reply)
     AI_ROUTE_DECISION_LOG.clear()
 
     with TestClient(main.app) as client:
@@ -848,12 +848,152 @@ def test_whatsapp_voice_known_medicine_only_opens_local_selector_without_ai_inte
             data = response.json()
             assert response.status_code == 200
             assert data["command_handler"] == "voice_medicine_selector"
-            assert f"Medicine: {medicine}" in data["reply"]
-            assert "Quantity: 1, 2, 3, 5, 10, +, -" in data["reply"]
+            assert f"{medicine} x1 - Cash" in data["reply"]
+            assert "Qty: 1 | 2 | 3 | 5 | 10 | + | -" in data["reply"]
 
     assert selected == ["Panadol", "Glucose", "ORS", "Belladonna"]
     assert len(AI_ROUTE_DECISION_LOG) == 4
     assert all(item["reason"] == "voice_transcription" for item in AI_ROUTE_DECISION_LOG)
+
+
+def test_whatsapp_text_glucose_opens_short_local_selector_card_without_ai(monkeypatch):
+    from app.ai import AI_ROUTE_DECISION_LOG
+
+    main.get_sheet_store.cache_clear()
+    main.get_intake_service.cache_clear()
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, DEMO_MODE=True, ALLOWED_WHATSAPP_NUMBERS="254700000000"),
+    )
+    AI_ROUTE_DECISION_LOG.clear()
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=bridge_payload("Glucose"))
+
+    data = response.json()
+    assert response.status_code == 200
+    assert data["command_handler"] == "text_medicine_selector"
+    assert data["selector_card"]["medicine"] == "Glucose"
+    assert data["selector_card"]["quantity"] == 1
+    assert "Glucose x1 - Cash" in data["reply"]
+    assert "Qty: 1 | 2 | 3 | 5 | 10 | + | -" in data["reply"]
+    assert "Then reply YES" not in data["reply"]
+    assert AI_ROUTE_DECISION_LOG == []
+
+
+def test_whatsapp_text_spoken_quantity_payment_prefills_local_selector_card_without_ai(monkeypatch):
+    from app.ai import AI_ROUTE_DECISION_LOG
+
+    main.get_sheet_store.cache_clear()
+    main.get_intake_service.cache_clear()
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, DEMO_MODE=True, ALLOWED_WHATSAPP_NUMBERS="254700000000"),
+    )
+    AI_ROUTE_DECISION_LOG.clear()
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=bridge_payload("Panadol mbili mpesa"))
+
+    data = response.json()
+    assert response.status_code == 200
+    assert data["command_handler"] == "text_medicine_selector"
+    assert data["selector_card"]["medicine"] == "Panadol"
+    assert data["selector_card"]["quantity"] == 2
+    assert data["selector_card"]["payment"] == "M-Pesa"
+    assert "Panadol x2 - M-Pesa" in data["reply"]
+    assert AI_ROUTE_DECISION_LOG == []
+
+
+def test_whatsapp_text_unknown_medicine_uses_local_setup_prompt_without_ai(monkeypatch):
+    from app.ai import AI_ROUTE_DECISION_LOG
+
+    main.get_sheet_store.cache_clear()
+    main.get_intake_service.cache_clear()
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, DEMO_MODE=True, ALLOWED_WHATSAPP_NUMBERS="254700000000"),
+    )
+    AI_ROUTE_DECISION_LOG.clear()
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=bridge_payload("xyzmedicine 2"))
+
+    assert response.status_code == 200
+    assert "not found in inventory" in response.json()["reply"]
+    assert all(not item["used_ai"] for item in AI_ROUTE_DECISION_LOG)
+
+
+def test_whatsapp_text_amox_asks_local_clarification_without_ai(monkeypatch):
+    from app.ai import AI_ROUTE_DECISION_LOG
+
+    main.get_sheet_store.cache_clear()
+    main.get_intake_service.cache_clear()
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, DEMO_MODE=True, ALLOWED_WHATSAPP_NUMBERS="254700000000"),
+    )
+    AI_ROUTE_DECISION_LOG.clear()
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=bridge_payload("amox"))
+
+    reply = response.json()["reply"]
+    assert response.status_code == 200
+    assert "Which medicine?" in reply
+    assert "Amoxicillin" in reply
+    assert "Amoxil" in reply
+    assert AI_ROUTE_DECISION_LOG == []
+
+
+def test_whatsapp_voice_spoken_quantity_payment_returns_one_prefilled_selector_card(monkeypatch):
+    from app.ai import AI_ROUTE_DECISION_LOG
+
+    class FakeTranscriptionService:
+        is_available = True
+        calls = 0
+
+        def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
+            self.calls += 1
+            return "Panadol mbili mpesa"
+
+    transcription = FakeTranscriptionService()
+    main.get_sheet_store.cache_clear()
+    main.get_intake_service.cache_clear()
+    main.processed_whatsapp_web_message_ids.clear()
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, DEMO_MODE=True, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_transcription_service", lambda: transcription)
+    AI_ROUTE_DECISION_LOG.clear()
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["message_id"] = "voice-selector-once"
+    payload["media_base64"] = base64.b64encode(b"voice bytes").decode("ascii")
+    payload["media_mime_type"] = "audio/ogg"
+
+    with TestClient(main.app) as client:
+        first = client.post("/bridge/whatsapp-web", json=payload)
+        duplicate = client.post("/bridge/whatsapp-web", json=payload)
+
+    data = first.json()
+    assert first.status_code == 200
+    assert data["command_handler"] == "voice_medicine_selector"
+    assert data["selector_card"]["medicine"] == "Panadol"
+    assert data["selector_card"]["quantity"] == 2
+    assert data["selector_card"]["payment"] == "M-Pesa"
+    assert "Panadol x2 - M-Pesa" in data["reply"]
+    assert "saved for review" not in data["reply"]
+    assert duplicate.json()["status"] == "duplicate"
+    assert duplicate.json()["reply"] == ""
+    assert transcription.calls == 1
+    assert len(AI_ROUTE_DECISION_LOG) == 1
+    assert AI_ROUTE_DECISION_LOG[0]["reason"] == "voice_transcription"
 
 
 def test_whatsapp_voice_amox_asks_local_clarification_before_intake(monkeypatch):
@@ -1011,9 +1151,9 @@ def test_whatsapp_voice_splits_joined_swahili_quantity_payment(monkeypatch):
 
     data = response.json()
     assert response.status_code == 200
-    assert seen["text"] == "Panadol 2 cash"
+    assert seen == {}
     assert "Heard: Panadol mbili cash" in data["reply"]
-    assert "Panadol x2 cash recorded" in data["reply"]
+    assert "Panadol x2 - Cash" in data["reply"]
 
 
 def test_whatsapp_unknown_photo_uses_ai_to_extract_invoice_when_key_active(monkeypatch, tmp_path):
@@ -1085,9 +1225,9 @@ def test_whatsapp_voice_repairs_close_medicine_and_joined_payment(monkeypatch):
 
     data = response.json()
     assert response.status_code == 200
-    assert seen["text"] == "Panadol 2 cash"
+    assert seen == {}
     assert "Heard: Panadol mbili cash" in data["reply"]
-    assert "Panadol x2 cash recorded" in data["reply"]
+    assert "Panadol x2 - Cash" in data["reply"]
 
 
 def test_whatsapp_voice_repairs_tukas_as_two_cash(monkeypatch):
@@ -1120,9 +1260,9 @@ def test_whatsapp_voice_repairs_tukas_as_two_cash(monkeypatch):
 
     data = response.json()
     assert response.status_code == 200
-    assert seen["text"] == "Panadol 2 cash"
+    assert seen == {}
     assert "Heard: Panadol two cash" in data["reply"]
-    assert "Panadol x2 cash recorded" in data["reply"]
+    assert "Panadol x2 - Cash" in data["reply"]
 
 
 def test_whatsapp_voice_repairs_melikas_as_mbili_cash(monkeypatch):
@@ -1155,9 +1295,9 @@ def test_whatsapp_voice_repairs_melikas_as_mbili_cash(monkeypatch):
 
     data = response.json()
     assert response.status_code == 200
-    assert seen["text"] == "Panadol 2 cash"
+    assert seen == {}
     assert "Heard: Panadol mbili cash" in data["reply"]
-    assert "Panadol x2 cash recorded" in data["reply"]
+    assert "Panadol x2 - Cash" in data["reply"]
 
 
 def test_whatsapp_voice_reconstructs_inventory_medicines_without_ai_interpretation(monkeypatch):
@@ -1199,7 +1339,7 @@ def test_whatsapp_voice_reconstructs_inventory_medicines_without_ai_interpretati
             response = client.post("/bridge/whatsapp-web", json=payload)
             assert response.status_code == 200
 
-    assert seen == ["Glucose 2 mpesa", "ORS 2 cash"]
+    assert seen == []
     assert all(item["route"] == "audio/transcriptions" for item in AI_ROUTE_DECISION_LOG)
     assert all(item["reason"] == "voice_transcription" for item in AI_ROUTE_DECISION_LOG)
 
