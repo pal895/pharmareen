@@ -14,6 +14,15 @@ const allowAllDirectChatsForTest = String(process.env.ALLOW_ALL_DIRECT_CHATS_FOR
 const allowedNumbers = parseAllowedNumbers(process.env.ALLOWED_WHATSAPP_NUMBERS || '');
 const offlineConfirmationPollMs = Number(process.env.OFFLINE_CONFIRMATION_POLL_MS || 10000);
 let offlineConfirmationPoller = null;
+let reconnectTimer = null;
+const currentRuntimeStatus = {
+  state: 'starting',
+  connected: false,
+  qr_required: false,
+  last_message_received: '',
+  last_reply_sent: '',
+  last_error: ''
+};
 
 function phoneDigits(value) {
   return String(value || '').replace(/whatsapp:/g, '').replace(/\D/g, '');
@@ -99,9 +108,11 @@ async function safeSendReply(sock, jid, text) {
     const result = await sock.sendMessage(jid, { text: body });
     const messageId = result && result.key ? result.key.id : '';
     console.log(`WHATSAPP_REPLY_SENT to ${maskSender(jid)} ${jidDebug(jid)} message_id=${messageId || 'unknown'} length=${body.length}`);
+    reportRuntimeStatus({ state: 'connected', connected: true, last_reply_sent: new Date().toISOString(), last_error: '' });
     return true;
   } catch (error) {
     console.error(`WHATSAPP_SEND_FAILED to ${maskSender(jid)} ${jidDebug(jid)}: ${error.stack || error.message}`);
+    reportRuntimeStatus({ last_error: `reply_send_failed: ${error.message || error}` });
     return false;
   }
 }
@@ -222,6 +233,17 @@ function normalizeConfirmationJid(value) {
   return digits ? `${digits}@s.whatsapp.net` : raw;
 }
 
+async function reportRuntimeStatus(patch = {}) {
+  Object.assign(currentRuntimeStatus, patch);
+  try {
+    await axios.post(`${backendUrl}/bridge/runtime-status`, currentRuntimeStatus, { timeout: 5000 });
+  } catch (error) {
+    console.log(`BRIDGE_RUNTIME_STATUS_SKIPPED ${error.message}`);
+  }
+}
+
+setInterval(() => reportRuntimeStatus({}), 10000);
+
 async function resolveOfflineConfirmationTarget(sock, rawTarget, itemId) {
   const normalized = normalizeConfirmationJid(rawTarget);
   console.log(`normalized jid=${normalized} ${jidDebug(normalized)}`);
@@ -302,6 +324,7 @@ async function sendOfflineConfirmation(sock, target, text, itemId) {
       `WHATSAPP_CONFIRMATION_SEND_RESULT id=${itemId || 'unknown'} sent=true ` +
       `acked=false message_id=${messageId || 'unknown'}`
     );
+    reportRuntimeStatus({ state: 'connected', connected: true, last_reply_sent: new Date().toISOString(), last_error: '' });
     return { sent: true, messageId };
   } catch (error) {
     const reason = error && (error.stack || error.message) ? (error.stack || error.message) : String(error);
@@ -314,6 +337,7 @@ async function sendOfflineConfirmation(sock, target, text, itemId) {
       `WHATSAPP_CONFIRMATION_SEND_RESULT id=${itemId || 'unknown'} sent=false ` +
       `acked=false reason=${error.message || 'send_failed'}`
     );
+    reportRuntimeStatus({ last_error: `offline_confirmation_send_failed: ${error.message || error}` });
     return { sent: false, error: error.message || 'send_failed' };
   }
 }
@@ -377,6 +401,18 @@ function startOfflineConfirmationPolling(sock) {
   pollOfflineConfirmations(sock);
 }
 
+function scheduleReconnect(options = {}) {
+  if (reconnectTimer) return;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    startBaileys(options).catch((error) => {
+      console.error('Baileys reconnect failed:', error.message);
+      reportRuntimeStatus({ state: 'error', connected: false, last_error: `reconnect_failed: ${error.message}` });
+      scheduleReconnect(options);
+    });
+  }, 3000);
+}
+
 function extractBackendReply(data) {
   const keys = ['reply', 'message', 'text', 'response', 'whatsapp_reply'];
   for (const key of keys) {
@@ -428,6 +464,7 @@ function clearBaileysSession(reason) {
 async function startBaileys(options = {}) {
   const sessionResetAttempted = Boolean(options.sessionResetAttempted);
   console.log('PharMareen Baileys bridge starting...');
+  reportRuntimeStatus({ state: 'starting', connected: false, qr_required: false, last_error: '' });
   console.log(`Backend: ${backendUrl}`);
   console.log(`Baileys session path: ${sessionPath}`);
   console.log(`Baileys log level: ${baileysLogLevel}`);
@@ -464,16 +501,26 @@ async function startBaileys(options = {}) {
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect, qr } = update;
     logConnectionUpdate(update);
+    reportRuntimeStatus({
+      state: connection || (qr ? 'qr_required' : 'connecting'),
+      connected: connection === 'open',
+      qr_required: Boolean(qr),
+      last_error: connection === 'close' ? (describeDisconnect(lastDisconnect).errorMessage || 'connection_closed') : ''
+    });
     if (qr) {
       console.log('\nSCAN THIS QR WITH WHATSAPP:');
       console.log('WhatsApp > Linked devices > Link a device\n');
       qrcode.generate(qr, { small: true });
     }
     if (connection === 'open') {
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = null;
       console.log('Baileys bridge ready. Send a pharmacy message from an allowed direct chat.');
       startOfflineConfirmationPolling(sock);
     }
     if (connection === 'close') {
+      if (offlineConfirmationPoller) clearInterval(offlineConfirmationPoller);
+      offlineConfirmationPoller = null;
       const statusCode = lastDisconnect && lastDisconnect.error && lastDisconnect.error.output
         ? lastDisconnect.error.output.statusCode
         : undefined;
@@ -481,10 +528,10 @@ async function startBaileys(options = {}) {
       console.log(`Baileys disconnected. statusCode=${statusCode || 'unknown'} reconnect=${shouldReconnect}`);
       if (!shouldReconnect && autoResetOnLoggedOut && !sessionResetAttempted) {
         clearBaileysSession('logged out or invalid stale session');
-        startBaileys({ sessionResetAttempted: true }).catch((error) => console.error('Baileys reconnect after reset failed:', error.message));
+        scheduleReconnect({ sessionResetAttempted: true });
         return;
       }
-      if (shouldReconnect) startBaileys({ sessionResetAttempted }).catch((error) => console.error('Baileys reconnect failed:', error.message));
+      if (shouldReconnect) scheduleReconnect({ sessionResetAttempted });
     }
   });
 
@@ -503,6 +550,7 @@ async function startBaileys(options = {}) {
 
       const text = extractText(msg).trim();
       const messageId = msg.key.id || '';
+      reportRuntimeStatus({ state: 'connected', connected: true, last_message_received: new Date().toISOString(), last_error: '' });
       console.log(`INCOMING_SENDER_JID ${maskSender(sender)} ${jidDebug(sender)}`);
       if (isImageMessage(msg)) {
         const mimeType = imageMimeType(msg);

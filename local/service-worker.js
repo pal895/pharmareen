@@ -1,8 +1,8 @@
-const CACHE_NAME = "pharmareen-offline-v21-kenya-medicine-brain";
-console.log("OFFLINE_APP_BUILD_VERSION=kenya-medicine-brain-v2026-05-31-1 service-worker");
+const CACHE_NAME = "pharmareen-offline-v22-offline-parity";
+const OFFLINE_INDEX = "/offline_app/index.html";
+console.log("OFFLINE_APP_BUILD_VERSION=kenya-medicine-brain-v2026-05-31-offline-parity service-worker");
 const APP_SHELL = [
-  "/offline-app",
-  "/offline_app/index.html",
+  OFFLINE_INDEX,
   "/offline_app/parser.js",
   "/offline_app/app.js",
   "/offline_app/styles.css",
@@ -22,5 +22,13 @@ self.addEventListener("activate", event => {
 
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
-  event.respondWith(fetch(event.request).catch(() => caches.match(event.request).then(response => response || caches.match("/offline-app"))));
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(OFFLINE_INDEX, { ignoreSearch: true }))
+    );
+    return;
+  }
+  event.respondWith(
+    fetch(event.request).catch(() => caches.match(event.request, { ignoreSearch: true }))
+  );
 });

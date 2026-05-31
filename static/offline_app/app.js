@@ -12,8 +12,8 @@ const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
-const OFFLINE_APP_BUILD_VERSION = "kenya-medicine-brain-v2026-05-31-1";
-const SERVICE_WORKER_VERSION = "pharmareen-offline-v21-kenya-medicine-brain";
+const OFFLINE_APP_BUILD_VERSION = "kenya-medicine-brain-v2026-05-31-offline-parity";
+const SERVICE_WORKER_VERSION = "pharmareen-offline-v22-offline-parity";
 const DEFAULT_MEDICINE_SHORTCUTS = ["Panadol", "Amox", "Piriton", "ORS", "Glucose"];
 console.log(`OFFLINE_APP_BUILD_VERSION=${OFFLINE_APP_BUILD_VERSION}`);
 
@@ -67,6 +67,7 @@ let recordedChunks = [];
 let voiceRecognition = null;
 let voiceRecognitionTimeout = null;
 let voiceRecognitionActive = false;
+let voiceRecordingTimeout = null;
 let currentPaymentMode = localStorage.getItem(PAYMENT_MODE_KEY) || "Cash";
 let lastBarcodeScan = { code: "", at: 0 };
 let pendingBarcodeScan = { code: "", count: 0, at: 0 };
@@ -164,10 +165,17 @@ async function loadInventoryMedicines() {
     const data = await response.json();
     if (Array.isArray(data.medicines)) {
       inventoryMedicines = data.medicines.map(name => String(name || "").trim()).filter(Boolean).slice(0, 200);
-      saveJson(INVENTORY_MEDICINES_KEY, inventoryMedicines);
     }
-    if (data.aliases && typeof data.aliases === "object" && !Array.isArray(data.aliases)) {
-      inventoryMedicineAliases = data.aliases;
+    if (Array.isArray(data.selector_medicines)) {
+      inventoryMedicines = [...inventoryMedicines, ...data.selector_medicines]
+        .map(name => String(name || "").trim())
+        .filter(Boolean);
+    }
+    inventoryMedicines = [...new Map(inventoryMedicines.map(name => [normalizeMedicineToken(name), name])).values()];
+    saveJson(INVENTORY_MEDICINES_KEY, inventoryMedicines);
+    const aliases = data.selector_aliases || data.aliases;
+    if (aliases && typeof aliases === "object" && !Array.isArray(aliases)) {
+      inventoryMedicineAliases = aliases;
       saveJson(INVENTORY_ALIASES_KEY, inventoryMedicineAliases);
     }
   } catch {
@@ -218,8 +226,14 @@ function similarity(left, right) {
 function detectLocalMedicineFromSpeech(transcript) {
   const clean = String(transcript || "").toLowerCase();
   const { names, aliases } = voiceMedicineCandidates();
-  for (const [alias, medicine] of Object.entries(aliases)) {
-    if (normalizeMedicineToken(clean).includes(normalizeMedicineToken(alias))) return medicine;
+  const compactClean = normalizeMedicineToken(clean);
+  if (aliases[compactClean]) return aliases[compactClean];
+  const safeAliases = Object.entries(aliases)
+    .map(([alias, medicine]) => [normalizeMedicineToken(alias), medicine])
+    .filter(([alias]) => alias.length >= 3)
+    .sort((left, right) => right[0].length - left[0].length);
+  for (const [alias, medicine] of safeAliases) {
+    if (compactClean.includes(alias)) return medicine;
   }
   let best = { name: "", score: 0 };
   for (const medicine of names) {
@@ -264,15 +278,8 @@ function showVoiceSelector(medicine) {
 async function confirmLocalVoiceSale() {
   if (!selectedVoiceSale.medicine) return;
   const entry = applyPaymentMode({
+    ...Parser.createVoiceSelectorSale(selectedVoiceSale.medicine, selectedVoiceSale.quantity, selectedVoiceSale.payment),
     id: `voice-selector-${Date.now()}`,
-    type: "sale",
-    action: "sale",
-    drug_name: selectedVoiceSale.medicine,
-    quantity: selectedVoiceSale.quantity,
-    payment_method: selectedVoiceSale.payment,
-    command_text: `${selectedVoiceSale.medicine} ${selectedVoiceSale.quantity} ${selectedVoiceSale.payment}`,
-    raw_text: "local voice selector",
-    source: "offline_voice_selector",
     sync_status: "pending",
     timestamp: new Date().toISOString(),
     confirmation_whatsapp: getConfirmationWhatsapp(),
@@ -847,20 +854,14 @@ function startLocalVoiceSelector() {
         voiceStatus.textContent = "Please allow microphone to use Tap & Talk.";
         return;
       }
-      voiceStatus.textContent = "Medicine not clear. Recording a voice note instead...";
-      startVoiceRecording({ skipSelector: true });
+      voiceStatus.textContent = "I didn't catch the medicine. Tap again or choose from search.";
     };
     recognition.onresult = event => {
       resetVoiceRecognition();
       const transcript = event.results && event.results[0] && event.results[0][0]
         ? event.results[0][0].transcript
         : "";
-      const medicine = detectLocalMedicineFromSpeech(transcript);
-      if (medicine) showVoiceSelector(medicine);
-      else {
-        voiceStatus.textContent = "Medicine not clear. Recording a voice note instead...";
-        startVoiceRecording({ skipSelector: true });
-      }
+      handleLocalVoiceTranscript(transcript);
     };
     recognition.onend = () => {
       voiceRecognitionActive = false;
@@ -869,14 +870,23 @@ function startLocalVoiceSelector() {
     voiceRecognitionTimeout = setTimeout(() => {
       try { recognition.abort(); } catch {}
       resetVoiceRecognition();
-      voiceStatus.textContent = "Medicine not clear. Recording a voice note instead...";
-      startVoiceRecording({ skipSelector: true });
+      voiceStatus.textContent = "I didn't catch the medicine. Tap again or choose from search.";
     }, 6000);
     return true;
   } catch {
     resetVoiceRecognition();
     return false;
   }
+}
+
+function handleLocalVoiceTranscript(transcript) {
+  const medicine = detectLocalMedicineFromSpeech(transcript);
+  if (medicine) {
+    showVoiceSelector(medicine);
+    return true;
+  }
+  voiceStatus.textContent = "I didn't catch the medicine. Tap again or choose from search.";
+  return false;
 }
 
 async function startVoiceRecording(options = {}) {
@@ -904,18 +914,21 @@ async function startVoiceRecording(options = {}) {
       if (event.data && event.data.size > 0) recordedChunks.push(event.data);
     };
     mediaRecorder.onstop = async () => {
+      if (voiceRecordingTimeout) clearTimeout(voiceRecordingTimeout);
+      voiceRecordingTimeout = null;
       stream.getTracks().forEach(track => track.stop());
       const type = recordedChunks[0] ? recordedChunks[0].type || "audio/webm" : "audio/webm";
       const blob = new Blob(recordedChunks, { type });
       const fileName = `voice-note-${Date.now()}.webm`;
       const file = typeof File !== "undefined" ? new File([blob], fileName, { type }) : Object.assign(blob, { name: fileName });
-      await queueMedia(file, "audio", "tap_talk_voice");
-      voiceStatus.textContent = "🎤 Voice note saved safely";
+      await queueMedia(file, "audio", "tap_talk_voice_review", { displayLabel: "Voice note for review" });
+      voiceStatus.textContent = "🎤 Voice note saved safely for review";
       const button = document.getElementById("tapTalk");
       if (button) button.textContent = "Tap & Talk";
     };
     mediaRecorder.start();
     voiceStatus.textContent = "Recording... tap again to save.";
+    voiceRecordingTimeout = setTimeout(() => stopVoiceRecording(), 10000);
     const button = document.getElementById("tapTalk");
     if (button) button.textContent = "Save Voice";
   } catch {
@@ -1342,6 +1355,7 @@ window.PharMareenOffline = {
   detectLocalMedicineFromSpeech,
   maybeShowTypedMedicineSelector,
   startLocalVoiceSelector,
+  handleLocalVoiceTranscript,
   startVoiceRecording,
   showVoiceSelector,
   confirmLocalVoiceSale

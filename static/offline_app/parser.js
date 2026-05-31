@@ -351,5 +351,28 @@
     return base;
   }
 
-  return { splitCommands, parseCommand, numberFrom, normalizeNumberWords };
+  function createVoiceSelectorSale(medicine, quantity, paymentMethod) {
+    const drugName = normalizeSpaces(medicine);
+    const safeQuantity = Math.max(1, Number(quantity || 1));
+    const lowerPayment = normalizeSpaces(paymentMethod).toLowerCase();
+    const payment = lowerPayment === "mpesa" || lowerPayment === "m-pesa"
+      ? "M-Pesa"
+      : lowerPayment === "credit"
+        ? "Credit"
+        : lowerPayment === "mixed"
+          ? "Mixed"
+          : "Cash";
+    return {
+      type: "sale",
+      action: "sale",
+      drug_name: drugName,
+      quantity: safeQuantity,
+      payment_method: payment,
+      command_text: `${drugName} ${safeQuantity} ${payment}`,
+      raw_text: "local voice selector",
+      source: "offline_voice_selector"
+    };
+  }
+
+  return { splitCommands, parseCommand, numberFrom, normalizeNumberWords, createVoiceSelectorSale };
 });

@@ -600,6 +600,10 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "WHATSAPP_SEND_TARGET" in source
     assert "WHATSAPP_REPLY_SENT" in source
     assert "WHATSAPP_SEND_FAILED" in source
+    assert "reportRuntimeStatus" in source
+    assert "/bridge/runtime-status" in source
+    assert "setInterval(() => reportRuntimeStatus({}), 10000)" in source
+    assert "scheduleReconnect" in source
     assert "bridge picked offline confirmation" in source
     assert "BRIDGE_PICKED_OFFLINE_CONFIRMATION" in source
     assert "normalized jid=" in source
@@ -646,6 +650,38 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     send_lines = [line.strip() for line in source.splitlines() if "sock.sendMessage" in line]
     assert "const result = await sock.sendMessage(jid, { text: body });" in send_lines
     assert "const result = await sock.sendMessage(target, { text: body });" in send_lines
+
+
+def test_bridge_runtime_status_reports_connected_receive_reply_and_error_fields():
+    previous = dict(main.whatsapp_bridge_runtime_status)
+    try:
+        with TestClient(main.app) as client:
+            update = client.post(
+                "/bridge/runtime-status",
+                json={
+                    "state": "open",
+                    "connected": True,
+                    "qr_required": False,
+                    "last_message_received": "2026-05-31T12:00:00+03:00",
+                    "last_reply_sent": "2026-05-31T12:00:01+03:00",
+                    "last_error": "",
+                },
+            )
+            status = client.get("/debug/system-status")
+
+        assert update.status_code == 200
+        assert status.status_code == 200
+        runtime = status.json()["details"]["bridge"]["runtime"]
+        assert runtime["state"] == "open"
+        assert runtime["connected"] is True
+        assert runtime["qr_required"] is False
+        assert runtime["last_message_received"] == "2026-05-31T12:00:00+03:00"
+        assert runtime["last_reply_sent"] == "2026-05-31T12:00:01+03:00"
+        assert runtime["last_error"] == ""
+        assert runtime["updated_at"]
+    finally:
+        main.whatsapp_bridge_runtime_status.clear()
+        main.whatsapp_bridge_runtime_status.update(previous)
 
 
 def test_windows_local_bridge_helper_requires_backend_and_allowlist():
@@ -731,6 +767,40 @@ def test_whatsapp_voice_does_not_claim_records_updated_when_parse_fails(monkeypa
     assert response.status_code == 200
     assert "I could not safely record that" in data["reply"]
     assert "Records updated safely" not in data["reply"]
+
+
+def test_whatsapp_voice_random_transcript_is_saved_for_review_without_intake(monkeypatch):
+    class FakeTranscriptionService:
+        is_available = True
+
+        def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
+            return "Share this video with your friends"
+
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_transcription_service", lambda: FakeTranscriptionService())
+    monkeypatch.setattr(
+        main,
+        "process_intake_text_for_sender",
+        lambda text, sender: (_ for _ in ()).throw(AssertionError("random transcript must not enter intake")),
+    )
+
+    payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+    payload["media_base64"] = base64.b64encode(b"random voice bytes").decode("ascii")
+    payload["media_mime_type"] = "audio/ogg"
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=payload)
+
+    data = response.json()
+    assert response.status_code == 200
+    assert data["status"] == "ok"
+    assert data["command_handler"] == "voice_note_needs_review"
+    assert "Voice note saved for review" in data["reply"]
+    assert "Share this video" not in data["reply"]
 
 
 def test_offline_voice_sync_transcribes_and_returns_parsed_confirmation(monkeypatch, tmp_path):

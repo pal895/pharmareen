@@ -85,7 +85,7 @@ last_openai_error: dict[str, Any] = {
 VOICE_QUOTA_REPLY = "🎧 Voice received safely. AI transcription is ready but OpenAI credits are not active yet."
 PHOTO_QUOTA_REPLY = "📷 Photo received safely. Saved for review."
 DEFAULT_PUBLIC_BASE_URL = "https://pharmareen-1--pal895.replit.app"
-OFFLINE_BUILD_VERSION = "kenya-medicine-brain-v2026-05-31-1"
+OFFLINE_BUILD_VERSION = "kenya-medicine-brain-v2026-05-31-offline-parity"
 OFFLINE_FRONTEND_MARKER = f"PHARMAREEN REAL PATH BUILD {OFFLINE_BUILD_VERSION}"
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
 OFFLINE_NO_CACHE_HEADERS = {
@@ -93,6 +93,15 @@ OFFLINE_NO_CACHE_HEADERS = {
     "Pragma": "no-cache",
     "Expires": "0",
     "X-PharMareen-Offline-Version": OFFLINE_BUILD_VERSION,
+}
+whatsapp_bridge_runtime_status: dict[str, Any] = {
+    "state": "unknown",
+    "connected": False,
+    "qr_required": False,
+    "last_message_received": "",
+    "last_reply_sent": "",
+    "last_error": "",
+    "updated_at": "",
 }
 
 
@@ -219,10 +228,13 @@ async def offline_medicine_names(include_catalog: bool = Query(default=False)) -
         seen.add(key)
         cleaned.append(text)
     metadata = load_catalog_metadata()
+    selector_medicines = catalog_medicine_names()
     result: dict[str, Any] = {
         "status": "ok",
         "medicines": cleaned[:200],
         "aliases": catalog_unique_aliases(cleaned[:200]),
+        "selector_medicines": selector_medicines,
+        "selector_aliases": catalog_unique_aliases(),
         "universal_catalog_count": int(metadata.get("catalog_entry_count") or len(catalog_medicine_names())),
         "ai_used": False,
     }
@@ -617,8 +629,12 @@ def split_joined_voice_words(text: str) -> str:
 
 def apply_voice_medicine_aliases(text: str, medicine_names: list[str] | None = None) -> str:
     clean = text
-    aliases = VOICE_MEDICINE_ALIASES if medicine_names is None else catalog_unique_aliases(medicine_names, compact_keys=False)
+    aliases = VOICE_MEDICINE_ALIASES if medicine_names is None else catalog_unique_aliases(compact_keys=False)
     for alias, medicine in sorted(aliases.items(), key=lambda item: len(item[0]), reverse=True):
+        # Short catalog fragments collide with ordinary speech ("na", "to", "ya").
+        # Voice matching keeps them for explicit inventory flows, but never rewrites them here.
+        if len(re.sub(r"[^a-z0-9]+", "", str(alias).lower())) < 3:
+            continue
         if alias == "pep lime":
             pattern = r"\bpep\s+lime\b(?!\s+cordial)"
         else:
@@ -633,6 +649,7 @@ def voice_medicine_names_from_inventory() -> list[str]:
         names.extend(str(name).strip() for name in get_intake_service().store.list_master_drug_names())
     except Exception:
         pass
+    names.extend(catalog_medicine_names())
     if not names:
         names.extend(VOICE_MEDICINE_NAMES)
     seen: set[str] = set()
@@ -1862,6 +1879,25 @@ def bridge_process_running(script_name: str) -> bool:
         return False
 
 
+@app.post("/bridge/runtime-status")
+async def bridge_runtime_status_update(request: Request) -> dict[str, Any]:
+    """Receive a secret-free heartbeat from the local Baileys worker."""
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    for key in ("state", "last_message_received", "last_reply_sent", "last_error"):
+        if key in payload:
+            whatsapp_bridge_runtime_status[key] = str(payload.get(key) or "")[:240]
+    for key in ("connected", "qr_required"):
+        if key in payload:
+            whatsapp_bridge_runtime_status[key] = boolish(payload.get(key))
+    whatsapp_bridge_runtime_status["updated_at"] = now_in_timezone(get_settings().timezone).isoformat(timespec="seconds")
+    return {"status": "ok", "bridge": dict(whatsapp_bridge_runtime_status)}
+
+
 @app.get("/debug/system-status")
 def debug_system_status() -> dict[str, Any]:
     settings = get_settings()
@@ -1899,6 +1935,7 @@ def debug_system_status() -> dict[str, Any]:
                 "safe_allowlist_configured": bool(parse_allowed_whatsapp_numbers(settings)),
                 "test_mode": settings.allow_all_direct_chats_for_test,
                 "endpoint": whatsapp_bridge_url_for(settings),
+                "runtime": dict(whatsapp_bridge_runtime_status),
             },
             "reports": {
                 "public_base_url": report_public_base_url(settings),
@@ -2234,6 +2271,14 @@ async def process_whatsapp_web_payload(
                     command_handler="voice_note_transcribed",
                 )
             interpreted = normalize_spoken_command_text(transcript)
+            if not voice_transcript_is_clear(interpreted):
+                return WhatsAppProcessResult(
+                    reply=voice_saved_for_review_reply(),
+                    message_type="voice",
+                    success=True,
+                    error_reason="voice_needs_review",
+                    command_handler="voice_note_needs_review",
+                )
             reply = process_intake_text_for_sender(interpreted, sender)
             result = WhatsAppProcessResult(
                 reply=voice_reply(transcript, interpreted, reply),
@@ -3071,6 +3116,11 @@ def voice_needs_correction_reply(transcript: str) -> str:
 
 def voice_transcription_failed_message() -> str:
     return "🎙 I heard the voice but could not read it clearly. Try saying: \"Panadol two\" or type: Panadol 2."
+
+
+def voice_saved_for_review_reply() -> str:
+    return "🎙 Voice note saved for review.\nI didn't catch a pharmacy action. Tap again or type the medicine."
+
 
 def voice_transcript_is_clear(transcript: str) -> bool:
     from app.intake import parse_operating_commands
