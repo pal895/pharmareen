@@ -163,9 +163,11 @@ function renderMedicineShortcuts() {
   });
 }
 
-async function loadInventoryMedicines() {
+async function loadInventoryMedicines(options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 1500));
   try {
-    const response = await fetch("/offline/medicine-names", { cache: "no-store" });
+    const response = await fetch("/offline/medicine-names", { cache: "no-store", signal: controller.signal });
     if (!response.ok) return;
     const data = await response.json();
     if (Array.isArray(data.medicines)) {
@@ -185,6 +187,8 @@ async function loadInventoryMedicines() {
     }
   } catch {
     // Keep the last safe inventory list so the selector still works offline.
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -1453,8 +1457,9 @@ async function boot() {
     confirmationWhatsapp.addEventListener("blur", saveConfirmationWhatsapp);
   }
   setPaymentMode(currentPaymentMode);
-  await loadInventoryMedicines();
+  await loadInventoryMedicines({ timeoutMs: 1500 });
   setMedicineMatcherReady(true);
+  loadInventoryMedicines({ timeoutMs: 8000 });
   renderMedicineShortcuts();
   await initializeStorage();
   updateConnectionStatus();

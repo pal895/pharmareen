@@ -678,15 +678,19 @@ def test_phone_tap_talk_waits_for_cached_medicine_matcher_before_first_use():
 
     assert 'const SERVICE_WORKER_VERSION = "pharmareen-offline-v25-phone-ready"' in script
     assert "setMedicineMatcherReady(false)" in script
-    assert "await loadInventoryMedicines()" in script
+    assert "await loadInventoryMedicines({ timeoutMs: 1500 })" in script
     assert "setMedicineMatcherReady(true)" in script
-    assert script.index("setMedicineMatcherReady(false)") < script.index("await loadInventoryMedicines()")
-    assert script.index("await loadInventoryMedicines()") < script.index("setMedicineMatcherReady(true)")
+    assert script.index("setMedicineMatcherReady(false)") < script.index("await loadInventoryMedicines({ timeoutMs: 1500 })")
+    assert script.index("await loadInventoryMedicines({ timeoutMs: 1500 })") < script.index("setMedicineMatcherReady(true)")
     assert "button.disabled = !medicineMatcherReady" in script
     assert "Getting medicines ready..." in script
+    assert "new AbortController()" in script
+    assert "loadInventoryMedicines({ timeoutMs: 1500 })" in script
+    assert "loadInventoryMedicines({ timeoutMs: 8000 })" in script
     assert 'const MEDICINE_INDEX = "/offline/medicine-names"' in worker
     assert "cache.put(MEDICINE_INDEX" in worker
     assert "caches.match(MEDICINE_INDEX" in worker
+    assert ".then(cached => cached || refresh)" in worker
 
 
 def test_local_voice_selector_ui_hides_internal_architecture_wording():

@@ -40,16 +40,19 @@ self.addEventListener("fetch", event => {
     return;
   }
   if (new URL(event.request.url).pathname === MEDICINE_INDEX) {
+    const refresh = fetch(event.request)
+      .then(async response => {
+        if (response.ok) {
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put(MEDICINE_INDEX, response.clone());
+        }
+        return response;
+      });
+    event.waitUntil(refresh.catch(() => undefined));
     event.respondWith(
-      fetch(event.request)
-        .then(async response => {
-          if (response.ok) {
-            const cache = await caches.open(CACHE_NAME);
-            await cache.put(MEDICINE_INDEX, response.clone());
-          }
-          return response;
-        })
-        .catch(() => caches.match(MEDICINE_INDEX, { ignoreSearch: true }))
+      caches.match(MEDICINE_INDEX, { ignoreSearch: true })
+        .then(cached => cached || refresh)
+        .catch(() => refresh)
     );
     return;
   }
