@@ -128,10 +128,100 @@ function logSelectorCardFallback(data, sender) {
   );
 }
 
+function selectorRows(card) {
+  const quantity = Number(card.quantity || 1) || 1;
+  const payment = String(card.payment || 'Cash');
+  const rows = [
+    { title: 'Confirm', rowId: 'confirm', description: `${card.medicine || 'Medicine'} x${quantity} ${payment}` },
+    { title: 'Cancel', rowId: 'cancel', description: 'Do not save' }
+  ];
+  for (const qty of [1, 2, 3, 5, 10]) {
+    rows.push({ title: `${qty} Cash`, rowId: `${qty} cash`, description: `Qty ${qty}, Cash` });
+    rows.push({ title: `${qty} M-Pesa`, rowId: `${qty} mpesa`, description: `Qty ${qty}, M-Pesa` });
+  }
+  rows.push({ title: 'Credit', rowId: `${quantity} credit`, description: `Qty ${quantity}, Credit` });
+  rows.push({ title: 'Mixed', rowId: `${quantity} mixed`, description: `Qty ${quantity}, Mixed` });
+  return rows.slice(0, 12);
+}
+
+function compactSelectorText(card, replyText) {
+  const quantity = Number(card.quantity || 1) || 1;
+  const payment = String(card.payment || 'Cash');
+  const medicine = String(card.medicine || 'Medicine');
+  const fallback = String(replyText || '').trim();
+  if (fallback) return fallback;
+  return [
+    'Sale approval',
+    `${medicine} x${quantity} - ${payment}`,
+    'Qty: 1 | 2 | 3 | 5 | 10',
+    'Pay: Cash | M-Pesa | Credit | Mixed',
+    'Confirm | Cancel'
+  ].join('\n');
+}
+
+async function safeSendSelectorReply(sock, jid, data, replyText) {
+  const card = data && data.selector_card;
+  if (!card || card.type !== 'sale_selector') {
+    return safeSendReply(sock, jid, replyText);
+  }
+  const safety = isAllowedDirectChat(jid);
+  if (!safety.allowed) {
+    console.log(`Reply blocked to ${maskSender(jid)} reason=${safety.reason}`);
+    return false;
+  }
+  const body = compactSelectorText(card, replyText).slice(0, 1000);
+  const startedAt = Date.now();
+  console.log(
+    `SELECTOR_INTERACTIVE_ATTEMPT sender=${maskSender(jid)} medicine=${card.medicine || ''} ` +
+    `quantity=${card.quantity || 1} payment=${card.payment || 'Cash'}`
+  );
+  try {
+    const result = await sock.sendMessage(jid, {
+      text: body,
+      footer: 'PharMareen',
+      title: 'Sale approval',
+      buttonText: 'Choose',
+      sections: [{ title: 'Quick sale', rows: selectorRows(card) }]
+    });
+    const messageId = result && result.key ? result.key.id : '';
+    console.log(
+      `SELECTOR_INTERACTIVE_SENT sender=${maskSender(jid)} message_id=${messageId || 'unknown'} ` +
+      `elapsed_ms=${Date.now() - startedAt}`
+    );
+    reportRuntimeStatus({ state: 'connected', connected: true, last_reply_sent: new Date().toISOString(), last_error: '' });
+    return true;
+  } catch (error) {
+    console.error(`SELECTOR_INTERACTIVE_FAILED sender=${maskSender(jid)} fallback=text error=${error.stack || error.message}`);
+    logSelectorCardFallback(data, jid);
+    return safeSendReply(sock, jid, body);
+  }
+}
+
 function extractText(message) {
   const content = unwrapMessageContent(message.message || {});
   if (content.conversation) return content.conversation;
   if (content.extendedTextMessage && content.extendedTextMessage.text) return content.extendedTextMessage.text;
+  if (content.buttonsResponseMessage) {
+    return content.buttonsResponseMessage.selectedDisplayText || content.buttonsResponseMessage.selectedButtonId || '';
+  }
+  if (content.listResponseMessage) {
+    const selected = content.listResponseMessage.singleSelectReply || {};
+    return content.listResponseMessage.title || selected.selectedRowId || content.listResponseMessage.description || '';
+  }
+  if (content.templateButtonReplyMessage) {
+    return content.templateButtonReplyMessage.selectedDisplayText || content.templateButtonReplyMessage.selectedId || '';
+  }
+  if (content.interactiveResponseMessage && content.interactiveResponseMessage.nativeFlowResponseMessage) {
+    const flow = content.interactiveResponseMessage.nativeFlowResponseMessage;
+    if (flow.paramsJson) {
+      try {
+        const parsed = JSON.parse(flow.paramsJson);
+        return parsed.title || parsed.id || parsed.name || '';
+      } catch {
+        return flow.paramsJson;
+      }
+    }
+  }
   if (content.imageMessage && content.imageMessage.caption) return content.imageMessage.caption;
   if (content.videoMessage && content.videoMessage.caption) return content.videoMessage.caption;
   return '';
@@ -575,10 +665,9 @@ async function startBaileys(options = {}) {
             media_caption: text
           });
           console.log(`BACKEND_REPLY_RECEIVED from ${maskSender(sender)} status=${data.status || 'unknown'} handler=${data.command_handler || 'unknown'} reason=${data.error_reason || 'none'}`);
-          logSelectorCardFallback(data, sender);
           const reply = extractBackendReply(data);
           console.log(`EXTRACTED_REPLY_TEXT ${reply}`);
-          await safeSendReply(sock, sender, reply);
+          await safeSendSelectorReply(sock, sender, data, reply);
         } catch (error) {
           const status = error.response && error.response.status ? error.response.status : 'no-status';
           console.error(`Photo bridge error for ${maskSender(sender)} status=${status}: ${error.stack || error.message}`);
@@ -599,10 +688,9 @@ async function startBaileys(options = {}) {
             voice_transcribe_only: false
           });
           console.log(`BACKEND_REPLY_RECEIVED from ${maskSender(sender)} status=${data.status || 'unknown'} handler=${data.command_handler || 'unknown'} reason=${data.error_reason || 'none'}`);
-          logSelectorCardFallback(data, sender);
           const reply = extractBackendReply(data);
           console.log(`EXTRACTED_REPLY_TEXT ${reply}`);
-          await safeSendReply(sock, sender, reply);
+          await safeSendSelectorReply(sock, sender, data, reply);
         } catch (error) {
           const status = error.response && error.response.status ? error.response.status : 'no-status';
           console.error(`Voice bridge error for ${maskSender(sender)} status=${status}: ${error.stack || error.message}`);
@@ -622,14 +710,13 @@ async function startBaileys(options = {}) {
       try {
         const data = await sendToBackend(text, sender, messageId);
         console.log(`BACKEND_REPLY_RECEIVED from ${maskSender(sender)} status=${data.status || 'unknown'} handler=${data.command_handler || 'unknown'} reason=${data.error_reason || 'none'}`);
-        logSelectorCardFallback(data, sender);
         if (data.status === 'ignored') {
           console.log(`Backend ignored message from ${maskSender(sender)} reason=${data.error_reason || 'unknown'}`);
           continue;
         }
         const reply = extractBackendReply(data);
         console.log(`EXTRACTED_REPLY_TEXT ${reply}`);
-        await safeSendReply(sock, sender, reply);
+        await safeSendSelectorReply(sock, sender, data, reply);
         if (data.media_url) {
           await safeSendReply(sock, sender, `Report file: ${data.media_url}`);
         }

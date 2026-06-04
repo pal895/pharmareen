@@ -591,6 +591,16 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     backend_source = (Path(__file__).resolve().parents[1] / "app" / "main.py").read_text(encoding="utf-8")
 
     assert "async function safeSendReply" in source
+    assert "async function safeSendSelectorReply" in source
+    assert "SELECTOR_INTERACTIVE_ATTEMPT" in source
+    assert "SELECTOR_INTERACTIVE_SENT" in source
+    assert "SELECTOR_INTERACTIVE_FAILED" in source
+    assert "buttonText: 'Choose'" in source
+    assert "sections: [{ title: 'Quick sale', rows: selectorRows(card) }]" in source
+    assert "buttonsResponseMessage" in source
+    assert "listResponseMessage" in source
+    assert "templateButtonReplyMessage" in source
+    assert "nativeFlowResponseMessage" in source
     assert "safe_mode_no_allowlist" in source
     assert "@s.whatsapp.net" in source
     assert "domain === '@lid'" in source

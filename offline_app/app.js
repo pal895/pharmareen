@@ -12,9 +12,19 @@ const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
-const OFFLINE_APP_BUILD_VERSION = "pharmareen-phone-ready-v2026-05-31";
-const SERVICE_WORKER_VERSION = "pharmareen-offline-v25-phone-ready";
-const DEFAULT_MEDICINE_SHORTCUTS = ["Panadol", "Amox", "Piriton", "ORS", "Glucose"];
+const OFFLINE_APP_BUILD_VERSION = "pharmareen-phone-voice-v2026-06-04";
+const SERVICE_WORKER_VERSION = "pharmareen-offline-v26-phone-voice";
+const DEFAULT_MEDICINE_SHORTCUTS = [
+  "Panadol",
+  "Glucose",
+  "ORS",
+  "Paracetamol",
+  "Amoxyl",
+  "Cetirizine",
+  "Belladonna",
+  "Amox",
+  "Piriton"
+];
 console.log(`OFFLINE_APP_BUILD_VERSION=${OFFLINE_APP_BUILD_VERSION}`);
 
 const examples = {
@@ -198,8 +208,8 @@ function setMedicineMatcherReady(ready) {
     if (button) button.disabled = !medicineMatcherReady;
   }
   if (voiceStatus && !medicineMatcherReady) {
-    voiceStatus.textContent = "Getting medicines ready...";
-  } else if (voiceStatus && voiceStatus.textContent === "Getting medicines ready...") {
+    voiceStatus.textContent = "Preparing pharmacy brain...";
+  } else if (voiceStatus && voiceStatus.textContent === "Preparing pharmacy brain...") {
     voiceStatus.textContent = "Ready.";
   }
 }
@@ -936,7 +946,7 @@ function focusVoiceMedicineSearch() {
 
 function startLocalVoiceSelector() {
   if (!medicineMatcherReady) {
-    voiceStatus.textContent = "Getting medicines ready...";
+    voiceStatus.textContent = "Preparing pharmacy brain...";
     return true;
   }
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -962,7 +972,7 @@ function startLocalVoiceSelector() {
         focusVoiceMedicineSearch();
         return;
       }
-      voiceStatus.textContent = "I didn't catch the medicine. Choose it from search.";
+      voiceStatus.textContent = "I didn't catch the medicine. Try again or search below.";
       focusVoiceMedicineSearch();
     };
     recognition.onresult = event => {
@@ -977,7 +987,7 @@ function startLocalVoiceSelector() {
       const handled = voiceRecognitionHandled;
       resetVoiceRecognition();
       if (!handled) {
-        voiceStatus.textContent = "I didn't catch the medicine. Choose it from search.";
+        voiceStatus.textContent = "I didn't catch the medicine. Try again or search below.";
         focusVoiceMedicineSearch();
       }
     };
@@ -1000,14 +1010,14 @@ function handleLocalVoiceTranscript(transcript) {
   }
   voiceStatus.textContent = resolution.choices.length
     ? `Which medicine? ${resolution.choices.join(" or ")}. Type the full name.`
-    : "I didn't catch the medicine. Choose it from search.";
+    : "I didn't catch the medicine. Try again or search below.";
   focusVoiceMedicineSearch();
   return false;
 }
 
 async function startVoiceRecording(options = {}) {
   if (!medicineMatcherReady) {
-    voiceStatus.textContent = "Getting medicines ready...";
+    voiceStatus.textContent = "Preparing pharmacy brain...";
     return;
   }
   if (voiceRecognitionActive && voiceRecognition) {
