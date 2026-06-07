@@ -712,6 +712,7 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
 
     assert "async function safeSendReply" in source
     assert "async function safeSendSelectorReply" in source
+    assert "BACKEND_SELECTOR_CARD_RECEIVED" in source
     assert "SELECTOR_INTERACTIVE_ATTEMPT" in source
     assert "SELECTOR_LIST_ATTEMPT" in source
     assert "SELECTOR_BUTTONS_ATTEMPT" in source

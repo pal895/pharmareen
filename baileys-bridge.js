@@ -291,6 +291,10 @@ async function safeSendSelectorReply(sock, jid, data, replyText) {
   if (!card || card.type !== 'sale_selector') {
     return safeSendReply(sock, jid, replyText);
   }
+  console.log(
+    `BACKEND_SELECTOR_CARD_RECEIVED sender=${maskSender(jid)} medicine=${card.medicine || ''} ` +
+    `quantity=${card.quantity || 1} payment=${card.payment || 'Cash'}`
+  );
   const safety = isAllowedDirectChat(jid);
   if (!safety.allowed) {
     console.log(`Reply blocked to ${maskSender(jid)} reason=${safety.reason}`);

@@ -12,8 +12,8 @@ const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
-const OFFLINE_APP_BUILD_VERSION = "pharmareen-phone-voice-v2026-06-04";
-const SERVICE_WORKER_VERSION = "pharmareen-offline-v26-phone-voice";
+const OFFLINE_APP_BUILD_VERSION = "pharmareen-live-selector-v2026-06-07";
+const SERVICE_WORKER_VERSION = "pharmareen-offline-v27-live-selector";
 const DEFAULT_MEDICINE_SHORTCUTS = [
   "Panadol",
   "Glucose",
@@ -972,7 +972,7 @@ function startLocalVoiceSelector() {
         focusVoiceMedicineSearch();
         return;
       }
-      voiceStatus.textContent = "I didn't catch the medicine. Try again or search below.";
+      voiceStatus.textContent = "Choose medicine below or tap Tap & Talk again.";
       focusVoiceMedicineSearch();
     };
     recognition.onresult = event => {
@@ -987,7 +987,7 @@ function startLocalVoiceSelector() {
       const handled = voiceRecognitionHandled;
       resetVoiceRecognition();
       if (!handled) {
-        voiceStatus.textContent = "I didn't catch the medicine. Try again or search below.";
+        voiceStatus.textContent = "Choose medicine below or tap Tap & Talk again.";
         focusVoiceMedicineSearch();
       }
     };
@@ -1010,7 +1010,7 @@ function handleLocalVoiceTranscript(transcript) {
   }
   voiceStatus.textContent = resolution.choices.length
     ? `Which medicine? ${resolution.choices.join(" or ")}. Type the full name.`
-    : "I didn't catch the medicine. Try again or search below.";
+    : "Choose medicine below or tap Tap & Talk again.";
   focusVoiceMedicineSearch();
   return false;
 }
@@ -1027,7 +1027,7 @@ async function startVoiceRecording(options = {}) {
   }
   if (!options.skipSelector && startLocalVoiceSelector()) return;
   if (!options.skipSelector) {
-    voiceStatus.textContent = "Speech recognition is not available here. Choose medicine from search.";
+    voiceStatus.textContent = "Choose medicine below. Tap a medicine or search; no internet needed.";
     focusVoiceMedicineSearch();
     return;
   }

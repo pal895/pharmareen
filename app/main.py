@@ -88,7 +88,7 @@ last_openai_error: dict[str, Any] = {
 VOICE_QUOTA_REPLY = "🎧 Voice received safely. Voice reading is unavailable right now. Please choose the medicine or type it."
 PHOTO_QUOTA_REPLY = "📷 Photo received safely. Saved for review."
 DEFAULT_PUBLIC_BASE_URL = "https://pharmareen-1--pal895.replit.app"
-OFFLINE_BUILD_VERSION = "pharmareen-phone-voice-v2026-06-04"
+OFFLINE_BUILD_VERSION = "pharmareen-live-selector-v2026-06-07"
 OFFLINE_FRONTEND_MARKER = f"PHARMAREEN REAL PATH BUILD {OFFLINE_BUILD_VERSION}"
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
 OFFLINE_NO_CACHE_HEADERS = {
@@ -3406,6 +3406,16 @@ def local_sale_selector_result(
         success=True,
         command_handler="voice_medicine_selector" if message_type == "voice" else "text_medicine_selector",
         selector_card=sale_selector_card(drug_name, quantity, payment_method),
+    )
+    logger.info(
+        "LOCAL_SELECTOR_RESULT sender=%s message_type=%s medicine=%s quantity=%s payment=%s "
+        "handler=%s selector_card=true ai_used=false",
+        mask_phone(sender),
+        message_type,
+        drug_name,
+        quantity,
+        payment_method,
+        result.command_handler,
     )
     logger.info(
         "LOCAL_SELECTOR_TIMING sender=%s medicine=%s message_type=%s elapsed_ms=%.1f ai_used=false",

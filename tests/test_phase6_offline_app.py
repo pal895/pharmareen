@@ -123,7 +123,7 @@ def test_offline_app_routes_return_html():
     assert "Take Photo" in followed_response.text
     assert "Save Photo" in followed_response.text
     assert "Save Voice" in followed_response.text
-    assert "PHARMAREEN REAL PATH BUILD pharmareen-phone-voice-v2026-06-04" in followed_response.text
+    assert "PHARMAREEN REAL PATH BUILD pharmareen-live-selector-v2026-06-07" in followed_response.text
     assert "PHARMAREEN SMOOTH TEST v2026-05-15" in followed_response.text
     assert "Cash mode active" in followed_response.text
     assert 'class="bottom-nav"' in followed_response.text
@@ -147,7 +147,7 @@ def test_offline_app_routes_return_html():
     assert "PharMareen Offline Mode" in compat_response.text
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in compat_response.text
     assert "no-store" in compat_response.headers.get("cache-control", "")
-    assert compat_response.headers.get("x-pharmareen-offline-version") == "pharmareen-phone-voice-v2026-06-04"
+    assert compat_response.headers.get("x-pharmareen-offline-version") == "pharmareen-live-selector-v2026-06-07"
     assert parser_response.status_code == 200
     assert manifest_response.status_code == 200
     assert worker_response.status_code == 200
@@ -159,7 +159,7 @@ def test_debug_version_exposes_realpath_build_marker():
 
     assert response.status_code == 200
     data = response.json()
-    assert data["offline_build_version"] == "pharmareen-phone-voice-v2026-06-04"
+    assert data["offline_build_version"] == "pharmareen-live-selector-v2026-06-07"
     assert "PHARMAREEN REAL PATH BUILD" in data["offline_frontend_marker"]
 
 
@@ -422,7 +422,7 @@ def test_debug_offline_app_reports_all_phase6_features(monkeypatch, tmp_path):
     assert data["voice_queue_ready"] is True
     assert data["persistent_storage_ready"] is True
     assert data["auto_sync_ready"] is True
-    assert data["frontend_marker"] == "PHARMAREEN REAL PATH BUILD pharmareen-phone-voice-v2026-06-04"
+    assert data["frontend_marker"] == "PHARMAREEN REAL PATH BUILD pharmareen-live-selector-v2026-06-07"
     assert data["served_index_path"].endswith("static/offline_app/index.html") or data["served_index_path"].endswith("static\\offline_app\\index.html")
     assert "offline_log_exists" in data
 
@@ -529,7 +529,7 @@ def test_legacy_local_offline_app_matches_phase6_frontend():
     legacy_parser = root / "local" / "parser.js"
 
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in legacy_html
-    assert "PHARMAREEN REAL PATH BUILD pharmareen-phone-voice-v2026-06-04" in legacy_html
+    assert "PHARMAREEN REAL PATH BUILD pharmareen-live-selector-v2026-06-07" in legacy_html
     assert "PHARMAREEN SMOOTH TEST v2026-05-15" in legacy_html
     assert "Choose From Files/Gallery" in legacy_html
     assert "Choose voice/audio files" in legacy_html
@@ -547,7 +547,7 @@ def test_legacy_offline_app_folder_matches_final_frontend():
     legacy_parser = root / "offline_app" / "parser.js"
 
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in legacy_html
-    assert "PHARMAREEN REAL PATH BUILD pharmareen-phone-voice-v2026-06-04" in legacy_html
+    assert "PHARMAREEN REAL PATH BUILD pharmareen-live-selector-v2026-06-07" in legacy_html
     assert "PHARMAREEN SMOOTH TEST v2026-05-15" in legacy_html
     assert "Choose From Files/Gallery" in legacy_html
     assert "Choose voice/audio files" in legacy_html
@@ -556,7 +556,7 @@ def test_legacy_offline_app_folder_matches_final_frontend():
     assert " required" not in legacy_html
     assert "disableNativeRequiredValidation" in legacy_app
     assert "queueMediaFiles" in legacy_app
-    assert "pharmareen-offline-v26-phone-voice" in legacy_worker
+    assert "pharmareen-offline-v27-live-selector" in legacy_worker
     assert legacy_parser.exists()
 
 
@@ -651,7 +651,7 @@ def test_mobile_layout_and_local_voice_selector_hooks_are_present():
     assert "resetVoiceRecognition" in script
     assert "setTimeout" in script
     assert "skipSelector" in script
-    assert "I didn't catch the medicine. Try again or search below." in script
+    assert "Choose medicine below or tap Tap & Talk again." in script
     assert "handleLocalVoiceTranscript" in script
     assert "voiceRecordingTimeout" in script
     assert "INVENTORY_MEDICINES_KEY" in script
@@ -662,13 +662,14 @@ def test_mobile_layout_and_local_voice_selector_hooks_are_present():
     assert 'id="voiceMedicineSearch"' in html
     assert 'id="chooseVoiceMedicine"' in html
     assert "Stop Listening" in script
-    assert "Speech recognition is not available here. Choose medicine from search." in script
+    assert "Choose medicine below. Tap a medicine or search; no internet needed." in script
     assert "chooseVoiceMedicineFromSearch" in script
     assert "phoneticMedicineToken" in script
     assert "spokenSimilarity" in script
     assert "voiceSaleDefaults" in script
     assert "focusVoiceMedicineSearch" in script
-    assert "I didn't catch the medicine. Try again or search below." in script
+    assert "Choose medicine below. Tap a medicine or search; no internet needed." in script
+    assert "I didn't catch the medicine" not in script
 
 
 def test_phone_tap_talk_waits_for_cached_medicine_matcher_before_first_use():
@@ -676,7 +677,7 @@ def test_phone_tap_talk_waits_for_cached_medicine_matcher_before_first_use():
     script = (root / "static" / "offline_app" / "app.js").read_text(encoding="utf-8")
     worker = (root / "static" / "offline_app" / "service-worker.js").read_text(encoding="utf-8")
 
-    assert 'const SERVICE_WORKER_VERSION = "pharmareen-offline-v26-phone-voice"' in script
+    assert 'const SERVICE_WORKER_VERSION = "pharmareen-offline-v27-live-selector"' in script
     assert "setMedicineMatcherReady(false)" in script
     assert "await loadInventoryMedicines({ timeoutMs: 1500 })" in script
     assert "setMedicineMatcherReady(true)" in script
@@ -842,14 +843,14 @@ def test_offline_pwa_assets_contain_auto_sync_media_and_retry_logic():
     assert "parseCommand" in parser
     assert "Save Offline" in html
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in html
-    assert "PHARMAREEN REAL PATH BUILD pharmareen-phone-voice-v2026-06-04" in html
+    assert "PHARMAREEN REAL PATH BUILD pharmareen-live-selector-v2026-06-07" in html
     assert "PHARMAREEN SMOOTH TEST v2026-05-15" in html
     assert "Save Photo" in html
     assert "Save Voice" in html
     assert "Tap & Talk" in html
     assert '"start_url": "/offline-app"' in manifest
     assert "/offline_app/parser.js" in worker
-    assert "pharmareen-offline-v26-phone-voice" in worker
+    assert "pharmareen-offline-v27-live-selector" in worker
     assert 'const OFFLINE_INDEX = "/offline_app/index.html"' in worker
     assert 'event.request.mode === "navigate"' in worker
     assert "ignoreSearch: true" in worker
