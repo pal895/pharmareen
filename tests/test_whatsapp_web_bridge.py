@@ -159,6 +159,23 @@ def test_whatsapp_web_bridge_processes_allowed_sender(monkeypatch):
     assert data["command_handler"] == "help_start"
 
 
+def test_whatsapp_web_bridge_processes_allowed_sender_from_direct_chat_number_alias(monkeypatch):
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_DIRECT_CHAT_NUMBERS="254700000000"),
+    )
+
+    with TestClient(main.app) as client:
+        response = client.post("/bridge/whatsapp-web", json=bridge_payload("help"))
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "Panadol" in data["reply"]
+    assert data["command_handler"] == "help_start"
+
+
 def test_whatsapp_web_bridge_greeting_and_how_to_use_are_human_friendly(monkeypatch):
     main.get_sheet_store.cache_clear()
     main.get_intake_service.cache_clear()
@@ -253,6 +270,74 @@ def test_whatsapp_web_bridge_ignores_lid_sender_without_test_mode(monkeypatch):
     assert data["status"] == "ignored"
     assert data["reply"] == ""
     assert data["error_reason"] == "sender_direct_but_no_phone_digits"
+
+
+def test_whatsapp_web_bridge_allows_lid_sender_when_lid_is_allowlisted(monkeypatch):
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(
+            _env_file=None,
+            ALLOWED_DIRECT_CHAT_NUMBERS="254721149472",
+            ALLOWED_DIRECT_CHAT_LIDS="894365771",
+        ),
+    )
+
+    with TestClient(main.app) as client:
+        response = client.post(
+            "/bridge/whatsapp-web",
+            json=bridge_payload("help", sender="894365771@lid"),
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "Panadol" in data["reply"]
+    assert data["command_handler"] == "help_start"
+
+
+def test_whatsapp_web_bridge_blocks_lid_sender_when_lid_not_allowlisted(monkeypatch):
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(
+            _env_file=None,
+            ALLOWED_DIRECT_CHAT_NUMBERS="254721149472",
+            ALLOWED_DIRECT_CHAT_LIDS="111111111",
+        ),
+    )
+
+    with TestClient(main.app) as client:
+        response = client.post(
+            "/bridge/whatsapp-web",
+            json=bridge_payload("help", sender="894365771@lid"),
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ignored"
+    assert data["reply"] == ""
+    assert data["error_reason"] == "sender_lid_not_allowed"
+
+
+def test_whatsapp_web_bridge_allows_lid_sender_when_phone_is_resolved(monkeypatch):
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, ALLOWED_DIRECT_CHAT_NUMBERS="254721149472"),
+    )
+
+    with TestClient(main.app) as client:
+        payload = bridge_payload("help", sender="894365771@lid")
+        payload["sender_phone"] = "254721149472"
+        payload["sender_lid"] = "894365771"
+        response = client.post("/bridge/whatsapp-web", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "Panadol" in data["reply"]
+    assert data["command_handler"] == "help_start"
 
 
 def test_whatsapp_web_bridge_allows_lid_sender_in_test_mode(monkeypatch):
@@ -648,6 +733,16 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "@s.whatsapp.net" in source
     assert "domain === '@lid'" in source
     assert "ALLOW_ALL_DIRECT_CHATS_FOR_TEST" in source
+    assert "ALLOWED_DIRECT_CHAT_NUMBERS" in source
+    assert "ALLOWED_DIRECT_CHAT_LIDS" in source
+    assert "allowedLids" in source
+    assert "senderIdentityFromMessage" in source
+    assert "contacts.update" in source
+    assert "ALLOWLIST_DECISION" in source
+    assert "normalized_phone=" in source
+    assert "normalized_lid=" in source
+    assert "allowed_lid" in source
+    assert "sender_lid_not_allowed" in source
     assert "allow_all_direct_chats_for_test" in source
     assert "jid_domain=" in source
     assert "TEST MODE ACCEPTED DIRECT CHAT" in source
@@ -704,9 +799,12 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "BACKEND_TEST_MODE_ACCEPTED_LID" in backend_source
     assert "BACKEND_REPLY_TEXT" in backend_source
     assert "boolish" in backend_source
-    assert "SAFE MODE: no allowed numbers configured" in source
+    assert "SAFE MODE: no allowed direct chat numbers or LIDs configured" in source
     assert "GROUP REPLIES: DISABLED" in source
     assert "UNKNOWN NUMBER REPLIES: DISABLED" in source
+    assert "allowed_direct_chat_lids_configured" in backend_source
+    assert "parse_allowed_whatsapp_lids" in backend_source
+    assert "WHATSAPP_ALLOWLIST_DECISION" in backend_source
 
     send_lines = [line.strip() for line in source.splitlines() if "sock.sendMessage" in line]
     assert "const result = await sock.sendMessage(jid, { text: body });" in send_lines

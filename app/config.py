@@ -49,7 +49,11 @@ class Settings(BaseSettings):
     )
     allowed_whatsapp_numbers: str = Field(
         default="",
-        validation_alias=AliasChoices("ALLOWED_WHATSAPP_NUMBERS", "ALLOWED_PHONE_NUMBERS"),
+        validation_alias=AliasChoices("ALLOWED_WHATSAPP_NUMBERS", "ALLOWED_DIRECT_CHAT_NUMBERS", "ALLOWED_PHONE_NUMBERS"),
+    )
+    allowed_direct_chat_lids: str = Field(
+        default="",
+        validation_alias=AliasChoices("ALLOWED_DIRECT_CHAT_LIDS", "ALLOWED_WHATSAPP_LIDS"),
     )
     allow_all_direct_chats_for_test: bool = Field(
         default=False,

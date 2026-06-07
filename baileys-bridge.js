@@ -18,10 +18,16 @@ const sessionPath = process.env.BAILEYS_SESSION_PATH || './.baileys_auth';
 const baileysLogLevel = process.env.BAILEYS_LOG_LEVEL || 'info';
 const autoResetOnLoggedOut = String(process.env.AUTO_RESET_BAILEYS_ON_LOGOUT || 'true').toLowerCase() !== 'false';
 const allowAllDirectChatsForTest = String(process.env.ALLOW_ALL_DIRECT_CHATS_FOR_TEST || 'false').toLowerCase() === 'true';
-const allowedNumbers = parseAllowedNumbers(process.env.ALLOWED_WHATSAPP_NUMBERS || '');
+const allowedNumbers = parseAllowedNumbers(
+  `${process.env.ALLOWED_WHATSAPP_NUMBERS || ''},${process.env.ALLOWED_DIRECT_CHAT_NUMBERS || ''}`
+);
+const allowedLids = parseAllowedLids(
+  `${process.env.ALLOWED_DIRECT_CHAT_LIDS || ''},${process.env.ALLOWED_WHATSAPP_LIDS || ''}`
+);
 const offlineConfirmationPollMs = Number(process.env.OFFLINE_CONFIRMATION_POLL_MS || 10000);
 let offlineConfirmationPoller = null;
 let reconnectTimer = null;
+const phoneByLid = new Map();
 const currentRuntimeStatus = {
   state: 'starting',
   connected: false,
@@ -37,6 +43,18 @@ function phoneDigits(value) {
 
 function parseAllowedNumbers(raw) {
   return new Set(String(raw || '').split(/[;,]/).map(phoneDigits).filter(Boolean));
+}
+
+function normalizeLid(value) {
+  let text = String(value || '').trim().toLowerCase().replace(/whatsapp:/g, '');
+  if (!text) return '';
+  if (text.includes('@')) text = text.slice(0, text.lastIndexOf('@'));
+  if (text.includes(':')) text = text.split(':')[0];
+  return text.replace(/[^a-z0-9]/g, '');
+}
+
+function parseAllowedLids(raw) {
+  return new Set(String(raw || '').split(/[;,]/).map(normalizeLid).filter(Boolean));
 }
 
 function maskSender(value) {
@@ -80,26 +98,91 @@ function jidDebug(jid) {
   return `jid_domain=${jidDomain(jid)}`;
 }
 
-function isAllowedDirectChat(jid) {
+function senderIdentityFromMessage(msg) {
+  const key = (msg && msg.key) || {};
+  const senderJid = key.remoteJid || 'unknown';
+  const candidates = [
+    key.remoteJid,
+    key.participant,
+    key.remoteJidAlt,
+    key.participantAlt,
+    key.senderPn,
+    key.senderJid,
+    msg && msg.participant,
+    msg && msg.sender
+  ].filter(Boolean);
+  let normalizedPhone = '';
+  let normalizedLid = '';
+  for (const candidate of candidates) {
+    const domain = jidDomain(candidate);
+    if (!normalizedPhone && domain === '@s.whatsapp.net') normalizedPhone = phoneDigits(candidate);
+    if (!normalizedLid && domain === '@lid') normalizedLid = normalizeLid(candidate);
+  }
+  if (!normalizedPhone && normalizedLid && phoneByLid.has(normalizedLid)) {
+    normalizedPhone = phoneByLid.get(normalizedLid);
+  }
+  return { senderJid, normalizedPhone, normalizedLid };
+}
+
+function isAllowedDirectChat(jid, identity = {}) {
   if (!jid || isGroupJid(jid) || isBroadcastJid(jid) || !isDirectUserJid(jid)) {
     return { allowed: false, reason: 'not_direct_chat' };
   }
   if (allowAllDirectChatsForTest) {
     return { allowed: true, reason: 'test_mode_allowed_direct_chat' };
   }
-  if (jidDomain(jid) === '@lid') {
-    return { allowed: false, reason: 'sender_direct_but_no_phone_digits' };
-  }
-  if (allowedNumbers.size === 0) {
+  if (allowedNumbers.size === 0 && allowedLids.size === 0) {
     return { allowed: false, reason: 'safe_mode_no_allowlist' };
   }
-  const digits = phoneDigits(jid);
-  if (!digits) {
+  const domain = jidDomain(jid);
+  const normalizedPhone = identity.normalizedPhone || (domain === '@s.whatsapp.net' ? phoneDigits(jid) : '');
+  const normalizedLid = identity.normalizedLid || (domain === '@lid' ? normalizeLid(jid) : '');
+  if (normalizedPhone && allowedNumbers.has(normalizedPhone)) {
+    return { allowed: true, reason: 'allowed_number' };
+  }
+  if (normalizedLid && allowedLids.has(normalizedLid)) {
+    return { allowed: true, reason: 'allowed_lid' };
+  }
+  if (domain === '@lid' && !normalizedPhone && allowedLids.size === 0) {
     return { allowed: false, reason: 'sender_direct_but_no_phone_digits' };
   }
-  return allowedNumbers.has(digits)
-    ? { allowed: true, reason: 'allowed_number' }
-    : { allowed: false, reason: 'sender_not_allowed' };
+  if (domain === '@lid') {
+    return { allowed: false, reason: 'sender_lid_not_allowed' };
+  }
+  if (!normalizedPhone) {
+    return { allowed: false, reason: 'sender_direct_but_no_phone_digits' };
+  }
+  return { allowed: false, reason: 'sender_not_allowed' };
+}
+
+function logAllowlistDecision(identity, safety) {
+  console.log(
+    `ALLOWLIST_DECISION sender_jid=${identity.senderJid || ''} sender_domain=${jidDomain(identity.senderJid || '')} ` +
+    `normalized_phone=${identity.normalizedPhone || ''} normalized_lid=${identity.normalizedLid || ''} ` +
+    `allowed=${Boolean(safety && safety.allowed)} reason=${(safety && safety.reason) || 'unknown'}`
+  );
+}
+
+function indexContactIdentity(contact) {
+  const candidates = [
+    contact && contact.id,
+    contact && contact.jid,
+    contact && contact.lid,
+    contact && contact.phoneNumber,
+    contact && contact.pn
+  ].filter(Boolean);
+  let lid = '';
+  let phone = '';
+  for (const candidate of candidates) {
+    const domain = jidDomain(candidate);
+    if (!lid && domain === '@lid') lid = normalizeLid(candidate);
+    if (!phone && domain === '@s.whatsapp.net') phone = phoneDigits(candidate);
+    if (!phone && String(candidate || '').startsWith('+')) phone = phoneDigits(candidate);
+  }
+  if (lid && phone) {
+    phoneByLid.set(lid, phone);
+    console.log(`CONTACT_IDENTITY_INDEXED normalized_lid=${lid} normalized_phone=${phone}`);
+  }
 }
 
 async function safeSendReply(sock, jid, text) {
@@ -355,11 +438,14 @@ async function downloadImageBase64(sock, msg) {
   return downloadMediaBase64(sock, msg);
 }
 
-async function sendToBackend(text, sender, messageId, extraPayload = {}) {
+async function sendToBackend(text, sender, messageId, extraPayload = {}, identity = {}) {
   const url = `${backendUrl}/bridge/whatsapp-web`;
   const payload = {
     message: text,
     from: sender,
+    sender_jid: identity.senderJid || sender,
+    sender_phone: identity.normalizedPhone || '',
+    sender_lid: identity.normalizedLid || '',
     message_id: messageId || '',
     is_group: isGroupJid(sender),
     is_broadcast: isBroadcastJid(sender),
@@ -369,6 +455,7 @@ async function sendToBackend(text, sender, messageId, extraPayload = {}) {
   console.log(`BACKEND_REQUEST_URL ${url}`);
   console.log(
     `BACKEND_REQUEST_PAYLOAD sender=${maskSender(sender)} ${jidDebug(sender)} ` +
+    `normalized_phone=${identity.normalizedPhone || ''} normalized_lid=${identity.normalizedLid || ''} ` +
     `message_length=${String(text || '').length} has_media=${Boolean(extraPayload.media_base64)} ` +
     `media_mime_type=${extraPayload.media_mime_type || ''} test_mode=${allowAllDirectChatsForTest}`
   );
@@ -621,10 +708,10 @@ async function startBaileys(options = {}) {
   console.log(`Backend: ${backendUrl}`);
   console.log(`Baileys session path: ${sessionPath}`);
   console.log(`Baileys log level: ${baileysLogLevel}`);
-  if (allowedNumbers.size === 0) {
-    console.log('SAFE MODE: no allowed numbers configured');
+  if (allowedNumbers.size === 0 && allowedLids.size === 0) {
+    console.log('SAFE MODE: no allowed direct chat numbers or LIDs configured');
   } else {
-    console.log(`Safety allowlist active: ${allowedNumbers.size} number(s).`);
+    console.log(`Safety allowlist active: ${allowedNumbers.size} number(s), ${allowedLids.size} LID(s).`);
   }
   if (allowAllDirectChatsForTest) {
     console.log('TEST MODE ACTIVE: allowing all direct chats that are not groups/broadcasts/status/newsletters/channels.');
@@ -688,13 +775,24 @@ async function startBaileys(options = {}) {
     }
   });
 
+  sock.ev.on('contacts.update', (updates) => {
+    for (const contact of updates || []) {
+      indexContactIdentity(contact);
+    }
+  });
+
   sock.ev.on('messages.upsert', async ({ messages }) => {
     for (const msg of messages || []) {
       if (!msg.message || (msg.key && msg.key.fromMe)) continue;
-      const sender = msg.key.remoteJid || 'unknown';
-      const safety = isAllowedDirectChat(sender);
+      const identity = senderIdentityFromMessage(msg);
+      const sender = identity.senderJid;
+      const safety = isAllowedDirectChat(sender, identity);
+      logAllowlistDecision(identity, safety);
       if (!safety.allowed) {
-        console.log(`Ignored WhatsApp message from ${maskSender(sender)} ${jidDebug(sender)} reason=${safety.reason}`);
+        console.log(
+          `Ignored WhatsApp message from ${maskSender(sender)} sender_jid=${sender} sender_domain=${jidDomain(sender)} ` +
+          `normalized_phone=${identity.normalizedPhone || ''} normalized_lid=${identity.normalizedLid || ''} reason=${safety.reason}`
+        );
         continue;
       }
       if (safety.reason === 'test_mode_allowed_direct_chat') {
@@ -715,7 +813,7 @@ async function startBaileys(options = {}) {
             media_base64: mediaBase64,
             media_mime_type: mimeType,
             media_caption: text
-          });
+          }, identity);
           console.log(`BACKEND_REPLY_RECEIVED from ${maskSender(sender)} status=${data.status || 'unknown'} handler=${data.command_handler || 'unknown'} reason=${data.error_reason || 'none'}`);
           const reply = extractBackendReply(data);
           console.log(`EXTRACTED_REPLY_TEXT ${reply}`);
@@ -738,7 +836,7 @@ async function startBaileys(options = {}) {
             media_base64: mediaBase64,
             media_mime_type: mimeType,
             voice_transcribe_only: false
-          });
+          }, identity);
           console.log(`BACKEND_REPLY_RECEIVED from ${maskSender(sender)} status=${data.status || 'unknown'} handler=${data.command_handler || 'unknown'} reason=${data.error_reason || 'none'}`);
           const reply = extractBackendReply(data);
           console.log(`EXTRACTED_REPLY_TEXT ${reply}`);
@@ -760,7 +858,7 @@ async function startBaileys(options = {}) {
       console.log(`Incoming allowed direct message from ${maskSender(sender)} length=${text.length}`);
       console.log(`INCOMING_MESSAGE_TEXT ${text}`);
       try {
-        const data = await sendToBackend(text, sender, messageId);
+        const data = await sendToBackend(text, sender, messageId, {}, identity);
         console.log(`BACKEND_REPLY_RECEIVED from ${maskSender(sender)} status=${data.status || 'unknown'} handler=${data.command_handler || 'unknown'} reason=${data.error_reason || 'none'}`);
         if (data.status === 'ignored') {
           console.log(`Backend ignored message from ${maskSender(sender)} reason=${data.error_reason || 'unknown'}`);

@@ -1668,6 +1668,27 @@ def parse_allowed_whatsapp_numbers(settings: Settings) -> set[str]:
     return numbers
 
 
+def normalize_lid(value: str) -> str:
+    text = str(value or "").strip().lower().replace("whatsapp:", "")
+    if not text:
+        return ""
+    if "@" in text:
+        text = text.rsplit("@", 1)[0]
+    if ":" in text:
+        text = text.split(":", 1)[0]
+    return "".join(character for character in text if character.isalnum())
+
+
+def parse_allowed_whatsapp_lids(settings: Settings) -> set[str]:
+    raw = str(getattr(settings, "allowed_direct_chat_lids", "") or "")
+    lids: set[str] = set()
+    for item in raw.replace(";", ",").split(","):
+        lid = normalize_lid(item)
+        if lid:
+            lids.add(lid)
+    return lids
+
+
 def phone_digits(value: str) -> str:
     text = str(value or "").replace("whatsapp:", "")
     return "".join(character for character in text if character.isdigit())
@@ -1706,22 +1727,31 @@ def whatsapp_sender_allowed(
     is_group: bool = False,
     is_broadcast: bool = False,
     allow_all_direct_chats_for_test: bool | None = None,
+    sender_phone: str = "",
+    sender_lid: str = "",
 ) -> tuple[bool, str]:
     if not is_direct_whatsapp_sender(sender, is_group=is_group, is_broadcast=is_broadcast):
         return False, "not_direct_chat"
     effective_test_mode = settings.allow_all_direct_chats_for_test or boolish(allow_all_direct_chats_for_test)
     if effective_test_mode:
         return True, "test_mode_allowed_direct_chat"
-    if whatsapp_jid_domain(sender) == "@lid":
-        return False, "sender_direct_but_no_phone_digits"
     allowed_numbers = parse_allowed_whatsapp_numbers(settings)
-    if not allowed_numbers:
+    allowed_lids = parse_allowed_whatsapp_lids(settings)
+    if not allowed_numbers and not allowed_lids:
         return False, "safe_mode_no_allowlist"
-    digits = phone_digits(sender)
+    domain = whatsapp_jid_domain(sender)
+    digits = phone_digits(sender_phone) or (phone_digits(sender) if domain == "@s.whatsapp.net" else "")
+    lid = normalize_lid(sender_lid) or (normalize_lid(sender) if domain == "@lid" else "")
+    if digits and digits in allowed_numbers:
+        return True, "allowed_number"
+    if lid and lid in allowed_lids:
+        return True, "allowed_lid"
+    if domain == "@lid" and not digits and not allowed_lids:
+        return False, "sender_direct_but_no_phone_digits"
+    if domain == "@lid":
+        return False, "sender_lid_not_allowed"
     if not digits:
         return False, "sender_direct_but_no_phone_digits"
-    if digits in allowed_numbers:
-        return True, "allowed_number"
     return False, "sender_not_allowed"
 
 
@@ -1937,7 +1967,8 @@ def debug_system_status() -> dict[str, Any]:
                 "bridge_script": bridge_script_name,
                 "bridge_script_exists": (PROJECT_ROOT / bridge_script_name).exists(),
                 "node_modules_exists": (PROJECT_ROOT / "node_modules").exists(),
-                "safe_allowlist_configured": bool(parse_allowed_whatsapp_numbers(settings)),
+                "safe_allowlist_configured": bool(parse_allowed_whatsapp_numbers(settings) or parse_allowed_whatsapp_lids(settings)),
+                "allowed_direct_chat_lids_configured": bool(parse_allowed_whatsapp_lids(settings)),
                 "test_mode": settings.allow_all_direct_chats_for_test,
                 "endpoint": whatsapp_bridge_url_for(settings),
                 "runtime": dict(whatsapp_bridge_runtime_status),
@@ -2135,6 +2166,8 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
 
     message = str(payload.get("message") or payload.get("body") or "").strip()
     sender = str(payload.get("from") or payload.get("sender") or "whatsapp-web").strip()
+    sender_phone = str(payload.get("sender_phone") or payload.get("normalized_phone") or "").strip()
+    sender_lid = str(payload.get("sender_lid") or payload.get("normalized_lid") or "").strip()
     message_id = str(payload.get("message_id") or payload.get("id") or "").strip()
     media_base64 = str(payload.get("media_base64") or "").strip()
     media_mime_type = str(payload.get("media_mime_type") or payload.get("mimetype") or "").strip()
@@ -2161,6 +2194,17 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
         is_group=is_group,
         is_broadcast=is_broadcast,
         allow_all_direct_chats_for_test=allow_all_direct_chats_for_test,
+        sender_phone=sender_phone,
+        sender_lid=sender_lid,
+    )
+    logger.info(
+        "WHATSAPP_ALLOWLIST_DECISION sender_jid=%s sender_domain=%s normalized_phone=%s normalized_lid=%s allowed=%s reason=%s",
+        sender,
+        whatsapp_jid_domain(sender),
+        phone_digits(sender_phone) or (phone_digits(sender) if whatsapp_jid_domain(sender) == "@s.whatsapp.net" else ""),
+        normalize_lid(sender_lid) or (normalize_lid(sender) if whatsapp_jid_domain(sender) == "@lid" else ""),
+        allowed,
+        reason,
     )
     if not allowed:
         logger.info(
