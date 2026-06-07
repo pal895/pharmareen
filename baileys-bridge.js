@@ -1,5 +1,12 @@
 ﻿const makeWASocket = require('@whiskeysockets/baileys').default;
-const { DisconnectReason, downloadMediaMessage, fetchLatestBaileysVersion, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const {
+  DisconnectReason,
+  downloadMediaMessage,
+  fetchLatestBaileysVersion,
+  generateWAMessageFromContent,
+  proto,
+  useMultiFileAuthState
+} = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
 const P = require('pino');
@@ -131,32 +138,69 @@ function logSelectorCardFallback(data, sender) {
 function selectorRows(card) {
   const quantity = Number(card.quantity || 1) || 1;
   const payment = String(card.payment || 'Cash');
-  const rows = [
+  return [
     { title: 'Confirm', rowId: 'confirm', description: `${card.medicine || 'Medicine'} x${quantity} ${payment}` },
-    { title: 'Cancel', rowId: 'cancel', description: 'Do not save' }
+    { title: 'Cancel', rowId: 'cancel', description: 'Do not save' },
+    { title: '+', rowId: '+', description: 'Add one' },
+    { title: '-', rowId: '-', description: 'Remove one' },
+    ...[1, 2, 3, 5, 10].map(qty => ({ title: `${qty} Cash`, rowId: `${qty} cash`, description: `Qty ${qty}, Cash` })),
+    ...[1, 2, 3, 5, 10].map(qty => ({ title: `${qty} M-Pesa`, rowId: `${qty} mpesa`, description: `Qty ${qty}, M-Pesa` })),
+    { title: 'Credit', rowId: `${quantity} credit`, description: `Qty ${quantity}, Credit` },
+    { title: 'Mixed', rowId: `${quantity} mixed`, description: `Qty ${quantity}, Mixed` }
   ];
-  for (const qty of [1, 2, 3, 5, 10]) {
-    rows.push({ title: `${qty} Cash`, rowId: `${qty} cash`, description: `Qty ${qty}, Cash` });
-    rows.push({ title: `${qty} M-Pesa`, rowId: `${qty} mpesa`, description: `Qty ${qty}, M-Pesa` });
-  }
-  rows.push({ title: 'Credit', rowId: `${quantity} credit`, description: `Qty ${quantity}, Credit` });
-  rows.push({ title: 'Mixed', rowId: `${quantity} mixed`, description: `Qty ${quantity}, Mixed` });
-  return rows.slice(0, 12);
 }
 
 function compactSelectorText(card, replyText) {
   const quantity = Number(card.quantity || 1) || 1;
   const payment = String(card.payment || 'Cash');
   const medicine = String(card.medicine || 'Medicine');
-  const fallback = String(replyText || '').trim();
-  if (fallback) return fallback;
   return [
-    'Sale approval',
-    `${medicine} x${quantity} - ${payment}`,
-    'Qty: 1 | 2 | 3 | 5 | 10',
-    'Pay: Cash | M-Pesa | Credit | Mixed',
+    `${medicine} x${quantity} • ${payment}`,
+    'Choose: 1/2/3/5/10, Cash/M-Pesa/Credit/Mixed',
     'Confirm | Cancel'
   ].join('\n');
+}
+
+function selectorListMessage(card, body) {
+  const rows = selectorRows(card);
+  return proto.Message.fromObject({
+    listMessage: {
+      title: `${card.medicine || 'Medicine'} sale`,
+      description: body,
+      buttonText: 'Choose',
+      listType: 1,
+      footerText: 'PharMareen',
+      sections: [
+        { title: 'Save', rows: rows.slice(0, 4) },
+        { title: 'Cash', rows: rows.slice(4, 9) },
+        { title: 'M-Pesa', rows: rows.slice(9, 14) },
+        { title: 'Other', rows: rows.slice(14) }
+      ]
+    }
+  });
+}
+
+function selectorButtonsMessage(card, body) {
+  return proto.Message.fromObject({
+    buttonsMessage: {
+      contentText: body,
+      footerText: 'PharMareen',
+      headerType: 1,
+      buttons: [
+        { buttonId: 'confirm', buttonText: { displayText: 'Confirm' }, type: 1 },
+        { buttonId: '+', buttonText: { displayText: '+' }, type: 1 },
+        { buttonId: 'cancel', buttonText: { displayText: 'Cancel' }, type: 1 }
+      ]
+    }
+  });
+}
+
+async function relaySelectorNativeMessage(sock, jid, messageContent) {
+  const message = generateWAMessageFromContent(jid, messageContent, {
+    userJid: sock && sock.user && sock.user.id ? sock.user.id : undefined
+  });
+  await sock.relayMessage(jid, message.message, { messageId: message.key.id });
+  return message;
 }
 
 async function safeSendSelectorReply(sock, jid, data, replyText) {
@@ -176,22 +220,30 @@ async function safeSendSelectorReply(sock, jid, data, replyText) {
     `quantity=${card.quantity || 1} payment=${card.payment || 'Cash'}`
   );
   try {
-    const result = await sock.sendMessage(jid, {
-      text: body,
-      footer: 'PharMareen',
-      title: 'Sale approval',
-      buttonText: 'Choose',
-      sections: [{ title: 'Quick sale', rows: selectorRows(card) }]
-    });
+    console.log(`SELECTOR_LIST_ATTEMPT sender=${maskSender(jid)}`);
+    const result = await relaySelectorNativeMessage(sock, jid, selectorListMessage(card, body));
     const messageId = result && result.key ? result.key.id : '';
     console.log(
-      `SELECTOR_INTERACTIVE_SENT sender=${maskSender(jid)} message_id=${messageId || 'unknown'} ` +
+      `SELECTOR_INTERACTIVE_SENT sender=${maskSender(jid)} type=list message_id=${messageId || 'unknown'} ` +
       `elapsed_ms=${Date.now() - startedAt}`
     );
     reportRuntimeStatus({ state: 'connected', connected: true, last_reply_sent: new Date().toISOString(), last_error: '' });
     return true;
-  } catch (error) {
-    console.error(`SELECTOR_INTERACTIVE_FAILED sender=${maskSender(jid)} fallback=text error=${error.stack || error.message}`);
+  } catch (listError) {
+    console.error(`SELECTOR_LIST_FAILED sender=${maskSender(jid)} error=${listError.stack || listError.message}`);
+  }
+  try {
+    console.log(`SELECTOR_BUTTONS_ATTEMPT sender=${maskSender(jid)}`);
+    const result = await relaySelectorNativeMessage(sock, jid, selectorButtonsMessage(card, body));
+    const messageId = result && result.key ? result.key.id : '';
+    console.log(
+      `SELECTOR_INTERACTIVE_SENT sender=${maskSender(jid)} type=buttons message_id=${messageId || 'unknown'} ` +
+      `elapsed_ms=${Date.now() - startedAt}`
+    );
+    reportRuntimeStatus({ state: 'connected', connected: true, last_reply_sent: new Date().toISOString(), last_error: '' });
+    return true;
+  } catch (buttonError) {
+    console.error(`SELECTOR_INTERACTIVE_FAILED sender=${maskSender(jid)} fallback=text error=${buttonError.stack || buttonError.message}`);
     logSelectorCardFallback(data, jid);
     return safeSendReply(sock, jid, body);
   }

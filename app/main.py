@@ -3283,7 +3283,7 @@ def sale_selector_card(drug_name: str, quantity: int, payment_method: str) -> di
         "payment": payment_method,
         "quantity_options": [1, 2, 3, 5, 10, "+", "-"],
         "payment_options": ["Cash", "M-Pesa", "Credit", "Mixed"],
-        "confirm_options": ["YES", "CANCEL"],
+        "confirm_options": ["Confirm", "Cancel"],
     }
 
 
@@ -3295,14 +3295,12 @@ def prepare_local_sale_selector_reply(drug_name: str, quantity: int, payment_met
             drug_name,
             quantity,
             payment_method,
-            conversation_id=mask_phone(sender),
+            conversation_id=sender,
         )
     return "\n".join(
         [
-            "Sale approval",
-            f"{drug_name} x{quantity} - {payment_method}",
-            "Qty: 1 | 2 | 3 | 5 | 10 | + | -",
-            "Pay: Cash | M-Pesa | Credit | Mixed",
+            f"{drug_name} x{quantity} • {payment_method}",
+            "Choose: 1/2/3/5/10, Cash/M-Pesa/Credit/Mixed",
             "Confirm | Cancel",
         ]
     )

@@ -756,10 +756,8 @@ class IntakeService:
 
     def _selector_approval_reply(self, selector: OperatingCommand, *, ready_to_confirm: bool = False) -> str:
         lines = [
-            "Sale approval",
-            f"{selector.drug_name} x{selector.quantity} - {selector.payment_method or 'Cash'}",
-            "Qty: 1 | 2 | 3 | 5 | 10 | + | -",
-            "Pay: Cash | M-Pesa | Credit | Mixed",
+            f"{selector.drug_name} x{selector.quantity} • {selector.payment_method or 'Cash'}",
+            "Choose: 1/2/3/5/10, Cash/M-Pesa/Credit/Mixed",
         ]
         if ready_to_confirm:
             lines.append("Confirm | Cancel")

@@ -200,6 +200,41 @@ def test_whatsapp_web_bridge_followup_sale_uses_sender_context(monkeypatch):
     assert "Stock left:" in second.json()["reply"]
 
 
+def test_whatsapp_selector_confirm_saves_sale_once_and_duplicate_confirm_is_ignored(monkeypatch):
+    from app.ai import AI_ROUTE_DECISION_LOG
+
+    main.get_sheet_store.cache_clear()
+    main.get_intake_service.cache_clear()
+    main.processed_whatsapp_web_message_ids.clear()
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, DEMO_MODE=True, ALLOWED_WHATSAPP_NUMBERS="254700000000"),
+    )
+    AI_ROUTE_DECISION_LOG.clear()
+
+    confirm_payload = bridge_payload("Confirm")
+    confirm_payload["message_id"] = "selector-confirm-once"
+
+    with TestClient(main.app) as client:
+        opened = client.post("/bridge/whatsapp-web", json=bridge_payload("Panadol"))
+        confirmed = client.post("/bridge/whatsapp-web", json=confirm_payload)
+        duplicate = client.post("/bridge/whatsapp-web", json=confirm_payload)
+
+    store = main.get_sheet_store()
+    assert opened.status_code == 200
+    assert opened.json()["selector_card"]["medicine"] == "Panadol"
+    assert "Panadol x1 • Cash" in opened.json()["reply"]
+    assert confirmed.status_code == 200
+    assert "Panadol x1 recorded" in confirmed.json()["reply"]
+    assert "Stock left:" in confirmed.json()["reply"]
+    assert duplicate.status_code == 200
+    assert duplicate.json()["status"] == "duplicate"
+    assert duplicate.json()["reply"] == ""
+    assert store.find_stock("Panadol").current_stock == 29
+    assert all(not item.get("used_ai") for item in AI_ROUTE_DECISION_LOG)
+
+
 def test_whatsapp_web_bridge_ignores_lid_sender_without_test_mode(monkeypatch):
     monkeypatch.setattr(
         main,
@@ -593,10 +628,18 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "async function safeSendReply" in source
     assert "async function safeSendSelectorReply" in source
     assert "SELECTOR_INTERACTIVE_ATTEMPT" in source
+    assert "SELECTOR_LIST_ATTEMPT" in source
+    assert "SELECTOR_BUTTONS_ATTEMPT" in source
+    assert "SELECTOR_LIST_FAILED" in source
     assert "SELECTOR_INTERACTIVE_SENT" in source
     assert "SELECTOR_INTERACTIVE_FAILED" in source
     assert "buttonText: 'Choose'" in source
-    assert "sections: [{ title: 'Quick sale', rows: selectorRows(card) }]" in source
+    assert "generateWAMessageFromContent" in source
+    assert "proto.Message.fromObject" in source
+    assert "relaySelectorNativeMessage" in source
+    assert "listMessage" in source
+    assert "buttonsMessage" in source
+    assert "sock.relayMessage" in source
     assert "buttonsResponseMessage" in source
     assert "listResponseMessage" in source
     assert "templateButtonReplyMessage" in source
@@ -756,7 +799,7 @@ def test_whatsapp_voice_cleans_swahili_misheard_number_and_records(monkeypatch):
     assert data["status"] == "ok"
     assert seen == {}
     assert "Heard: Panadol mbili cash" in data["reply"]
-    assert "Panadol x2 - Cash" in data["reply"]
+    assert "Panadol x2 • Cash" in data["reply"]
 
 
 def test_whatsapp_voice_does_not_claim_records_updated_when_parse_fails(monkeypatch):
@@ -783,7 +826,7 @@ def test_whatsapp_voice_does_not_claim_records_updated_when_parse_fails(monkeypa
 
     data = response.json()
     assert response.status_code == 200
-    assert "Panadol x2 - Cash" in data["reply"]
+    assert "Panadol x2 • Cash" in data["reply"]
     assert "Records updated safely" not in data["reply"]
 
 
@@ -840,10 +883,8 @@ def test_whatsapp_voice_known_medicine_only_opens_local_selector_without_ai_inte
         selected.append(text)
         return "\n".join(
             [
-                "Sale approval",
-                f"{text} x{quantity} - {payment}",
-                "Qty: 1 | 2 | 3 | 5 | 10 | + | -",
-                "Pay: Cash | M-Pesa | Credit | Mixed",
+                f"{text} x{quantity} • {payment}",
+                "Choose: 1/2/3/5/10, Cash/M-Pesa/Credit/Mixed",
                 "Confirm | Cancel",
             ]
         )
@@ -866,8 +907,10 @@ def test_whatsapp_voice_known_medicine_only_opens_local_selector_without_ai_inte
             data = response.json()
             assert response.status_code == 200
             assert data["command_handler"] == "voice_medicine_selector"
-            assert f"{medicine} x1 - Cash" in data["reply"]
-            assert "Qty: 1 | 2 | 3 | 5 | 10 | + | -" in data["reply"]
+            assert f"{medicine} x1 • Cash" in data["reply"]
+            assert "Choose: 1/2/3/5/10, Cash/M-Pesa/Credit/Mixed" in data["reply"]
+            assert "Sale approval" not in data["reply"]
+            assert "Reply YES" not in data["reply"]
 
     assert selected == ["Panadol", "Glucose", "ORS", "Belladonna"]
     assert len(AI_ROUTE_DECISION_LOG) == 4
@@ -894,8 +937,9 @@ def test_whatsapp_text_glucose_opens_short_local_selector_card_without_ai(monkey
     assert data["command_handler"] == "text_medicine_selector"
     assert data["selector_card"]["medicine"] == "Glucose"
     assert data["selector_card"]["quantity"] == 1
-    assert "Glucose x1 - Cash" in data["reply"]
-    assert "Qty: 1 | 2 | 3 | 5 | 10 | + | -" in data["reply"]
+    assert "Glucose x1 • Cash" in data["reply"]
+    assert "Choose: 1/2/3/5/10, Cash/M-Pesa/Credit/Mixed" in data["reply"]
+    assert "Sale approval" not in data["reply"]
     assert "Then reply YES" not in data["reply"]
     assert AI_ROUTE_DECISION_LOG == []
 
@@ -921,7 +965,7 @@ def test_whatsapp_text_spoken_quantity_payment_prefills_local_selector_card_with
     assert data["selector_card"]["medicine"] == "Panadol"
     assert data["selector_card"]["quantity"] == 2
     assert data["selector_card"]["payment"] == "M-Pesa"
-    assert "Panadol x2 - M-Pesa" in data["reply"]
+    assert "Panadol x2 • M-Pesa" in data["reply"]
     assert AI_ROUTE_DECISION_LOG == []
 
 
@@ -1005,7 +1049,7 @@ def test_whatsapp_voice_spoken_quantity_payment_returns_one_prefilled_selector_c
     assert data["selector_card"]["medicine"] == "Panadol"
     assert data["selector_card"]["quantity"] == 2
     assert data["selector_card"]["payment"] == "M-Pesa"
-    assert "Panadol x2 - M-Pesa" in data["reply"]
+    assert "Panadol x2 • M-Pesa" in data["reply"]
     assert "saved for review" not in data["reply"]
     assert duplicate.json()["status"] == "duplicate"
     assert duplicate.json()["reply"] == ""
@@ -1210,7 +1254,7 @@ def test_whatsapp_voice_splits_joined_swahili_quantity_payment(monkeypatch):
     assert response.status_code == 200
     assert seen == {}
     assert "Heard: Panadol mbili cash" in data["reply"]
-    assert "Panadol x2 - Cash" in data["reply"]
+    assert "Panadol x2 • Cash" in data["reply"]
 
 
 def test_whatsapp_unknown_photo_uses_ai_to_extract_invoice_when_key_active(monkeypatch, tmp_path):
@@ -1284,7 +1328,7 @@ def test_whatsapp_voice_repairs_close_medicine_and_joined_payment(monkeypatch):
     assert response.status_code == 200
     assert seen == {}
     assert "Heard: Panadol mbili cash" in data["reply"]
-    assert "Panadol x2 - Cash" in data["reply"]
+    assert "Panadol x2 • Cash" in data["reply"]
 
 
 def test_whatsapp_voice_repairs_tukas_as_two_cash(monkeypatch):
@@ -1319,7 +1363,7 @@ def test_whatsapp_voice_repairs_tukas_as_two_cash(monkeypatch):
     assert response.status_code == 200
     assert seen == {}
     assert "Heard: Panadol two cash" in data["reply"]
-    assert "Panadol x2 - Cash" in data["reply"]
+    assert "Panadol x2 • Cash" in data["reply"]
 
 
 def test_whatsapp_voice_repairs_melikas_as_mbili_cash(monkeypatch):
@@ -1354,7 +1398,7 @@ def test_whatsapp_voice_repairs_melikas_as_mbili_cash(monkeypatch):
     assert response.status_code == 200
     assert seen == {}
     assert "Heard: Panadol mbili cash" in data["reply"]
-    assert "Panadol x2 - Cash" in data["reply"]
+    assert "Panadol x2 • Cash" in data["reply"]
 
 
 def test_whatsapp_voice_reconstructs_inventory_medicines_without_ai_interpretation(monkeypatch):
