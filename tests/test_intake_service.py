@@ -1709,17 +1709,39 @@ def test_known_medicine_selector_is_local_and_accepts_quantity_payment_reply():
 
     prompt = service.process_text("Glucose", conversation_id="voice")
     selected = service.process_text("2 mpesa", conversation_id="voice")
-    saved = service.process_text("yes", conversation_id="voice")
 
     assert "Sale approval" not in prompt
     assert "Glucose x1 • Cash" in prompt
     assert "Choose: 1/2/3/5/10, Cash/M-Pesa/Credit/Mixed" in prompt
-    assert "Glucose x2 • M-Pesa" in selected
-    assert "Confirm | Cancel" in selected
-    assert "Glucose x2" in saved
-    assert "M-Pesa" in saved
+    assert "Glucose x2" in selected
+    assert "M-Pesa" in selected
     assert store.stocks["glucose"].current_stock == 10
     assert parser.called is False
+
+
+def test_known_medicine_selector_saves_any_quantity_or_payment_choice_immediately():
+    store = FakeStore()
+    store.stocks["piriton"] = StockItem(
+        drug_name="Piriton",
+        selling_price=50,
+        cost_price=30,
+        current_stock=20,
+        reorder_level=5,
+        row_number=11,
+    )
+    service = IntakeService(FailingParser(), store)
+
+    prompt = service.process_text("Piriton", conversation_id="rush")
+    saved_qty = service.process_text("7", conversation_id="rush")
+    service.process_text("Piriton", conversation_id="rush-pay")
+    saved_payment = service.process_text("mpesa", conversation_id="rush-pay")
+
+    assert "Piriton x1 • Cash" in prompt
+    assert "Piriton x7" in saved_qty
+    assert "Cash" in saved_qty
+    assert "Piriton x1" in saved_payment
+    assert "M-Pesa" in saved_payment
+    assert store.stocks["piriton"].current_stock == 12
 
 
 def test_typo_sale_and_payment_stay_local_without_ai_parser():

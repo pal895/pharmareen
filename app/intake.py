@@ -423,6 +423,9 @@ class IntakeService:
                 return "No problem. Nothing was saved."
             updated_selector = self._update_selector_choice(text, pending_selector)
             if updated_selector is not None:
+                if self._selector_choice_is_final(text):
+                    self.pending_selector_confirmations.pop(conversation_key, None)
+                    return self._process_commands([updated_selector], conversation_key=conversation_key)
                 self.pending_selector_confirmations[conversation_key] = updated_selector
                 return self._selector_approval_reply(updated_selector, ready_to_confirm=True)
             self.pending_selector_confirmations.pop(conversation_key, None)
@@ -802,6 +805,14 @@ class IntakeService:
         if re.fullmatch(payment_pattern(), clean, flags=re.IGNORECASE):
             return replace(selector, payment_method=parse_payment_method(clean))
         return None
+
+    def _selector_choice_is_final(self, text: str) -> bool:
+        clean = normalize_natural_text(replace_number_words(text.strip()))
+        if clean in {"+", "-"}:
+            return False
+        if re.fullmatch(rf"\d+(?:\s+({payment_pattern()}))?", clean, flags=re.IGNORECASE):
+            return True
+        return bool(re.fullmatch(payment_pattern(), clean, flags=re.IGNORECASE))
 
     def _share_reply(self) -> str:
         return "\n".join(
