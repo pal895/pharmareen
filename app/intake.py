@@ -428,7 +428,8 @@ class IntakeService:
                     return self._process_commands([updated_selector], conversation_key=conversation_key)
                 self.pending_selector_confirmations[conversation_key] = updated_selector
                 return self._selector_approval_reply(updated_selector, ready_to_confirm=True)
-            self.pending_selector_confirmations.pop(conversation_key, None)
+            self.pending_selector_confirmations[conversation_key] = pending_selector
+            return "Choose qty/payment: 1 2 3 5 10, cash/mpesa/credit. Example: 10 mpesa."
         pending_void_confirmation = self.pending_void_confirmation.get(conversation_key)
         if pending_void_confirmation is not None:
             response_key = normalize_key(text)
@@ -789,7 +790,7 @@ class IntakeService:
         return self._selector_approval_reply(selector, ready_to_confirm=True)
 
     def _update_selector_choice(self, text: str, selector: OperatingCommand) -> OperatingCommand | None:
-        clean = normalize_natural_text(replace_number_words(text.strip()))
+        clean = self._normalize_selector_choice_text(text)
         response_key = normalize_key(clean)
         if clean == "+":
             return replace(selector, quantity=max(selector.quantity + 1, 1))
@@ -806,8 +807,41 @@ class IntakeService:
             return replace(selector, payment_method=parse_payment_method(clean))
         return None
 
-    def _selector_choice_is_final(self, text: str) -> bool:
+    def _normalize_selector_choice_text(self, text: str) -> str:
         clean = normalize_natural_text(replace_number_words(text.strip()))
+        clean = " ".join(clean.replace("-", " ").split())
+        key = normalize_key(clean)
+        payment_aliases = {
+            "m": "mpesa",
+            "mp": "mpesa",
+            "mps": "mpesa",
+            "mpesa": "mpesa",
+            "m pesa": "mpesa",
+            "pesa": "mpesa",
+            "c": "cash",
+            "ca": "cash",
+            "csh": "cash",
+            "cash": "cash",
+            "kash": "cash",
+            "cr": "credit",
+            "cred": "credit",
+            "credit": "credit",
+            "card": "card",
+            "mix": "mixed",
+            "mixed": "mixed",
+        }
+        compact = re.fullmatch(r"(\d+)\s*([A-Za-z]+)", clean, flags=re.IGNORECASE)
+        if compact:
+            payment = payment_aliases.get(normalize_key(compact.group(2)))
+            if payment:
+                return f"{compact.group(1)} {payment}"
+        payment = payment_aliases.get(key)
+        if payment:
+            return payment
+        return clean
+
+    def _selector_choice_is_final(self, text: str) -> bool:
+        clean = self._normalize_selector_choice_text(text)
         if clean in {"+", "-"}:
             return False
         if re.fullmatch(rf"\d+(?:\s+({payment_pattern()}))?", clean, flags=re.IGNORECASE):

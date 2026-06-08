@@ -1744,6 +1744,43 @@ def test_known_medicine_selector_saves_any_quantity_or_payment_choice_immediatel
     assert store.stocks["piriton"].current_stock == 12
 
 
+def test_known_medicine_selector_accepts_rush_hour_quantity_payment_shorthand():
+    store = FakeStore()
+    store.stocks["cetirizine"] = StockItem(
+        drug_name="Cetirizine",
+        selling_price=40,
+        cost_price=20,
+        current_stock=100,
+        reorder_level=10,
+        row_number=12,
+    )
+    service = IntakeService(FailingParser(), store)
+
+    service.process_text("Cetirizine", conversation_id="m")
+    mpesa_short = service.process_text("10 M", conversation_id="m")
+    service.process_text("Cetirizine", conversation_id="compact")
+    mpesa_compact = service.process_text("10MPESA", conversation_id="compact")
+    service.process_text("Cetirizine", conversation_id="cash")
+    cash_compact = service.process_text("7c", conversation_id="cash")
+    service.process_text("Cetirizine", conversation_id="credit")
+    credit_compact = service.process_text("5cr", conversation_id="credit")
+    service.process_text("Cetirizine", conversation_id="keeps")
+    help_reply = service.process_text("not sure", conversation_id="keeps")
+    recovered = service.process_text("3 cash", conversation_id="keeps")
+
+    assert "Cetirizine x10" in mpesa_short
+    assert "M-Pesa" in mpesa_short
+    assert "Cetirizine x10" in mpesa_compact
+    assert "M-Pesa" in mpesa_compact
+    assert "Cetirizine x7" in cash_compact
+    assert "Cash" in cash_compact
+    assert "Cetirizine x5" in credit_compact
+    assert "Credit" in credit_compact
+    assert "Choose qty/payment" in help_reply
+    assert "Cetirizine x3" in recovered
+    assert "Cash" in recovered
+
+
 def test_typo_sale_and_payment_stay_local_without_ai_parser():
     store = FakeStore()
     parser = FailingParser()
