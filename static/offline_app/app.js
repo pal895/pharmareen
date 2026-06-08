@@ -81,6 +81,8 @@ let voiceRecognition = null;
 let voiceRecognitionTimeout = null;
 let voiceRecognitionActive = false;
 let voiceRecognitionHandled = false;
+let voiceRecognitionRetryCount = 0;
+let voiceRecognitionLastTranscript = "";
 let voiceRecordingTimeout = null;
 let currentPaymentMode = localStorage.getItem(PAYMENT_MODE_KEY) || "Cash";
 let lastBarcodeScan = { code: "", at: 0 };
@@ -351,6 +353,11 @@ function renderVoiceSaleCard() {
   });
 }
 
+function clearVoiceSelector() {
+  selectedVoiceSale = { medicine: "", quantity: 1, payment: currentPaymentMode };
+  renderVoiceSaleCard();
+}
+
 function showVoiceSelector(medicine, options = {}) {
   selectedVoiceSale = {
     medicine,
@@ -371,6 +378,7 @@ function chooseVoiceMedicineFromSearch() {
     return true;
   }
   if (voiceStatus) {
+    clearVoiceSelector();
     voiceStatus.textContent = resolution.choices.length
       ? `Which medicine? ${resolution.choices.join(" or ")}. Type the full name.`
       : "I didn't find that medicine. Type the full medicine name.";
@@ -944,7 +952,7 @@ function focusVoiceMedicineSearch() {
   if (voiceMedicineSearch) voiceMedicineSearch.focus();
 }
 
-function startLocalVoiceSelector() {
+function startLocalVoiceSelector(options = {}) {
   if (!medicineMatcherReady) {
     voiceStatus.textContent = "Preparing pharmacy brain...";
     return true;
@@ -956,11 +964,13 @@ function startLocalVoiceSelector() {
     voiceRecognition = recognition;
     voiceRecognitionActive = true;
     voiceRecognitionHandled = false;
+    voiceRecognitionRetryCount = Number(options.retryCount || 0);
+    voiceRecognitionLastTranscript = "";
     recognition.lang = "en-KE";
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 3;
     recognition.onstart = () => {
-      voiceStatus.textContent = "Listening... tap again to stop.";
+      voiceStatus.textContent = voiceRecognitionRetryCount ? "Listening again..." : "Listening...";
       const button = document.getElementById("tapTalk");
       if (button) button.textContent = "Stop Listening";
     };
@@ -968,33 +978,58 @@ function startLocalVoiceSelector() {
       voiceRecognitionHandled = true;
       resetVoiceRecognition();
       if (event && (event.error === "not-allowed" || event.error === "service-not-allowed")) {
+        clearVoiceSelector();
         voiceStatus.textContent = "Please allow microphone to use Tap & Talk.";
         focusVoiceMedicineSearch();
         return;
       }
-      voiceStatus.textContent = "Choose medicine below or tap Tap & Talk again.";
+      if (event && event.error === "no-speech" && voiceRecognitionRetryCount < 1) {
+        voiceStatus.textContent = "Listening again...";
+        setTimeout(() => startLocalVoiceSelector({ retryCount: voiceRecognitionRetryCount + 1 }), 120);
+        return;
+      }
+      clearVoiceSelector();
+      voiceStatus.textContent = "I didn't hear a medicine clearly. Search or tap again.";
       focusVoiceMedicineSearch();
     };
     recognition.onresult = event => {
-      voiceRecognitionHandled = true;
-      resetVoiceRecognition();
-      const transcript = event.results && event.results[0] && event.results[0][0]
-        ? event.results[0][0].transcript
-        : "";
-      handleLocalVoiceTranscript(transcript);
+      const transcript = Array.from(event.results || [])
+        .map(result => result && result[0] ? result[0].transcript : "")
+        .join(" ")
+        .trim();
+      if (transcript) voiceRecognitionLastTranscript = transcript;
+      const resolution = resolveLocalMedicineFromSpeech(voiceRecognitionLastTranscript);
+      if (resolution.medicine) {
+        voiceRecognitionHandled = true;
+        try { recognition.stop(); } catch {}
+        handleLocalVoiceTranscript(voiceRecognitionLastTranscript);
+      } else if (voiceRecognitionLastTranscript) {
+        voiceStatus.textContent = "Checking medicine...";
+      }
     };
     recognition.onend = () => {
       const handled = voiceRecognitionHandled;
+      const transcript = voiceRecognitionLastTranscript;
       resetVoiceRecognition();
+      if (!handled && transcript) {
+        handleLocalVoiceTranscript(transcript);
+        return;
+      }
       if (!handled) {
-        voiceStatus.textContent = "Choose medicine below or tap Tap & Talk again.";
+        if (voiceRecognitionRetryCount < 1) {
+          voiceStatus.textContent = "Listening again...";
+          setTimeout(() => startLocalVoiceSelector({ retryCount: voiceRecognitionRetryCount + 1 }), 120);
+          return;
+        }
+        clearVoiceSelector();
+        voiceStatus.textContent = "I didn't hear a medicine clearly. Search or tap again.";
         focusVoiceMedicineSearch();
       }
     };
     recognition.start();
     voiceRecognitionTimeout = setTimeout(() => {
       try { recognition.stop(); } catch {}
-    }, 6000);
+    }, 9000);
     return true;
   } catch {
     resetVoiceRecognition();
@@ -1011,6 +1046,7 @@ function handleLocalVoiceTranscript(transcript) {
   voiceStatus.textContent = resolution.choices.length
     ? `Which medicine? ${resolution.choices.join(" or ")}. Type the full name.`
     : "Choose medicine below or tap Tap & Talk again.";
+  clearVoiceSelector();
   focusVoiceMedicineSearch();
   return false;
 }
