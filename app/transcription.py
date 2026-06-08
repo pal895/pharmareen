@@ -12,6 +12,15 @@ class TranscriptionUnavailableError(RuntimeError):
     pass
 
 
+PHARMACY_TRANSCRIPTION_PROMPT = (
+    "Kenyan pharmacy voice note. Listen for medicine names and short sale words. "
+    "Common medicines include Panadol, Glucose, ORS, Cetirizine, Piriton, Amoxyl, "
+    "Amoxicillin, Paracetamol, Insulin, Antacid, Cough Syrup, WaterGuard, PEP Lime Cordial. "
+    "Swahili numbers: moja=1, mbili=2, tatu=3, nne=4, tano=5, sita=6, saba=7, nane=8, tisa=9, kumi=10. "
+    "Payments: cash, M-Pesa, mpesa, credit, mixed. Keep the transcript short."
+)
+
+
 class TranscriptionService:
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -38,6 +47,7 @@ class TranscriptionService:
             model=self.settings.openai_transcription_model,
             file=(filename, audio_bytes, clean_content_type),
             response_format="text",
+            prompt=PHARMACY_TRANSCRIPTION_PROMPT,
         )
         if isinstance(result, str):
             return result.strip()

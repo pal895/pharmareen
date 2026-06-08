@@ -2348,6 +2348,10 @@ async def process_whatsapp_web_payload(
                 str(raw_transcript or "")[:160],
                 transcript[:160],
             )
+            print(
+                f"VOICE_TRANSCRIPT_RESULT job_id={job_id} raw={str(raw_transcript or '')[:160]} clean={transcript[:160]}",
+                flush=True,
+            )
             if voice_transcribe_only:
                 clean_transcript = transcript.strip()
                 if not clean_transcript:
