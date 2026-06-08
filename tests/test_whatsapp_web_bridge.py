@@ -791,6 +791,8 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "VOICE_MESSAGE_DOWNLOADED" in source
     assert "PHOTO_MESSAGE_RECEIVED" in source
     assert "PHOTO_MESSAGE_DOWNLOADED" in source
+    assert "Reply: 3c / 5m / confirm" in source
+    assert "Send: 2 mpesa or confirm" not in source
     assert "voice_transcribe_only" in source
     assert "media_base64" in source
     assert "message_id=" in source
@@ -959,7 +961,7 @@ def test_whatsapp_voice_random_transcript_is_saved_for_review_without_intake(mon
     assert response.status_code == 200
     assert data["status"] == "ok"
     assert data["command_handler"] == "voice_note_needs_review"
-    assert "Voice note saved for review" in data["reply"]
+    assert "did not catch the medicine clearly" in data["reply"]
     assert "Share this video" not in data["reply"]
 
 
@@ -1090,6 +1092,59 @@ def test_whatsapp_voice_known_medicine_with_payment_words_opens_prefilled_select
     assert third_data["selector_card"]["payment"] == "M-Pesa"
     assert len(AI_ROUTE_DECISION_LOG) == 3
     assert all(item["route"] == "audio/transcriptions" for item in AI_ROUTE_DECISION_LOG)
+
+
+def test_whatsapp_voice_repairs_noisy_medicines_quantities_and_payments_to_selector(monkeypatch):
+    from app.ai import AI_ROUTE_DECISION_LOG
+
+    class FakeTranscriptionService:
+        is_available = True
+
+        def __init__(self, transcripts: list[str]):
+            self.transcripts = transcripts
+
+        def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
+            return self.transcripts.pop(0)
+
+    transcription = FakeTranscriptionService([
+        "Citizen five em",
+        "Pirton tatu cash",
+        "Glucos ten m",
+    ])
+    main.get_sheet_store.cache_clear()
+    main.get_intake_service.cache_clear()
+    main.processed_whatsapp_web_message_ids.clear()
+    main.offline_media_job_results.clear()
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, DEMO_MODE=True, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_transcription_service", lambda: transcription)
+    AI_ROUTE_DECISION_LOG.clear()
+
+    results = []
+    with TestClient(main.app) as client:
+        for index in range(3):
+            payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+            payload["message_id"] = f"voice-noisy-selector-{index}"
+            payload["media_base64"] = base64.b64encode(f"voice {index}".encode()).decode("ascii")
+            payload["media_mime_type"] = "audio/ogg"
+            response = client.post("/bridge/whatsapp-web", json=payload)
+            assert response.status_code == 200
+            results.append(response.json())
+
+    assert results[0]["command_handler"] == "voice_medicine_selector"
+    assert results[0]["selector_card"]["medicine"] == "Cetirizine"
+    assert results[0]["selector_card"]["quantity"] == 5
+    assert results[0]["selector_card"]["payment"] == "M-Pesa"
+    assert results[1]["selector_card"]["medicine"] == "Piriton"
+    assert results[1]["selector_card"]["quantity"] == 3
+    assert results[1]["selector_card"]["payment"] == "Cash"
+    assert results[2]["selector_card"]["medicine"] == "Glucose"
+    assert results[2]["selector_card"]["quantity"] == 10
+    assert results[2]["selector_card"]["payment"] == "M-Pesa"
+    assert [item["reason"] for item in AI_ROUTE_DECISION_LOG] == ["voice_transcription"] * 3
 
 
 def test_whatsapp_text_glucose_opens_short_local_selector_card_without_ai(monkeypatch):

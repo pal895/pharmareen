@@ -612,9 +612,38 @@ VOICE_NON_MEDICINE_WORDS = {
     "restock",
 }
 
+VOICE_AUDIO_REPAIR_ALIASES = {
+    # Frequent live speech/transcription slips. These only repair medicine words;
+    # quantity, payment, and final sale handling remain deterministic.
+    "panado": "Panadol",
+    "pandol": "Panadol",
+    "panadoll": "Panadol",
+    "anadol": "Panadol",
+    "citizen": "Cetirizine",
+    "cetrizen": "Cetirizine",
+    "cetrizine": "Cetirizine",
+    "setrizine": "Cetirizine",
+    "setrizen": "Cetirizine",
+    "cetrezine": "Cetirizine",
+    "pirton": "Piriton",
+    "piritone": "Piriton",
+    "periton": "Piriton",
+    "pyrton": "Piriton",
+    "glucos": "Glucose",
+    "glukos": "Glucose",
+    "glucosee": "Glucose",
+}
+
 
 def voice_token_similarity(left: str, right: str) -> float:
     return SequenceMatcher(None, left.lower(), right.lower()).ratio()
+
+
+def apply_voice_audio_repairs(text: str) -> str:
+    clean = text
+    for alias, medicine in sorted(VOICE_AUDIO_REPAIR_ALIASES.items(), key=lambda item: len(item[0]), reverse=True):
+        clean = re.sub(r"\b" + re.escape(alias) + r"\b", medicine, clean, flags=re.IGNORECASE)
+    return clean
 
 
 def split_joined_voice_words(text: str) -> str:
@@ -697,12 +726,14 @@ def clean_voice_transcript_for_intake(transcript: str, medicine_names: list[str]
     clean = re.sub(r"\b(?:tukas|tukash|two\s*kash|two\s*cash|too\s*cash|to\s*cash)\b", "two cash", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\b(?:moja|mojaa)\s*(?:mpesa|m-pesa)\b", "moja mpesa", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\b(?:tatu|tattoo)\s*(?:kash|cash|mpesa|m-pesa)\b", lambda m: m.group(0).replace("kash", "cash"), clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\b(moja|mbili|tatu|nne|tano|sita|saba|nane|tisa|kumi|one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(?:em|m)\b", r"\1 mpesa", clean, flags=re.IGNORECASE)
     clean = split_joined_voice_words(clean)
     clean = re.sub(r"\b(?:billi|bili|billy|mbil|mbilii|mbele|mbeli)\b", "mbili", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\b(?:kash|cashi)\b", "cash", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\bpesa\b", "mpesa", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\bmpessa\b", "mpesa", clean, flags=re.IGNORECASE)
     clean = re.sub(r"^nimetoa\s+", "sold ", clean, flags=re.IGNORECASE)
+    clean = apply_voice_audio_repairs(clean)
     clean = apply_voice_medicine_aliases(clean, medicine_names=medicine_names)
     clean = repair_voice_medicine_tokens(clean, medicine_names=medicine_names)
     comma_parts = [part.strip() for part in clean.split(",") if part.strip()]
@@ -3255,7 +3286,7 @@ def voice_transcription_failed_message() -> str:
 
 
 def voice_saved_for_review_reply() -> str:
-    return "🎙 Voice note saved for review.\nI didn't catch a pharmacy action. Tap again or type the medicine."
+    return "🎙 I did not catch the medicine clearly.\nType the medicine name, e.g. Panadol or Glucose."
 
 
 def voice_transcript_is_clear(transcript: str) -> bool:

@@ -239,12 +239,10 @@ function compactSelectorText(card, replyText) {
   const payment = String(card.payment || 'Cash');
   const medicine = String(card.medicine || 'Medicine');
   return [
-    `${medicine} sale`,
-    `Qty: ${quantity}`,
-    `Pay: ${payment}`,
-    'Choose qty: 1 2 3 5 10',
-    'Choose pay: cash mpesa credit mixed',
-    'Send: 2 mpesa or confirm'
+    `${medicine}`,
+    `Qty ${quantity} • ${payment}`,
+    '1 2 3 5 10 | cash mpesa credit mixed',
+    'Reply: 3c / 5m / confirm'
   ].join('\n');
 }
 
