@@ -12,8 +12,8 @@ const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
-const OFFLINE_APP_BUILD_VERSION = "pharmareen-live-selector-v2026-06-07";
-const SERVICE_WORKER_VERSION = "pharmareen-offline-v27-live-selector";
+const OFFLINE_APP_BUILD_VERSION = "pharmareen-tap-talk-retry-v2026-06-08";
+const SERVICE_WORKER_VERSION = "pharmareen-offline-v28-tap-talk-retry";
 const DEFAULT_MEDICINE_SHORTCUTS = [
   "Panadol",
   "Glucose",
