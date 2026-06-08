@@ -1016,6 +1016,82 @@ def test_whatsapp_voice_known_medicine_only_opens_local_selector_without_ai_inte
     assert all(item["reason"] == "voice_transcription" for item in AI_ROUTE_DECISION_LOG)
 
 
+def test_whatsapp_voice_known_medicine_with_payment_words_opens_prefilled_selector(monkeypatch):
+    from app.ai import AI_ROUTE_DECISION_LOG
+
+    class FakeTranscriptionService:
+        is_available = True
+
+        def __init__(self, transcripts: list[str]):
+            self.transcripts = transcripts
+
+        def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
+            return self.transcripts.pop(0)
+
+    transcription = FakeTranscriptionService([
+        "Glucose mbili mpesa",
+        "ORS mbili cash",
+        "Panado mpesa",
+    ])
+    main.get_sheet_store.cache_clear()
+    main.get_intake_service.cache_clear()
+    main.processed_whatsapp_web_message_ids.clear()
+    main.offline_media_job_results.clear()
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: Settings(_env_file=None, DEMO_MODE=True, ALLOWED_WHATSAPP_NUMBERS="254700000000", openai_api_key="test-key"),
+    )
+    monkeypatch.setattr(main, "get_transcription_service", lambda: transcription)
+    AI_ROUTE_DECISION_LOG.clear()
+
+    with TestClient(main.app) as client:
+        first_payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+        first_payload["message_id"] = "voice-glucose-selector"
+        first_payload["media_base64"] = base64.b64encode(b"glucose voice").decode("ascii")
+        first_payload["media_mime_type"] = "audio/ogg"
+        first = client.post("/bridge/whatsapp-web", json=first_payload)
+
+        second_payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+        second_payload["message_id"] = "voice-ors-selector"
+        second_payload["media_base64"] = base64.b64encode(b"ors voice").decode("ascii")
+        second_payload["media_mime_type"] = "audio/ogg"
+        second = client.post("/bridge/whatsapp-web", json=second_payload)
+
+        third_payload = bridge_payload("", sender="254700000000@s.whatsapp.net")
+        third_payload["message_id"] = "voice-panado-selector"
+        third_payload["media_base64"] = base64.b64encode(b"panado voice").decode("ascii")
+        third_payload["media_mime_type"] = "audio/ogg"
+        third = client.post("/bridge/whatsapp-web", json=third_payload)
+
+    first_data = first.json()
+    second_data = second.json()
+    third_data = third.json()
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert third.status_code == 200
+    assert first_data["command_handler"] == "voice_medicine_selector"
+    assert first_data["selector_card"] == {
+        "type": "sale_selector",
+        "medicine": "Glucose",
+        "quantity": 2,
+        "payment": "M-Pesa",
+        "quantity_options": [1, 2, 3, 5, 10, "+", "-"],
+        "payment_options": ["Cash", "M-Pesa", "Credit", "Mixed"],
+        "confirm_options": ["Confirm", "Cancel"],
+    }
+    assert second_data["command_handler"] == "voice_medicine_selector"
+    assert second_data["selector_card"]["medicine"] == "ORS"
+    assert second_data["selector_card"]["quantity"] == 2
+    assert second_data["selector_card"]["payment"] == "Cash"
+    assert third_data["command_handler"] == "voice_medicine_selector"
+    assert third_data["selector_card"]["medicine"] == "Panadol"
+    assert third_data["selector_card"]["quantity"] == 1
+    assert third_data["selector_card"]["payment"] == "M-Pesa"
+    assert len(AI_ROUTE_DECISION_LOG) == 3
+    assert all(item["route"] == "audio/transcriptions" for item in AI_ROUTE_DECISION_LOG)
+
+
 def test_whatsapp_text_glucose_opens_short_local_selector_card_without_ai(monkeypatch):
     from app.ai import AI_ROUTE_DECISION_LOG
 

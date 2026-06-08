@@ -33,7 +33,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from app.ai import AIService, ai_usage_snapshot, log_ai_route_decision
 from app.config import Settings, get_settings
 from app.demo_store import DemoPharmacyStore
-from app.intake import IntakeService, normalize_key, normalize_spoken_command_text, parse_operating_commands
+from app.intake import IntakeService, normalize_key, normalize_spoken_command_text, parse_operating_commands, replace_number_words
 from app.pdf_reports import generate_daily_report_pdf, reports_pdf_dir
 from app.reports import LowStockWarning, ReportMetrics, ReportService, build_report_metrics, build_transaction_metrics, low_stock_from_items
 from app.routes.admin import router as admin_router
@@ -59,6 +59,7 @@ from app.services.photo_intake import (
     read_photo_intake_stats,
     save_photo_upload,
 )
+from app.services.pharmacy_engine import parse_payment_method
 from app.sheets import GoogleSheetsStore, SHEETS_UNAVAILABLE_MESSAGE, SheetsUnavailableError
 from app.transcription import TranscriptionService, TranscriptionUnavailableError
 from app.utils import now_in_timezone, parse_int
@@ -2341,6 +2342,12 @@ async def process_whatsapp_web_payload(
             )
             clear_last_openai_error("voice")
             transcript = clean_voice_transcript_for_intake(raw_transcript, medicine_names=voice_medicine_names_from_inventory())
+            logger.info(
+                "VOICE_TRANSCRIPT_RESULT job_id=%s raw=%s clean=%s",
+                job_id,
+                str(raw_transcript or "")[:160],
+                transcript[:160],
+            )
             if voice_transcribe_only:
                 clean_transcript = transcript.strip()
                 if not clean_transcript:
@@ -3294,6 +3301,50 @@ VOICE_SELECTOR_BLOCK_WORDS = {
     "think",
 }
 
+VOICE_SELECTOR_FILLER_WORDS = VOICE_SELECTOR_BLOCK_WORDS | {
+    "i",
+    "me",
+    "my",
+    "the",
+    "a",
+    "an",
+    "and",
+    "na",
+    "ya",
+    "for",
+    "with",
+    "this",
+    "that",
+    "hii",
+    "hiyo",
+    "dawa",
+    "medicine",
+    "drug",
+    "please",
+    "pls",
+    "nimeuza",
+    "niliuza",
+    "uza",
+    "toa",
+    "nimetoa",
+    "customer",
+    "said",
+    "says",
+    "want",
+    "wants",
+    "need",
+    "needs",
+}
+
+
+def safe_voice_medicine_match(match: MedicineMatch) -> bool:
+    if not match.matched:
+        return False
+    source = str(match.source or "")
+    if source in {"inventory_exact", "pharmacy_alias", "catalog_alias", "inventory_prefix"}:
+        return True
+    return float(match.confidence or 0) >= 0.88
+
 
 def local_selector_match(text: str) -> MedicineMatch:
     try:
@@ -3313,10 +3364,44 @@ def local_selector_match(text: str) -> MedicineMatch:
 def local_voice_selector_match(transcript: str) -> MedicineMatch:
     """Resolve a medicine-only voice transcript locally before asking for review."""
     clean = " ".join(str(transcript or "").strip().split())
-    words = {word.lower() for word in re.findall(r"[A-Za-z0-9-]+", clean)}
-    if not clean or any(character.isdigit() for character in clean) or words & VOICE_SELECTOR_BLOCK_WORDS:
+    if not clean:
         return MedicineMatch()
-    return local_selector_match(clean)
+    direct = local_selector_match(clean)
+    if direct.ambiguous or safe_voice_medicine_match(direct):
+        return direct
+    normalized = replace_number_words(clean)
+    tokens = [
+        token
+        for token in re.findall(r"[A-Za-z0-9-]+", normalized)
+        if not token.isdigit()
+        and token.lower() not in VOICE_SELECTOR_FILLER_WORDS
+        and not parse_payment_method(token)
+    ]
+    if not tokens:
+        return MedicineMatch()
+    candidates: list[str] = []
+    max_window = min(4, len(tokens))
+    for window in range(max_window, 0, -1):
+        for index in range(0, len(tokens) - window + 1):
+            candidates.append(" ".join(tokens[index:index + window]))
+    best_match = MedicineMatch()
+    for candidate in candidates:
+        match = local_selector_match(candidate)
+        if match.ambiguous:
+            return match
+        if safe_voice_medicine_match(match) and match.confidence >= best_match.confidence:
+            best_match = match
+    return best_match
+
+
+def voice_quantity_payment_from_transcript(transcript: str) -> tuple[int, str]:
+    clean = replace_number_words(clean_voice_transcript_for_intake(transcript, medicine_names=voice_medicine_names_from_inventory()))
+    quantity = 1
+    quantity_match = re.search(r"\b(\d+)\b", clean)
+    if quantity_match:
+        quantity = max(parse_int(quantity_match.group(1), default=1) or 1, 1)
+    payment = parse_payment_method(clean) or "Cash"
+    return quantity, payment
 
 
 def sale_selector_card(drug_name: str, quantity: int, payment_method: str) -> dict[str, Any]:
@@ -3382,6 +3467,20 @@ def local_sale_selector_result(
             )
         if match.matched:
             drug_name = match.canonical_name
+            quantity, payment_method = voice_quantity_payment_from_transcript(interpreted)
+    else:
+        match = local_voice_selector_match(interpreted)
+        if match.ambiguous:
+            choices = "\n".join(f"{index}. {choice}" for index, choice in enumerate(match.choices[:3], start=1))
+            return WhatsAppProcessResult(
+                reply=f"Which medicine?\n{choices}\nReply with the medicine name.",
+                message_type=message_type,
+                success=True,
+                command_handler="local_medicine_clarification",
+            )
+        if match.matched:
+            drug_name = match.canonical_name
+            quantity, payment_method = voice_quantity_payment_from_transcript(interpreted)
     if not drug_name:
         return None
 
