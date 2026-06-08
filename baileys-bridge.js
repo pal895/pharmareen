@@ -18,6 +18,7 @@ const sessionPath = process.env.BAILEYS_SESSION_PATH || './.baileys_auth';
 const baileysLogLevel = process.env.BAILEYS_LOG_LEVEL || 'info';
 const autoResetOnLoggedOut = String(process.env.AUTO_RESET_BAILEYS_ON_LOGOUT || 'true').toLowerCase() !== 'false';
 const allowAllDirectChatsForTest = String(process.env.ALLOW_ALL_DIRECT_CHATS_FOR_TEST || 'false').toLowerCase() === 'true';
+const nativeSelectorEnabled = String(process.env.WHATSAPP_NATIVE_SELECTOR_ENABLED || 'false').toLowerCase() === 'true';
 const allowedNumbers = parseAllowedNumbers(
   `${process.env.ALLOWED_WHATSAPP_NUMBERS || ''},${process.env.ALLOWED_DIRECT_CHAT_NUMBERS || ''}`
 );
@@ -238,9 +239,12 @@ function compactSelectorText(card, replyText) {
   const payment = String(card.payment || 'Cash');
   const medicine = String(card.medicine || 'Medicine');
   return [
-    `${medicine} x${quantity} • ${payment}`,
-    'Choose: 1/2/3/5/10, Cash/M-Pesa/Credit/Mixed',
-    'Confirm | Cancel'
+    `${medicine} sale`,
+    `Qty: ${quantity}`,
+    `Pay: ${payment}`,
+    'Choose qty: 1 2 3 5 10',
+    'Choose pay: cash mpesa credit mixed',
+    'Send: 2 mpesa or confirm'
   ].join('\n');
 }
 
@@ -302,6 +306,18 @@ async function safeSendSelectorReply(sock, jid, data, replyText) {
   }
   const body = compactSelectorText(card, replyText).slice(0, 1000);
   const startedAt = Date.now();
+  if (!nativeSelectorEnabled) {
+    console.log(
+      `SELECTOR_NATIVE_SKIPPED sender=${maskSender(jid)} reason=native_selector_disabled ` +
+      `medicine=${card.medicine || ''} quantity=${card.quantity || 1} payment=${card.payment || 'Cash'}`
+    );
+    const sent = await safeSendReply(sock, jid, body);
+    console.log(
+      `SELECTOR_TEXT_FALLBACK_RESULT sender=${maskSender(jid)} sent=${sent} ` +
+      `medicine=${card.medicine || ''} quantity=${card.quantity || 1} payment=${card.payment || 'Cash'}`
+    );
+    return sent;
+  }
   console.log(
     `SELECTOR_INTERACTIVE_ATTEMPT sender=${maskSender(jid)} medicine=${card.medicine || ''} ` +
     `quantity=${card.quantity || 1} payment=${card.payment || 'Cash'}`
