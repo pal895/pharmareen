@@ -1,7 +1,7 @@
-const CACHE_NAME = "pharmareen-offline-v28-tap-talk-retry";
+﻿const CACHE_NAME = "pharmareen-offline-v30-tap-talk-first-attempt";
 const OFFLINE_INDEX = "/offline_app/index.html";
 const MEDICINE_INDEX = "/offline/medicine-names";
-console.log("OFFLINE_APP_BUILD_VERSION=pharmareen-tap-talk-retry-v2026-06-08 service-worker");
+console.log("OFFLINE_APP_BUILD_VERSION=pharmareen-tap-talk-first-attempt-v2026-06-08 service-worker");
 const APP_SHELL = [
   OFFLINE_INDEX,
   "/offline_app/parser.js",

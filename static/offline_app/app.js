@@ -12,8 +12,8 @@ const QUEUE_STORE = "queue";
 const HISTORY_STORE = "history";
 const MAX_RETRIES = 3;
 const Parser = window.PharMareenOfflineParser;
-const OFFLINE_APP_BUILD_VERSION = "pharmareen-tap-talk-retry-v2026-06-08";
-const SERVICE_WORKER_VERSION = "pharmareen-offline-v28-tap-talk-retry";
+const OFFLINE_APP_BUILD_VERSION = "pharmareen-tap-talk-first-attempt-v2026-06-08";
+const SERVICE_WORKER_VERSION = "pharmareen-offline-v30-tap-talk-first-attempt";
 const DEFAULT_MEDICINE_SHORTCUTS = [
   "Panadol",
   "Glucose",
@@ -83,6 +83,8 @@ let voiceRecognitionActive = false;
 let voiceRecognitionHandled = false;
 let voiceRecognitionRetryCount = 0;
 let voiceRecognitionLastTranscript = "";
+let voiceRecognitionBestTranscript = "";
+let voiceRecognitionBestMedicine = "";
 let voiceRecordingTimeout = null;
 let currentPaymentMode = localStorage.getItem(PAYMENT_MODE_KEY) || "Cash";
 let lastBarcodeScan = { code: "", at: 0 };
@@ -952,6 +954,41 @@ function focusVoiceMedicineSearch() {
   if (voiceMedicineSearch) voiceMedicineSearch.focus();
 }
 
+function collectSpeechTranscripts(event) {
+  const phrases = [];
+  const primary = [];
+  Array.from(event && event.results ? event.results : []).forEach(result => {
+    if (!result) return;
+    for (let index = 0; index < result.length; index += 1) {
+      const transcript = result[index] && result[index].transcript ? result[index].transcript.trim() : "";
+      if (transcript) phrases.push(transcript);
+      if (index === 0 && transcript) primary.push(transcript);
+    }
+  });
+  const joinedPrimary = primary.join(" ").trim();
+  if (joinedPrimary) phrases.unshift(joinedPrimary);
+  return [...new Set(phrases.map(phrase => phrase.replace(/\s+/g, " ").trim()).filter(Boolean))];
+}
+
+function rememberVoiceMedicineCandidate(transcript) {
+  if (!transcript) return { medicine: "", choices: [] };
+  voiceRecognitionLastTranscript = transcript;
+  const resolution = resolveLocalMedicineFromSpeech(transcript);
+  if (resolution.medicine) {
+    voiceRecognitionBestTranscript = transcript;
+    voiceRecognitionBestMedicine = resolution.medicine;
+  }
+  return resolution;
+}
+
+function openRememberedVoiceSelector() {
+  const transcript = voiceRecognitionBestTranscript || voiceRecognitionLastTranscript;
+  const medicine = voiceRecognitionBestMedicine || resolveLocalMedicineFromSpeech(transcript).medicine;
+  if (!medicine) return false;
+  showVoiceSelector(medicine, voiceSaleDefaults(transcript));
+  return true;
+}
+
 function startLocalVoiceSelector(options = {}) {
   if (!medicineMatcherReady) {
     voiceStatus.textContent = "Preparing pharmacy brain...";
@@ -960,76 +997,102 @@ function startLocalVoiceSelector(options = {}) {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) return false;
   try {
+    const retryCount = Number(options.retryCount || 0);
     const recognition = new SpeechRecognition();
     voiceRecognition = recognition;
     voiceRecognitionActive = true;
     voiceRecognitionHandled = false;
-    voiceRecognitionRetryCount = Number(options.retryCount || 0);
-    voiceRecognitionLastTranscript = "";
+    voiceRecognitionRetryCount = retryCount;
+    if (retryCount === 0) {
+      voiceRecognitionLastTranscript = "";
+      voiceRecognitionBestTranscript = "";
+      voiceRecognitionBestMedicine = "";
+    }
     recognition.lang = "en-KE";
     recognition.interimResults = true;
-    recognition.maxAlternatives = 3;
+    recognition.maxAlternatives = 10;
+    try { recognition.continuous = true; } catch {}
+
+    const finishFromMemory = () => {
+      const transcript = voiceRecognitionBestTranscript || voiceRecognitionLastTranscript;
+      const medicine = voiceRecognitionBestMedicine || resolveLocalMedicineFromSpeech(transcript).medicine;
+      if (!medicine) return false;
+      voiceRecognitionHandled = true;
+      showVoiceSelector(medicine, voiceSaleDefaults(transcript || medicine));
+      try { recognition.stop(); } catch {}
+      resetVoiceRecognition();
+      return true;
+    };
+
+    const retryQuietly = () => {
+      resetVoiceRecognition();
+      voiceStatus.textContent = "Listening...";
+      setTimeout(() => startLocalVoiceSelector({ retryCount: retryCount + 1 }), 220);
+    };
+
     recognition.onstart = () => {
-      voiceStatus.textContent = voiceRecognitionRetryCount ? "Listening again..." : "Listening...";
+      voiceStatus.textContent = retryCount ? "Listening again..." : "Listening...";
       const button = document.getElementById("tapTalk");
       if (button) button.textContent = "Stop Listening";
     };
     recognition.onerror = event => {
-      voiceRecognitionHandled = true;
-      resetVoiceRecognition();
+      if (finishFromMemory()) return;
       if (event && (event.error === "not-allowed" || event.error === "service-not-allowed")) {
-        clearVoiceSelector();
+        voiceRecognitionHandled = true;
+        resetVoiceRecognition();
         voiceStatus.textContent = "Please allow microphone to use Tap & Talk.";
         focusVoiceMedicineSearch();
         return;
       }
-      if (event && event.error === "no-speech" && voiceRecognitionRetryCount < 1) {
-        voiceStatus.textContent = "Listening again...";
-        setTimeout(() => startLocalVoiceSelector({ retryCount: voiceRecognitionRetryCount + 1 }), 120);
+      if (event && event.error === "no-speech" && retryCount < 2) {
+        voiceRecognitionHandled = true;
+        retryQuietly();
         return;
       }
-      clearVoiceSelector();
+      voiceRecognitionHandled = true;
+      resetVoiceRecognition();
+      if (!selectedVoiceSale.medicine) clearVoiceSelector();
       voiceStatus.textContent = "I didn't hear a medicine clearly. Search or tap again.";
       focusVoiceMedicineSearch();
     };
     recognition.onresult = event => {
-      const transcript = Array.from(event.results || [])
-        .map(result => result && result[0] ? result[0].transcript : "")
-        .join(" ")
-        .trim();
-      if (transcript) voiceRecognitionLastTranscript = transcript;
-      const resolution = resolveLocalMedicineFromSpeech(voiceRecognitionLastTranscript);
-      if (resolution.medicine) {
-        voiceRecognitionHandled = true;
-        try { recognition.stop(); } catch {}
-        handleLocalVoiceTranscript(voiceRecognitionLastTranscript);
+      const phrases = collectSpeechTranscripts(event);
+      let foundMedicine = false;
+      phrases.forEach(phrase => {
+        const resolution = rememberVoiceMedicineCandidate(phrase);
+        if (resolution.medicine) foundMedicine = true;
+      });
+      if (foundMedicine) {
+        finishFromMemory();
       } else if (voiceRecognitionLastTranscript) {
         voiceStatus.textContent = "Checking medicine...";
       }
     };
     recognition.onend = () => {
       const handled = voiceRecognitionHandled;
-      const transcript = voiceRecognitionLastTranscript;
+      const transcript = voiceRecognitionBestTranscript || voiceRecognitionLastTranscript;
+      if (!handled && finishFromMemory()) return;
       resetVoiceRecognition();
       if (!handled && transcript) {
         handleLocalVoiceTranscript(transcript);
         return;
       }
       if (!handled) {
-        if (voiceRecognitionRetryCount < 1) {
-          voiceStatus.textContent = "Listening again...";
-          setTimeout(() => startLocalVoiceSelector({ retryCount: voiceRecognitionRetryCount + 1 }), 120);
+        if (retryCount < 2) {
+          voiceStatus.textContent = "Listening...";
+          setTimeout(() => startLocalVoiceSelector({ retryCount: retryCount + 1 }), 220);
           return;
         }
-        clearVoiceSelector();
+        if (!selectedVoiceSale.medicine) clearVoiceSelector();
         voiceStatus.textContent = "I didn't hear a medicine clearly. Search or tap again.";
         focusVoiceMedicineSearch();
       }
     };
     recognition.start();
     voiceRecognitionTimeout = setTimeout(() => {
+      if (finishFromMemory()) return;
       try { recognition.stop(); } catch {}
-    }, 9000);
+    }, retryCount ? 7000 : 9000);
     return true;
   } catch {
     resetVoiceRecognition();
@@ -1054,7 +1117,8 @@ function handleLocalVoiceTranscript(transcript) {
 async function startVoiceRecording(options = {}) {
   if (!medicineMatcherReady) {
     voiceStatus.textContent = "Preparing pharmacy brain...";
-    return;
+    try { await loadInventoryMedicines({ timeoutMs: 2500 }); } catch {}
+    setMedicineMatcherReady(true);
   }
   if (voiceRecognitionActive && voiceRecognition) {
     voiceStatus.textContent = "Checking medicine...";

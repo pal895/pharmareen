@@ -123,7 +123,7 @@ def test_offline_app_routes_return_html():
     assert "Take Photo" in followed_response.text
     assert "Save Photo" in followed_response.text
     assert "Save Voice" in followed_response.text
-    assert "PHARMAREEN REAL PATH BUILD pharmareen-live-selector-v2026-06-07" in followed_response.text
+    assert "PHARMAREEN REAL PATH BUILD pharmareen-tap-talk-first-attempt-v2026-06-08" in followed_response.text
     assert "PHARMAREEN SMOOTH TEST v2026-05-15" in followed_response.text
     assert "Cash mode active" in followed_response.text
     assert 'class="bottom-nav"' in followed_response.text
@@ -147,7 +147,7 @@ def test_offline_app_routes_return_html():
     assert "PharMareen Offline Mode" in compat_response.text
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in compat_response.text
     assert "no-store" in compat_response.headers.get("cache-control", "")
-    assert compat_response.headers.get("x-pharmareen-offline-version") == "pharmareen-live-selector-v2026-06-07"
+    assert compat_response.headers.get("x-pharmareen-offline-version") == "pharmareen-tap-talk-first-attempt-v2026-06-08"
     assert parser_response.status_code == 200
     assert manifest_response.status_code == 200
     assert worker_response.status_code == 200
@@ -159,7 +159,7 @@ def test_debug_version_exposes_realpath_build_marker():
 
     assert response.status_code == 200
     data = response.json()
-    assert data["offline_build_version"] == "pharmareen-live-selector-v2026-06-07"
+    assert data["offline_build_version"] == "pharmareen-tap-talk-first-attempt-v2026-06-08"
     assert "PHARMAREEN REAL PATH BUILD" in data["offline_frontend_marker"]
 
 
@@ -422,7 +422,7 @@ def test_debug_offline_app_reports_all_phase6_features(monkeypatch, tmp_path):
     assert data["voice_queue_ready"] is True
     assert data["persistent_storage_ready"] is True
     assert data["auto_sync_ready"] is True
-    assert data["frontend_marker"] == "PHARMAREEN REAL PATH BUILD pharmareen-live-selector-v2026-06-07"
+    assert data["frontend_marker"] == "PHARMAREEN REAL PATH BUILD pharmareen-tap-talk-first-attempt-v2026-06-08"
     assert data["served_index_path"].endswith("static/offline_app/index.html") or data["served_index_path"].endswith("static\\offline_app\\index.html")
     assert "offline_log_exists" in data
 
@@ -529,7 +529,7 @@ def test_legacy_local_offline_app_matches_phase6_frontend():
     legacy_parser = root / "local" / "parser.js"
 
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in legacy_html
-    assert "PHARMAREEN REAL PATH BUILD pharmareen-live-selector-v2026-06-07" in legacy_html
+    assert "PHARMAREEN REAL PATH BUILD pharmareen-tap-talk-first-attempt-v2026-06-08" in legacy_html
     assert "PHARMAREEN SMOOTH TEST v2026-05-15" in legacy_html
     assert "Choose From Files/Gallery" in legacy_html
     assert "Choose voice/audio files" in legacy_html
@@ -547,7 +547,7 @@ def test_legacy_offline_app_folder_matches_final_frontend():
     legacy_parser = root / "offline_app" / "parser.js"
 
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in legacy_html
-    assert "PHARMAREEN REAL PATH BUILD pharmareen-live-selector-v2026-06-07" in legacy_html
+    assert "PHARMAREEN REAL PATH BUILD pharmareen-tap-talk-first-attempt-v2026-06-08" in legacy_html
     assert "PHARMAREEN SMOOTH TEST v2026-05-15" in legacy_html
     assert "Choose From Files/Gallery" in legacy_html
     assert "Choose voice/audio files" in legacy_html
@@ -556,7 +556,7 @@ def test_legacy_offline_app_folder_matches_final_frontend():
     assert " required" not in legacy_html
     assert "disableNativeRequiredValidation" in legacy_app
     assert "queueMediaFiles" in legacy_app
-    assert "pharmareen-offline-v27-live-selector" in legacy_worker
+    assert "pharmareen-offline-v30-tap-talk-first-attempt" in legacy_worker
     assert legacy_parser.exists()
 
 
@@ -677,12 +677,12 @@ def test_phone_tap_talk_waits_for_cached_medicine_matcher_before_first_use():
     script = (root / "static" / "offline_app" / "app.js").read_text(encoding="utf-8")
     worker = (root / "static" / "offline_app" / "service-worker.js").read_text(encoding="utf-8")
 
-    assert 'const SERVICE_WORKER_VERSION = "pharmareen-offline-v27-live-selector"' in script
-    assert "setMedicineMatcherReady(false)" in script
-    assert "await loadInventoryMedicines({ timeoutMs: 1500 })" in script
-    assert "setMedicineMatcherReady(true)" in script
-    assert script.index("setMedicineMatcherReady(false)") < script.index("await loadInventoryMedicines({ timeoutMs: 1500 })")
-    assert script.index("await loadInventoryMedicines({ timeoutMs: 1500 })") < script.index("setMedicineMatcherReady(true)")
+    assert 'const SERVICE_WORKER_VERSION = "pharmareen-offline-v30-tap-talk-first-attempt"' in script
+    start_idx = script.index("async function startVoiceRecording")
+    voice_block = script[start_idx:start_idx + 2500]
+    assert "await loadInventoryMedicines({ timeoutMs: 2500 })" in voice_block
+    assert "setMedicineMatcherReady(true)" in voice_block
+    assert voice_block.index("await loadInventoryMedicines({ timeoutMs: 2500 })") < voice_block.index("setMedicineMatcherReady(true)")
     assert "button.disabled = !medicineMatcherReady" in script
     assert "Preparing pharmacy brain..." in script
     assert "Getting medicines ready..." not in script
@@ -843,14 +843,14 @@ def test_offline_pwa_assets_contain_auto_sync_media_and_retry_logic():
     assert "parseCommand" in parser
     assert "Save Offline" in html
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in html
-    assert "PHARMAREEN REAL PATH BUILD pharmareen-live-selector-v2026-06-07" in html
+    assert "PHARMAREEN REAL PATH BUILD pharmareen-tap-talk-first-attempt-v2026-06-08" in html
     assert "PHARMAREEN SMOOTH TEST v2026-05-15" in html
     assert "Save Photo" in html
     assert "Save Voice" in html
     assert "Tap & Talk" in html
     assert '"start_url": "/offline-app"' in manifest
     assert "/offline_app/parser.js" in worker
-    assert "pharmareen-offline-v27-live-selector" in worker
+    assert "pharmareen-offline-v30-tap-talk-first-attempt" in worker
     assert 'const OFFLINE_INDEX = "/offline_app/index.html"' in worker
     assert 'event.request.mode === "navigate"' in worker
     assert "ignoreSearch: true" in worker
