@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "medicines": [
+    {
+      "canonical_id": "panadol",
+      "name": "Panadol",
+      "generic_names": ["Paracetamol"],
+      "aliases": ["panadol", "panado", "pnadol", "pandol"],
+      "common_forms": ["tablet", "syrup"],
+      "common_units": ["500mg"],
+      "kenya_common": true
+    },
+    {
+      "canonical_id": "paracetamol",
+      "name": "Paracetamol",
+      "generic_names": [],
+      "aliases": ["paracetamol", "para", "paracet"],
+      "common_forms": ["tablet", "syrup"],
+      "common_units": ["500mg", "120mg/5ml"],
+      "kenya_common": true
+    },
+    {
+      "canonical_id": "piriton",
+      "name": "Piriton",
+      "generic_names": ["Chlorpheniramine"],
+      "aliases": ["piriton", "pirton", "chlorpheniramine"],
+      "common_forms": ["tablet", "syrup"],
+      "common_units": ["4mg"],
+      "kenya_common": true
+    },
+    {
+      "canonical_id": "amoxicillin",
+      "name": "Amoxicillin",
+      "generic_names": [],
+      "aliases": ["amoxicillin", "amox", "amoxil", "amoxyl", "amoxi"],
+      "common_forms": ["capsule", "syrup"],
+      "common_units": ["250mg", "500mg"],
+      "kenya_common": true
+    },
+    {
+      "canonical_id": "augmentin",
+      "name": "Augmentin",
+      "generic_names": ["Co-amoxiclav"],
+      "aliases": ["augmentin", "aug", "coamoxiclav", "co-amoxiclav"],
+      "common_forms": ["tablet", "syrup"],
+      "common_units": ["625mg", "1g"],
+      "kenya_common": true
+    },
+    {
+      "canonical_id": "cetirizine",
+      "name": "Cetirizine",
+      "generic_names": [],
+      "aliases": ["cetirizine", "cet", "cetzine", "cetrizine"],
+      "common_forms": ["tablet", "syrup"],
+      "common_units": ["10mg"],
+      "kenya_common": true
+    },
+    {
+      "canonical_id": "glucose",
+      "name": "Glucose",
+      "generic_names": [],
+      "aliases": ["glucose", "gluco"],
+      "common_forms": ["powder", "sachet"],
+      "common_units": [],
+      "kenya_common": true
+    },
+    {
+      "canonical_id": "ors",
+      "name": "ORS",
+      "generic_names": ["Oral Rehydration Salts"],
+      "aliases": ["ors", "oral rehydration salts", "rehydration salts"],
+      "common_forms": ["sachet"],
+      "common_units": [],
+      "kenya_common": true
+    }
+  ]
+}

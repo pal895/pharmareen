@@ -1,0 +1,9 @@
+{"input": "panadol2cash", "expected": {"status": "matched", "medicine_name": "Panadol", "quantity": 2, "payment": "cash"}}
+{"input": "pnadol 1 cahs", "expected": {"status": "matched", "medicine_name": "Panadol", "quantity": 1, "payment": "cash"}}
+{"input": "amox1mpesa", "expected": {"status": "matched", "medicine_name": "Amoxicillin", "quantity": 1, "payment": "mpesa"}}
+{"input": "glucose 2 cash", "expected": {"status": "matched", "medicine_name": "Glucose", "quantity": 2, "payment": "cash"}}
+{"input": "1 strip panadol", "expected": {"status": "matched", "medicine_name": "Panadol", "quantity": 1, "packaging": "strip"}}
+{"input": "augmentin syrup", "expected": {"status": "matched", "medicine_name": "Augmentin", "form": "syrup"}}
+{"input": "cet 10mpesa", "expected": {"status": "matched", "medicine_name": "Cetirizine", "quantity": 10, "payment": "mpesa"}}
+{"input": "p", "expected": {"status": "ambiguous"}}
+{"input": "panadol stock", "expected": {"status": "matched", "medicine_name": "Panadol", "action": "stock_check"}}

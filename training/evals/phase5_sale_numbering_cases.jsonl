@@ -1,0 +1,16 @@
+{"case": "ledger_reset_by_date"}
+{"case": "parser_sale_number_commands"}
+{"case": "sale_flow_assigns_numbers"}
+{"case": "undo_by_sale_number"}
+{"case": "undo_last_sale_restores_stock"}
+{"case": "correction_by_sale_number"}
+{"case": "wrong_medicine_correction"}
+{"case": "wrong_quantity_correction"}
+{"case": "wrong_payment_correction"}
+{"case": "finance_totals_reverse_safely"}
+{"case": "payment_totals_reconcile_after_undo_edit"}
+{"case": "reports_reflect_corrected_totals"}
+{"case": "audit_history_trace"}
+{"case": "duplicate_reversal_blocked"}
+{"case": "zero_ai_phase5_commands"}
+{"case": "show_sale_and_today_count"}

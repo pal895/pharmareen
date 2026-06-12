@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "medicine_aliases": {
+    "panadol": "Panadol",
+    "panado": "Panadol",
+    "pnadol": "Panadol",
+    "pandol": "Panadol",
+    "para": "Paracetamol",
+    "paracet": "Paracetamol",
+    "piriton": "Piriton",
+    "pirton": "Piriton",
+    "amox": "Amoxicillin",
+    "amoxil": "Amoxicillin",
+    "amoxyl": "Amoxicillin",
+    "amoxi": "Amoxicillin",
+    "augmentin": "Augmentin",
+    "aug": "Augmentin",
+    "cet": "Cetirizine",
+    "cetzine": "Cetirizine",
+    "cetrizine": "Cetirizine",
+    "gluco": "Glucose",
+    "ors": "ORS"
+  },
+  "payment_aliases": {
+    "c": "cash",
+    "cash": "cash",
+    "cahs": "cash",
+    "cas": "cash",
+    "m": "mpesa",
+    "mpesa": "mpesa",
+    "m-pesa": "mpesa",
+    "m pesa": "mpesa",
+    "mpes": "mpesa",
+    "cr": "credit",
+    "cred": "credit",
+    "credit": "credit"
+  },
+  "shorthand_candidates": {
+    "p": ["Panadol", "Paracetamol", "Piriton"]
+  }
+}

@@ -1,0 +1,11 @@
+{"case":"central_provisioning_creates_full_infrastructure"}
+{"case":"three_step_owner_onboarding_provisions_ready_pharmacy"}
+{"case":"medicine_bootstrap_normalizes_aliases_and_duplicates"}
+{"case":"unknown_number_admin_approval_provisions_pharmacy"}
+{"case":"unknown_number_admin_review_controls"}
+{"case":"activation_gate_allows_ready_and_blocks_unready"}
+{"case":"namespace_isolation_between_pharmacies"}
+{"case":"templates_cover_required_deployments"}
+{"case":"stress_test_generates_required_sizes"}
+{"case":"rollback_recovery_configs_created"}
+{"case":"zero_token_and_phase_protections_preserved"}

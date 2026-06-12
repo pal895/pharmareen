@@ -1,0 +1,8 @@
+{"case": "one_pharmacy_at_a_time_rollout"}
+{"case": "telemetry_evidence_and_reliability_logging"}
+{"case": "live_issue_creates_retraining_example"}
+{"case": "owner_correction_learns_in_pharmacy_namespace"}
+{"case": "known_flow_token_monitoring"}
+{"case": "rollback_recovery_safety"}
+{"case": "owner_feedback_and_friction_tracking"}
+{"case": "pilot_stability_and_readiness_validation"}

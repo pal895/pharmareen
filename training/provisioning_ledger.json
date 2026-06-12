@@ -1,0 +1,33 @@
+{
+  "counters": {
+    "temp_namespaces": 1,
+    "unknown_sessions": 1
+  },
+  "owner_sessions": {},
+  "pharmacies": {},
+  "phone_index": {},
+  "unknown_sessions": {
+    "unknown-session-254721149472-1": {
+      "admin_reviews": [],
+      "audit": [
+        {
+          "action": "unknown_number_onboarding_started",
+          "at": "2026-06-12T12:54:05.758472+00:00",
+          "details": {
+            "temp_namespace": "temp_254721149472_1"
+          }
+        }
+      ],
+      "collected": {},
+      "created_at": "2026-06-12T12:54:05.758472+00:00",
+      "first_message": "panadol2cash",
+      "phone_number": "+254721149472",
+      "session_id": "unknown-session-254721149472-1",
+      "status": "collecting",
+      "temporary_namespace": "temp_254721149472_1",
+      "type": "unknown_number",
+      "updated_at": "2026-06-12T12:54:05.758472+00:00"
+    }
+  },
+  "version": 1
+}

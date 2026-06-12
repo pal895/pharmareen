@@ -1,0 +1,8 @@
+{"case": "offline_queue_persists"}
+{"case": "duplicate_prevention"}
+{"case": "whatsapp_offline_sync_safety"}
+{"case": "reconnect_recovery"}
+{"case": "failed_sync_retry_safety"}
+{"case": "grouped_confirmation_handling"}
+{"case": "low_network_behavior"}
+{"case": "no_data_loss_guarantee"}

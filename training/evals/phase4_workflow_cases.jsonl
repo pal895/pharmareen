@@ -1,0 +1,14 @@
+{"mode": "parser", "input": "panadol2cash", "expected": {"action": "Sold", "medicine_name": "Panadol", "quantity": 2, "notes_contains": "Payment: Cash", "fallback_calls": 0}}
+{"mode": "parser", "input": "panadol stock", "expected": {"action": "Stock Check", "medicine_name": "Panadol", "fallback_calls": 0}}
+{"mode": "parser", "input": "restock panadol 5", "expected": {"action": "Restock", "medicine_name": "Panadol", "quantity": 5, "fallback_calls": 0}}
+{"mode": "parser", "input": "amox no stock", "expected": {"action": "Out of Stock", "medicine_name": "Amoxicillin", "fallback_calls": 0}}
+{"mode": "parser", "input": "undo sale 4", "expected": {"action": "Undo", "notes_contains": "Target sale: 4", "fallback_calls": 0}}
+{"mode": "parser", "input": "correct sale 7 to mpesa", "expected": {"action": "Correction Request", "notes_contains": "Target sale: 7", "fallback_calls": 0}}
+{"mode": "parser", "input": "expiry panadol 2026-12", "expected": {"action": "Expiry Note", "notes_contains": "Placeholder", "fallback_calls": 0}}
+{"mode": "parser", "input": "supplier panadol cosmos", "expected": {"action": "Supplier Note", "notes_contains": "Placeholder", "fallback_calls": 0}}
+{"mode": "parser", "input": "batch panadol AB123", "expected": {"action": "Batch Note", "notes_contains": "Placeholder", "fallback_calls": 0}}
+{"mode": "intake", "input": "ors 9", "event": {"drug_name": "ORS", "action": "Sold", "quantity": 9}, "expected": {"reply_contains": "Insufficient stock for ORS", "logged_action": "Out of Stock"}}
+{"mode": "intake", "input": "undo sale 4", "event": {"drug_name": "Workflow", "action": "Undo", "quantity": 1}, "expected": {"reply_contains": "Undo recognized", "logs": 0}}
+{"mode": "intake", "input": "correct sale 7 to mpesa", "event": {"drug_name": "Workflow", "action": "Correction Request", "quantity": 1}, "expected": {"reply_contains": "Correction recognized", "logs": 0}}
+{"mode": "intake", "input": "expiry panadol 2026-12", "event": {"drug_name": "Workflow", "action": "Expiry Note", "quantity": 1}, "expected": {"reply_contains": "Expiry tracking recognized", "logs": 0}}
+{"mode": "report", "input": "report 2026-04-27", "expected": {"reply_contains": "Zilla Pharmacy", "parser_called": false}}

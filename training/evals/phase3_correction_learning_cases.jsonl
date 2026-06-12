@@ -1,0 +1,5 @@
+{"correction": "brf means brufen", "followup": "brf2cash", "expected": {"correction_type": "medicine_alias", "medicine_name": "Brufen", "quantity": 2, "payment": "cash", "fallback_calls": 0}}
+{"correction": "p means panadol", "followup": "p", "expected": {"correction_type": "medicine_alias", "medicine_name": "Panadol", "fallback_calls": 0}}
+{"correction": "k means cash", "followup": "panadol2k", "expected": {"correction_type": "payment_alias", "medicine_name": "Panadol", "quantity": 2, "payment": "cash", "fallback_calls": 0}}
+{"correction": "sleeve means strip", "followup": "1 sleeve panadol", "expected": {"correction_type": "packaging_alias", "medicine_name": "Panadol", "quantity": 1, "packaging": "strip", "fallback_calls": 0}}
+{"correction": "mls means ml", "followup": "augmentin 125mls", "expected": {"correction_type": "unit_alias", "medicine_name": "Augmentin", "dose": "125ml", "unit": "ml", "fallback_calls": 0}}

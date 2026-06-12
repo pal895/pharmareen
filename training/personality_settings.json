@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "default": {
+    "enabled": true,
+    "morning_greeting_enabled": true,
+    "end_of_day_enabled": true,
+    "morning_window_start": "06:00",
+    "morning_window_end": "11:30",
+    "end_of_day_window_start": "23:30",
+    "end_of_day_window_end": "23:59",
+    "morning_template": "Morning {name}. Ready for another strong pharmacy day?",
+    "morning_template_no_name": "Morning. Ready for another strong pharmacy day?",
+    "end_of_day_template": "Great work today. You handled {sales_count} sales with clear records.",
+    "end_of_day_template_no_sales": "Great work today. Your pharmacy records are safely saved.",
+    "max_message_length": 120
+  },
+  "pharmacies": {}
+}

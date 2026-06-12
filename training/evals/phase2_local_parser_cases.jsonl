@@ -1,0 +1,8 @@
+{"input": "panadol2cash", "expected": {"route": "local", "action": "Sold", "medicine_name": "Panadol", "quantity": 2, "notes_contains": "Payment: Cash"}}
+{"input": "pnadol 1 cahs", "expected": {"route": "local", "action": "Sold", "medicine_name": "Panadol", "quantity": 1, "notes_contains": "Payment: Cash"}}
+{"input": "amox1mpesa", "expected": {"route": "local", "action": "Sold", "medicine_name": "Amoxicillin", "quantity": 1, "notes_contains": "Payment: M-Pesa"}}
+{"input": "p", "expected": {"route": "local", "needs_clarification": true, "question_contains": "Panadol"}}
+{"input": "panadol stock", "expected": {"route": "local", "action": "Stock Check", "medicine_name": "Panadol"}}
+{"input": "amox no stock", "expected": {"route": "local", "action": "Out of Stock", "medicine_name": "Amoxicillin"}}
+{"input": "restock panadol 5", "expected": {"route": "local", "action": "Restock", "medicine_name": "Panadol", "quantity": 5}}
+{"input": "unknown medicine from long messy customer story", "expected": {"route": "fallback"}}

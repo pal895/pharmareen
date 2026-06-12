@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     demo_mode: bool = False
 
     report_trigger_token: str | None = None
+    enable_live_onboarding: bool = True
+    live_test_number: str = "+254721149472"
+    admin_whatsapp_numbers: str | None = None
+    existing_pharmacy_numbers: str | None = None
     report_storage_mode: str = "local"
     report_public_dir: str = "reports_pdf"
     support_contact: str = "Support contact coming soon"

@@ -1,0 +1,154 @@
+{
+  "templates": {
+    "medium_pharmacy": {
+      "branches": [
+        "Main",
+        "Dispensary"
+      ],
+      "id": "medium_pharmacy",
+      "label": "Medium pharmacy",
+      "starter_medicines": [
+        {
+          "aliases": [
+            "panado"
+          ],
+          "form": "tablet",
+          "name": "Panadol",
+          "opening_stock": 40,
+          "selling_price": 200,
+          "unit": "tablet"
+        },
+        {
+          "aliases": [
+            "cet"
+          ],
+          "form": "tablet",
+          "name": "Cetirizine",
+          "opening_stock": 25,
+          "selling_price": 50,
+          "unit": "tablet"
+        },
+        {
+          "aliases": [
+            "oral rehydration salts"
+          ],
+          "form": "sachet",
+          "name": "ORS",
+          "opening_stock": 30,
+          "selling_price": 80,
+          "unit": "sachet"
+        }
+      ]
+    },
+    "multi_branch_pharmacy": {
+      "branches": [
+        "Main",
+        "Branch 2",
+        "Branch 3"
+      ],
+      "id": "multi_branch_pharmacy",
+      "label": "Multi-branch pharmacy",
+      "starter_medicines": [
+        {
+          "aliases": [
+            "panado"
+          ],
+          "form": "tablet",
+          "name": "Panadol",
+          "opening_stock": 60,
+          "selling_price": 200,
+          "unit": "tablet"
+        },
+        {
+          "aliases": [
+            "amox"
+          ],
+          "form": "capsule",
+          "name": "Amoxicillin",
+          "opening_stock": 40,
+          "selling_price": 150,
+          "unit": "capsule"
+        },
+        {
+          "aliases": [
+            "ors"
+          ],
+          "form": "sachet",
+          "name": "ORS",
+          "opening_stock": 50,
+          "selling_price": 80,
+          "unit": "sachet"
+        }
+      ]
+    },
+    "small_pharmacy": {
+      "branches": [
+        "Main"
+      ],
+      "id": "small_pharmacy",
+      "label": "Small pharmacy",
+      "starter_medicines": [
+        {
+          "aliases": [
+            "panado"
+          ],
+          "form": "tablet",
+          "name": "Panadol",
+          "opening_stock": 20,
+          "selling_price": 200,
+          "unit": "tablet"
+        },
+        {
+          "aliases": [
+            "oral rehydration salts"
+          ],
+          "form": "sachet",
+          "name": "ORS",
+          "opening_stock": 15,
+          "selling_price": 80,
+          "unit": "sachet"
+        }
+      ]
+    },
+    "starter_pharmacy": {
+      "branches": [
+        "Main"
+      ],
+      "id": "starter_pharmacy",
+      "label": "Starter pharmacy",
+      "starter_medicines": [
+        {
+          "aliases": [
+            "panado"
+          ],
+          "form": "tablet",
+          "name": "Panadol",
+          "opening_stock": 20,
+          "selling_price": 200,
+          "unit": "tablet"
+        },
+        {
+          "aliases": [
+            "cet"
+          ],
+          "form": "tablet",
+          "name": "Cetirizine",
+          "opening_stock": 10,
+          "selling_price": 50,
+          "unit": "tablet"
+        },
+        {
+          "aliases": [
+            "oral rehydration salts"
+          ],
+          "form": "sachet",
+          "name": "ORS",
+          "opening_stock": 15,
+          "selling_price": 80,
+          "unit": "sachet"
+        }
+      ]
+    }
+  },
+  "version": 1
+}

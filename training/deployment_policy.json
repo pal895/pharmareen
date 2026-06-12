@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "required_checklist": [
+    "profile_bootstrapped",
+    "owner_setup",
+    "branch_registered",
+    "medicines_imported",
+    "reliability_verified",
+    "pilot_safety_verified",
+    "rollback_ready",
+    "monitoring_ready",
+    "audit_ready"
+  ],
+  "minimum_deployment_score": 90,
+  "max_known_flow_tokens": 0,
+  "minutes_per_onboarding_step": 3,
+  "score_penalties": {
+    "missing_checklist_item": 8,
+    "known_flow_token_violation": 30,
+    "reliability_issue": 25,
+    "open_high_support_ticket": 20
+  }
+}

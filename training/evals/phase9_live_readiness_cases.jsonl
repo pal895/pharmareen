@@ -1,0 +1,7 @@
+{"case": "all_live_checklist_items_prepared"}
+{"case": "live_execution_not_started"}
+{"case": "one_test_at_a_time_rule_present"}
+{"case": "evidence_fields_required"}
+{"case": "token_preservation_declared"}
+{"case": "paused_photo_and_offline_items_are_prepared_only"}
+{"case": "phase8_dashboard_ready"}

@@ -11,6 +11,15 @@ class Action(str, Enum):
     OUT_OF_STOCK = "Out of Stock"
     NOT_SOLD = "Not Sold"
     RESTOCKED = "Restocked"
+    STOCK_CHECK = "Stock Check"
+    RESTOCK = "Restock"
+    UNDO = "Undo"
+    CORRECTION_REQUEST = "Correction Request"
+    EXPIRY_NOTE = "Expiry Note"
+    SUPPLIER_NOTE = "Supplier Note"
+    BATCH_NOTE = "Batch Note"
+    SHOW_SALE = "Show Sale"
+    SALE_COUNT = "Sale Count"
 
     @classmethod
     def from_value(cls, value: Any) -> "Action | None":
@@ -39,6 +48,24 @@ class Action(str, Enum):
             "restocked": cls.RESTOCKED,
             "re stock": cls.RESTOCKED,
             "stock added": cls.RESTOCKED,
+            "stock check": cls.STOCK_CHECK,
+            "check stock": cls.STOCK_CHECK,
+            "stock": cls.STOCK_CHECK,
+            "received stock": cls.RESTOCKED,
+            "undo": cls.UNDO,
+            "reverse": cls.UNDO,
+            "cancel": cls.UNDO,
+            "correction request": cls.CORRECTION_REQUEST,
+            "correct": cls.CORRECTION_REQUEST,
+            "expiry note": cls.EXPIRY_NOTE,
+            "expiry": cls.EXPIRY_NOTE,
+            "supplier note": cls.SUPPLIER_NOTE,
+            "supplier": cls.SUPPLIER_NOTE,
+            "batch note": cls.BATCH_NOTE,
+            "batch": cls.BATCH_NOTE,
+            "show sale": cls.SHOW_SALE,
+            "sale count": cls.SALE_COUNT,
+            "today sale count": cls.SALE_COUNT,
         }
         return aliases.get(normalized)
 

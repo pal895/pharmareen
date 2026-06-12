@@ -363,14 +363,16 @@ class IntakeService:
         parser: Parser,
         store: StockStore,
         timezone: str = "Africa/Nairobi",
-        pharmacy_name: str = "PharMareen",
+        pharmacy_name: str = "Zilla Pharmacy",
         app_base_url: str | None = None,
         whatsapp_number: str | None = None,
+        sale_ledger: Any | None = None,
     ):
         self.parser = parser
         self.store = store
         self.timezone = timezone
         self.pharmacy_name = pharmacy_name
+        self.sale_ledger = sale_ledger
         self.app_base_url = clean_app_base_url(app_base_url)
         self.whatsapp_number = clean_whatsapp_number(whatsapp_number)
         self.pending_followups: dict[str, OperatingCommand] = {}
@@ -387,7 +389,18 @@ class IntakeService:
         self.receipt_printing_enabled = False
         self.operational_memory = OperationalMemory()
 
-    def process_text(self, text: str, conversation_id: str | None = None) -> str:
+    def process_text(
+        self,
+        text: str,
+        conversation_id: str | None = None,
+        *,
+        actor_context: Any | None = None,
+        actor_id: str | None = None,
+        owner_id: str | None = None,
+        staff_id: str | None = None,
+        actor_role: str | None = None,
+        source: str | None = None,
+    ) -> str:
         text = text.strip()
         if not text:
             return "Please send a short text message or voice note."
@@ -401,6 +414,31 @@ class IntakeService:
             used_ai=route_decision.use_ai,
             reason=route_decision.reason,
         )
+
+        if self.sale_ledger is not None:
+            phase_reply = self._phase_ledger_reply(
+                text,
+                conversation_key,
+                actor_meta=ledger_actor_metadata(
+                    actor_context=actor_context,
+                    actor_id=actor_id,
+                    owner_id=owner_id,
+                    staff_id=staff_id,
+                    actor_role=actor_role,
+                    source=source,
+                ),
+            )
+            if phase_reply is not None:
+                return phase_reply
+
+        early_report_date = parse_report_command(text, self.timezone)
+        if early_report_date:
+            return self._saved_report_reply(early_report_date)
+
+        if self.parser.__class__.__name__ != "AIService":
+            parser_reply = self._local_parser_reply(text, conversation_key)
+            if parser_reply is not None:
+                return parser_reply
 
         pending_repeat = self.pending_repeat_confirmation.get(conversation_key)
         if pending_repeat is not None:
@@ -669,6 +707,48 @@ class IntakeService:
         return f"Logged {len(logged_results)} entries:\n\n" + "\n".join(
             f"- {line}" for line in lines
         )
+
+    def _phase_ledger_reply(self, text: str, conversation_key: str, actor_meta: dict[str, str]) -> str | None:
+        try:
+            master_drug_names = self.store.list_master_drug_names()
+        except Exception:
+            master_drug_names = []
+        try:
+            parsed = self.parser.parse_events(text, master_drug_names)
+        except Exception:
+            return None
+        if parsed.needs_clarification or not parsed.events:
+            return parsed.clarification_question if parsed.needs_clarification else None
+        results = [self._process_event(event, conversation_key=conversation_key, actor_meta=actor_meta) for event in parsed.events]
+        if len(results) == 1:
+            return results[0].reply
+        logged_results = [result for result in results if result.logged]
+        if not logged_results:
+            return "\n".join(result.reply for result in results)
+        lines = [result.summary_line for result in logged_results]
+        lines.extend(result.reply for result in results if not result.logged)
+        return f"Logged {len(logged_results)} entries:\n\n" + "\n".join(f"- {line}" for line in lines)
+
+    def _local_parser_reply(self, text: str, conversation_key: str) -> str | None:
+        try:
+            master_drug_names = self.store.list_master_drug_names()
+        except Exception:
+            master_drug_names = []
+        try:
+            parsed = self.parser.parse_events(text, master_drug_names)
+        except Exception:
+            return None
+        if parsed.needs_clarification or not parsed.events:
+            return parsed.clarification_question if parsed.needs_clarification else None
+        results = [self._process_event(event, conversation_key=conversation_key) for event in parsed.events]
+        if len(results) == 1:
+            return results[0].reply
+        logged_results = [result for result in results if result.logged]
+        if not logged_results:
+            return "\n".join(result.reply for result in results)
+        lines = [result.summary_line for result in logged_results]
+        lines.extend(result.reply for result in results if not result.logged)
+        return f"Logged {len(logged_results)} entries:\n\n" + "\n".join(f"- {line}" for line in lines)
 
     def _memory_reference_reply(self, text: str, conversation_key: str) -> str:
         normalized = normalize_key(text)
@@ -1254,7 +1334,12 @@ class IntakeService:
             category="errors",
         )
 
-    def _process_event(self, event: ParsedEvent) -> EntryResult:
+    def _process_event(
+        self,
+        event: ParsedEvent,
+        conversation_key: str = "__default__",
+        actor_meta: dict[str, str] | None = None,
+    ) -> EntryResult:
         if event.needs_clarification or not event.drug_name or event.action is None:
             return EntryResult(
                 logged=False,
@@ -1264,19 +1349,53 @@ class IntakeService:
             )
 
         if event.action in {Action.SOLD, Action.LATE_SALE}:
-            return self._process_sale(event)
-        if event.action == Action.RESTOCKED:
+            return self._process_sale(event, conversation_key=conversation_key, actor_meta=actor_meta)
+        if event.action in {Action.RESTOCKED, Action.RESTOCK}:
             return self._process_restock(event)
         if event.action == Action.OUT_OF_STOCK:
             return self._process_missed_demand(event)
+        if event.action == Action.STOCK_CHECK:
+            return EntryResult(
+                logged=False,
+                reply=self._stock_check_reply(event.drug_name),
+                summary_line="",
+                category="stock_checks",
+            )
+        if event.action == Action.UNDO:
+            return self._process_ledger_undo(event, actor_meta=actor_meta)
+        if event.action == Action.CORRECTION_REQUEST:
+            return self._process_ledger_correction(event, actor_meta=actor_meta)
+        if event.action == Action.SHOW_SALE:
+            return self._process_ledger_show_sale(event)
+        if event.action == Action.SALE_COUNT:
+            return self._process_ledger_sale_count()
+        if event.action in {Action.EXPIRY_NOTE, Action.SUPPLIER_NOTE, Action.BATCH_NOTE}:
+            label = {
+                Action.EXPIRY_NOTE: "Expiry",
+                Action.SUPPLIER_NOTE: "Supplier",
+                Action.BATCH_NOTE: "Batch",
+            }.get(event.action, "Tracking")
+            return EntryResult(
+                logged=False,
+                reply=f"{label} tracking recognized. Structured tracking is staged for onboarding.",
+                summary_line="",
+                category="stock_checks",
+            )
         return self._process_lost_opportunity(event)
 
-    def _process_sale(self, event: ParsedEvent) -> EntryResult:
+    def _process_sale(
+        self,
+        event: ParsedEvent,
+        conversation_key: str = "__default__",
+        actor_meta: dict[str, str] | None = None,
+    ) -> EntryResult:
         return self._record_sale(
             drug_name=event.drug_name,
             quantity=event.quantity,
             is_late=event.action == Action.LATE_SALE,
             note=event.notes,
+            conversation_key=conversation_key,
+            actor_meta=actor_meta,
         )
 
     def _process_sale_command(self, command: OperatingCommand, is_late: bool, conversation_key: str = "__default__") -> EntryResult:
@@ -1335,6 +1454,7 @@ class IntakeService:
         barcode: str = "",
         target_day: str = "",
         conversation_key: str = "__default__",
+        actor_meta: dict[str, str] | None = None,
     ) -> EntryResult:
         try:
             stock = self._resolve_stock(drug_name)
@@ -1372,7 +1492,11 @@ class IntakeService:
             discount = round(gross_sales * (float(discount_percent) / 100), 2)
         sale_trace_id = trace_id_value or trace_id("SALE")
         stock_plan = build_stock_update_plan(stock, base_quantity)
+        sale_date = current_sale_date(self.timezone)
+        sale_number = self.sale_ledger.preview_next_sale_number(sale_date) if self.sale_ledger is not None else None
         notes = merge_notes(note, stock_plan.warning_notes)
+        if sale_number is not None:
+            notes = merge_notes(notes, sale_number_note(sale_number))
         fefo_reply = ""
         try:
             from app.services.batch_service import BatchService
@@ -1444,6 +1568,21 @@ class IntakeService:
                     "Stock level could not be updated because Google Sheets could not be updated."
                 )
 
+        if self.sale_ledger is not None and sale_number is not None:
+            self.sale_ledger.record_sale(
+                sale_date,
+                drug_name=event.drug_name,
+                quantity=base_quantity,
+                price=stock.selling_price,
+                total_value=total_sales,
+                notes=event.notes,
+                payment=normalize_payment_for_ledger(payment_method),
+                actor_id=(actor_meta or {}).get("actor_id") or "system",
+                actor_role=(actor_meta or {}).get("actor_role") or "runtime",
+                source=(actor_meta or {}).get("source") or "intake",
+                sale_number=sale_number,
+            )
+
         payment_label = payment_method or "Cash"
         if is_late:
             reply_parts = [
@@ -1479,6 +1618,8 @@ class IntakeService:
             else:
                 reply_parts.append("🧾 Digital receipt ready — printer not detected.")
         reply = "\n".join(reply_parts)
+        if sale_number is not None:
+            reply = f"Sale #{sale_number}: {reply}"
         sale_memory = {
             "drug_name": stock.drug_name,
             "quantity": base_quantity,
@@ -1542,7 +1683,7 @@ class IntakeService:
         else:
             reason = f"Only {self._format_stock_level(stock.drug_name, available, unit)} available."
         reply = (
-            f"⚠️ {reason} Sale not recorded. "
+            f"Insufficient stock for {stock.drug_name}. ⚠️ {reason} Sale not recorded. "
             f"Missed sale saved: {quantity_label}.\n"
             f"Stock left: {self._format_stock_level(stock.drug_name, available, unit)}"
         )
@@ -1562,6 +1703,137 @@ class IntakeService:
                 raw_text=event.drug_name,
             )
         )
+
+    def _process_ledger_undo(self, event: ParsedEvent, actor_meta: dict[str, str] | None = None) -> EntryResult:
+        if self.sale_ledger is None:
+            return EntryResult(logged=False, reply="Undo recognized. Sale numbering is not configured yet.", summary_line="")
+        sale_number = extract_sale_number(event.notes)
+        if sale_number is None and not wants_last_sale(event.notes):
+            return EntryResult(logged=False, reply="Which sale number should I undo?", summary_line="")
+        sale_date = current_sale_date(self.timezone)
+        result = (
+            self.sale_ledger.undo_last_sale(
+                sale_date,
+                actor_id=(actor_meta or {}).get("actor_id") or "system",
+                actor_role=(actor_meta or {}).get("actor_role") or "runtime",
+                reason=event.notes,
+            )
+            if sale_number is None
+            else self.sale_ledger.undo_sale(
+                sale_date,
+                sale_number,
+                actor_id=(actor_meta or {}).get("actor_id") or "system",
+                actor_role=(actor_meta or {}).get("actor_role") or "runtime",
+                reason=event.notes,
+            )
+        )
+        if not result.found or result.record is None:
+            return EntryResult(logged=False, reply=result.message, summary_line="")
+        stock_reply = ""
+        try:
+            stock = self._resolve_stock(str(result.record.get("drug_name") or ""))
+            if stock is not None and stock.current_stock is not None:
+                restored_stock = parse_int(stock.current_stock, default=0) + int(result.record.get("quantity") or 0)
+                self.store.update_current_stock(stock, restored_stock)
+                stock_reply = f" Stock restored to {restored_stock}."
+        except Exception:
+            stock_reply = " Stock restore failed; check Master_Stock."
+        return EntryResult(
+            logged=True,
+            reply=f"{result.message}{stock_reply}",
+            summary_line=f"sale #{sale_number or 'last'} undone",
+            category="sales",
+        )
+
+    def _process_ledger_correction(self, event: ParsedEvent, actor_meta: dict[str, str] | None = None) -> EntryResult:
+        if self.sale_ledger is None:
+            return EntryResult(logged=False, reply="Correction recognized. Sale numbering is not configured yet.", summary_line="")
+        sale_number = extract_sale_number(event.notes)
+        if sale_number is None:
+            return EntryResult(logged=False, reply="Which sale number should I correct?", summary_line="")
+        updates = extract_sale_correction_updates(event.notes)
+        sale_date = current_sale_date(self.timezone)
+        lookup = self.sale_ledger.get_sale(sale_date, sale_number)
+        if not lookup.found or lookup.record is None:
+            return EntryResult(logged=False, reply=lookup.message, summary_line="")
+        stock_error = self._apply_ledger_correction_stock_delta(lookup.record, updates)
+        if stock_error:
+            return EntryResult(logged=False, reply=stock_error, summary_line="")
+        old_price = lookup.record.get("price")
+        if "drug_name" in updates and "price" not in updates:
+            try:
+                new_stock = self._resolve_stock(str(updates["drug_name"]))
+                if new_stock is not None:
+                    updates["drug_name"] = new_stock.drug_name
+                    updates["price"] = new_stock.selling_price
+            except Exception:
+                pass
+        if "quantity" in updates and "total_value" not in updates:
+            price = updates.get("price", old_price)
+            if price is not None:
+                updates["total_value"] = float(price) * int(updates["quantity"])
+        result = self.sale_ledger.correct_sale(
+            sale_date,
+            sale_number,
+            updates,
+            actor_id=(actor_meta or {}).get("actor_id") or "system",
+            actor_role=(actor_meta or {}).get("actor_role") or "runtime",
+        )
+        return EntryResult(
+            logged=result.found,
+            reply=result.message,
+            summary_line=f"sale #{sale_number} corrected" if result.found else "",
+            category="sales",
+        )
+
+    def _apply_ledger_correction_stock_delta(self, record: dict[str, Any], updates: dict[str, Any]) -> str | None:
+        old_drug = str(record.get("drug_name") or "")
+        old_quantity = int(record.get("quantity") or 0)
+        new_drug = str(updates.get("drug_name") or old_drug)
+        new_quantity = int(updates.get("quantity") or old_quantity)
+        if normalize_key(old_drug) == normalize_key(new_drug) and old_quantity == new_quantity:
+            return None
+        try:
+            old_stock = self._resolve_stock(old_drug)
+            new_stock = self._resolve_stock(new_drug)
+        except SheetsUnavailableError:
+            return SHEETS_UNAVAILABLE_MESSAGE
+        except Exception:
+            return SAVE_ERROR
+        if old_stock is None or old_stock.current_stock is None:
+            return f"Cannot correct sale stock because {old_drug} stock is missing."
+        if new_stock is None or new_stock.current_stock is None:
+            return f"Cannot correct sale stock because {new_drug} stock is missing."
+        old_level = parse_int(old_stock.current_stock, default=0) or 0
+        new_level_current = parse_int(new_stock.current_stock, default=0) or 0
+        if normalize_key(old_stock.drug_name) == normalize_key(new_stock.drug_name):
+            updated_level = old_level + old_quantity - new_quantity
+            if updated_level < 0:
+                return f"Cannot correct sale #{record.get('sale_number')}; insufficient {old_drug} stock for quantity {new_quantity}."
+            self.store.update_current_stock(old_stock, updated_level)
+            return None
+        restored_old = old_level + old_quantity
+        updated_new = new_level_current - new_quantity
+        if updated_new < 0:
+            return f"Cannot correct sale #{record.get('sale_number')}; insufficient {new_drug} stock."
+        self.store.update_current_stock(old_stock, restored_old)
+        self.store.update_current_stock(new_stock, updated_new)
+        return None
+
+    def _process_ledger_show_sale(self, event: ParsedEvent) -> EntryResult:
+        if self.sale_ledger is None:
+            return EntryResult(logged=False, reply="Sale numbering is not configured yet.", summary_line="")
+        sale_number = extract_sale_number(event.notes)
+        if sale_number is None:
+            return EntryResult(logged=False, reply="Which sale number should I show?", summary_line="")
+        result = self.sale_ledger.get_sale(current_sale_date(self.timezone), sale_number)
+        return EntryResult(logged=False, reply=result.message, summary_line="")
+
+    def _process_ledger_sale_count(self) -> EntryResult:
+        if self.sale_ledger is None:
+            return EntryResult(logged=False, reply="Sale numbering is not configured yet.", summary_line="")
+        count = self.sale_ledger.sale_count(current_sale_date(self.timezone))
+        return EntryResult(logged=False, reply=f"Today sale count: {count}.", summary_line="")
 
     def _process_restock_command(self, command: OperatingCommand) -> EntryResult:
         try:
@@ -2734,6 +3006,75 @@ def parse_report_command(text: str, timezone: str) -> str | None:
     if target == "yesterday":
         return (today - timedelta(days=1)).isoformat()
     return target
+
+
+def current_sale_date(timezone: str) -> str:
+    return now_in_timezone(timezone).date().isoformat()
+
+
+def sale_number_note(sale_number: int | None) -> str:
+    return f"Sale #{sale_number}" if sale_number is not None else ""
+
+
+def extract_sale_number(notes: str) -> int | None:
+    patterns = [
+        r"\bTarget sale:\s*(\d+)\b",
+        r"\bSale\s*#?\s*(\d+)\b",
+        r"#\s*(\d+)\b",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, notes, flags=re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def wants_last_sale(notes: str) -> bool:
+    return bool(re.search(r"\b(Target sale:\s*last|last sale|undo last)\b", notes, flags=re.IGNORECASE))
+
+
+def extract_sale_correction_updates(notes: str) -> dict[str, Any]:
+    updates: dict[str, Any] = {}
+    payment_match = re.search(r"\bPayment:\s*([^;]+)", notes, flags=re.IGNORECASE)
+    if payment_match:
+        updates["payment"] = normalize_payment_for_ledger(payment_match.group(1))
+    quantity_match = re.search(r"\bQuantity:\s*(\d+)\b", notes, flags=re.IGNORECASE)
+    if quantity_match:
+        updates["quantity"] = int(quantity_match.group(1))
+    medicine_match = re.search(r"\bMedicine:\s*([^;]+)", notes, flags=re.IGNORECASE)
+    if medicine_match:
+        updates["drug_name"] = title_drug_name(medicine_match.group(1).strip())
+    return updates
+
+
+def normalize_payment_for_ledger(payment: str | None) -> str:
+    clean = normalize_key(str(payment or ""))
+    if clean in {"m pesa", "mpesa", "m-pesa"}:
+        return "mpesa"
+    if clean in {"credit", "cash"}:
+        return clean
+    return clean or "unknown"
+
+
+def ledger_actor_metadata(
+    *,
+    actor_context: Any | None = None,
+    actor_id: str | None = None,
+    owner_id: str | None = None,
+    staff_id: str | None = None,
+    actor_role: str | None = None,
+    source: str | None = None,
+) -> dict[str, str]:
+    context_actor_id = str(getattr(actor_context, "actor_id", "") or "").strip()
+    context_role = str(getattr(actor_context, "role", "") or "").strip()
+    context_source = str(getattr(actor_context, "source", "") or "").strip()
+    resolved_actor = context_actor_id or actor_id or owner_id or staff_id or ""
+    resolved_role = context_role or actor_role or ("owner" if owner_id else "staff" if staff_id else "")
+    return {
+        "actor_id": str(resolved_actor or "system"),
+        "actor_role": str(resolved_role or "runtime"),
+        "source": str(context_source or source or "intake"),
+    }
 
 
 def parse_followup_prompt(text: str) -> FollowUpPrompt | None:

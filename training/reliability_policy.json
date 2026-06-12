@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "max_attempts": 3,
+  "retry_delays_seconds": [0, 30, 120],
+  "inflight_timeout_seconds": 300,
+  "low_network_backlog_threshold": 5,
+  "offline_ack": "Saved offline. It will sync when connection improves.",
+  "duplicate_ack": "Already synced. No duplicate was created.",
+  "grouped_confirmation_template": "{applied} synced, {queued} waiting, {failed} need review."
+}

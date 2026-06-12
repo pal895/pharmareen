@@ -1,0 +1,13 @@
+{
+  "activation_min_score": 90,
+  "medicine_sources": [
+    "csv",
+    "google_sheet",
+    "invoice_photo",
+    "previous_pos_export",
+    "manual_add"
+  ],
+  "stress_latency_warning_ms": 500,
+  "stress_memory_warning_bytes": 8000000,
+  "version": 1
+}

@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "forms": {
+    "tablet": {
+      "aliases": ["tab", "tabs", "tablet", "tablets"]
+    },
+    "capsule": {
+      "aliases": ["cap", "caps", "capsule", "capsules"]
+    },
+    "syrup": {
+      "aliases": ["syrup", "syp"]
+    },
+    "injection": {
+      "aliases": ["inj", "injection", "injections"]
+    },
+    "vial": {
+      "aliases": ["vial", "vials"]
+    },
+    "ampoule": {
+      "aliases": ["amp", "amps", "ampoule", "ampoules"]
+    },
+    "cream": {
+      "aliases": ["cream", "crm"]
+    },
+    "drops": {
+      "aliases": ["drop", "drops", "eye drops", "ear drops"]
+    },
+    "bottle": {
+      "aliases": ["bottle", "bottles", "btl"]
+    },
+    "sachet": {
+      "aliases": ["sachet", "sachets"]
+    },
+    "tube": {
+      "aliases": ["tube", "tubes"]
+    }
+  },
+  "packaging": {
+    "strip": {
+      "aliases": ["strip", "strips"]
+    },
+    "box": {
+      "aliases": ["box", "boxes"]
+    },
+    "packet": {
+      "aliases": ["pack", "packet", "packets", "pkt", "pkts"]
+    },
+    "carton": {
+      "aliases": ["carton", "cartons"]
+    }
+  },
+  "units": {
+    "mg": {
+      "aliases": ["mg", "milligram", "milligrams"]
+    },
+    "g": {
+      "aliases": ["g", "gram", "grams"]
+    },
+    "mcg": {
+      "aliases": ["mcg", "microgram", "micrograms"]
+    },
+    "ml": {
+      "aliases": ["ml", "millilitre", "millilitres", "milliliter", "milliliters"]
+    },
+    "iu": {
+      "aliases": ["iu", "unit", "units"]
+    }
+  },
+  "payments": {
+    "cash": {
+      "aliases": ["cash", "c", "cahs", "cas", "caash"]
+    },
+    "mpesa": {
+      "aliases": ["mpesa", "m-pesa", "m pesa", "m", "mpes", "mesa"]
+    },
+    "credit": {
+      "aliases": ["credit", "cr", "cred", "on credit"]
+    }
+  }
+}

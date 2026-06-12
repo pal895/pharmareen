@@ -3870,3 +3870,69 @@ def run_local_server() -> None:
 
 if __name__ == "__main__":
     run_local_server()
+
+
+# PHARMAREEN_PHASE13_LIVE_PATCH
+try:
+    from pathlib import Path as _PharmareenPath
+    from fastapi import Header as _Header, Query as _Query, Request as _Request
+    from app.live_runtime import LIVE_TEST_NUMBER as _LIVE_TEST_NUMBER, LiveRuntimeRouter as _LiveRuntimeRouter, build_live_readiness_report as _build_live_readiness_report, split_phone_numbers as _split_phone_numbers
+    from app.provisioning import AutonomousProvisioningEngine as _AutonomousProvisioningEngine
+    _phase13_provisioning_engine = _AutonomousProvisioningEngine()
+    def _phase13_settings_safe():
+        try:
+            return get_settings(), None
+        except Exception as exc:
+            return None, str(exc)
+    def _phase13_intake_factory():
+        if "get_intake_service" in globals():
+            return get_intake_service()
+        raise RuntimeError("get_intake_service is not available")
+    def _phase13_router():
+        settings, _err = _phase13_settings_safe()
+        admins = []
+        existing = []
+        live_number = _LIVE_TEST_NUMBER
+        enabled = True
+        if settings is not None:
+            admins.extend(_split_phone_numbers(getattr(settings, "admin_whatsapp_numbers", None)))
+            existing.extend(_split_phone_numbers(getattr(settings, "existing_pharmacy_numbers", None)))
+            owner = getattr(settings, "owner_whatsapp_to", None)
+            if owner:
+                admins.extend(_split_phone_numbers(owner)); existing.extend(_split_phone_numbers(owner))
+            live_number = getattr(settings, "live_test_number", live_number)
+            enabled = bool(getattr(settings, "enable_live_onboarding", True))
+        return _LiveRuntimeRouter(intake_service_factory=_phase13_intake_factory, provisioning_engine=_phase13_provisioning_engine, admin_numbers=admins, existing_pharmacy_numbers=existing, live_test_number=live_number, onboarding_enabled=enabled)
+    def try_get_settings():
+        return _phase13_settings_safe()
+    def get_live_runtime_router():
+        return _phase13_router()
+    @app.get("/live/readiness")
+    def phase13_live_readiness():
+        settings, err = try_get_settings()
+        sheets_available = False
+        try:
+            store = get_sheet_store() if "get_sheet_store" in globals() else None
+            sheets_available = bool(getattr(store, "is_available", False))
+        except Exception as exc:
+            err = err or str(exc)
+        readiness_root = (
+            _PharmareenPath(__file__).resolve().parent.parent
+            if settings is not None
+            else _PharmareenPath("__missing_runtime_settings__")
+        )
+        return _build_live_readiness_report(root_dir=readiness_root, sheets_available=sheets_available, settings_loaded=settings is not None, settings_error=err)
+    @app.post("/webhooks/baileys/whatsapp")
+    async def phase13_baileys_whatsapp(request: _Request):
+        payload = await request.json()
+        result = get_live_runtime_router().handle_whatsapp_message(phone_number=str(payload.get("from") or payload.get("phone_number") or payload.get("sender") or ""), text=str(payload.get("text") or payload.get("body") or payload.get("message") or ""), source="baileys", message_id=str(payload.get("message_id") or payload.get("id") or "") or None)
+        return result.as_dict()
+    @app.post("/admin/onboarding/{session_id}/{action}")
+    def phase13_admin_onboarding(session_id: str, action: str, corrections_requested: str | None = _Query(default=None), authorization: str | None = _Header(default=None)):
+        settings, _err = _phase13_settings_safe()
+        if settings is not None and "authorize_report_trigger" in globals():
+            authorize_report_trigger(settings, authorization)
+        result = _phase13_router().admin_review_unknown_session(session_id=session_id, action=action, admin_id="admin_http", source="admin_http", corrections_requested=corrections_requested)
+        return result.as_dict()
+except Exception as _phase13_patch_error:
+    print("PHARMAREEN_PHASE13_LIVE_PATCH_LOAD_ERROR", repr(_phase13_patch_error))

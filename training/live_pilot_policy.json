@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "one_active_pharmacy": true,
+  "max_known_flow_tokens": 0,
+  "minimum_stability_score": 90,
+  "required_evidence_fields": [
+    "input_sent",
+    "actual_reply",
+    "pass_fail",
+    "token_observation"
+  ],
+  "stability_penalties": {
+    "critical": 35,
+    "high": 20,
+    "medium": 10,
+    "low": 3,
+    "known_flow_token_violation": 25
+  }
+}

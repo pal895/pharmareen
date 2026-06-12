@@ -37,6 +37,11 @@ class RecommendationEngine(Protocol):
         ...
 
 
+class SaleFinanceLedger(Protocol):
+    def finance_summary(self, sale_date: str) -> dict[str, Any]:
+        ...
+
+
 @dataclass(frozen=True)
 class LowStockWarning:
     drug_name: str
@@ -63,6 +68,7 @@ class ReportMetrics:
     late_sale_transactions: int = 0
     peak_sales_count: int = 0
     peak_items_sold: int = 0
+    payment_totals: dict[str, float] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -90,6 +96,7 @@ class ReportMetrics:
             "late_sale_transactions": self.late_sale_transactions,
             "peak_sales_count": self.peak_sales_count,
             "peak_items_sold": self.peak_items_sold,
+            "payment_totals": self.payment_totals,
         }
 
 
@@ -101,12 +108,14 @@ class ReportService:
         recommender: RecommendationEngine | None = None,
         pharmacy_name: str = "PharMareen",
         timezone: str = "Africa/Nairobi",
+        sale_ledger: SaleFinanceLedger | None = None,
     ):
         self.store = store
         self.whatsapp = whatsapp
         self.recommender = recommender
         self.pharmacy_name = pharmacy_name
         self.timezone = timezone
+        self.sale_ledger = sale_ledger
 
     def generate_daily_report(
         self,
@@ -124,7 +133,10 @@ class ReportService:
         except Exception:
             logger.exception("Low-stock lookup failed; report will continue without low-stock section")
             low_stock = []
-        metrics = build_transaction_metrics(date_text, transactions, low_stock) if transactions else build_report_metrics(date_text, logs, low_stock)
+        if self.sale_ledger is not None:
+            metrics = build_report_metrics_from_ledger(date_text, self.sale_ledger, logs, low_stock)
+        else:
+            metrics = build_transaction_metrics(date_text, transactions, low_stock) if transactions else build_report_metrics(date_text, logs, low_stock)
         recommendations = self._recommendations(metrics)
         report_text = render_report(
             metrics,
@@ -362,6 +374,8 @@ def render_daily_summary(
         f"Date: {metrics.report_date}",
         "",
         f"Sales: {format_ksh(metrics.total_sales).replace('Ksh', 'KES')}",
+        f"Total sales: {format_ksh(metrics.total_sales)}",
+        f"Payment totals: {format_payment_totals(metrics.payment_totals)}",
         f"Cost: {format_ksh(metrics.total_cost).replace('Ksh', 'KES')}",
         f"Gross Profit: {format_ksh(metrics.gross_profit).replace('Ksh', 'KES')}",
         f"Items Sold: {metrics.total_items_sold}",
@@ -379,6 +393,86 @@ def render_daily_summary(
     if metrics.missing_profit_data:
         lines.append("- Warning: Some items had missing price data, so profit may be incomplete.")
     return "\n".join(lines)
+
+
+def build_report_metrics_from_ledger(
+    report_date: str,
+    sale_ledger: SaleFinanceLedger,
+    logs: list[dict[str, Any]] | None = None,
+    low_stock_warnings: list[LowStockWarning] | None = None,
+) -> ReportMetrics:
+    finance = sale_ledger.finance_summary(report_date)
+    requested_counter: Counter[str] = Counter()
+    sold_counter: Counter[str] = Counter()
+    missed_counter: Counter[str] = Counter()
+    not_sold_counter: Counter[str] = Counter()
+    hour_counter: Counter[int] = Counter()
+
+    for sale in finance.get("sales", []):
+        if not isinstance(sale, dict):
+            continue
+        drug_name = str(sale.get("drug_name") or "").strip()
+        if not drug_name:
+            continue
+        quantity = parse_int(sale.get("quantity"), default=1) or 1
+        requested_counter[drug_name] += quantity
+        sold_counter[drug_name] += quantity
+
+    for row in logs or []:
+        drug_name = str(row.get("Drug Name") or "").strip()
+        if not drug_name:
+            continue
+        hour = _hour_from_time(row.get("Time"))
+        if hour is not None:
+            hour_counter[hour] += 1
+        quantity = parse_int(row.get("Quantity"), default=1) or 1
+        action = Action.from_value(row.get("Action"))
+        if action == Action.OUT_OF_STOCK:
+            requested_counter[drug_name] += quantity
+            missed_counter[drug_name] += quantity
+        elif action == Action.NOT_SOLD:
+            requested_counter[drug_name] += quantity
+            not_sold_counter[drug_name] += quantity
+
+    payment_totals = empty_payment_totals()
+    for key, value in dict(finance.get("payment_totals") or {}).items():
+        target = str(key or "unknown").lower()
+        if target not in payment_totals:
+            target = "unknown"
+        payment_totals[target] += float(value or 0)
+
+    return ReportMetrics(
+        report_date=report_date,
+        total_sales=float(finance.get("total_sales") or 0),
+        total_items_sold=int(finance.get("total_items") or 0),
+        sale_transactions=int(finance.get("active_sales") or 0),
+        most_requested=top_pairs(requested_counter, limit=5),
+        most_sold=top_pairs(sold_counter, limit=5),
+        missed_sales=top_pairs(missed_counter, limit=5),
+        not_sold=top_pairs(not_sold_counter, limit=5),
+        low_stock_warnings=low_stock_warnings or [],
+        peak_activity_time=format_peak_time(hour_counter),
+        payment_totals=payment_totals,
+    )
+
+
+def empty_payment_totals() -> dict[str, float]:
+    return {"cash": 0.0, "mpesa": 0.0, "credit": 0.0, "unknown": 0.0}
+
+
+def format_payment_totals(payment_totals: dict[str, float]) -> str:
+    totals = empty_payment_totals()
+    for key, value in dict(payment_totals or {}).items():
+        target = str(key or "unknown").lower()
+        if target not in totals:
+            target = "unknown"
+        totals[target] += float(value or 0)
+    return (
+        f"Cash {format_ksh(totals['cash'])}, "
+        f"M-Pesa {format_ksh(totals['mpesa'])}, "
+        f"Credit {format_ksh(totals['credit'])}, "
+        f"Unknown {format_ksh(totals['unknown'])}"
+    )
 
 
 def deterministic_recommendations(metrics: ReportMetrics) -> list[str]:
