@@ -20,6 +20,8 @@ const autoResetOnLoggedOut = String(process.env.AUTO_RESET_BAILEYS_ON_LOGOUT || 
 const allowAllDirectChatsForTest = String(process.env.ALLOW_ALL_DIRECT_CHATS_FOR_TEST || 'false').toLowerCase() === 'true';
 const pharmacyRegistryAuthEnabled = String(process.env.PHARMACY_REGISTRY_AUTH_ENABLED || 'true').toLowerCase() !== 'false';
 const nativeSelectorEnabled = String(process.env.WHATSAPP_NATIVE_SELECTOR_ENABLED || 'false').toLowerCase() === 'true';
+const liveTestNumber = phoneDigits(process.env.LIVE_TEST_NUMBER || '');
+const useLiveTestNumberForLid = String(process.env.USE_LIVE_TEST_NUMBER_FOR_LID || 'false').toLowerCase() === 'true';
 const allowedNumbers = parseAllowedNumbers(
   `${process.env.ALLOWED_WHATSAPP_NUMBERS || ''},${process.env.ALLOWED_DIRECT_CHAT_NUMBERS || ''}`
 );
@@ -106,11 +108,21 @@ function senderIdentityFromMessage(msg) {
   const candidates = [
     key.remoteJid,
     key.participant,
+    key.participantPn,
+    key.participant_pn,
     key.remoteJidAlt,
+    key.remoteJidPn,
+    key.remoteJid_pn,
     key.participantAlt,
     key.senderPn,
+    key.sender_pn,
     key.senderJid,
+    key.sender_jid,
     msg && msg.participant,
+    msg && msg.participantPn,
+    msg && msg.participant_pn,
+    msg && msg.senderPn,
+    msg && msg.sender_pn,
     msg && msg.sender
   ].filter(Boolean);
   let normalizedPhone = '';
@@ -122,6 +134,10 @@ function senderIdentityFromMessage(msg) {
   }
   if (!normalizedPhone && normalizedLid && phoneByLid.has(normalizedLid)) {
     normalizedPhone = phoneByLid.get(normalizedLid);
+  }
+  if (!normalizedPhone && normalizedLid && useLiveTestNumberForLid && liveTestNumber) {
+    normalizedPhone = liveTestNumber;
+    console.log(`LIVE_TEST_LID_PHONE_FALLBACK normalized_lid=${normalizedLid} normalized_phone=${normalizedPhone}`);
   }
   return { senderJid, normalizedPhone, normalizedLid };
 }

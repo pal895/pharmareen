@@ -738,6 +738,12 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "ALLOWED_DIRECT_CHAT_LIDS" in source
     assert "allowedLids" in source
     assert "senderIdentityFromMessage" in source
+    assert "participantPn" in source
+    assert "participant_pn" in source
+    assert "remoteJidPn" in source
+    assert "senderPn" in source
+    assert "USE_LIVE_TEST_NUMBER_FOR_LID" in source
+    assert "LIVE_TEST_LID_PHONE_FALLBACK" in source
     assert "contacts.update" in source
     assert "ALLOWLIST_DECISION" in source
     assert "normalized_phone=" in source
