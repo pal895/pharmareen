@@ -2,28 +2,37 @@
 
 ## Active WhatsApp Provider
 
-Production WhatsApp should use Meta WhatsApp Cloud API.
+Production WhatsApp should use the Baileys WhatsApp bridge.
 
 Webhook URL:
 
 ```text
-https://YOUR-DOMAIN/bridge endpoints/meta/whatsapp
+https://YOUR-DOMAIN/webhooks/baileys/whatsapp
 ```
 
 Set:
 
 ```text
-WHATSAPP_PROVIDER=meta
-META_VERIFY_TOKEN=
-META_ACCESS_TOKEN=
-META_PHONE_NUMBER_ID=
-META_WABA_ID=
-META_GRAPH_API_VERSION=v21.0
+WHATSAPP_BRIDGE_ENABLED=true
+PHARMAREEN_BACKEND_URL=http://localhost:5000
+OWNER_WHATSAPP_TO=whatsapp:+254700000000
 ```
 
-Keep the old WhatsApp Web bridge route only for compatibility while pharmacies move to Meta.
+Keep old Meta/Twilio/WhatsApp Web bridge routes only for compatibility with older installs.
 
 PharMareen can run locally for testing, or on a hosted public URL so WhatsApp Web bridge does not need ngrok.
+
+## Pharmacy Registry Model
+
+Replit Secrets are for system credentials/config only. Do not store customer pharmacy phone numbers there as the long-term production model.
+
+Production pharmacy access is registry-first:
+
+- Google Sheet tab: `Pharmacies`
+- Required identity fields: pharmacy ID, pharmacy name, owner name, phone number, location, timezone, currency, status, active flag, created timestamp
+- `ALLOWED_WHATSAPP_NUMBERS` is only a temporary development override for controlled testing
+- Unregistered direct WhatsApp numbers can only start onboarding/register a pharmacy
+- Registered and active numbers route to their pharmacy workspace
 
 ## Recommended Hosting
 
@@ -64,6 +73,7 @@ WHATSAPP_NUMBER=2547XXXXXXXXxxx
 PHARMAREEN_BACKEND_URL=http://localhost:5000
 WHATSAPP_WEB_SESSION_PATH=.wwebjs_auth
 OWNER_WHATSAPP_TO=whatsapp:+254700000000
+PHARMACY_REGISTRY_AUTH_ENABLED=true
 
 GOOGLE_SHEET_ID=your-google-sheet-id
 GOOGLE_SHEETS_CREDENTIALS={"type":"service_account",...}
@@ -79,19 +89,20 @@ REPORT_PUBLIC_DIR=reports_pdf
 
 `GOOGLE_SHEETS_CREDENTIALS` can be the full service-account JSON string. For local Windows use, `GOOGLE_SERVICE_ACCOUNT_JSON=./service-account.json` still works.
 
-## WhatsApp Web bridge Webhook
+## Baileys WhatsApp Bridge Webhook
 
-In WhatsApp Web bridge Sandbox or production sender settings, set:
+In the Baileys bridge runtime, point inbound messages to:
 
 ```text
 When a message comes in:
-https://YOUR-DOMAIN/bridge endpoint/whatsapp
+https://YOUR-DOMAIN/webhooks/baileys/whatsapp
 Method: POST
 ```
 
-The old local route still works:
+Compatibility routes still exist for older clients:
 
 ```text
+/webhooks/twilio/whatsapp
 /bridge/whatsapp-web
 ```
 
@@ -99,16 +110,16 @@ The old local route still works:
 
 `http://localhost:8000` only works on the computer running PharMareen.
 
-WhatsApp Web bridge cannot send messages to localhost because it is not public. If the app opens locally and `/health` works, the app is running, but WhatsApp still needs a public HTTPS URL.
+The Baileys bridge can post to localhost when it runs beside the backend. Public HTTPS is still required for deployed browser/offline links and external callbacks.
 
 For real pharmacy use:
 
 1. Deploy PharMareen to Render, Railway, Fly.io, or a VPS.
 2. Set `APP_BASE_URL=https://YOUR-DOMAIN`.
-3. Set the WhatsApp Web bridge bridge endpoint to:
+3. Set the Baileys bridge endpoint to:
 
 ```text
-https://YOUR-DOMAIN/bridge endpoint/whatsapp
+https://YOUR-DOMAIN/webhooks/baileys/whatsapp
 ```
 
 4. Open:

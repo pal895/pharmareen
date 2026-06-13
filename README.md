@@ -2,13 +2,13 @@
 
 A simple MVP for pharmacy owners who only want to send WhatsApp text messages or WhatsApp voice notes.
 
-The app receives a WhatsApp update, uses AI to understand what happened, logs the event in Google Sheets, updates stock after sales, and generates daily WhatsApp reports for business decisions.
+The app receives a WhatsApp update, handles known pharmacy flows locally first, logs the event in Google Sheets, updates stock after sales, and generates daily WhatsApp reports for business decisions.
 
 Default pharmacy name: `PharMareen`.
 
-## Meta WhatsApp Cloud API Mode
+## Baileys WhatsApp Bridge Mode
 
-Meta is now the active WhatsApp provider for production.
+Baileys is the active WhatsApp bridge for the current production runtime.
 
 Run the backend:
 
@@ -19,24 +19,26 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 5000
 Set these environment variables:
 
 ```text
-WHATSAPP_PROVIDER=meta
-META_VERIFY_TOKEN=
-META_ACCESS_TOKEN=
-META_PHONE_NUMBER_ID=
-META_WABA_ID=
-META_GRAPH_API_VERSION=v21.0
+WHATSAPP_BRIDGE_ENABLED=true
+PHARMAREEN_BACKEND_URL=http://localhost:5000
+OWNER_WHATSAPP_TO=whatsapp:+254700000000
 OPENAI_API_KEY=
 GOOGLE_SHEET_ID=
 GOOGLE_SHEETS_CREDENTIALS=
+PHARMACY_REGISTRY_AUTH_ENABLED=true
 ```
 
-Meta bridge endpoint URL:
+Baileys bridge endpoint URL:
 
 ```text
-https://YOUR-DOMAIN/bridge endpoints/meta/whatsapp
+https://YOUR-DOMAIN/webhooks/baileys/whatsapp
 ```
 
-In Meta dashboard, paste that URL, set your verify token, then subscribe to WhatsApp messages.
+Legacy Meta/Twilio environment variables may remain for compatibility, but they are not the active live messaging bridge.
+
+## Pharmacy Registry
+
+Production pharmacy numbers live in the Google Sheet `Pharmacies` registry, not permanently in Replit Secrets. `ALLOWED_WHATSAPP_NUMBERS` remains available only as a temporary development override for controlled testing. Registered active numbers are served normally; unregistered direct numbers can only start onboarding or receive the setup prompt.
 
 ## AI Safety Rules
 

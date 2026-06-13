@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 from app.deployment import clean_text, normalize_id, normalize_key
+from app.pharmacy_registry import phone_digits as registry_phone_digits
+from app.pharmacy_registry import registry_phone_key
 from app.provisioning import (
     AutonomousProvisioningEngine,
     validate_step1,
@@ -53,18 +55,26 @@ class LiveRuntimeRouter:
         *,
         intake_service_factory: Callable[[], Any],
         provisioning_engine: AutonomousProvisioningEngine | None = None,
+        pharmacy_registry: Any | None = None,
         admin_numbers: list[str] | None = None,
         existing_pharmacy_numbers: list[str] | None = None,
+        development_override_numbers: list[str] | None = None,
         live_test_number: str = LIVE_TEST_NUMBER,
         onboarding_enabled: bool = True,
     ) -> None:
         self.intake_service_factory = intake_service_factory
         self.provisioning = provisioning_engine or AutonomousProvisioningEngine()
+        self.pharmacy_registry = pharmacy_registry
         self.admin_numbers = {normalize_phone(number) for number in (admin_numbers or []) if normalize_phone(number)}
         self.existing_pharmacy_numbers = {
             normalize_phone(number)
             for number in (existing_pharmacy_numbers or [])
             if normalize_phone(number)
+        }
+        self.development_override_numbers = {
+            registry_phone_key(number)
+            for number in (development_override_numbers or [])
+            if registry_phone_key(number)
         }
         self.live_test_number = normalize_phone(live_test_number) or LIVE_TEST_NUMBER
         self.onboarding_enabled = onboarding_enabled
@@ -92,6 +102,35 @@ class LiveRuntimeRouter:
                 admin_id=phone,
                 source=source,
             )
+
+        registry_record = self._active_registry_record(phone)
+        if registry_record is not None:
+            pharmacy_id = str(registry_record.get("pharmacy_id") or "")
+            if is_onboarding_start_command(body):
+                return LiveRuntimeResult(
+                    f"{registry_record.get('pharmacy_name') or 'This pharmacy'} is already registered and active.",
+                    "registered_active_pharmacy",
+                    phone,
+                    source,
+                    pharmacy_id=pharmacy_id,
+                )
+            return self._process_existing_pharmacy_message(
+                phone=phone,
+                text=body,
+                source=source,
+                pharmacy_id=pharmacy_id or normalize_id("registered_pharmacy"),
+            )
+
+        if self._is_development_override(phone):
+            return self._process_existing_pharmacy_message(
+                phone=phone,
+                text=body,
+                source=source,
+                pharmacy_id=normalize_id("development_override_pharmacy"),
+            )
+
+        if self._registry_available():
+            return self._handle_registry_onboarding(phone=phone, body=body, source=source)
 
         data = self.provisioning._load()
         pharmacy_id = data.setdefault("phone_index", {}).get(phone)
@@ -183,6 +222,11 @@ class LiveRuntimeRouter:
         phone: str,
         source: str,
     ) -> LiveRuntimeResult:
+        if self._registry_available():
+            registry_details = parse_registry_onboarding_details(text, phone)
+            if not validate_step1(registry_details):
+                return self._complete_registry_onboarding(registry_details, session=session, phone=phone, source=source)
+
         status = str(session.get("status") or "")
         session_id = str(session.get("session_id") or "")
         if status == "awaiting_admin_approval":
@@ -251,12 +295,139 @@ class LiveRuntimeRouter:
         intake = self.intake_service_factory()
         reply = intake.process_text(
             text,
+            conversation_id=f"{pharmacy_id}:{phone}",
             actor_id=phone,
             owner_id=phone,
             actor_role="owner",
             source=source,
         )
         return LiveRuntimeResult(reply, "processed_existing_pharmacy", phone, source, pharmacy_id=pharmacy_id)
+
+    def _active_registry_record(self, phone: str) -> dict[str, str] | None:
+        registry = self.pharmacy_registry
+        if registry is None or not getattr(registry, "is_available", False):
+            return None
+        finder = getattr(registry, "find_by_phone", None)
+        if not callable(finder):
+            return None
+        return finder(phone, active_only=True)
+
+    def _registry_available(self) -> bool:
+        registry = self.pharmacy_registry
+        if registry is None or not getattr(registry, "is_available", False):
+            return False
+        ensure_schema = getattr(registry, "ensure_schema", None)
+        if callable(ensure_schema):
+            return bool(ensure_schema())
+        return True
+
+    def _is_development_override(self, phone: str) -> bool:
+        return bool(registry_phone_key(phone) and registry_phone_key(phone) in self.development_override_numbers)
+
+    def _handle_registry_onboarding(self, *, phone: str, body: str, source: str) -> LiveRuntimeResult:
+        if not self.onboarding_enabled:
+            return LiveRuntimeResult(
+                "This number is not registered yet. Please contact the pharmacy owner/admin.",
+                "unknown_onboarding_disabled",
+                phone,
+                source,
+            )
+
+        data = self.provisioning._load()
+        session = open_unknown_session_for_phone(data, phone)
+        details = parse_registry_onboarding_details(body, phone)
+        valid_details = not validate_step1(details)
+        if valid_details:
+            if session is None:
+                opened = self.provisioning.handle_unknown_number_message(phone_number=phone, message=body)
+                session = opened.record or {}
+            return self._complete_registry_onboarding(details, session=session or {}, phone=phone, source=source)
+
+        if session is None and is_onboarding_start_command(body):
+            opened = self.provisioning.handle_unknown_number_message(phone_number=phone, message=body)
+            session = opened.record or {}
+            return LiveRuntimeResult(
+                f"{ONBOARDING_PROMPT}\n\nExample: Pharmacy: Zuri Chemist; Owner: Amina; Branch: Main; Location: Nairobi; Payments: cash, mpesa, credit",
+                "unknown_onboarding_started",
+                phone,
+                source,
+                session_id=str(session.get("session_id") or ""),
+            )
+
+        if session is not None:
+            return self._advance_unknown_onboarding(session, body, phone=phone, source=source)
+
+        return LiveRuntimeResult(
+            "This number is not registered yet. Reply START to set up PharMareen for your pharmacy.",
+            "unregistered_onboarding_prompt",
+            phone,
+            source,
+            token_safe=True,
+        )
+
+    def _complete_registry_onboarding(
+        self,
+        details: dict[str, Any],
+        *,
+        session: dict[str, Any],
+        phone: str,
+        source: str,
+    ) -> LiveRuntimeResult:
+        registry = self.pharmacy_registry
+        if registry is None:
+            return LiveRuntimeResult(
+                "Pharmacy registry is not available. Please try again later.",
+                "registry_unavailable",
+                phone,
+                source,
+            )
+        result = registry.register_pharmacy(
+            {
+                **details,
+                "phone_number": display_runtime_phone(phone),
+                "status": "active",
+                "active": "yes",
+            }
+        )
+        if not result.accepted:
+            return LiveRuntimeResult(
+                "I could not register the pharmacy in Google Sheets yet. Please check Sheets access.",
+                "registry_write_failed",
+                phone,
+                source,
+            )
+
+        record = result.record
+        session_id = str(session.get("session_id") or "")
+        self._sync_registry_to_provisioning(phone=phone, pharmacy_id=record.get("pharmacy_id", ""), session_id=session_id)
+        status = "registered_existing_pharmacy" if not result.created else "registered_active_pharmacy"
+        reply = (
+            f"{record.get('pharmacy_name') or 'Your pharmacy'} is registered and active. "
+            "You can now send sales like: Panadol 2 cash."
+        )
+        return LiveRuntimeResult(
+            reply,
+            status,
+            phone,
+            source,
+            pharmacy_id=record.get("pharmacy_id") or "",
+            session_id=session_id,
+            provisioned=True,
+            token_safe=True,
+        )
+
+    def _sync_registry_to_provisioning(self, *, phone: str, pharmacy_id: str, session_id: str = "") -> None:
+        if not pharmacy_id:
+            return
+        data = self.provisioning._load()
+        data.setdefault("phone_index", {})[phone] = pharmacy_id
+        if registry_phone_digits(phone):
+            data.setdefault("phone_index", {})[registry_phone_digits(phone)] = pharmacy_id
+        session = data.setdefault("unknown_sessions", {}).get(session_id) if session_id else None
+        if isinstance(session, dict):
+            session["status"] = "approved_provisioned"
+            session["pharmacy_id"] = pharmacy_id
+        self.provisioning._save(data)
 
 
 def parse_onboarding_details(text: str, phone_number: str) -> dict[str, Any]:
@@ -277,6 +448,14 @@ def parse_onboarding_details(text: str, phone_number: str) -> dict[str, Any]:
             for item in re.split(r"[,/|]+", str(details["payment_modes"]))
             if clean_text(item)
         ]
+    return details
+
+
+def parse_registry_onboarding_details(text: str, phone_number: str) -> dict[str, Any]:
+    details = parse_onboarding_details(text, phone_number)
+    if details.get("pharmacy_name") and details.get("owner_name") and details.get("location"):
+        details.setdefault("branch_name", "Main")
+        details.setdefault("payment_modes", ["cash", "mpesa", "credit"])
     return details
 
 
@@ -305,6 +484,22 @@ def parse_admin_command(text: str) -> dict[str, str] | None:
     if not match:
         return None
     return {"action": match.group(1), "session_id": match.group(2)}
+
+
+def is_onboarding_start_command(text: str) -> bool:
+    key = normalize_key(text)
+    return key in {
+        "start",
+        "setup",
+        "register",
+        "register pharmacy",
+        "create pharmacy",
+        "create a pharmacy",
+        "create new pharmacy",
+        "create a new pharmacy",
+        "new pharmacy",
+        "onboard pharmacy",
+    }
 
 
 def admin_approval_reply(session_id: str) -> str:
@@ -339,6 +534,11 @@ def normalize_phone(value: Any) -> str:
     if text.startswith("00"):
         text = "+" + text[2:]
     return text
+
+
+def display_runtime_phone(value: Any) -> str:
+    digits = registry_phone_digits(value)
+    return f"+{digits}" if digits else ""
 
 
 def split_phone_numbers(value: str | None) -> list[str]:

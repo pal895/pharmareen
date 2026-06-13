@@ -32,13 +32,21 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.ai import AIService, ai_usage_snapshot, log_ai_route_decision
 from app.config import Settings, get_settings
+from app.correction_learning import CorrectionLearningEngine
 from app.demo_store import DemoPharmacyStore
+from app.deployment import PharmacyDeploymentEngine, normalize_id as normalize_runtime_id
 from app.intake import IntakeService, normalize_key, normalize_spoken_command_text, parse_operating_commands, replace_number_words
+from app.local_first_parser import LocalFirstParser
+from app.live_pilot import LivePharmacyPilotEngine
+from app.medicine_brain import MedicineBrain
 from app.pdf_reports import generate_daily_report_pdf, reports_pdf_dir
+from app.pharmacy_registry import GoogleSheetsPharmacyRegistry, registry_phone_key
+from app.reliability import ProductionReliabilityEngine, SyncEnvelope
 from app.reports import LowStockWarning, ReportMetrics, ReportService, build_report_metrics, build_transaction_metrics, low_stock_from_items
 from app.routes.admin import router as admin_router
 from app.routes.meta_webhook import meta_callback_router, router as meta_whatsapp_router
 from app.routes.offline_sync import router as offline_sync_router
+from app.sale_numbering import DailySaleLedger
 from app.services.medicine_catalog import (
     MedicineMatch,
     catalog_entries_payload,
@@ -61,6 +69,7 @@ from app.services.photo_intake import (
 )
 from app.services.pharmacy_engine import parse_payment_method
 from app.sheets import GoogleSheetsStore, SHEETS_UNAVAILABLE_MESSAGE, SheetsUnavailableError
+from app.training_store import TrainingStore
 from app.transcription import TranscriptionService, TranscriptionUnavailableError
 from app.utils import now_in_timezone, parse_int
 from app.whatsapp import WhatsAppClient, xml_message_response
@@ -88,7 +97,7 @@ last_openai_error: dict[str, Any] = {
 }
 VOICE_QUOTA_REPLY = "🎧 Voice received safely. Voice reading is unavailable right now. Please choose the medicine or type it."
 PHOTO_QUOTA_REPLY = "📷 Photo received safely. Saved for review."
-DEFAULT_PUBLIC_BASE_URL = "https://pharmareen-1--pal895.replit.app"
+DEFAULT_PUBLIC_BASE_URL = "https://pharmareen--pal895.replit.app"
 OFFLINE_BUILD_VERSION = "pharmareen-tap-talk-first-attempt-v2026-06-08"
 OFFLINE_FRONTEND_MARKER = f"PHARMAREEN REAL PATH BUILD {OFFLINE_BUILD_VERSION}"
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
@@ -1176,6 +1185,45 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
         if not entry_id:
             failed.append({"id": "", "status": "failed", "error": "Missing id."})
             continue
+        reliability_result = None
+        try:
+            reliability_result = get_reliability_engine().enqueue(
+                SyncEnvelope(
+                    source="offline_pwa",
+                    payload=entry,
+                    pharmacy_id=live_pharmacy_id(),
+                    idempotency_key=entry_id,
+                    source_message_id=entry_id,
+                    group_id=str(payload.get("sender") or entry.get("sender") or "offline_app"),
+                )
+            )
+        except Exception:
+            logger.warning("Offline sync reliability enqueue failed", exc_info=True)
+        if reliability_result is not None and reliability_result.conflict:
+            failed.append(
+                {
+                    "id": entry_id,
+                    "status": "failed",
+                    "error": reliability_result.message,
+                    "reliability": reliability_record_public(reliability_result),
+                }
+            )
+            append_offline_sync_log(entry, "conflict", "", reliability_result.message)
+            continue
+        if (
+            reliability_result is not None
+            and reliability_result.duplicate
+            and str((reliability_result.record or {}).get("status") or "").lower() == "applied"
+        ):
+            duplicate_reply = str(reliability_result.message or "Already synced. No duplicate was created.")
+            previous = dict(offline_synced_entry_results.get(entry_id) or {})
+            if not previous:
+                previous = {"id": entry_id, "reply": duplicate_reply, "result_summary": duplicate_reply, "whatsapp_confirmation": "ready"}
+            previous["status"] = "already_synced"
+            previous["reliability"] = reliability_record_public(reliability_result)
+            synced.append(previous)
+            append_offline_sync_log(entry, "already_synced", str(previous.get("reply") or duplicate_reply), "")
+            continue
         if entry_id in offline_synced_entry_ids:
             previous = dict(offline_synced_entry_results.get(entry_id) or {})
             if not previous:
@@ -1313,6 +1361,22 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
             reason = sanitize_error_message(exc)
             pending.append({"id": entry_id, "status": "pending", "reason": reason})
             append_offline_sync_log(entry_for_log, "pending", "", reason)
+    try:
+        reliability = get_reliability_engine()
+        for item in synced:
+            item_id = str(item.get("id") or "").strip()
+            if item_id:
+                reliability.mark_applied(item_id, confirmation=str(item.get("reply") or item.get("result_summary") or "Synced safely."))
+        for item in failed:
+            item_id = str(item.get("id") or "").strip()
+            if item_id:
+                reliability.mark_failed(item_id, str(item.get("error") or "Offline sync failed."), retryable=False)
+        for item in pending:
+            item_id = str(item.get("id") or "").strip()
+            if item_id:
+                reliability.mark_failed(item_id, str(item.get("reason") or "Offline sync pending."), retryable=True)
+    except Exception:
+        logger.warning("Offline sync reliability finalization failed", exc_info=True)
     message = offline_sync_success_message(entries, synced) if synced else ""
     for item in synced:
         summary_payload = {
@@ -1354,6 +1418,7 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
         "whatsapp_reply": message,
         "admin_message": message,
         "whatsapp_confirmation": confirmation_status or {"status": "not_queued"},
+        "reliability": get_reliability_engine().no_data_loss_report(),
         "synced": synced,
         "failed": failed,
         "pending": pending,
@@ -1389,7 +1454,7 @@ def startup_status_page() -> str:
         warning = """
         <section class="ready">
           <strong>Public URL looks ready.</strong><br>
-          Run the WhatsApp Web bridge, scan the QR code, then send "start" on WhatsApp.
+          Run the Baileys WhatsApp bridge, scan the QR code if needed, then send "start" on WhatsApp.
         </section>
         """
 
@@ -1425,7 +1490,7 @@ def startup_status_page() -> str:
           <div class="row"><span>WhatsApp provider</span><span><code>{escape(settings.whatsapp_provider)}</code></span></div>
           <div class="row"><span>Public HTTPS URL ready</span><span class="{status_class(production_ready)}">{yes_no(production_ready)}</span></div>
           <div class="row"><span>APP_BASE_URL</span><span><code>{escape(base_url)}</code></span></div>
-          <div class="row"><span>WhatsApp Web bridge endpoint</span><span><code>{escape(bridge_url)}</code></span></div>
+          <div class="row"><span>Baileys WhatsApp bridge endpoint</span><span><code>{escape(bridge_url)}</code></span></div>
         </section>
         <section class="card">
           <p><strong>Local app:</strong> <a href="http://localhost:5000">http://localhost:5000</a></p>
@@ -1826,7 +1891,7 @@ def startup_console_lines() -> list[str]:
         f"Local app: http://localhost:{port}",
         f"Health: http://localhost:{port}/health",
         f"Status: http://localhost:{port}/status",
-        "WhatsApp Web bridge: run ./start_with_whatsapp_web.sh and scan the QR code",
+        "Baileys WhatsApp bridge: run ./start_with_whatsapp_web.sh and scan the QR code if needed",
     ]
     base_url = effective_app_base_url(settings)
     if is_local_base_url(base_url):
@@ -2238,6 +2303,20 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
         allowed,
         reason,
     )
+    registry = get_pharmacy_registry()
+    if (
+        not allowed
+        and getattr(settings, "pharmacy_registry_auth_enabled", True)
+        and is_direct_whatsapp_sender(sender, is_group=is_group, is_broadcast=is_broadcast)
+        and registry.is_available
+    ):
+        allowed = True
+        reason = "registry_backend_gate"
+        logger.info(
+            "WHATSAPP_REGISTRY_GATE_ACCEPTED sender_jid=%s normalized_phone=%s",
+            sender,
+            sender_phone or phone_digits(sender),
+        )
     if not allowed:
         logger.info(
             "WHATSAPP_WEB_IGNORED sender=%s jid_domain=%s reason=%s",
@@ -2276,17 +2355,32 @@ async def whatsapp_web_bridge(request: Request) -> dict[str, Any]:
         bool(media_base64),
     )
 
-    result = await process_whatsapp_web_payload(
-        message=message,
-        sender=sender,
-        message_id=message_id,
-        media_base64=media_base64,
-        media_mime_type=media_mime_type,
-        media_caption=media_caption,
-        media_filename=media_filename,
-        media_purpose=media_purpose,
-        voice_transcribe_only=voice_transcribe_only,
-    )
+    if message and not media_base64 and registry.is_available:
+        normalized_sender = sender_phone or sender
+        live_result = get_live_runtime_router().handle_whatsapp_message(
+            phone_number=normalized_sender,
+            text=message,
+            source="baileys",
+            message_id=message_id or None,
+        )
+        result = WhatsAppProcessResult(
+            reply=live_result.reply,
+            message_type="text",
+            success=True,
+            command_handler=live_result.status,
+        )
+    else:
+        result = await process_whatsapp_web_payload(
+            message=message,
+            sender=sender,
+            message_id=message_id,
+            media_base64=media_base64,
+            media_mime_type=media_mime_type,
+            media_caption=media_caption,
+            media_filename=media_filename,
+            media_purpose=media_purpose,
+            voice_transcribe_only=voice_transcribe_only,
+        )
     log_webhook_request(sender, "whatsapp_web", result.success, result.error_reason)
     logger.info("BACKEND_REPLY_TEXT sender=%s reply=%s", mask_phone(sender), result.reply)
     if message_id:
@@ -3481,6 +3575,10 @@ def local_sale_selector_result(
     interpreted = normalize_spoken_command_text(
         clean_voice_transcript_for_intake(text, medicine_names=voice_medicine_names_from_inventory())
     )
+    if message_type == "voice":
+        voice_tokens = {token.lower() for token in re.findall(r"[A-Za-z0-9-]+", interpreted)}
+        if voice_tokens & {"maybe", "perhaps", "unsure", "unclear"}:
+            return None
     commands = parse_operating_commands(interpreted)
     drug_name = ""
     quantity = 1
@@ -3490,6 +3588,8 @@ def local_sale_selector_result(
         drug_name = command.drug_name
         quantity = command.quantity
         payment_method = command.payment_method or "Cash"
+    elif commands and len(commands) > 1:
+        return None
     elif not any(character.isdigit() for character in interpreted):
         match = local_voice_selector_match(interpreted)
         if match.ambiguous:
@@ -3564,6 +3664,8 @@ def local_sale_selector_result(
 def local_text_sale_selector_result(text: str, sender: str) -> WhatsAppProcessResult | None:
     clean = " ".join(str(text or "").strip().split())
     if not clean or any(character.isdigit() for character in clean):
+        return None
+    if re.search(r"\b(sell|sold|sale|uza|kuuza)\b", clean, flags=re.IGNORECASE):
         return None
     if classify_command_handler(clean) != "natural_or_ai_parser":
         return None
@@ -3816,21 +3918,85 @@ def get_sheet_store():
     return GoogleSheetsStore(settings)
 
 
+def get_pharmacy_registry():
+    settings = get_settings()
+    return GoogleSheetsPharmacyRegistry(
+        get_sheet_store(),
+        timezone_name=settings.timezone,
+        currency="KES",
+    )
+
+
 @lru_cache
 def get_whatsapp_client() -> WhatsAppClient:
     return WhatsAppClient(get_settings())
+
+
+def live_pharmacy_id() -> str:
+    configured = (
+        os.getenv("PHARMAREEN_DEFAULT_PHARMACY_ID")
+        or os.getenv("PHARMAREEN_PHARMACY_ID")
+        or "default"
+    )
+    return normalize_runtime_id(configured)
+
+
+def get_training_store() -> TrainingStore:
+    return TrainingStore(pharmacy_id=live_pharmacy_id())
+
+
+def get_medicine_brain() -> MedicineBrain:
+    return MedicineBrain(get_training_store())
+
+
+def get_correction_learning_engine() -> CorrectionLearningEngine:
+    return CorrectionLearningEngine(get_training_store())
+
+
+def get_local_first_parser() -> LocalFirstParser:
+    return LocalFirstParser(
+        get_ai_service(),
+        brain=get_medicine_brain(),
+        learning_engine=get_correction_learning_engine(),
+    )
+
+
+def get_sale_ledger() -> DailySaleLedger:
+    return DailySaleLedger(pharmacy_id=live_pharmacy_id())
+
+
+def get_reliability_engine() -> ProductionReliabilityEngine:
+    return ProductionReliabilityEngine(store=get_training_store(), pharmacy_id=live_pharmacy_id())
+
+
+def get_live_pilot_engine() -> LivePharmacyPilotEngine:
+    return LivePharmacyPilotEngine(
+        store=get_training_store(),
+        reliability_engine=get_reliability_engine(),
+        pharmacy_id=live_pharmacy_id(),
+    )
+
+
+def get_deployment_engine() -> PharmacyDeploymentEngine:
+    return PharmacyDeploymentEngine(
+        store=get_training_store(),
+        reliability_engine=get_reliability_engine(),
+        pilot_engine=get_live_pilot_engine(),
+        pharmacy_id=live_pharmacy_id(),
+    )
 
 
 @lru_cache
 def get_intake_service() -> IntakeService:
     settings = get_settings()
     return IntakeService(
-        get_ai_service(),
+        get_local_first_parser(),
         get_sheet_store(),
         timezone=settings.timezone,
         pharmacy_name=settings.pharmacy_name,
         app_base_url=report_public_base_url(settings),
         whatsapp_number=settings.whatsapp_number,
+        sale_ledger=get_sale_ledger(),
     )
 
 
@@ -3843,7 +4009,111 @@ def get_report_service() -> ReportService:
         recommender=get_ai_service(),
         pharmacy_name=settings.pharmacy_name,
         timezone=settings.timezone,
+        sale_ledger=get_sale_ledger(),
     )
+
+
+def reliability_record_public(result: Any | None) -> dict[str, Any]:
+    if result is None:
+        return {"tracked": False}
+    record = getattr(result, "record", {}) or {}
+    return {
+        "tracked": True,
+        "accepted": bool(getattr(result, "accepted", False)),
+        "duplicate": bool(getattr(result, "duplicate", False)),
+        "conflict": bool(getattr(result, "conflict", False)),
+        "status": str(record.get("status") or ""),
+        "idempotency_key": str(record.get("idempotency_key") or ""),
+        "message": str(getattr(result, "message", "") or ""),
+    }
+
+
+def bailey_payload_text(payload: dict[str, Any]) -> str:
+    return str(payload.get("text") or payload.get("body") or payload.get("message") or "")
+
+
+def bailey_payload_sender(payload: dict[str, Any]) -> str:
+    return str(payload.get("from") or payload.get("phone_number") or payload.get("sender") or "")
+
+
+def bailey_payload_message_id(payload: dict[str, Any]) -> str:
+    return str(payload.get("message_id") or payload.get("id") or "").strip()
+
+
+def ai_call_count(snapshot: dict[str, Any]) -> int:
+    try:
+        return int(snapshot.get("total_logged") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def local_parser_used_fallback() -> bool:
+    try:
+        parser = getattr(get_intake_service(), "parser", None)
+        return bool(getattr(parser, "last_used_fallback", False))
+    except Exception:
+        return False
+
+
+def record_live_runtime_evidence(
+    *,
+    source: str,
+    workflow_id: str,
+    phone_number: str,
+    text: str,
+    reply: str,
+    status: str,
+    source_message_id: str | None,
+    idempotency_key: str | None,
+    known_flow: bool,
+    ai_calls_used: int,
+    error: str | None = None,
+) -> dict[str, Any]:
+    evidence = {
+        "phone_number": phone_number,
+        "message_id": source_message_id or "",
+        "idempotency_key": idempotency_key or "",
+        "reply_preview": reply[:160],
+        "runtime_status": status,
+        "ai_calls_used": ai_calls_used,
+    }
+    token_violation = bool(known_flow and ai_calls_used > 0)
+    deployment_recorded = False
+    pilot_recorded = False
+    try:
+        get_deployment_engine().record_token_observation(
+            source=source,
+            known_flow=known_flow,
+            tokens_used=ai_calls_used,
+        )
+        deployment_recorded = True
+    except Exception:
+        logger.warning("Deployment token observation failed", exc_info=True)
+    try:
+        pilot_result = get_live_pilot_engine().record_live_event(
+            event_type="live_intake_message",
+            source=source,
+            workflow_id=workflow_id,
+            payload={"phone_number": phone_number, "text": text[:240]},
+            evidence=evidence,
+            known_flow=known_flow,
+            tokens_used=ai_calls_used,
+            status="failed" if error or token_violation else "processed",
+            error=error or ("Known flow attempted AI/OpenAI call." if token_violation else None),
+            idempotency_key=None,
+            source_message_id=None,
+            group_id=phone_number,
+        )
+        pilot_recorded = bool(getattr(pilot_result, "accepted", False))
+    except Exception:
+        logger.warning("Live pilot telemetry failed", exc_info=True)
+    return {
+        "deployment_recorded": deployment_recorded,
+        "pilot_recorded": pilot_recorded,
+        "known_flow": known_flow,
+        "ai_calls_used": ai_calls_used,
+        "token_violation": token_violation,
+    }
 
 
 class UnsupportedInputError(Exception):
@@ -3902,7 +4172,17 @@ try:
                 admins.extend(_split_phone_numbers(owner)); existing.extend(_split_phone_numbers(owner))
             live_number = getattr(settings, "live_test_number", live_number)
             enabled = bool(getattr(settings, "enable_live_onboarding", True))
-        return _LiveRuntimeRouter(intake_service_factory=_phase13_intake_factory, provisioning_engine=_phase13_provisioning_engine, admin_numbers=admins, existing_pharmacy_numbers=existing, live_test_number=live_number, onboarding_enabled=enabled)
+        development_overrides = parse_allowed_whatsapp_numbers(settings) if settings is not None else set()
+        return _LiveRuntimeRouter(
+            intake_service_factory=_phase13_intake_factory,
+            provisioning_engine=_phase13_provisioning_engine,
+            pharmacy_registry=get_pharmacy_registry() if settings is not None and getattr(settings, "pharmacy_registry_auth_enabled", True) else None,
+            admin_numbers=admins,
+            existing_pharmacy_numbers=existing,
+            development_override_numbers=sorted(development_overrides),
+            live_test_number=live_number,
+            onboarding_enabled=enabled,
+        )
     def try_get_settings():
         return _phase13_settings_safe()
     def get_live_runtime_router():
@@ -3921,12 +4201,119 @@ try:
             if settings is not None
             else _PharmareenPath("__missing_runtime_settings__")
         )
-        return _build_live_readiness_report(root_dir=readiness_root, sheets_available=sheets_available, settings_loaded=settings is not None, settings_error=err)
+        report = _build_live_readiness_report(root_dir=readiness_root, sheets_available=sheets_available, settings_loaded=settings is not None, settings_error=err)
+        try:
+            registry = get_pharmacy_registry()
+            registry_ready = bool(registry.is_available and registry.ensure_schema())
+        except Exception as exc:
+            registry_ready = False
+            err = err or str(exc)
+        report["pharmacy_registry_connected"] = registry_ready
+        if not registry_ready and "google_sheets_not_confirmed_locally" not in report["blocked"]:
+            report["blocked"].append("pharmacy_registry_not_confirmed_locally")
+            report["status"] = "BLOCKED"
+        return report
     @app.post("/webhooks/baileys/whatsapp")
     async def phase13_baileys_whatsapp(request: _Request):
         payload = await request.json()
-        result = get_live_runtime_router().handle_whatsapp_message(phone_number=str(payload.get("from") or payload.get("phone_number") or payload.get("sender") or ""), text=str(payload.get("text") or payload.get("body") or payload.get("message") or ""), source="baileys", message_id=str(payload.get("message_id") or payload.get("id") or "") or None)
-        return result.as_dict()
+        phone_number = bailey_payload_sender(payload)
+        text = bailey_payload_text(payload)
+        message_id = bailey_payload_message_id(payload) or None
+        logger.info(
+            "BAILEYS_INBOUND sender_jid=%s normalized_phone=%s message_id=%s text_length=%s",
+            str(payload.get("jid") or payload.get("from") or ""),
+            registry_phone_key(phone_number),
+            message_id or "",
+            len(text),
+        )
+        reliability_result = get_reliability_engine().enqueue(
+            SyncEnvelope(
+                source="baileys",
+                payload={"from": phone_number, "text": text},
+                pharmacy_id=live_pharmacy_id(),
+                source_message_id=message_id,
+                group_id=phone_number,
+            )
+        )
+        reliability_payload = reliability_record_public(reliability_result)
+        record_status = str((reliability_result.record or {}).get("status") or "").lower()
+        if reliability_result.conflict:
+            logger.info("BAILEYS_BACKEND_ROUTE route=reliability_conflict normalized_phone=%s", registry_phone_key(phone_number))
+            return {
+                "reply": reliability_result.message,
+                "status": "sync_conflict_held",
+                "source": "baileys",
+                "phone_number": phone_number,
+                "reliability": reliability_payload,
+                "token_safe": True,
+            }
+        if reliability_result.duplicate and record_status == "applied":
+            logger.info("BAILEYS_BACKEND_ROUTE route=duplicate_ignored normalized_phone=%s", registry_phone_key(phone_number))
+            return {
+                "reply": reliability_result.message,
+                "status": "duplicate_ignored",
+                "source": "baileys",
+                "phone_number": phone_number,
+                "reliability": reliability_payload,
+                "token_safe": True,
+            }
+        idempotency_key = str((reliability_result.record or {}).get("idempotency_key") or "")
+        before_ai = ai_call_count(ai_usage_snapshot())
+        result = get_live_runtime_router().handle_whatsapp_message(
+            phone_number=phone_number,
+            text=text,
+            source="baileys",
+            message_id=message_id,
+        )
+        after_ai = ai_call_count(ai_usage_snapshot())
+        ai_calls_used = max(0, after_ai - before_ai)
+        known_flow = not local_parser_used_fallback()
+        response = result.as_dict()
+        reply_text = str(response.get("reply") or "")
+        logger.info(
+            "BAILEYS_BACKEND_ROUTE route=%s normalized_phone=%s pharmacy_id=%s",
+            str(response.get("status") or ""),
+            registry_phone_key(phone_number),
+            str(response.get("pharmacy_id") or ""),
+        )
+        evidence = record_live_runtime_evidence(
+            source="baileys",
+            workflow_id=str(response.get("status") or "baileys_live_intake"),
+            phone_number=phone_number,
+            text=text,
+            reply=reply_text,
+            status=str(response.get("status") or ""),
+            source_message_id=message_id,
+            idempotency_key=idempotency_key,
+            known_flow=known_flow,
+            ai_calls_used=ai_calls_used,
+        )
+        if evidence["token_violation"]:
+            get_reliability_engine().mark_failed(
+                idempotency_key,
+                "Known medicine flow attempted AI/OpenAI call.",
+                retryable=False,
+            )
+            return {
+                "reply": "Known medicine flow was blocked because it attempted an AI/OpenAI call.",
+                "status": "blocked_token_violation",
+                "source": "baileys",
+                "phone_number": phone_number,
+                "reliability": reliability_payload,
+                "evidence": evidence,
+                "token_safe": False,
+            }
+        get_reliability_engine().mark_applied(idempotency_key, confirmation=reply_text)
+        logger.info(
+            "BAILEYS_RESPONSE_SENT normalized_phone=%s status=%s reply_length=%s",
+            registry_phone_key(phone_number),
+            str(response.get("status") or ""),
+            len(reply_text),
+        )
+        response["reliability"] = reliability_payload
+        response["runtime_evidence"] = evidence
+        response["token_safe"] = evidence["known_flow"] and evidence["ai_calls_used"] == 0 or not evidence["known_flow"]
+        return response
     @app.post("/admin/onboarding/{session_id}/{action}")
     def phase13_admin_onboarding(session_id: str, action: str, corrections_requested: str | None = _Query(default=None), authorization: str | None = _Header(default=None)):
         settings, _err = _phase13_settings_safe()
@@ -3934,5 +4321,42 @@ try:
             authorize_report_trigger(settings, authorization)
         result = _phase13_router().admin_review_unknown_session(session_id=session_id, action=action, admin_id="admin_http", source="admin_http", corrections_requested=corrections_requested)
         return result.as_dict()
+    @app.get("/live/runtime-status")
+    def phase13_runtime_status():
+        reliability = get_reliability_engine()
+        deployment = get_deployment_engine()
+        pilot = get_live_pilot_engine()
+        deployment.automate_onboarding_checklist()
+        deployment.verify_reliability_protections()
+        pilot_state = pilot.current_pilot() or {}
+        return {
+            "status": "ok",
+            "pharmacy_id": live_pharmacy_id(),
+            "intake_parser": type(get_intake_service().parser).__name__,
+            "sale_ledger": str(get_sale_ledger().path),
+            "reliability": reliability.no_data_loss_report(),
+            "grouped_confirmation": reliability.grouped_confirmation(live_pharmacy_id()),
+            "deployment": deployment.monitoring_dashboard(),
+            "pilot_active": pilot_state.get("status") == "active",
+            "ai_usage": ai_usage_snapshot(),
+        }
+    @app.post("/admin/deployment/{action}")
+    def phase13_admin_deployment(action: str, authorization: str | None = _Header(default=None), reason: str | None = _Query(default=None)):
+        settings, _err = _phase13_settings_safe()
+        if settings is not None and "authorize_report_trigger" in globals():
+            authorize_report_trigger(settings, authorization)
+        deployment = get_deployment_engine()
+        clean_action = action.strip().lower()
+        if clean_action == "activate":
+            return deployment.activate_pharmacy(requested_by="admin_http").__dict__
+        if clean_action == "deactivate":
+            return deployment.deactivate_pharmacy(reason=reason or "admin_http", requested_by="admin_http").__dict__
+        if clean_action == "readiness":
+            deployment.automate_onboarding_checklist()
+            deployment.verify_reliability_protections()
+            return deployment.verify_deployment_readiness().__dict__
+        if clean_action == "rollback":
+            return deployment.prepare_deployment_rollback(reason=reason or "admin_http", requested_by="admin_http").__dict__
+        raise HTTPException(status_code=400, detail="Unsupported deployment action.")
 except Exception as _phase13_patch_error:
     print("PHARMAREEN_PHASE13_LIVE_PATCH_LOAD_ERROR", repr(_phase13_patch_error))

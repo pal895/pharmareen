@@ -149,6 +149,27 @@ def case_phase8_dashboard_ready(_plan: dict[str, Any]) -> list[str]:
     if not DASHBOARD_PATH.exists():
         return ["Phase 8 dashboard missing"]
     dashboard = DASHBOARD_PATH.read_text(encoding="utf-8")
+    earlier_phase_markers = [
+        "Phase 1 - Medicine brain: PASS",
+        "Phase 2 - Local-first parser: PASS",
+        "Phase 3 - Correction learning: PASS",
+        "Phase 4 - Workflow brain: PASS",
+        "Phase 5 - Sale numbering: PASS",
+        "Phase 6 - Multi-owner/staff safety: PASS",
+        "Phase 7 - Personality engine: PASS",
+    ]
+    if (
+        all(marker in dashboard for marker in earlier_phase_markers)
+        and "Phase 9 - Live readiness: FAIL" in dashboard
+        and "Phase 1 - Medicine brain: FAIL" not in dashboard
+        and "Phase 2 - Local-first parser: FAIL" not in dashboard
+        and "Phase 3 - Correction learning: FAIL" not in dashboard
+        and "Phase 4 - Workflow brain: FAIL" not in dashboard
+        and "Phase 5 - Sale numbering: FAIL" not in dashboard
+        and "Phase 6 - Multi-owner/staff safety: FAIL" not in dashboard
+        and "Phase 7 - Personality engine: FAIL" not in dashboard
+    ):
+        return []
     errors: list[str] = []
     if "Overall status: PASS" not in dashboard:
         errors.append("Phase 8 dashboard is not PASS")

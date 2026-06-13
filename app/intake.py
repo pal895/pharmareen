@@ -363,7 +363,7 @@ class IntakeService:
         parser: Parser,
         store: StockStore,
         timezone: str = "Africa/Nairobi",
-        pharmacy_name: str = "Zilla Pharmacy",
+        pharmacy_name: str = "PharMareen",
         app_base_url: str | None = None,
         whatsapp_number: str | None = None,
         sale_ledger: Any | None = None,
@@ -415,30 +415,14 @@ class IntakeService:
             reason=route_decision.reason,
         )
 
-        if self.sale_ledger is not None:
-            phase_reply = self._phase_ledger_reply(
-                text,
-                conversation_key,
-                actor_meta=ledger_actor_metadata(
-                    actor_context=actor_context,
-                    actor_id=actor_id,
-                    owner_id=owner_id,
-                    staff_id=staff_id,
-                    actor_role=actor_role,
-                    source=source,
-                ),
-            )
-            if phase_reply is not None:
-                return phase_reply
-
-        early_report_date = parse_report_command(text, self.timezone)
-        if early_report_date:
-            return self._saved_report_reply(early_report_date)
-
-        if self.parser.__class__.__name__ != "AIService":
-            parser_reply = self._local_parser_reply(text, conversation_key)
-            if parser_reply is not None:
-                return parser_reply
+        actor_meta = ledger_actor_metadata(
+            actor_context=actor_context,
+            actor_id=actor_id,
+            owner_id=owner_id,
+            staff_id=staff_id,
+            actor_role=actor_role,
+            source=source,
+        )
 
         pending_repeat = self.pending_repeat_confirmation.get(conversation_key)
         if pending_repeat is not None:
@@ -455,7 +439,7 @@ class IntakeService:
             response_key = normalize_key(text)
             if response_key in {"yes", "y", "confirm", "ndio", "sawa"}:
                 self.pending_selector_confirmations.pop(conversation_key, None)
-                return self._process_commands([pending_selector], conversation_key=conversation_key)
+                return self._process_commands([pending_selector], conversation_key=conversation_key, actor_meta=actor_meta)
             if response_key in {"cancel", "stop", "no", "hapana"}:
                 self.pending_selector_confirmations.pop(conversation_key, None)
                 return "No problem. Nothing was saved."
@@ -463,7 +447,7 @@ class IntakeService:
             if updated_selector is not None:
                 if self._selector_choice_is_final(text):
                     self.pending_selector_confirmations.pop(conversation_key, None)
-                    return self._process_commands([updated_selector], conversation_key=conversation_key)
+                    return self._process_commands([updated_selector], conversation_key=conversation_key, actor_meta=actor_meta)
                 self.pending_selector_confirmations[conversation_key] = updated_selector
                 return self._selector_approval_reply(updated_selector, ready_to_confirm=True)
             self.pending_selector_confirmations[conversation_key] = pending_selector
@@ -492,7 +476,7 @@ class IntakeService:
             completed = complete_followup_command(text, pending_followup)
             if completed is not None:
                 self.pending_followups.pop(conversation_key, None)
-                return self._process_commands([completed], conversation_key=conversation_key)
+                return self._process_commands([completed], conversation_key=conversation_key, actor_meta=actor_meta)
             if normalize_key(text) in {"cancel", "stop"}:
                 self.pending_followups.pop(conversation_key, None)
                 return "No problem. Nothing was saved."
@@ -519,6 +503,20 @@ class IntakeService:
 
         if is_unsafe_undo_number_command(text):
             return "Which sale should I undo? Send undo last sale or cancel TX-1046."
+
+        if should_try_phase_ledger(text):
+            phase_reply = self._phase_ledger_reply(
+                text,
+                conversation_key,
+                actor_meta=actor_meta,
+            )
+            if phase_reply is not None:
+                return phase_reply
+
+        followup_prompt = parse_followup_prompt(text)
+        if followup_prompt is not None:
+            self.pending_followups[conversation_key] = followup_prompt.command
+            return followup_prompt.question
 
         selector_reply = self._medicine_selector_reply(text, conversation_key)
         if selector_reply:
@@ -590,18 +588,13 @@ class IntakeService:
 
         commands = parse_operating_commands(text)
         if commands is not None:
-            return self._process_commands(commands, conversation_key=conversation_key)
+            return self._process_commands(commands, conversation_key=conversation_key, actor_meta=actor_meta)
 
         analytics_intent = parse_analytics_command(text)
         if analytics_intent is not None:
             if analytics_intent.get("type") == "low_stock":
                 return self._low_stock_reply()
             return self._analytics_reply(analytics_intent)
-
-        followup_prompt = parse_followup_prompt(text)
-        if followup_prompt is not None:
-            self.pending_followups[conversation_key] = followup_prompt.command
-            return followup_prompt.question
 
         if is_profit_today_command(text):
             return self._profit_today_reply()
@@ -691,7 +684,10 @@ class IntakeService:
             )
             return parsed.clarification_question or AMBIGUOUS_ERROR
 
-        results = [self._process_event(event) for event in parsed.events]
+        results = [
+            self._process_event(event, conversation_key=conversation_key, actor_meta=actor_meta)
+            for event in parsed.events
+        ]
         if len(results) == 1:
             return results[0].reply
 
@@ -1241,8 +1237,16 @@ class IntakeService:
         lower = self.app_base_url.lower()
         return lower.startswith("https://") and "localhost" not in lower and "127.0.0.1" not in lower
 
-    def _process_commands(self, commands: list[OperatingCommand], conversation_key: str = "__default__") -> str:
-        results = [self._process_command(command, conversation_key=conversation_key) for command in commands]
+    def _process_commands(
+        self,
+        commands: list[OperatingCommand],
+        conversation_key: str = "__default__",
+        actor_meta: dict[str, str] | None = None,
+    ) -> str:
+        results = [
+            self._process_command(command, conversation_key=conversation_key, actor_meta=actor_meta)
+            for command in commands
+        ]
         if len(results) == 1:
             return results[0].reply
 
@@ -1280,7 +1284,12 @@ class IntakeService:
                 lines.append("")
         return "\n".join(lines)
 
-    def _process_command(self, command: OperatingCommand, conversation_key: str = "__default__") -> EntryResult:
+    def _process_command(
+        self,
+        command: OperatingCommand,
+        conversation_key: str = "__default__",
+        actor_meta: dict[str, str] | None = None,
+    ) -> EntryResult:
         if command.kind == "error":
             return EntryResult(
                 logged=False,
@@ -1301,9 +1310,9 @@ class IntakeService:
             if resolution.drug_name:
                 command = replace(command, drug_name=resolution.drug_name)
         if command.kind == "sale":
-            return self._process_sale_command(command, is_late=False, conversation_key=conversation_key)
+            return self._process_sale_command(command, is_late=False, conversation_key=conversation_key, actor_meta=actor_meta)
         if command.kind == "late_sale":
-            return self._process_sale_command(command, is_late=True, conversation_key=conversation_key)
+            return self._process_sale_command(command, is_late=True, conversation_key=conversation_key, actor_meta=actor_meta)
         if command.kind == "restock":
             return self._process_restock_command(command)
         if command.kind == "set_staff":
@@ -1398,7 +1407,13 @@ class IntakeService:
             actor_meta=actor_meta,
         )
 
-    def _process_sale_command(self, command: OperatingCommand, is_late: bool, conversation_key: str = "__default__") -> EntryResult:
+    def _process_sale_command(
+        self,
+        command: OperatingCommand,
+        is_late: bool,
+        conversation_key: str = "__default__",
+        actor_meta: dict[str, str] | None = None,
+    ) -> EntryResult:
         note = "Entered later" if is_late else ""
         if command.target_day:
             note = merge_notes(note, f"Target day: {command.target_day}.")
@@ -1433,6 +1448,7 @@ class IntakeService:
             barcode=command.barcode,
             target_day=command.target_day,
             conversation_key=conversation_key,
+            actor_meta=actor_meta,
         )
 
     def _record_sale(
@@ -3077,12 +3093,31 @@ def ledger_actor_metadata(
     }
 
 
+def should_try_phase_ledger(text: str) -> bool:
+    clean = normalize_key(text)
+    if not clean:
+        return False
+    if re.search(r"\b(undo|reverse|cancel)\s+(?:last\s+)?sale\b", clean):
+        return True
+    if re.search(r"\b(?:correct|edit|change|fix)\s+(?:sale\s+)?#?\d+\b", clean):
+        return True
+    if re.search(r"\b(?:show|lookup|find)\s+sale\s+#?\d+\b", clean):
+        return True
+    if re.search(r"\bsale\s+(?:count|number|#?\d+)\b", clean):
+        return True
+    if re.search(r"\b(expiry|expires?|supplier|batch)\b", clean):
+        return True
+    return False
+
+
 def parse_followup_prompt(text: str) -> FollowUpPrompt | None:
     clean = normalize_natural_text(replace_number_words(text.strip()))
     clean = " ".join(clean.split())
     if not clean or any(separator in clean for separator in [",", "\n"]):
         return None
     if any(character.isdigit() for character in clean):
+        return None
+    if parse_analytics_command(clean) is not None:
         return None
 
     sale_match = re.fullmatch(r"(?:i\s+)?(?:sell|sold|sale)\s+(.+)", clean, flags=re.IGNORECASE)

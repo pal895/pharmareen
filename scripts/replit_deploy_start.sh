@@ -52,7 +52,7 @@ curl -fsS "http://127.0.0.1:5000/debug/offline-app" >/dev/null && echo "offline 
 curl -fsS "http://127.0.0.1:5000/debug/system-status" >/dev/null && echo "system status: ok"
 curl -fsS "http://127.0.0.1:5000/offline_app/index.html" | grep -E "PHARMAREEN SMOOTH TEST|Tap & Talk|Save Voice|Save Photo|Scan Barcode|Manual Entry|Cash|M-Pesa" >/dev/null && echo "frontend: ok"
 
-PUBLIC_URL="${PUBLIC_BASE_URL:-https://pharmareen-1--pal895.replit.app}"
+PUBLIC_URL="${PUBLIC_BASE_URL:-https://pharmareen--pal895.replit.app}"
 echo
 echo "Public links:"
 echo "$PUBLIC_URL/health"

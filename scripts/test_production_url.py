@@ -22,7 +22,7 @@ def main() -> int:
 
     checks = [
         ("GET /health", lambda: get_contains(base_url, "/health", '"status":"ok"')),
-        ("GET /status", lambda: get_contains(base_url, "/status", "WhatsApp Web bridge endpoint")),
+        ("GET /status", lambda: get_contains(base_url, "/status", "Baileys WhatsApp bridge endpoint")),
         ("GET /landing", lambda: get_contains(base_url, "/landing", "Run your pharmacy from WhatsApp")),
         ("POST /bridge/whatsapp-web", lambda: post_bridge_sample(base_url)),
     ]

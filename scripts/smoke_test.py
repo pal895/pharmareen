@@ -24,7 +24,7 @@ def main() -> int:
 
     checks = [
         ("HEALTH", lambda: get_json_contains(base_url, "/health", '"status":"ok"')),
-        ("STATUS PAGE", lambda: get_text_contains(base_url, "/status", "WhatsApp Web bridge endpoint")),
+        ("STATUS PAGE", lambda: get_text_contains(base_url, "/status", "Baileys WhatsApp bridge endpoint")),
         ("DEBUG CONFIG", lambda: get_debug_config(base_url)),
         ("WHATSAPP WEB BRIDGE DEBUG", lambda: post_debug_whatsapp(base_url)),
         ("PDF REPORT DEBUG", lambda: get_report_debug(base_url)),

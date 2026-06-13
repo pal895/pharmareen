@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 import shutil
+import uuid
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
+from gspread.exceptions import WorksheetNotFound
 
 import app.main as main
+from app.local_first_parser import LocalFirstParser
 from app.live_runtime import LIVE_TEST_NUMBER, LiveRuntimeResult, LiveRuntimeRouter, parse_onboarding_details
+from app.pharmacy_registry import GoogleSheetsPharmacyRegistry, PHARMACY_REGISTRY_HEADERS
 from app.provisioning import AutonomousProvisioningEngine
+from app.sale_numbering import DailySaleLedger
 from app.training_store import TrainingStore
 
 
@@ -32,6 +38,66 @@ class AvailableStore:
         return None
 
 
+class FakeRegistryWorksheet:
+    def __init__(self, title: str):
+        self.title = title
+        self.rows: list[list[object]] = []
+
+    def row_values(self, row: int) -> list[object]:
+        if row <= 0 or row > len(self.rows):
+            return []
+        return self.rows[row - 1]
+
+    def update(self, _range_name: str, values: list[list[object]]) -> None:
+        if self.rows:
+            self.rows[0] = list(values[0])
+        else:
+            self.rows.append(list(values[0]))
+
+    def append_row(self, row: list[object], value_input_option: str = "") -> None:
+        self.rows.append(list(row))
+
+    def get_all_values(self) -> list[list[object]]:
+        return [list(row) for row in self.rows]
+
+    def get_all_records(self) -> list[dict[str, object]]:
+        if not self.rows:
+            return []
+        headers = [str(value) for value in self.rows[0]]
+        records: list[dict[str, object]] = []
+        for row in self.rows[1:]:
+            records.append({header: row[index] if index < len(row) else "" for index, header in enumerate(headers)})
+        return records
+
+
+class FakeRegistrySpreadsheet:
+    id = "model20-test-sheet"
+    url = "https://docs.google.com/spreadsheets/d/model20-test-sheet"
+
+    def __init__(self):
+        self.worksheets: dict[str, FakeRegistryWorksheet] = {}
+
+    def worksheet(self, title: str) -> FakeRegistryWorksheet:
+        if title not in self.worksheets:
+            raise WorksheetNotFound(title)
+        return self.worksheets[title]
+
+    def add_worksheet(self, title: str, rows: int, cols: int) -> FakeRegistryWorksheet:
+        worksheet = FakeRegistryWorksheet(title)
+        self.worksheets[title] = worksheet
+        return worksheet
+
+
+class FakeRegistryStore:
+    is_available = True
+
+    def __init__(self):
+        self.spreadsheet = FakeRegistrySpreadsheet()
+
+    def ensure_schema(self) -> None:
+        return None
+
+
 class FakeRouter:
     def handle_whatsapp_message(self, **kwargs):
         return LiveRuntimeResult(
@@ -41,6 +107,33 @@ class FakeRouter:
             source=kwargs["source"],
             pharmacy_id="fake_pharmacy",
         )
+
+
+def clear_runtime_caches() -> None:
+    for name in (
+        "get_ai_service",
+        "get_correction_learning_engine",
+        "get_deployment_engine",
+        "get_intake_service",
+        "get_live_pilot_engine",
+        "get_local_first_parser",
+        "get_medicine_brain",
+        "get_report_service",
+        "get_reliability_engine",
+        "get_sale_ledger",
+        "get_training_store",
+        "get_whatsapp_client",
+    ):
+        cache_clear = getattr(getattr(main, name, None), "cache_clear", None)
+        if callable(cache_clear):
+            cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def clear_runtime_caches_fixture():
+    clear_runtime_caches()
+    yield
+    clear_runtime_caches()
 
 
 def make_engine(name: str) -> AutonomousProvisioningEngine:
@@ -146,19 +239,158 @@ def test_onboarding_detail_parser_accepts_keyed_owner_message():
     assert details["phone_number"] == LIVE_TEST_NUMBER
 
 
+def test_google_sheets_registry_onboards_phone_and_routes_sale():
+    store = FakeRegistryStore()
+    registry = GoogleSheetsPharmacyRegistry(store, timezone_name="Africa/Nairobi", currency="KES")
+    intake = FakeIntake()
+    router = LiveRuntimeRouter(
+        intake_service_factory=lambda: intake,
+        provisioning_engine=make_engine("registry_onboard"),
+        pharmacy_registry=registry,
+    )
+    phone = "+254700000777"
+
+    start = router.handle_whatsapp_message(phone_number=phone, text="START", source="baileys")
+    setup = router.handle_whatsapp_message(
+        phone_number=phone,
+        text="Pharmacy: Afya Chemist; Owner: Njeri; Location: Nakuru",
+        source="baileys",
+    )
+    sale = router.handle_whatsapp_message(phone_number=phone, text="Panadol 2 cash", source="baileys")
+
+    worksheet = store.spreadsheet.worksheets["Pharmacies"]
+    assert worksheet.rows[0] == PHARMACY_REGISTRY_HEADERS
+    assert len(worksheet.rows) == 2
+    assert worksheet.rows[1][1] == "Afya Chemist"
+    assert worksheet.rows[1][10] == phone
+    assert start.status == "unknown_onboarding_started"
+    assert setup.status == "registered_active_pharmacy"
+    assert setup.provisioned is True
+    assert sale.status == "processed_existing_pharmacy"
+    assert sale.pharmacy_id == setup.pharmacy_id
+    assert intake.calls[0]["text"] == "Panadol 2 cash"
+    assert intake.calls[0]["actor_id"] == phone
+
+
+def test_registry_duplicate_onboarding_does_not_create_second_row():
+    store = FakeRegistryStore()
+    registry = GoogleSheetsPharmacyRegistry(store)
+    router = LiveRuntimeRouter(
+        intake_service_factory=lambda: FakeIntake(),
+        provisioning_engine=make_engine("registry_duplicate"),
+        pharmacy_registry=registry,
+    )
+    phone = "+254700000888"
+
+    first = router.handle_whatsapp_message(
+        phone_number=phone,
+        text="Pharmacy: Baraka Pharmacy; Owner: Otieno; Location: Kisumu",
+        source="baileys",
+    )
+    second = router.handle_whatsapp_message(phone_number=phone, text="START", source="baileys")
+
+    assert first.status == "registered_active_pharmacy"
+    assert second.status == "registered_active_pharmacy"
+    assert len(store.spreadsheet.worksheets["Pharmacies"].rows) == 2
+
+
+def test_unregistered_non_onboarding_number_gets_registry_prompt_without_intake():
+    store = FakeRegistryStore()
+    registry = GoogleSheetsPharmacyRegistry(store)
+    intake = FakeIntake()
+    router = LiveRuntimeRouter(
+        intake_service_factory=lambda: intake,
+        provisioning_engine=make_engine("registry_block"),
+        pharmacy_registry=registry,
+    )
+
+    result = router.handle_whatsapp_message(
+        phone_number="+254700000999",
+        text="Panadol 2 cash",
+        source="baileys",
+    )
+
+    assert result.status == "unregistered_onboarding_prompt"
+    assert "Reply START" in result.reply
+    assert intake.calls == []
+
+
+def test_allowed_whatsapp_number_still_works_as_development_override():
+    intake = FakeIntake()
+    router = LiveRuntimeRouter(
+        intake_service_factory=lambda: intake,
+        provisioning_engine=make_engine("dev_override"),
+        development_override_numbers=["254721149472"],
+    )
+
+    result = router.handle_whatsapp_message(
+        phone_number="+254721149472",
+        text="Panadol 2 cash",
+        source="baileys",
+    )
+
+    assert result.status == "processed_existing_pharmacy"
+    assert result.pharmacy_id == "development_override_pharmacy"
+    assert intake.calls[0]["text"] == "Panadol 2 cash"
+
+
 def test_baileys_endpoint_returns_json_reply(monkeypatch):
+    clear_runtime_caches()
+    run_id = uuid.uuid4().hex
+    monkeypatch.setenv("PHARMAREEN_DEFAULT_PHARMACY_ID", f"test_baileys_{run_id}")
     monkeypatch.setattr(main, "get_sheet_store", lambda: AvailableStore())
     monkeypatch.setattr(main, "get_live_runtime_router", lambda: FakeRouter())
 
     with TestClient(main.app) as client:
         response = client.post(
             "/webhooks/baileys/whatsapp",
-            json={"from": LIVE_TEST_NUMBER, "text": "panadol2cash", "message_id": "m1"},
+            json={"from": LIVE_TEST_NUMBER, "text": "panadol2cash", "message_id": f"m1-{run_id}"},
         )
 
     assert response.status_code == 200
     assert response.json()["reply"] == "handled panadol2cash"
     assert response.json()["source"] == "baileys"
+    assert response.json()["token_safe"] is True
+    assert response.json()["reliability"]["tracked"] is True
+
+
+def test_live_factories_wire_local_parser_sale_ledger_and_reports(monkeypatch):
+    clear_runtime_caches()
+    monkeypatch.setenv("PHARMAREEN_DEFAULT_PHARMACY_ID", "test_live_factory")
+    monkeypatch.setattr(main, "get_sheet_store", lambda: AvailableStore())
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: main.Settings(_env_file=None, pharmacy_name="Test Pharmacy", timezone="Africa/Nairobi"),
+    )
+
+    intake = main.get_intake_service()
+    reports = main.get_report_service()
+
+    assert isinstance(intake.parser, LocalFirstParser)
+    assert isinstance(intake.sale_ledger, DailySaleLedger)
+    assert isinstance(reports.sale_ledger, DailySaleLedger)
+    assert main.get_reliability_engine().no_data_loss_report()["dead_letter"] == 0
+
+
+def test_runtime_status_exposes_live_wiring(monkeypatch):
+    clear_runtime_caches()
+    monkeypatch.setenv("PHARMAREEN_DEFAULT_PHARMACY_ID", "test_runtime_status")
+    monkeypatch.setattr(main, "get_sheet_store", lambda: AvailableStore())
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: main.Settings(_env_file=None, pharmacy_name="Test Pharmacy", timezone="Africa/Nairobi"),
+    )
+
+    with TestClient(main.app) as client:
+        response = client.get("/live/runtime-status")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["intake_parser"] == "LocalFirstParser"
+    assert body["reliability"]["dead_letter"] == 0
+    assert body["deployment"]["pharmacy_id"] == "test_runtime_status"
 
 
 def test_live_readiness_reports_blockers_without_replit_or_offline_sources(monkeypatch):

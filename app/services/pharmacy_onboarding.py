@@ -130,6 +130,11 @@ PHARMACIES_HEADERS = [
     "Created At",
     "Status",
     "Notes",
+    "Phone Number",
+    "Timezone",
+    "Currency",
+    "Active",
+    "Updated At",
 ]
 
 PHASE3_SHEETS: dict[str, list[str]] = {
@@ -258,12 +263,17 @@ class PharmacyOnboardingService:
             "pharmacy_name": pharmacy_name,
             "owner_name": payload.owner_name.strip(),
             "phone": payload.phone.strip(),
+            "phone_number": payload.phone.strip(),
             "location": payload.location.strip(),
             "spreadsheet_id": result["spreadsheet_id"],
             "spreadsheet_url": result["spreadsheet_url"],
             "created_at": created_at,
             "status": status,
             "notes": payload.notes.strip(),
+            "timezone": self.settings.timezone,
+            "currency": "KES",
+            "active": "yes" if status in {"google_live", "local_fallback"} else "no",
+            "updated_at": created_at,
         }
         self._save_registry_record(record)
         response = {
@@ -506,12 +516,17 @@ def normalize_registry_record(record: dict[str, Any]) -> dict[str, Any]:
         "pharmacy_name": str(record.get("pharmacy_name") or record.get("Pharmacy Name") or "").strip(),
         "owner_name": str(record.get("owner_name") or record.get("Owner Name") or "").strip(),
         "phone": str(record.get("phone") or record.get("Phone") or "").strip(),
+        "phone_number": str(record.get("phone_number") or record.get("Phone Number") or record.get("phone") or record.get("Phone") or "").strip(),
         "location": str(record.get("location") or record.get("Location") or "").strip(),
         "spreadsheet_id": str(record.get("spreadsheet_id") or record.get("Spreadsheet ID") or "").strip(),
         "spreadsheet_url": str(record.get("spreadsheet_url") or record.get("Spreadsheet URL") or "").strip(),
         "created_at": str(record.get("created_at") or record.get("Created At") or "").strip(),
         "status": str(record.get("status") or record.get("Status") or "").strip(),
         "notes": str(record.get("notes") or record.get("Notes") or "").strip(),
+        "timezone": str(record.get("timezone") or record.get("Timezone") or "Africa/Nairobi").strip(),
+        "currency": str(record.get("currency") or record.get("Currency") or "KES").strip(),
+        "active": str(record.get("active") or record.get("Active") or "").strip(),
+        "updated_at": str(record.get("updated_at") or record.get("Updated At") or "").strip(),
     }
 
 

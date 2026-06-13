@@ -33,6 +33,7 @@ SUPPLIERS = "Suppliers"
 IMPORT_REVIEW_QUEUE = "Import_Review_Queue"
 OFFLINE_SYNC_LOG = "Offline_Sync_Log"
 MEDICINE_CATALOG_METADATA = "Medicine_Catalog_Metadata"
+PHARMACIES = "Pharmacies"
 
 SHEETS_UNAVAILABLE_MESSAGE = (
     "Google Sheets is not configured. Add a valid service-account.json to enable logging."
@@ -365,6 +366,24 @@ MEDICINE_CATALOG_METADATA_HEADERS = [
     "Last Updated",
 ]
 
+PHARMACIES_HEADERS = [
+    "Pharmacy ID",
+    "Pharmacy Name",
+    "Owner Name",
+    "Phone",
+    "Location",
+    "Spreadsheet ID",
+    "Spreadsheet URL",
+    "Created At",
+    "Status",
+    "Notes",
+    "Phone Number",
+    "Timezone",
+    "Currency",
+    "Active",
+    "Updated At",
+]
+
 
 class GoogleSheetsStore:
     def __init__(self, settings: Settings):
@@ -403,6 +422,7 @@ class GoogleSheetsStore:
         self._ensure_worksheet(IMPORT_REVIEW_QUEUE, IMPORT_REVIEW_HEADERS, rows=10000)
         self._ensure_worksheet(OFFLINE_SYNC_LOG, OFFLINE_SYNC_HEADERS, rows=10000)
         self._ensure_worksheet(MEDICINE_CATALOG_METADATA, MEDICINE_CATALOG_METADATA_HEADERS, rows=3000)
+        self._ensure_worksheet(PHARMACIES, PHARMACIES_HEADERS, rows=2000)
 
     def list_master_drug_names(self) -> list[str]:
         return [

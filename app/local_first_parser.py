@@ -83,6 +83,8 @@ class LocalFirstParser:
         self.last_command = LocalCommand(intent=intent, brain_result=result)
 
         if result.status == AMBIGUOUS:
+            if intent == "sale" and has_explicit_sale_verb(text) and not has_sale_detail(text):
+                return None
             return ParseResult(
                 events=[],
                 needs_clarification=True,
@@ -331,3 +333,11 @@ def is_clear_sale_shape(result: MedicineBrainResult) -> bool:
     if result.payment or result.form or result.packaging or result.dose:
         return True
     return len(result.normalized_text.split()) <= 2
+
+
+def has_sale_detail(text: str) -> bool:
+    return bool(re.search(r"\d|\b(cash|m-?pesa|mpesa|credit|mixed)\b", text, flags=re.IGNORECASE))
+
+
+def has_explicit_sale_verb(text: str) -> bool:
+    return bool(re.search(r"\b(sell|sold|sale|uza|kuuza)\b", text, flags=re.IGNORECASE))

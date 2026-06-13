@@ -18,6 +18,7 @@ const sessionPath = process.env.BAILEYS_SESSION_PATH || './.baileys_auth';
 const baileysLogLevel = process.env.BAILEYS_LOG_LEVEL || 'info';
 const autoResetOnLoggedOut = String(process.env.AUTO_RESET_BAILEYS_ON_LOGOUT || 'true').toLowerCase() !== 'false';
 const allowAllDirectChatsForTest = String(process.env.ALLOW_ALL_DIRECT_CHATS_FOR_TEST || 'false').toLowerCase() === 'true';
+const pharmacyRegistryAuthEnabled = String(process.env.PHARMACY_REGISTRY_AUTH_ENABLED || 'true').toLowerCase() !== 'false';
 const nativeSelectorEnabled = String(process.env.WHATSAPP_NATIVE_SELECTOR_ENABLED || 'false').toLowerCase() === 'true';
 const allowedNumbers = parseAllowedNumbers(
   `${process.env.ALLOWED_WHATSAPP_NUMBERS || ''},${process.env.ALLOWED_DIRECT_CHAT_NUMBERS || ''}`
@@ -131,6 +132,9 @@ function isAllowedDirectChat(jid, identity = {}) {
   }
   if (allowAllDirectChatsForTest) {
     return { allowed: true, reason: 'test_mode_allowed_direct_chat' };
+  }
+  if (pharmacyRegistryAuthEnabled) {
+    return { allowed: true, reason: 'registry_backend_gate' };
   }
   if (allowedNumbers.size === 0 && allowedLids.size === 0) {
     return { allowed: false, reason: 'safe_mode_no_allowlist' };

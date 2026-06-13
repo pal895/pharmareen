@@ -55,6 +55,10 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("ALLOWED_DIRECT_CHAT_LIDS", "ALLOWED_WHATSAPP_LIDS"),
     )
+    pharmacy_registry_auth_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("PHARMACY_REGISTRY_AUTH_ENABLED", "PHARMACY_REGISTRY_ENABLED"),
+    )
     allow_all_direct_chats_for_test: bool = Field(
         default=False,
         validation_alias=AliasChoices("ALLOW_ALL_DIRECT_CHATS_FOR_TEST", "ALLOW_ALL_DIRECT_CHATS"),

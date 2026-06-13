@@ -157,7 +157,7 @@ def run_intake_case(case: dict[str, Any]) -> list[str]:
 
 def run_report_case(case: dict[str, Any]) -> list[str]:
     parser = FailingParser()
-    service = IntakeService(parser, EvalStore())
+    service = IntakeService(parser, EvalStore(), pharmacy_name="Zilla Pharmacy")
     reply = service.process_text(str(case["input"]))
     expected = case["expected"]
     errors: list[str] = []
