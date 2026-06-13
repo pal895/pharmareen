@@ -477,13 +477,22 @@ async function downloadImageBase64(sock, msg) {
 }
 
 async function sendToBackend(text, sender, messageId, extraPayload = {}, identity = {}) {
-  const url = `${backendUrl}/bridge/whatsapp-web`;
+  const hasMedia = Boolean(extraPayload.media_base64 || extraPayload.media_mime_type);
+  const textOnly = Boolean(String(text || '').trim()) && !hasMedia;
+  const url = textOnly ? `${backendUrl}/webhooks/baileys/whatsapp` : `${backendUrl}/bridge/whatsapp-web`;
   const payload = {
     message: text,
-    from: sender,
+    text,
+    body: text,
+    from: textOnly && identity.normalizedPhone ? identity.normalizedPhone : sender,
+    jid: identity.senderJid || sender,
+    sender: sender,
     sender_jid: identity.senderJid || sender,
     sender_phone: identity.normalizedPhone || '',
     sender_lid: identity.normalizedLid || '',
+    phone_number: identity.normalizedPhone || '',
+    normalized_phone: identity.normalizedPhone || '',
+    normalized_lid: identity.normalizedLid || '',
     message_id: messageId || '',
     is_group: isGroupJid(sender),
     is_broadcast: isBroadcastJid(sender),
@@ -497,7 +506,7 @@ async function sendToBackend(text, sender, messageId, extraPayload = {}, identit
     `message_length=${String(text || '').length} has_media=${Boolean(extraPayload.media_base64)} ` +
     `media_mime_type=${extraPayload.media_mime_type || ''} test_mode=${allowAllDirectChatsForTest}`
   );
-  const response = await axios.post(url, payload, { timeout: 60000 });
+  const response = await axios.post(url, payload, { timeout: textOnly ? 15000 : 60000 });
   console.log(`BACKEND_HTTP_STATUS ${response.status}`);
   console.log(`BACKEND_JSON_RESPONSE ${JSON.stringify(response.data || {})}`);
   return response.data || {};

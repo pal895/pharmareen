@@ -755,6 +755,10 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "TEST MODE ACCEPTED DIRECT CHAT" in source
     assert "BACKEND_REPLY_RECEIVED" in source
     assert "BACKEND_REQUEST_URL" in source
+    assert "/webhooks/baileys/whatsapp" in source
+    assert "textOnly ? `${backendUrl}/webhooks/baileys/whatsapp`" in source
+    assert "textOnly ? 15000 : 60000" in source
+    assert "phone_number: identity.normalizedPhone" in source
     assert "BACKEND_HTTP_STATUS" in source
     assert "BACKEND_JSON_RESPONSE" in source
     assert "INCOMING_SENDER_JID" in source
