@@ -39,7 +39,7 @@ def test_python_app_main_starts_and_reports_clear_local_status(tmp_path):
             output, _ = process.communicate(timeout=10)
 
     assert '"status":"ok"' in body.replace(" ", "")
-    assert "PharMareen System Running" in output
+    assert "MS2.0 System Running" in output
     assert "Status: http://localhost:8799/status" in output
     assert "localhost is not public" in output
     assert "Missing production settings" in output

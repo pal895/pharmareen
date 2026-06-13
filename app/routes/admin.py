@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
+from app.branding import APP_BRAND
 from app.config import get_settings
 from app.services.pharmacy_onboarding import PharmacyOnboardingService, PharmacyPayload
 
@@ -27,7 +28,7 @@ class BulkCreateRequest(BaseModel):
 
 @router.get("/onboard", response_class=HTMLResponse)
 def onboard_page() -> str:
-    return ADMIN_HTML
+    return ADMIN_HTML.replace("__APP_BRAND__", APP_BRAND)
 
 
 @router.post("/create-pharmacy")
@@ -84,7 +85,7 @@ ADMIN_HTML = """
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PharMareen Pharmacy Onboarding</title>
+  <title>__APP_BRAND__ Pharmacy Onboarding</title>
   <style>
     body { margin:0; font-family: Arial, sans-serif; background:#f6f8fb; color:#172033; }
     main { max-width: 1040px; margin: 0 auto; padding: 28px 16px 48px; }
@@ -104,7 +105,7 @@ ADMIN_HTML = """
 </head>
 <body>
 <main>
-  <h1>PharMareen Pharmacy Onboarding</h1>
+  <h1>__APP_BRAND__ Pharmacy Onboarding</h1>
 
   <section>
     <h2>Create One Pharmacy</h2>

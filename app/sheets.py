@@ -137,6 +137,16 @@ def record_money_value(record: dict[str, Any], aliases: list[str]) -> float | No
     return None
 
 
+def metadata_text_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (list, tuple, set)):
+        return ", ".join(str(item).strip() for item in value if str(item).strip())
+    return str(value).strip()
+
+
 def is_inventory_worksheet_title(title: str) -> bool:
     clean_title = str(title or "").strip()
     if not clean_title:
@@ -362,6 +372,7 @@ MEDICINE_CATALOG_METADATA_HEADERS = [
     "Units",
     "Manufacturer/Importer",
     "PPB Registration Number",
+    "Pack Sizes",
     "Source",
     "Last Updated",
 ]
@@ -574,6 +585,30 @@ class GoogleSheetsStore:
         )
         self.upsert_medicine_catalog_metadata(name)
 
+    def upsert_medicine_catalog_record(self, record: dict[str, Any]) -> None:
+        """Save owner-imported catalog metadata without touching legacy stock columns."""
+        name = " ".join(
+            str(record.get("drug_name") or record.get("name") or record.get("Drug Name") or "").strip().split()
+        )
+        if not name:
+            return
+        row = [
+            name,
+            metadata_text_value(record.get("generic_name")),
+            metadata_text_value(record.get("brand_names")),
+            metadata_text_value(record.get("aliases")),
+            metadata_text_value(record.get("category")),
+            metadata_text_value(record.get("strengths")),
+            metadata_text_value(record.get("dosage_forms") or record.get("forms")),
+            metadata_text_value(record.get("units")),
+            metadata_text_value(record.get("manufacturer_importer")),
+            metadata_text_value(record.get("ppb_registration_number")),
+            metadata_text_value(record.get("pack_sizes") or record.get("packaging")),
+            metadata_text_value(record.get("source")) or "Pharmacy owner import",
+            now_in_timezone(self.settings.timezone).strftime("%Y-%m-%d %H:%M:%S"),
+        ]
+        self._upsert_medicine_catalog_row(name, row)
+
     def upsert_medicine_catalog_metadata(self, drug_name: str) -> None:
         """Keep onboarding metadata separate so legacy stock columns stay stable."""
         try:
@@ -600,18 +635,22 @@ class GoogleSheetsStore:
                 ", ".join(entry.get("units", [])),
                 ", ".join(entry.get("manufacturer_importer", [])),
                 entry.get("ppb_registration_number", ""),
+                "",
                 entry.get("source", "") or "Local Kenya medicine brain",
                 now_in_timezone(self.settings.timezone).strftime("%Y-%m-%d %H:%M:%S"),
             ]
-            worksheet = self._worksheet(MEDICINE_CATALOG_METADATA)
-            records = worksheet.get_all_values()
-            for row_number, existing in enumerate(records[1:], start=2):
-                if existing and normalize_key(existing[0]) == normalize_key(drug_name):
-                    worksheet.update(f"A{row_number}", [row])
-                    return
-            worksheet.append_row(row, value_input_option="USER_ENTERED")
+            self._upsert_medicine_catalog_row(drug_name, row)
         except Exception:
             logger.warning("Medicine metadata could not be saved for %s", drug_name, exc_info=True)
+
+    def _upsert_medicine_catalog_row(self, drug_name: str, row: list[Any]) -> None:
+        worksheet = self._worksheet(MEDICINE_CATALOG_METADATA)
+        records = worksheet.get_all_values()
+        for row_number, existing in enumerate(records[1:], start=2):
+            if existing and normalize_key(existing[0]) == normalize_key(drug_name):
+                worksheet.update(f"A{row_number}", [row])
+                return
+        worksheet.append_row(row, value_input_option="USER_ENTERED")
 
     def list_low_stock_items(self) -> list[StockItem]:
         low_stock: list[StockItem] = []

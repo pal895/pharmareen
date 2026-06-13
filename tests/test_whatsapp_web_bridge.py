@@ -190,10 +190,10 @@ def test_whatsapp_web_bridge_greeting_and_how_to_use_are_human_friendly(monkeypa
         guide = client.post("/bridge/whatsapp-web", json=bridge_payload("how do I use this"))
 
     assert hello.status_code == 200
-    assert "Welcome to PharMareen" in hello.json()["reply"]
+    assert "Welcome to MS2.0" in hello.json()["reply"]
     assert "Panadol 2" in hello.json()["reply"]
     assert guide.status_code == 200
-    assert "PHARMAREEN QUICK COMMANDS" in guide.json()["reply"]
+    assert "MS2.0 QUICK COMMANDS" in guide.json()["reply"]
     assert "Offline mode" in guide.json()["reply"]
 
 
@@ -804,7 +804,7 @@ def test_baileys_bridge_source_uses_safe_reply_and_strict_allowlist():
     assert "message_id=" in source
     assert "extractBackendReply" in source
     assert "whatsapp_reply" in source
-    assert "✅ PharMareen received your message." in source
+    assert "✅ MS2.0 received your message." in source
     assert "BACKEND_TEST_MODE_ACCEPTED_LID" in backend_source
     assert "BACKEND_REPLY_TEXT" in backend_source
     assert "boolish" in backend_source

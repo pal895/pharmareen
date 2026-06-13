@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Any, Protocol
 from urllib.parse import quote
 
+from app.branding import APP_BRAND
 from app.domain import Action, ParsedEvent, ParseResult, StockItem
 from app.pdf_reports import generate_daily_report_pdf, generate_weekly_report_pdf
 from app.reports import ReportMetrics, build_report_metrics, low_stock_from_items, render_daily_summary, top_pairs
@@ -51,7 +52,7 @@ UNDERSTAND_ERROR = "\n".join(
 SAVE_ERROR = "I could not save this record right now. Please check the Google Sheets connection."
 GREETING_TEXT = "\n".join(
     [
-        "👋 Welcome to PharMareen.",
+        f"👋 Welcome to {APP_BRAND}.",
         "",
         "You can manage your pharmacy through simple WhatsApp messages.",
         "",
@@ -68,7 +69,7 @@ GREETING_TEXT = "\n".join(
 )
 HELP_TEXT = "\n".join(
     [
-        "PHARMAREEN QUICK COMMANDS",
+        f"{APP_BRAND} QUICK COMMANDS",
         "",
         "Sales:",
         "- Panadol sold 2",
@@ -131,10 +132,10 @@ AMBIGUOUS_ERROR = (
     "4. Get report"
 )
 ORDERING_TODO_REPLY = (
-    "Customer ordering is planned. For now, PharMareen focuses on sales, stock, profit, reports, and no-stock demand."
+    f"Customer ordering is planned. For now, {APP_BRAND} focuses on sales, stock, profit, reports, and no-stock demand."
 )
 HIGH_VOLUME_REPLY = (
-    "No. PharMareen can keep recording many transactions.\n\n"
+    f"No. {APP_BRAND} can keep recording many transactions.\n\n"
     "If your pharmacy grows, we can upgrade the storage without changing how you use WhatsApp."
 )
 
@@ -363,7 +364,7 @@ class IntakeService:
         parser: Parser,
         store: StockStore,
         timezone: str = "Africa/Nairobi",
-        pharmacy_name: str = "PharMareen",
+        pharmacy_name: str = APP_BRAND,
         app_base_url: str | None = None,
         whatsapp_number: str | None = None,
         sale_ledger: Any | None = None,
@@ -407,6 +408,7 @@ class IntakeService:
         text = expand_compact_pharmacy_text(text)
 
         conversation_key = conversation_id or "__default__"
+        self.aliases_by_key = self._load_pharmacy_aliases(conversation_key)
         route_decision = decide_ai_route(text=text)
         log_ai_route_decision(
             text=text,
@@ -927,7 +929,7 @@ class IntakeService:
     def _share_reply(self) -> str:
         return "\n".join(
             [
-                "📲 Share PharMareen with staff:",
+                f"📲 Share {APP_BRAND} with staff:",
                 "",
                 "Tap to open WhatsApp:",
                 self._whatsapp_start_link(),
@@ -936,7 +938,7 @@ class IntakeService:
 
     def _whatsapp_start_link(self) -> str:
         if not self.whatsapp_number:
-            return "Ask the pharmacy admin for the PharMareen WhatsApp number."
+            return f"Ask the pharmacy admin for the {APP_BRAND} WhatsApp number."
         return f"https://wa.me/{self.whatsapp_number}?text=start"
 
     def _saved_report_reply(self, report_date: str) -> str:
@@ -2384,9 +2386,15 @@ class IntakeService:
             return None
         return self.store.find_stock(match.canonical_name)
 
-    def _load_pharmacy_aliases(self) -> dict[str, str]:
+    def _load_pharmacy_aliases(self, conversation_key: str | None = None) -> dict[str, str]:
         aliases = {normalize_key(key): value for key, value in SHORTCUT_DRUGS.items()}
-        aliases.update(self.pharmacy_alias_store.accepted_aliases(self.pharmacy_learning_key))
+        learning_keys = [self.pharmacy_learning_key]
+        if conversation_key and ":" in conversation_key:
+            pharmacy_key = normalize_key(conversation_key.split(":", 1)[0])
+            if pharmacy_key and pharmacy_key not in learning_keys:
+                learning_keys.append(pharmacy_key)
+        for key in learning_keys:
+            aliases.update(self.pharmacy_alias_store.accepted_aliases(key))
         raw_aliases = os.getenv("PHARMAREEN_DRUG_ALIASES", "")
         for pair in raw_aliases.split(","):
             if "=" not in pair:
@@ -2594,7 +2602,7 @@ class IntakeService:
         amount = sale.get("total_sales")
         return "\n".join(
             [
-                "PHARMAREEN RECEIPT",
+                f"{APP_BRAND} RECEIPT",
                 f"Medicine: {sale['drug_name']}",
                 f"Quantity: {sale['display_quantity']}{unit_suffix(sale.get('unit', ''), sale['display_quantity'])}",
                 f"Payment: {sale.get('payment_method') or 'Cash'}",
@@ -2775,6 +2783,8 @@ def is_help_command(text: str) -> bool:
         "guide",
         "tutorial",
         "how do i use this",
+        "how do i use ms20",
+        "how do i use ms 20",
         "how do i use phar mareen",
         "how do i use pharmareen",
         "what can you do",

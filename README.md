@@ -4,7 +4,7 @@ A simple MVP for pharmacy owners who only want to send WhatsApp text messages or
 
 The app receives a WhatsApp update, handles known pharmacy flows locally first, logs the event in Google Sheets, updates stock after sales, and generates daily WhatsApp reports for business decisions.
 
-Default pharmacy name: `PharMareen`.
+Default system display name: `MS2.0`.
 
 ## Baileys WhatsApp Bridge Mode
 
@@ -126,7 +126,7 @@ C:\Program Files (x86)\ZillaPharmacy\ZillaPharmacyApp.exe
 If Google Sheets is not configured yet, the app still starts. `/health` should return:
 
 ```json
-{"status":"ok","service":"PharMareen","version":"day-2"}
+{"status":"ok","service":"MS2.0","version":"day-2"}
 ```
 
 ## What The System Does

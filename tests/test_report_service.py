@@ -114,7 +114,7 @@ def test_render_report_contains_demo_summary():
     )
     report = render_report(metrics, deterministic_recommendations(metrics), report_time="18:30")
 
-    assert report.startswith("📊 PharMareen Daily Report\nDate: 2026-04-27")
+    assert report.startswith("📊 MS2.0 Daily Report\nDate: 2026-04-27")
     assert "Sales: KES 50" in report
     assert "Cost: KES 0" in report
     assert "Gross Profit: KES 0" in report
@@ -129,7 +129,7 @@ def test_daily_report_contains_pharmareen():
     metrics = build_report_metrics("2026-04-27", [], [])
     report = render_report(metrics, ["No urgent action found today."], report_time="08:00")
 
-    assert report.splitlines()[0] == "📊 PharMareen Daily Report"
+    assert report.splitlines()[0] == "📊 MS2.0 Daily Report"
 
 
 def test_transaction_metrics_calculates_peak_time():

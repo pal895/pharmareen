@@ -116,7 +116,7 @@ def test_existing_public_routes_still_work():
         response = client.get("/offline_app/index.html")
 
     assert response.status_code == 200
-    assert "PharMareen Offline" in response.text
+    assert "MS2.0 Offline" in response.text
 
 def test_meta_callback_url_verification_succeeds():
     with TestClient(main.app) as client:

@@ -1,4 +1,4 @@
-# PharMareen Production Deployment
+# MS2.0 Production Deployment
 
 ## Active WhatsApp Provider
 
@@ -20,7 +20,7 @@ OWNER_WHATSAPP_TO=whatsapp:+254700000000
 
 Keep old Meta/Twilio/WhatsApp Web bridge routes only for compatibility with older installs.
 
-PharMareen can run locally for testing, or on a hosted public URL so WhatsApp Web bridge does not need ngrok.
+MS2.0 can run locally for testing, or on a hosted public URL so WhatsApp Web bridge does not need ngrok.
 
 ## Pharmacy Registry Model
 
@@ -65,7 +65,7 @@ Deployment files are included for:
 ## Required Environment Variables
 
 ```env
-PHARMACY_NAME=PharMareen
+PHARMACY_NAME=MS2.0
 TIMEZONE=Africa/Nairobi
 APP_BASE_URL=https://YOUR-DOMAIN
 
@@ -108,13 +108,13 @@ Compatibility routes still exist for older clients:
 
 ## Important: Localhost vs WhatsApp
 
-`http://localhost:8000` only works on the computer running PharMareen.
+`http://localhost:8000` only works on the computer running MS2.0.
 
 The Baileys bridge can post to localhost when it runs beside the backend. Public HTTPS is still required for deployed browser/offline links and external callbacks.
 
 For real pharmacy use:
 
-1. Deploy PharMareen to Render, Railway, Fly.io, or a VPS.
+1. Deploy MS2.0 to Render, Railway, Fly.io, or a VPS.
 2. Set `APP_BASE_URL=https://YOUR-DOMAIN`.
 3. Set the Baileys bridge endpoint to:
 
@@ -143,7 +143,7 @@ Expected response:
 ```json
 {
   "status": "ok",
-  "service": "PharMareen",
+  "service": "MS2.0",
   "version": "day-2"
 }
 ```

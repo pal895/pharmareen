@@ -221,7 +221,7 @@ def test_admin_routes_create_list_and_show_pharmacy(tmp_path, monkeypatch):
         placeholder = client.post("/admin/photo-onboard-placeholder")
 
     assert page.status_code == 200
-    assert "PharMareen Pharmacy Onboarding" in page.text
+    assert "MS2.0 Pharmacy Onboarding" in page.text
     assert created.status_code == 200
     assert created.json()["ok"] is True
     assert listed.json()["pharmacies"]

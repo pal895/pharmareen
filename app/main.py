@@ -30,6 +30,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from app.branding import APP_BRAND
 from app.ai import AIService, ai_usage_snapshot, log_ai_route_decision
 from app.config import Settings, get_settings
 from app.correction_learning import CorrectionLearningEngine
@@ -57,6 +58,7 @@ from app.services.medicine_catalog import (
     medicine_match_snapshot,
     search_catalog_entries,
 )
+from app.services.medicine_onboarding import import_pharmacy_medicines
 from app.services.photo_intake import (
     append_photo_intake_log,
     build_invoice_extraction_placeholder,
@@ -296,6 +298,30 @@ async def offline_medicine_alias_learn(request: Request) -> dict[str, Any]:
     return {"status": "ok", "ai_used": False, "shortcut": result}
 
 
+@app.post("/admin/medicine-catalog/import")
+async def admin_medicine_catalog_import(request: Request) -> dict[str, Any]:
+    """Import pharmacy-owned medicines into the local-first catalog path without AI."""
+    payload = await request.json()
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="JSON body is required.")
+    settings = get_settings()
+    pharmacy_id = str(
+        payload.get("pharmacy_id")
+        or payload.get("pharmacy_name")
+        or settings.pharmareen_default_pharmacy_id
+        or settings.pharmacy_name
+        or "default"
+    ).strip()
+    result = import_pharmacy_medicines(
+        payload,
+        store=get_sheet_store(),
+        pharmacy_id=pharmacy_id,
+    )
+    if result["records_received"] == 0:
+        raise HTTPException(status_code=400, detail="No medicines found to import.")
+    return result
+
+
 @app.get("/offline_app/index.html", include_in_schema=False)
 async def offline_app_index_file() -> FileResponse:
     return FileResponse(
@@ -392,7 +418,7 @@ def offline_test() -> dict[str, str]:
 
 @app.get("/offline-html-test", response_class=HTMLResponse)
 def offline_html_test() -> str:
-    return "<h1>PharMareen Offline Public Test OK</h1>"
+    return f"<h1>{APP_BRAND} Offline Public Test OK</h1>"
 
 
 def offline_entry_action(entry: dict[str, Any]) -> str:
@@ -1096,7 +1122,7 @@ async def debug_queue_test_offline_confirmation(request: Request) -> dict[str, A
         payload.get("message")
         if isinstance(payload, dict)
         else ""
-    ).strip() or "✅ Offline confirmation test from PharMareen."
+    ).strip() or f"✅ Offline confirmation test from {APP_BRAND}."
     queued = queue_offline_whatsapp_confirmation(recipient, message)
     return {"status": "ok" if queued else "error", "queued": queued or {"status": "not_queued"}}
 
@@ -1111,7 +1137,7 @@ async def debug_send_test_offline_confirmation(request: Request) -> dict[str, An
     recipient = offline_confirmation_recipient({"confirmation_whatsapp": raw_recipient})
     message = str((payload.get("message") if isinstance(payload, dict) else "") or "").strip()
     if not message:
-        message = "✅ PharMareen bridge delivery test. If you see this, offline confirmations can reach WhatsApp."
+        message = f"✅ {APP_BRAND} bridge delivery test. If you see this, offline confirmations can reach WhatsApp."
     queued = queue_offline_whatsapp_confirmation(recipient, message)
     print(
         "OFFLINE_CONFIRMATION_QUEUED_REAL_SYNC "
@@ -1439,7 +1465,7 @@ def startup_status_page() -> str:
     if base_is_local:
         warning = """
         <section class="warning">
-          <strong>WhatsApp Web MVP can still run locally.</strong><br>
+          <strong>Baileys WhatsApp bridge can still run locally.</strong><br>
           Public report links will open on phones only after APP_BASE_URL is set to the Replit public URL.
         </section>
         """
@@ -1464,7 +1490,7 @@ def startup_status_page() -> str:
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
-      <title>PharMareen Status</title>
+      <title>{APP_BRAND} Status</title>
       <style>
         body {{ margin:0; font-family: Arial, sans-serif; background:#f6f8fb; color:#132238; }}
         main {{ max-width: 820px; margin: 0 auto; padding: 28px 18px; }}
@@ -1481,8 +1507,8 @@ def startup_status_page() -> str:
     </head>
     <body>
       <main>
-        <h1>PharMareen Status</h1>
-        <p>Use this page before testing the WhatsApp Web MVP bridge.</p>
+        <h1>{APP_BRAND} Status</h1>
+        <p>Use this page before testing the Baileys WhatsApp bridge.</p>
         {warning}
         <section class="card">
           <div class="row"><span>App running</span><span class="ok">yes</span></div>
@@ -1495,7 +1521,7 @@ def startup_status_page() -> str:
         <section class="card">
           <p><strong>Local app:</strong> <a href="http://localhost:5000">http://localhost:5000</a></p>
           <p><strong>Health check:</strong> <a href="http://localhost:5000/health">http://localhost:5000/health</a></p>
-          <p><strong>Bridge:</strong> run <code>./start_with_whatsapp_web.sh</code>, scan the QR code, then send <code>start</code>.</p>
+          <p><strong>Bridge:</strong> run <code>WHATSAPP_BRIDGE_ENABLED=true bash start.sh</code>, scan the QR code if needed, then send <code>start</code>.</p>
         </section>
       </main>
     </body>
@@ -1517,7 +1543,7 @@ def landing_page() -> str:
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <link rel="manifest" href="/manifest.json">
-      <title>PharMareen</title>
+      <title>{APP_BRAND}</title>
       <style>
         body {{ margin:0; font-family: Arial, sans-serif; background:#f6f8fb; color:#14213d; }}
         main {{ max-width: 760px; margin: 0 auto; padding: 32px 20px; }}
@@ -1532,7 +1558,7 @@ def landing_page() -> str:
     </head>
     <body>
       <main>
-        <h1>PharMareen</h1>
+        <h1>{APP_BRAND}</h1>
         <p>Run your pharmacy from WhatsApp.</p>
         <section class="panel">
           <h2>Save This WhatsApp Number</h2>
@@ -1570,8 +1596,8 @@ def landing_page() -> str:
 def manifest() -> JSONResponse:
     return JSONResponse(
         {
-            "name": "PharMareen",
-            "short_name": "PharMareen",
+            "name": APP_BRAND,
+            "short_name": APP_BRAND,
             "start_url": "/landing",
             "display": "standalone",
             "background_color": "#f6f8fb",
@@ -1640,7 +1666,7 @@ def regenerate_missing_report_pdf(safe_name: str) -> Path:
     try:
         generated = generate_daily_report_pdf(
             metrics,
-            pharmacy_name=settings.pharmacy_name or "PharMareen",
+            pharmacy_name=settings.pharmacy_name or APP_BRAND,
             report_time=now_in_timezone(settings.timezone).strftime("%H:%M"),
         )
         target = reports_pdf_dir() / safe_name
@@ -1887,7 +1913,7 @@ def startup_console_lines() -> list[str]:
     settings = get_settings()
     port = os.getenv("PORT", "5000")
     lines = [
-        "PharMareen System Running",
+        f"{APP_BRAND} System Running",
         f"Local app: http://localhost:{port}",
         f"Health: http://localhost:{port}/health",
         f"Status: http://localhost:{port}/status",
@@ -2180,7 +2206,7 @@ async def debug_whatsapp_test() -> JSONResponse:
 
 @app.get("/debug/xml-test")
 def debug_xml_test() -> Response:
-    return xml_response("PharMareen XML test")
+    return xml_response(f"{APP_BRAND} XML test")
 
 
 @app.get("/debug/report-test")
@@ -4127,9 +4153,9 @@ def run_local_server() -> None:
     try:
         uvicorn.run(app, host="0.0.0.0", port=port, reload=False)
     except KeyboardInterrupt:
-        print("PharMareen stopped.", flush=True)
+        print(f"{APP_BRAND} stopped.", flush=True)
     except BaseException as exc:
-        print("PharMareen could not start.", flush=True)
+        print(f"{APP_BRAND} could not start.", flush=True)
         print(f"Error: {exc}", flush=True)
         try:
             input("Press any key to close.")

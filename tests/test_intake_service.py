@@ -271,7 +271,7 @@ def test_help_command_returns_available_commands_without_parser():
         reply = service.process_text(command)
 
         assert len(reply) < 1200
-        assert "PHARMAREEN QUICK COMMANDS" in reply
+        assert "MS2.0 QUICK COMMANDS" in reply
         assert "Panadol sold 2" in reply
         assert "Insulin sold 1" in reply
         assert "Panadol stock" in reply
@@ -436,7 +436,7 @@ def test_greeting_returns_warm_onboarding_without_parser():
     for command in ["hello", "hi", "habari", "good morning", "mambo"]:
         reply = service.process_text(command)
 
-        assert "Welcome to PharMareen" in reply
+        assert "Welcome to MS2.0" in reply
         assert "Panadol 2" in reply
         assert "+Panadol 20" in reply
         assert "report today" in reply
@@ -910,7 +910,7 @@ def test_receipt_printing_setting_and_printable_last_receipt():
     assert "🧾 Digital receipt ready — printer not detected" in sale_reply
     receipt = service.process_text("print receipt last")
 
-    assert "PHARMAREEN RECEIPT" in receipt
+    assert "MS2.0 RECEIPT" in receipt
     assert "Medicine: Panadol" in receipt
     assert "Quantity: 2" in receipt
 
@@ -1349,7 +1349,7 @@ def test_share_command_returns_click_to_chat_link():
 
     reply = service.process_text("share")
 
-    assert "Share PharMareen with staff:" in reply
+    assert "Share MS2.0 with staff:" in reply
     assert "https://wa.me/14155238886?text=start" in reply
 
 
@@ -1415,10 +1415,10 @@ def test_report_by_date_found_returns_saved_report():
     service = IntakeService(parser, store)
 
     reply = service.process_text("report 2026-04-27")
-    assert reply.startswith("PharMareen")
+    assert reply.startswith("MS2.0")
     assert "Zilla Pharmacy" not in reply
     return
-    assert reply.startswith("PharMareen")
+    assert reply.startswith("MS2.0")
     assert "Zilla Pharmacy" not in reply
     return
 
@@ -1592,7 +1592,7 @@ def test_short_correction_and_receipt_variants_use_local_memory_without_ai():
     assert "5" in qty_reply
     assert "Updated last Panadol sale quantity: 5" in inc_reply
     assert "6" in inc_reply
-    assert "PHARMAREEN RECEIPT" in receipt
+    assert "MS2.0 RECEIPT" in receipt
     assert "Payment: M-Pesa" in receipt
     assert "Amount:" in receipt
     assert parser.called is False
@@ -1655,7 +1655,7 @@ def test_no_space_commands_and_same_as_last_sequence_keep_context_local():
     assert "Daily Report" in report
     assert same == "Repeat Panadol x2 Cash? Reply YES."
     assert "Panadol x2" in repeated
-    assert "PHARMAREEN RECEIPT" in receipt
+    assert "MS2.0 RECEIPT" in receipt
     assert "Medicine: Panadol" in receipt
 
 
@@ -1667,7 +1667,7 @@ def test_no_space_report_analytics_and_receipt_commands_are_deterministic():
     assert "Daily Report" in service.process_text("reporttoday", conversation_id="owner")
     assert "Cash received today" in service.process_text("cashtoday", conversation_id="owner")
     assert "Best seller today" in service.process_text("bestsellertoday", conversation_id="owner")
-    assert "PHARMAREEN RECEIPT" in service.process_text("printreceipt", conversation_id="owner")
+    assert "MS2.0 RECEIPT" in service.process_text("printreceipt", conversation_id="owner")
 
 
 def test_replace_last_sale_with_inventory_medicine_and_undo_number_is_safe():

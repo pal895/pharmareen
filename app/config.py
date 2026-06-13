@@ -5,6 +5,8 @@ from functools import lru_cache
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.branding import APP_BRAND
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -15,7 +17,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Pharmacy Intelligence Assistant"
-    pharmacy_name: str = "PharMareen"
+    pharmacy_name: str = APP_BRAND
     app_version: str = "whatsapp-web-mvp"
     timezone: str = "Africa/Nairobi"
     public_base_url: str | None = Field(default=None, validation_alias=AliasChoices("APP_BASE_URL", "PUBLIC_BASE_URL"))

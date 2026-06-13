@@ -274,7 +274,7 @@ function selectorListMessage(card, body) {
       description: body,
       buttonText: 'Choose',
       listType: 1,
-      footerText: 'PharMareen',
+      footerText: 'MS2.0',
       sections: [
         { title: 'Save', rows: rows.slice(0, 4) },
         { title: 'Cash', rows: rows.slice(4, 9) },
@@ -289,7 +289,7 @@ function selectorButtonsMessage(card, body) {
   return proto.Message.fromObject({
     buttonsMessage: {
       contentText: body,
-      footerText: 'PharMareen',
+      footerText: 'MS2.0',
       headerType: 1,
       buttons: [
         { buttonId: 'confirm', buttonText: { displayText: 'Confirm' }, type: 1 },
@@ -699,7 +699,7 @@ function extractBackendReply(data) {
       return value.trim();
     }
   }
-  return '✅ PharMareen received your message.';
+  return '✅ MS2.0 received your message.';
 }
 
 function describeDisconnect(lastDisconnect) {
@@ -741,7 +741,7 @@ function clearBaileysSession(reason) {
 
 async function startBaileys(options = {}) {
   const sessionResetAttempted = Boolean(options.sessionResetAttempted);
-  console.log('PharMareen Baileys bridge starting...');
+  console.log('MS2.0 Baileys bridge starting...');
   reportRuntimeStatus({ state: 'starting', connected: false, qr_required: false, last_error: '' });
   console.log(`Backend: ${backendUrl}`);
   console.log(`Baileys session path: ${sessionPath}`);
@@ -768,7 +768,7 @@ async function startBaileys(options = {}) {
     version,
     logger: P({ level: baileysLogLevel }),
     printQRInTerminal: false,
-    browser: ['PharMareen', 'Chrome', '1.0'],
+    browser: ['MS2.0', 'Chrome', '1.0'],
     markOnlineOnConnect: false,
     syncFullHistory: false,
     connectTimeoutMs: 60000
@@ -911,7 +911,7 @@ async function startBaileys(options = {}) {
       } catch (error) {
         const status = error.response && error.response.status ? error.response.status : 'no-status';
         console.error(`Backend bridge error for ${maskSender(sender)} status=${status}: ${error.message}`);
-        await safeSendReply(sock, sender, 'PharMareen is running, but I could not process that message right now.');
+        await safeSendReply(sock, sender, 'MS2.0 is running, but I could not process that message right now.');
       }
     }
   });

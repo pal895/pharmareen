@@ -1,1 +1,1 @@
-"""PharMareen service layer."""
+"""MS2.0 service layer."""

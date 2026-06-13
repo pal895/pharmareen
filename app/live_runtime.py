@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from app.branding import onboarding_prompt, unregistered_setup_prompt
 from app.deployment import clean_text, normalize_id, normalize_key
 from app.pharmacy_registry import phone_digits as registry_phone_digits
 from app.pharmacy_registry import registry_phone_key
@@ -17,10 +18,7 @@ from app.provisioning import (
 LIVE_TEST_NUMBER = "+254721149472"
 REPLIT_OFFLINE_APP_PATH = "/offline_app/index.html"
 
-ONBOARDING_PROMPT = (
-    "Welcome to PharMareen setup. Please send: "
-    "pharmacy name, owner name, branch name, location, and payment modes."
-)
+ONBOARDING_PROMPT = onboarding_prompt()
 
 
 @dataclass(frozen=True)
@@ -162,7 +160,7 @@ class LiveRuntimeRouter:
             )
             session = opened.record or {}
             return LiveRuntimeResult(
-                f"{ONBOARDING_PROMPT}\n\nExample: Pharmacy: Zuri Chemist; Owner: Amina; Branch: Main; Location: Nairobi; Payments: cash, mpesa, credit",
+                onboarding_prompt(include_example=True),
                 "unknown_onboarding_started",
                 phone,
                 source,
@@ -347,7 +345,7 @@ class LiveRuntimeRouter:
             opened = self.provisioning.handle_unknown_number_message(phone_number=phone, message=body)
             session = opened.record or {}
             return LiveRuntimeResult(
-                f"{ONBOARDING_PROMPT}\n\nExample: Pharmacy: Zuri Chemist; Owner: Amina; Branch: Main; Location: Nairobi; Payments: cash, mpesa, credit",
+                onboarding_prompt(include_example=True),
                 "unknown_onboarding_started",
                 phone,
                 source,
@@ -358,7 +356,7 @@ class LiveRuntimeRouter:
             return self._advance_unknown_onboarding(session, body, phone=phone, source=source)
 
         return LiveRuntimeResult(
-            "This number is not registered yet. Reply START to set up PharMareen for your pharmacy.",
+            unregistered_setup_prompt(),
             "unregistered_onboarding_prompt",
             phone,
             source,

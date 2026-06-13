@@ -1,6 +1,6 @@
 ﻿{
-  "name": "PharMareen Offline App",
-  "short_name": "PharMareen",
+  "name": "MS2.0 Offline App",
+  "short_name": "MS2.0",
   "start_url": "/offline-app",
   "scope": "/",
   "display": "standalone",

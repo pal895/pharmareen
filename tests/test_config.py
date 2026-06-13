@@ -16,7 +16,7 @@ def test_pharmacy_name_fallback_when_env_missing(monkeypatch):
         owner_whatsapp_to="whatsapp:+20000000000",
     )
 
-    assert settings.pharmacy_name == "PharMareen"
+    assert settings.pharmacy_name == "MS2.0"
 
 
 def test_production_env_aliases_are_supported():

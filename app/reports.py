@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, Protocol
 
+from app.branding import APP_BRAND
 from app.domain import Action, StockItem
 from app.utils import format_ksh, normalize_key, now_in_timezone, parse_int, parse_money
 
@@ -106,7 +107,7 @@ class ReportService:
         store: DailyLogReader,
         whatsapp: WhatsAppSender | None = None,
         recommender: RecommendationEngine | None = None,
-        pharmacy_name: str = "PharMareen",
+        pharmacy_name: str = APP_BRAND,
         timezone: str = "Africa/Nairobi",
         sale_ledger: SaleFinanceLedger | None = None,
     ):
@@ -319,7 +320,7 @@ def build_transaction_metrics(
 def render_report(
     metrics: ReportMetrics,
     recommendations: list[str],
-    pharmacy_name: str = "PharMareen",
+    pharmacy_name: str = APP_BRAND,
     report_time: str | None = None,
 ) -> str:
     return render_daily_summary(metrics, pharmacy_name=pharmacy_name, report_time=report_time)
@@ -362,7 +363,7 @@ def render_report(
 
 def render_daily_summary(
     metrics: ReportMetrics,
-    pharmacy_name: str = "PharMareen",
+    pharmacy_name: str = APP_BRAND,
     report_time: str | None = None,
 ) -> str:
     report_time = report_time or now_in_timezone("Africa/Nairobi").strftime("%H:%M")

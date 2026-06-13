@@ -21,4 +21,4 @@ def test_offline_app_index_is_served_as_static_html():
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
-    assert "PharMareen Offline" in response.text
+    assert "MS2.0 Offline" in response.text

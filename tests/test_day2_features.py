@@ -74,7 +74,7 @@ def test_landing_page_and_manifest_work():
     assert "create-qr-code" in page.text
     assert "/status" in page.text
     assert manifest.status_code == 200
-    assert manifest.json()["short_name"] == "PharMareen"
+    assert manifest.json()["short_name"] == "MS2.0"
 
 
 def test_status_page_shows_startup_readiness_and_localhost_warning(monkeypatch):
@@ -90,7 +90,7 @@ def test_status_page_shows_startup_readiness_and_localhost_warning(monkeypatch):
     assert "Google Sheets connected" in response.text
     assert "WhatsApp provider" in response.text
     assert "http://localhost:8000/bridge/whatsapp-web" in response.text
-    assert "WhatsApp Web MVP can still run locally" in response.text
+    assert "Baileys WhatsApp bridge can still run locally" in response.text
 
 
 def test_status_page_shows_production_ready_for_https_domain(monkeypatch):
@@ -139,7 +139,7 @@ def test_debug_config_does_not_expose_secrets(monkeypatch):
 
 
 def test_debug_whatsapp_test_returns_xml(monkeypatch):
-    fake_intake = FakeIntake("👋 PharMareen Help")
+    fake_intake = FakeIntake("👋 MS2.0 Help")
     monkeypatch.setattr(main, "get_intake_service", lambda: fake_intake)
     monkeypatch.setattr(main, "get_settings", lambda: Settings(_env_file=None, WHATSAPP_NUMBER="25414155238886"))
 
@@ -156,7 +156,7 @@ def test_debug_whatsapp_test_returns_xml(monkeypatch):
 
 
 def test_legacy_form_webhook_logs_reply_length_and_returns_xml(monkeypatch, capsys):
-    fake_intake = FakeIntake("PharMareen Help\n\nSell:\nPanadol 2")
+    fake_intake = FakeIntake("MS2.0 Help\n\nSell:\nPanadol 2")
     monkeypatch.setattr(main, "get_intake_service", lambda: fake_intake)
     monkeypatch.setattr(main, "log_webhook_request", lambda *args, **kwargs: None)
     main.processed_message_sids.clear()
@@ -179,7 +179,7 @@ def test_legacy_form_webhook_logs_reply_length_and_returns_xml(monkeypatch, caps
     assert xml_payload(response.text).startswith("<Response>")
     assert "<Message>" in response.text
     assert "WHATSAPP_REPLY_LENGTH=" in captured
-    assert "WHATSAPP_REPLY_PREVIEW=PharMareen Help" in captured
+    assert "WHATSAPP_REPLY_PREVIEW=MS2.0 Help" in captured
     assert "WHATSAPP_REPLY_XML_PREVIEW=" in captured
     assert "WHATSAPP_REPLY_CONTENT_TYPE=application/xml" in captured
     assert fake_intake.received == "Start"
@@ -193,7 +193,7 @@ def test_debug_xml_test_returns_valid_xml():
     assert "xml" in response.headers["content-type"]
     assert response.text.startswith('<?xml version="1.0" encoding="UTF-8"?>')
     assert xml_payload(response.text).startswith("<Response>")
-    assert "<Message>PharMareen XML test</Message>" in response.text
+    assert "<Message>MS2.0 XML test</Message>" in response.text
 
 
 def test_debug_report_test_generates_pdf(monkeypatch, tmp_path):

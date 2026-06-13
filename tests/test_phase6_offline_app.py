@@ -113,8 +113,8 @@ def test_offline_app_routes_return_html():
         assert root_response.headers["location"] == "/offline_app/index.html"
     assert followed_response.status_code == 200
     assert followed_response.headers["content-type"].startswith("text/html")
-    assert "PharMareen Offline Mode" in followed_response.text
-    assert "PharMareen Pharmacy Assistant" in followed_response.text
+    assert "MS2.0 Offline Mode" in followed_response.text
+    assert "MS2.0 Pharmacy Assistant" in followed_response.text
     assert "Confirmation WhatsApp Number" in followed_response.text
     assert "Scan Barcode" in followed_response.text
     assert "Scan Invoice" in followed_response.text
@@ -144,7 +144,7 @@ def test_offline_app_routes_return_html():
     assert "Queue photo" not in followed_response.text
     assert compat_response.status_code == 200
     assert compat_response.headers["content-type"].startswith("text/html")
-    assert "PharMareen Offline Mode" in compat_response.text
+    assert "MS2.0 Offline Mode" in compat_response.text
     assert "PHASE 6 FINAL MEDIA SAVE WORKING" in compat_response.text
     assert "no-store" in compat_response.headers.get("cache-control", "")
     assert compat_response.headers.get("x-pharmareen-offline-version") == "pharmareen-tap-talk-first-attempt-v2026-06-08"
@@ -613,7 +613,7 @@ def test_offline_app_uses_pharmacy_owner_language_not_technical_queue_terms():
     assert "Tap & Talk" in html
     assert "Save Voice" in html
     assert "Save Photo" in html
-    assert "Install PharMareen on phone" in html
+    assert "Install MS2.0 on phone" in html
     assert "Saved successfully" not in html
     assert "Waiting" in script
     assert "📡 Offline mode active — saving safely" in script
@@ -1280,7 +1280,7 @@ def test_debug_offline_confirmation_send_test_defaults_to_live_verification_numb
     assert queued.json()["queued"]["status"] == "queued"
     assert outbox.json()["pending_count"] == 1
     assert outbox.json()["confirmations"][0]["to"] == "254728571649@s.whatsapp.net"
-    assert "PharMareen bridge delivery test" in outbox.json()["confirmations"][0]["message"]
+    assert "MS2.0 bridge delivery test" in outbox.json()["confirmations"][0]["message"]
 
 
 def test_offline_confirmation_queue_persists_pending_between_memory_resets(monkeypatch, tmp_path):

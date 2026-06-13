@@ -22,7 +22,7 @@ if (chromePath) {
   puppeteer.executablePath = chromePath;
 }
 
-console.log('PharMareen WhatsApp Web bridge starting...');
+console.log('MS2.0 WhatsApp Web bridge starting...');
 console.log(`Backend: ${backendUrl}`);
 console.log('A QR code will appear below if login is needed.');
 
@@ -93,7 +93,7 @@ client.on('message', async (message) => {
   } catch (error) {
     const detail = error.response && error.response.data ? JSON.stringify(error.response.data) : error.message;
     console.error('Backend bridge error:', detail);
-    await message.reply('PharMareen is running, but I could not process that message right now.');
+    await message.reply('MS2.0 is running, but I could not process that message right now.');
   }
 });
 
