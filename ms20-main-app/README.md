@@ -26,10 +26,13 @@ No dependency install is required.
 
 ## What Works Now
 
-- Messaging-first owner workspace with a quiet MS2.0 greeting and one command composer.
-- Technical status, route slots, totals, queue state, and contracts are moved behind collapsed Settings/Diagnostics/Admin controls.
+- Messaging app home with one MS2.0 Assistant conversation row.
+- Focused chat screen with header, message bubbles, bottom composer, voice button, and hidden attach/actions menu.
+- Complete high-confidence sale commands such as `Panadol 2 cash` record immediately through the existing safe queue path.
+- Missing or ambiguous commands show editable cards directly, without extra narration.
+- Technical status, route slots, totals, queue state, and contracts are moved behind hidden Settings/Diagnostics/Admin controls.
 - Offline app button remains available through Diagnostics and links to the existing live backend offline app route when the backend is running.
-- Conversation flow for low-typing text commands, Tap & Talk demo, photo demo, barcode placeholder, invoice demo, reports, setup, and sync.
+- Conversation flow for low-typing text commands, voice demo, photo demo, barcode placeholder, invoice demo, reports, setup, and sync.
 - Editable Card Workspace with reusable cards:
   - SaleCard
   - InvoiceCard
@@ -42,8 +45,9 @@ No dependency install is required.
   - MedicineMatchCard
   - VisualScanCard
   - SyncReviewCard
-- Demo text command `Panadol 2 cash` or `panadol2cash` creates a SaleCard locally.
-- Demo Tap & Talk creates a VoiceReviewCard.
+- Demo text command `Panadol 2 cash` or `panadol2cash` records a sale locally and queues it safely.
+- Incomplete commands such as `Panadol` or `Panadol 2` create editable review cards.
+- Demo voice uses the same local-first sale path when complete; uncertain voice results become review cards.
 - Demo photo upload creates VisualScanCard and PhotoReviewCard.
 - Demo invoice scan creates an InvoiceCard.
 - Demo onboarding creates an OnboardingCard.
@@ -55,11 +59,11 @@ No dependency install is required.
 
 The owner path is designed around three steps or less:
 
-1. Open MS2.0 and type, speak, scan, or upload in the conversation.
-2. Review the editable card that appears below the conversation.
-3. Confirm, correct, or cancel.
+1. Open MS2.0 and tap the MS2.0 Assistant conversation.
+2. Type, speak, scan, or upload in the chat.
+3. If MS2.0 needs owner judgement, review the editable card and confirm, correct, or cancel.
 
-The owner home screen should not show backend, Sheets, queue, token, route, or adapter details. Those belong in Settings, Diagnostics, Admin, or Developer Mode.
+Complete sale commands skip cards and return a concise sale receipt. The owner home and chat flow should not show backend, Sheets, queue, token, route, or adapter details. Those belong in Settings, Diagnostics, Admin, or Developer Mode.
 
 ## Cloud Memory And Recovery
 
@@ -69,7 +73,7 @@ When live auth is connected later, the recovery flow should:
 
 1. Login or identify the owner.
 2. Load pharmacy profile, branches, catalog, aliases, visual memory, pending queue, and card history from cloud memory.
-3. Rehydrate the dashboard, action feed, and editable card workspace.
+3. Rehydrate the chat home, conversation history, pending cards, and saved queue.
 4. Resume sync with idempotent action ids so no duplicate sale, restock, correction, or report action is applied.
 
 The placeholder gateway lives in `src/services/cloudGateway.js`.

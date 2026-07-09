@@ -31,14 +31,16 @@ The new isolated app was created in:
 
 ## Working Now
 
-- Messaging-first owner shell
+- Two-screen messaging owner shell
 - Read-only live backend status checks for `/health`, `/debug/version`, `/live/readiness`, and `/offline_app/index.html`
 - Technical diagnostics moved behind collapsed Settings/Diagnostics/Admin
 - Offline app route button pointing to the existing live backend offline app from Diagnostics
-- Conversation/action feed
+- One-row MS2.0 Assistant chat home
+- Permanent MS2.0 chat screen with bottom composer
+- Complete sale commands record instantly through the existing safe queue path
 - Editable card workspace
-- Text command to SaleCard demo
-- Tap & Talk to VoiceReviewCard demo
+- Text command to instant sale receipt or editable card when incomplete
+- Voice demo uses the same local-first path
 - Photo upload to VisualScanCard and PhotoReviewCard demo
 - Invoice scan to InvoiceCard demo
 - OnboardingCard demo

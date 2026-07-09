@@ -7,10 +7,11 @@ Snapshot date: 2026-07-09
 MS2.0 is now centered on the Main App as the primary pharmacy product. The owner experience is messaging-first:
 
 - Open MS2.0.
-- See a quiet greeting, not a technical dashboard.
-- Type, tap, speak, scan, or upload in the conversation.
-- Review an editable card.
-- Confirm, correct, or cancel.
+- See one MS2.0 Assistant conversation row, not a technical dashboard.
+- Tap into the permanent MS2.0 conversation.
+- Type, speak, scan, or upload in the chat.
+- Complete sales record instantly through the safe queue path.
+- Missing or ambiguous work becomes an editable card for confirm, correct, or cancel.
 
 The owner should not need to think about backend, Sheets, queues, route slots, tokens, adapters, or system diagnostics. Those details are available only behind Settings/Diagnostics/Admin. WhatsApp/Baileys remains a preserved optional integration layer for later.
 
@@ -48,7 +49,7 @@ Existing offline app route expected on backend:
 
 ## Main App Modules
 
-- `src/app.js`: Messaging-first Main UI shell, feed, editable cards, actions, queue handling, and collapsed diagnostics.
+- `src/app.js`: Two-screen messaging Main UI shell, chat home, conversation, instant sale receipts, editable cards, queue handling, and hidden diagnostics.
 - `src/contracts/integrationContracts.js`: Card types, token policy, cloud memory contract, live backend routes, adapter slot names.
 - `src/cards/editableCards.js`: Card field mappings and editable card helpers.
 - `src/routes/routeRegistry.js`: Frontend route slots plus live backend route status/link mapping.
@@ -66,8 +67,11 @@ Existing offline app route expected on backend:
 ## Connected Safely
 
 - Main App shell.
-- Messaging-first owner workspace.
-- Conversation/action feed.
+- Messaging app home.
+- Permanent MS2.0 Assistant conversation.
+- Chat bubbles and bottom composer.
+- Hidden attach/actions menu.
+- Instant complete-sale receipt path.
 - Editable card workspace.
 - Local deterministic sale parser.
 - Offline queue.
@@ -145,7 +149,7 @@ Passed:
 - HTTP 200 for `http://127.0.0.1:5177/index.html`
 - Browser load inspection
 - Browser console error check
-- Deterministic `Panadol 2 cash` card proof
+- Deterministic `Panadol 2 cash` instant sale proof
 
 Known caveat:
 
@@ -166,8 +170,8 @@ Not yet complete:
 Continue with Main App live product testing only:
 
 1. Start the Main App.
-2. Test the messaging-first home.
-3. Test every Main App workflow.
+2. Test the chat home.
+3. Test the chat screen and every Main App workflow.
 4. Record friction.
 5. Fix only verified friction.
 6. Preserve backend/offline/Baileys/Sheets systems.

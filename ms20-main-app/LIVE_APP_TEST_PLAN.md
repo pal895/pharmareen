@@ -56,22 +56,23 @@ Expected:
 - App loads.
 - Brand shows MS2.0.
 - No browser console errors.
-- A calm messaging-first home is visible.
+- A calm chat home is visible.
+- The only owner-facing item is the MS2.0 Assistant conversation row.
 - Backend, Sheets, queue, totals, and route diagnostics are not shown on the owner home.
-- Settings/Diagnostics/Admin is collapsed and available if needed.
+- Settings/Diagnostics/Admin is hidden behind the chat menu.
 
-## Messaging Home
+## Chat Home
 
 Test:
 
-- Owner sees MS2.0, a greeting, and a clear composer.
-- Owner can type a sale without reading technical status.
-- Owner can reach common actions without a noisy dashboard.
-- Diagnostics remain collapsed.
+- Owner sees MS2.0 and the subtitle.
+- Owner sees one row: MS2.0 Assistant, Ready, and the preview text.
+- Owner taps the row to open the chat.
+- No composer, stats, quick action grid, or diagnostics are visible on the home screen.
 
 Pass criteria:
 
-- Common action path is visible immediately.
+- Chat entry path is obvious.
 - No confusing old PharMareen user-facing brand.
 - No backend, Sheets, token, queue, route, or adapter details on the owner home.
 - No layout overlap.
@@ -82,16 +83,19 @@ Pass criteria:
 Test:
 
 - Type `Panadol 2 cash`.
-- Confirm it creates an editable sale card.
+- Confirm it records instantly and returns a sale receipt.
 - Try `panadol2cash`.
-- Confirm it creates the same sale intent.
+- Confirm it records the same sale intent.
+- Type `Panadol 2`.
+- Confirm it shows an editable card directly, without a narration message before the card.
 
 Pass criteria:
 
 - Local parser handles known structured sale.
 - No OpenAI/API call.
-- Editable card appears.
-- Owner can correct before confirm.
+- Complete sale does not show an editable card.
+- Missing or ambiguous sale does show an editable card.
+- Owner can correct the card before confirm.
 
 ## Editable Sale Card
 
@@ -116,12 +120,12 @@ Pass criteria:
 Test:
 
 - Use Tap & Talk demo.
-- Confirm VoiceReviewCard appears.
-- Confirm card can be reviewed, corrected, or cancelled.
+- Confirm complete voice result records instantly.
+- Confirm uncertain voice results can become review cards.
 
 Pass criteria:
 
-- Voice path is clearly placeholder/review-first.
+- Voice path uses the same local-first command route.
 - No AI/API call unless explicitly enabled later.
 
 ## Photo Workspace
@@ -246,7 +250,8 @@ Pass criteria:
 Test:
 
 - Use browser mobile viewport if available.
-- Confirm messaging home fits.
+- Confirm chat home fits.
+- Confirm chat screen fits.
 - Confirm editable cards fit.
 - Confirm action buttons are reachable.
 - Confirm text does not overlap.

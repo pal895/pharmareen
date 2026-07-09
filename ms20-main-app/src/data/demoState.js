@@ -22,14 +22,7 @@ export const demoState = {
     credit: 0
   },
   cards: [],
-  feed: [
-    {
-      id: "feed-welcome",
-      type: "system",
-      text: "I am ready. Type, speak, or scan when you need something.",
-      time: "Now"
-    }
-  ],
+  feed: [],
   cardTypes: EditableCardTypes
 };
 

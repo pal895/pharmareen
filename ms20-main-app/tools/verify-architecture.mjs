@@ -64,8 +64,12 @@ assert(html.includes("MS2.0 Main App"), "HTML title is not branded MS2.0");
 assert(!appSource.includes(oldBrand), "User-facing app source still contains old brand");
 assert(!html.includes(oldBrand), "HTML still contains old brand");
 assert(css.includes("@media (max-width: 720px)"), "Mobile responsive layout missing");
-assert(appSource.includes("conversationHeaderTemplate"), "Messaging-first shell missing");
-assert(css.includes(".message-os"), "Messaging-first CSS shell missing");
+assert(appSource.includes("chatHomeTemplate"), "Messaging app home missing");
+assert(appSource.includes("chatScreenTemplate"), "Messaging app conversation screen missing");
+assert(appSource.includes("canRecordInstantly"), "Instant complete-sale behavior missing");
+assert(css.includes(".chat-app"), "Messaging app CSS shell missing");
+assert(css.includes(".conversation-row"), "Chat home conversation row missing");
+assert(css.includes(".message-bubble"), "Chat message bubbles missing");
 
 for (const card of requiredCards) {
   assert(appSource.includes(card) || contracts.includes(card), `Missing card type ${card}`);
