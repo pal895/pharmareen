@@ -1,0 +1,9 @@
+{
+  "name": "MS2.0 Main App",
+  "short_name": "MS2.0",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f7faf8",
+  "theme_color": "#0f766e",
+  "icons": []
+}

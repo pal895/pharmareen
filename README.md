@@ -1,4 +1,57 @@
-# Pharmacy Intelligence Assistant
+# MS2.0 Pharmacy Operating Intelligence Platform
+
+## Current Product Direction
+
+MS2.0 is now Main App-first. The primary product surface is the isolated app in:
+
+```text
+ms20-main-app/
+```
+
+The Main App is a Pharmacy Operating Intelligence Platform, not an AI chatbot. The owner workflow is:
+
+1. Open MS2.0.
+2. Type, tap, speak, scan, or upload.
+3. Review an editable card, then confirm, correct, or cancel.
+
+WhatsApp/Baileys remains preserved in this repo as an optional external channel for later. Do not use WhatsApp live testing as proof of Main App readiness.
+
+## Replit Main App Live Testing
+
+After pulling this update into Replit, verify and start the Main App only:
+
+```bash
+cd ms20-main-app
+npm run verify
+npm run check
+PORT=${PORT:-5177} npm run serve
+```
+
+When Replit sets `REPLIT_DEV_DOMAIN`, `tools/serve.mjs` binds safely for the Replit dev URL and prints the phone-openable URL:
+
+```text
+https://$REPLIT_DEV_DOMAIN/
+```
+
+Main App live testing rules:
+
+- Main App only.
+- No WhatsApp/Baileys live testing.
+- No secrets changes.
+- No OpenAI/API calls unless explicitly required.
+- Keep local-first and queue-only behavior until live write sync is intentionally enabled.
+- Preserve backend, offline app, Google Sheets, reports, stock/sales safety, and runtime config.
+- Test one owner action at a time, record friction, fix root causes, verify, and resume.
+
+For the full Main App/Replit handoff, read:
+
+```text
+MS20_REPLIT_MAIN_APP_UPDATE.md
+ms20-main-app/REPLIT_WORKFLOW_HANDOFF.md
+ms20-main-app/LIVE_APP_TEST_PLAN.md
+```
+
+# Legacy Backend And Optional WhatsApp Runtime
 
 A simple MVP for pharmacy owners who only want to send WhatsApp text messages or WhatsApp voice notes.
 

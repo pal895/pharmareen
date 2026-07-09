@@ -1,4 +1,39 @@
-# Deploy PharMareen Now
+# Deploy MS2.0 Now
+
+## Main App First
+
+The current product to test and sell is the MS2.0 Main App:
+
+```text
+ms20-main-app/
+```
+
+For Replit live testing on phone, pull the latest repo update into Replit and run:
+
+```bash
+cd ms20-main-app
+npm run verify
+npm run check
+PORT=${PORT:-5177} npm run serve
+```
+
+Then open:
+
+```text
+https://$REPLIT_DEV_DOMAIN/
+```
+
+Main App live testing must stay local-first and zero-token by default:
+
+- Do not test WhatsApp/Baileys.
+- Do not touch secrets.
+- Do not call OpenAI/API.
+- Do not claim production write readiness from placeholder queue behavior.
+- Preserve backend, offline app, Google Sheets, reports, stock/sales safety, and runtime config.
+
+The legacy backend deployment notes below remain for preserved backend and optional external-channel deployment.
+
+# Legacy Backend Deployment Notes
 
 PharMareen works locally at `http://localhost:8000`, but WhatsApp needs a public HTTPS URL.
 
