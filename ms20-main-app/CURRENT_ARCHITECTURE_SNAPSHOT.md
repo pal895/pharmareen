@@ -9,6 +9,7 @@ MS2.0 is now centered on the Main App as the primary pharmacy product. The owner
 - Open MS2.0.
 - See one MS2.0 Assistant conversation row, not a technical dashboard.
 - Tap into the permanent MS2.0 conversation.
+- Complete first-run setup before daily workflows on a fresh device.
 - Type, speak, scan, or upload in the chat.
 - Complete sales record instantly through the safe queue path.
 - Missing or ambiguous work becomes an editable card for confirm, correct, or cancel.
@@ -49,7 +50,7 @@ Existing offline app route expected on backend:
 
 ## Main App Modules
 
-- `src/app.js`: Two-screen messaging Main UI shell, chat home, conversation, instant sale receipts, editable cards, queue handling, and hidden diagnostics.
+- `src/app.js`: Two-screen messaging Main UI shell, first-run onboarding, chat home, conversation, browser voice capture, direct camera/photo capture, instant sale receipts, editable cards, queue handling, silent cancel, and hidden diagnostics.
 - `src/contracts/integrationContracts.js`: Card types, token policy, cloud memory contract, live backend routes, adapter slot names.
 - `src/cards/editableCards.js`: Card field mappings and editable card helpers.
 - `src/routes/routeRegistry.js`: Frontend route slots plus live backend route status/link mapping.
@@ -71,6 +72,10 @@ Existing offline app route expected on backend:
 - Permanent MS2.0 Assistant conversation.
 - Chat bubbles and bottom composer.
 - Hidden attach/actions menu.
+- First-run onboarding card.
+- Browser speech capture from the Mic button.
+- Direct camera capture and photo library upload.
+- Silent card cancel with no chat noise.
 - Instant complete-sale receipt path.
 - Editable card workspace.
 - Local deterministic sale parser.

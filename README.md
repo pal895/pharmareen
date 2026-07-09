@@ -8,13 +8,21 @@ MS2.0 is now Main App-first. The primary product surface is the isolated app in:
 ms20-main-app/
 ```
 
-The Main App is a Pharmacy Operating Intelligence Platform, not an AI chatbot. The owner workflow is:
+The Main App is a Pharmacy Operating Intelligence Platform, not an AI chatbot. The first-run owner workflow is:
 
 1. Open MS2.0.
 2. Tap the single MS2.0 Assistant conversation.
-3. Type, speak, scan, or upload naturally.
+3. Complete setup.
+
+The daily owner workflow stays three steps or less:
+
+1. Open the MS2.0 Assistant conversation.
+2. Type, speak, scan, or upload naturally.
+3. Get an instant receipt or review the editable card only when needed.
 
 Complete sale commands record instantly through the existing safe queue path. Missing or ambiguous commands become editable cards. The owner home should stay free of backend, Sheets, queue, token, route, and adapter diagnostics. Those belong in Settings, Diagnostics, Admin, or Developer Mode.
+
+The Main App uses real browser voice capture from the Mic button, direct camera/photo upload from the composer attach menu, and quiet card cancellation with no extra chat noise.
 
 WhatsApp/Baileys remains preserved in this repo as an optional external channel for later. Do not use WhatsApp live testing as proof of Main App readiness.
 

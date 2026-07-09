@@ -37,13 +37,15 @@ The new isolated app was created in:
 - Offline app route button pointing to the existing live backend offline app from Diagnostics
 - One-row MS2.0 Assistant chat home
 - Permanent MS2.0 chat screen with bottom composer
+- First-run onboarding card before daily pharmacy workflows
 - Complete sale commands record instantly through the existing safe queue path
 - Editable card workspace
 - Text command to instant sale receipt or editable card when incomplete
-- Voice demo uses the same local-first path
-- Photo upload to VisualScanCard and PhotoReviewCard demo
-- Invoice scan to InvoiceCard demo
-- OnboardingCard demo
+- Browser Mic capture uses the same local-first path without fake demo text
+- Direct camera capture and photo library upload to VisualScanCard and PhotoReviewCard
+- Cancel removes cards silently without adding chat noise
+- Invoice review to InvoiceCard
+- First-run setup to OnboardingCard
 - Offline queue and duplicate/idempotency demo
 - Confirmed cards carry backend target metadata while staying queue-only
 - Sync state and cloud gateway placeholder

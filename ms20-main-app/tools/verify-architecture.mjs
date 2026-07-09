@@ -70,6 +70,12 @@ assert(appSource.includes("canRecordInstantly"), "Instant complete-sale behavior
 assert(css.includes(".chat-app"), "Messaging app CSS shell missing");
 assert(css.includes(".conversation-row"), "Chat home conversation row missing");
 assert(css.includes(".message-bubble"), "Chat message bubbles missing");
+assert(appSource.includes("ensureOnboardingStarted"), "First-run onboarding guard missing");
+assert(appSource.includes("startVoiceCapture"), "Browser voice capture path missing");
+assert(appSource.includes("capture=\"environment\""), "Direct camera capture input missing");
+assert(!appSource.includes("demo-voice"), "Fake voice demo action must not be present");
+assert(!appSource.includes("Cancelled."), "Cancel must silently remove cards without chat noise");
+assert(css.includes("replit-badge"), "Replit badge suppression CSS missing");
 
 for (const card of requiredCards) {
   assert(appSource.includes(card) || contracts.includes(card), `Missing card type ${card}`);

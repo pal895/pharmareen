@@ -58,6 +58,7 @@ Expected:
 - No browser console errors.
 - A calm chat home is visible.
 - The only owner-facing item is the MS2.0 Assistant conversation row.
+- A fresh device shows setup as the first required step.
 - Backend, Sheets, queue, totals, and route diagnostics are not shown on the owner home.
 - Settings/Diagnostics/Admin is hidden behind the chat menu.
 
@@ -66,17 +67,34 @@ Expected:
 Test:
 
 - Owner sees MS2.0 and the subtitle.
-- Owner sees one row: MS2.0 Assistant, Ready, and the preview text.
+- Owner sees one row: MS2.0 Assistant, Setup needed or Ready, and the preview text.
 - Owner taps the row to open the chat.
 - No composer, stats, quick action grid, or diagnostics are visible on the home screen.
 
 Pass criteria:
 
 - Chat entry path is obvious.
+- First-run owner path starts with setup before daily workflows.
 - No confusing old PharMareen user-facing brand.
 - No backend, Sheets, token, queue, route, or adapter details on the owner home.
 - No layout overlap.
 - No console errors.
+
+## First-Run Onboarding
+
+Test:
+
+- Open the MS2.0 Assistant conversation on a fresh device or after Reset setup.
+- Confirm the setup card appears before sale/report/photo work.
+- Fill pharmacy, owner, branch, location, and payment methods.
+- Confirm setup.
+
+Pass criteria:
+
+- Onboarding appears as the first real-system step.
+- No old demo messages or previous test cards are visible after refresh.
+- Confirming setup marks the assistant Ready.
+- Cancel removes the setup card quietly without adding a `Cancelled.` chat bubble.
 
 ## Chat Workspace
 
@@ -105,6 +123,7 @@ Test:
 - Change quantity.
 - Change payment mode.
 - Cancel card.
+- Confirm no `Cancelled.` chat bubble appears.
 - Create another sale card.
 - Confirm card to offline queue.
 
@@ -119,20 +138,26 @@ Pass criteria:
 
 Test:
 
-- Use Tap & Talk demo.
+- Tap Mic from the chat composer after setup is complete.
+- Confirm the browser asks for microphone permission or starts listening.
+- Speak a complete sale such as `Panadol 2 cash`.
 - Confirm complete voice result records instantly.
 - Confirm uncertain voice results can become review cards.
 
 Pass criteria:
 
 - Voice path uses the same local-first command route.
+- Mic does not inject fake demo text.
+- Mic status stays near the composer and does not create noisy chat messages.
 - No AI/API call unless explicitly enabled later.
 
 ## Photo Workspace
 
 Test:
 
-- Use Photo demo/upload.
+- Tap `+` in the composer.
+- Choose Camera and take a photo from the phone.
+- Choose Photo library and select an existing image.
 - Confirm VisualScanCard appears.
 - Confirm PhotoReviewCard appears.
 - Confirm result is review-first.
@@ -140,6 +165,7 @@ Test:
 Pass criteria:
 
 - Photo path does not claim full production extraction yet.
+- Camera capture is available directly from the app.
 - No AI/API call.
 - Owner can review/correct.
 

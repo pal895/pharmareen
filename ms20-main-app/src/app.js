@@ -17,8 +17,12 @@ const backendAdapters = new BackendAdapterRegistry();
 const pharmacyBrain = new PharmacyBrain({ pharmacyId: state.pharmacy.id });
 const sourceBrain = new SourceBrain();
 const aiFallback = new AIFallbackAdapter();
+const SETUP_KEY = "ms20-main-app:onboarding-complete";
+let activeRecognition = null;
 
 state.ui = { screen: "home" };
+state.voice = { listening: false, status: "" };
+state.onboarding = { started: false, completed: setupComplete() };
 state.liveBackend = {
   baseUrl: backendAdapters.liveBackendGateway.baseUrl,
   health: { ok: false, status: 0 },
@@ -39,10 +43,12 @@ function render() {
     </main>
   `;
   bindEvents();
+  hideReplitBadge();
   scrollChatToBottom();
 }
 
 function chatHomeTemplate() {
+  const setupReady = state.onboarding.completed;
   return `
     <section class="chat-home" aria-label="MS2.0 chat home">
       <header class="home-header">
@@ -55,8 +61,8 @@ function chatHomeTemplate() {
         <span class="assistant-avatar">M</span>
         <span class="conversation-copy">
           <strong>MS2.0 Assistant</strong>
-          <small>Ready</small>
-          <span>Ask, record, scan, or manage your pharmacy.</span>
+          <small>${setupReady ? "Ready" : "Setup needed"}</small>
+          <span>${setupReady ? "Ask, record, scan, or manage your pharmacy." : "Set up your pharmacy to begin."}</span>
         </span>
         <span class="row-arrow">Open</span>
       </button>
@@ -72,7 +78,7 @@ function chatScreenTemplate() {
         <span class="assistant-avatar">M</span>
         <span class="chat-title">
           <strong>MS2.0</strong>
-          <small>${state.sync.online ? "Online" : "Offline"} / Ready</small>
+          <small>${state.sync.online ? "Online" : "Offline"} / ${state.onboarding.completed ? "Ready" : "Setup needed"}</small>
         </span>
         ${adminMenuTemplate()}
       </header>
@@ -91,7 +97,7 @@ function chatMessageTemplates() {
   const intro = {
     id: "intro",
     type: "system",
-    text: `${greetingText()} How can I help today?`,
+    text: state.onboarding.completed ? `${greetingText()} How can I help today?` : "Welcome. Let's set up your pharmacy first.",
     time: "Now"
   };
   return [intro, ...state.feed].map(feedItemTemplate).join("");
@@ -112,7 +118,8 @@ function composerTemplate() {
       <details class="attach-menu">
         <summary aria-label="Open quick actions">+</summary>
         <div class="attach-sheet">
-          <button type="button" data-action="demo-photo">Photo</button>
+          <button type="button" data-action="take-photo">Camera</button>
+          <button type="button" data-action="upload-photo">Photo library</button>
           <button type="button" data-action="demo-invoice">Invoice</button>
           <button type="button" data-action="demo-barcode">Scan</button>
           <button type="button" data-action="demo-stock-correction">Stock fix</button>
@@ -122,10 +129,14 @@ function composerTemplate() {
       </details>
       <form class="message-form" id="commandForm">
         <input id="commandInput" type="text" autocomplete="off" inputmode="text" placeholder="Message MS2.0">
-        <button class="icon-button" type="button" data-action="demo-voice" aria-label="Use voice">Mic</button>
+        <button class="icon-button ${state.voice.listening ? "listening" : ""}" type="button" data-action="start-voice" aria-label="Use voice">
+          ${state.voice.listening ? "Stop" : "Mic"}
+        </button>
         <button class="send-button" type="submit">Send</button>
       </form>
+      ${state.voice.status ? `<p class="composer-hint">${escapeHtml(state.voice.status)}</p>` : ""}
       <input id="photoInput" class="hidden-input" type="file" accept="image/*">
+      <input id="cameraInput" class="hidden-input" type="file" accept="image/*" capture="environment">
     </footer>
   `;
 }
@@ -151,6 +162,7 @@ function adminMenuTemplate() {
           <button type="button" data-action="refresh-live-status">Check system</button>
           <button type="button" data-action="sync-now">Sync ${queue.pendingCount()}</button>
           <button type="button" data-action="demo-sync">Sync review</button>
+          <button type="button" data-action="reset-onboarding">Reset setup</button>
           <a class="button-link" href="${escapeHtml(offlineSlot.url)}" target="_blank" rel="noreferrer">Offline app</a>
         </div>
         <details class="developer-mode">
@@ -258,12 +270,18 @@ function bindEvents() {
     const file = event.target.files?.[0];
     addPhotoCards(file?.name || "camera-photo.jpg", "medicine_photo");
   });
+
+  root.querySelector("#cameraInput")?.addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    addPhotoCards(file?.name || "camera-photo.jpg", "medicine_photo");
+  });
 }
 
 function handleAction(dataset) {
   const action = dataset.action;
   if (action === "open-chat") {
     state.ui.screen = "chat";
+    ensureOnboardingStarted();
     render();
     return;
   }
@@ -274,8 +292,9 @@ function handleAction(dataset) {
   }
   if (action === "focus-chat") root.querySelector("#commandInput")?.focus();
   if (action === "demo-sale") handleCommand("Panadol 2 cash");
-  if (action === "demo-voice") handleVoiceTranscript("Panadol 2 cash");
-  if (action === "demo-photo") root.querySelector("#photoInput")?.click();
+  if (action === "start-voice") startVoiceCapture();
+  if (action === "take-photo") root.querySelector("#cameraInput")?.click();
+  if (action === "upload-photo") root.querySelector("#photoInput")?.click();
   if (action === "demo-barcode") addBarcodeCard();
   if (action === "demo-invoice") addPhotoCards("supplier-invoice.jpg", "invoice");
   if (action === "demo-onboarding") addOnboardingCard();
@@ -284,6 +303,7 @@ function handleAction(dataset) {
   if (action === "demo-stock-correction") addStockCorrectionCard();
   if (action === "refresh-live-status") void refreshLiveStatus();
   if (action === "sync-now") syncNow();
+  if (action === "reset-onboarding") resetOnboarding();
   if (action === "confirm-card") confirmCard(dataset.cardId);
   if (action === "correct-card") correctCard(dataset.cardId);
   if (action === "reject-card") rejectCard(dataset.cardId);
@@ -294,6 +314,11 @@ function handleAction(dataset) {
 function handleCommand(text) {
   state.ui.screen = "chat";
   const trimmed = String(text || "").trim();
+  if (!state.onboarding.completed) {
+    ensureOnboardingStarted();
+    render();
+    return;
+  }
   if (!trimmed) {
     addFeed("system", "Please add medicine, quantity, and payment. Example: Panadol 2 cash.");
     render();
@@ -327,6 +352,64 @@ function handleVoiceTranscript(text) {
       payment: card.fields?.payment || ""
     };
     addCard(card);
+  }
+}
+
+function startVoiceCapture() {
+  if (state.voice.listening && activeRecognition) {
+    activeRecognition.stop();
+    activeRecognition = null;
+    state.voice.listening = false;
+    state.voice.status = "";
+    render();
+    return;
+  }
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    state.voice.status = "Voice is not available in this browser. Please type for now.";
+    render();
+    return;
+  }
+  const recognition = new SpeechRecognition();
+  recognition.lang = "en-KE";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  activeRecognition = recognition;
+  state.voice.listening = true;
+  state.voice.status = "Listening...";
+  render();
+  recognition.onresult = (event) => {
+    const transcript = event.results?.[0]?.[0]?.transcript || "";
+    state.voice.listening = false;
+    state.voice.status = "";
+    activeRecognition = null;
+    if (transcript.trim()) {
+      handleVoiceTranscript(transcript);
+    } else {
+      render();
+    }
+  };
+  recognition.onerror = () => {
+    state.voice.listening = false;
+    state.voice.status = "Voice did not start. Check microphone permission.";
+    activeRecognition = null;
+    render();
+  };
+  recognition.onend = () => {
+    if (state.voice.listening) {
+      state.voice.listening = false;
+      state.voice.status = "";
+      activeRecognition = null;
+      render();
+    }
+  };
+  try {
+    recognition.start();
+  } catch {
+    activeRecognition = null;
+    state.voice.listening = false;
+    state.voice.status = "Voice did not start. Check microphone permission.";
+    render();
   }
 }
 
@@ -378,14 +461,33 @@ function addBarcodeCard() {
 }
 
 function addOnboardingCard() {
-  addCard(createEditableCard({
+  addCard(createOnboardingCard());
+}
+
+function createOnboardingCard() {
+  return createEditableCard({
     type: "OnboardingCard",
-    title: "Check setup",
+    title: "Set up your pharmacy",
     source: "Setup assistant",
     fields: { pharmacy: "", owner: "", branch: "Main", location: "", payments: "cash, mpesa, credit" },
     confidence: 0.86,
     validation: "Confirmed setup saves to cloud memory."
-  }));
+  });
+}
+
+function ensureOnboardingStarted() {
+  if (state.onboarding.completed || state.onboarding.started) return;
+  state.cards.unshift(createOnboardingCard());
+  state.onboarding.started = true;
+}
+
+function resetOnboarding() {
+  safeLocalStorage()?.removeItem(SETUP_KEY);
+  state.onboarding.completed = false;
+  state.onboarding.started = false;
+  state.cards = state.cards.filter((card) => card.type !== "OnboardingCard");
+  ensureOnboardingStarted();
+  render();
 }
 
 function addReportCard() {
@@ -454,6 +556,10 @@ function confirmCard(cardId) {
   const card = state.cards.find((item) => item.id === cardId);
   if (!card) return;
   recordCard(card);
+  if (card.type === "OnboardingCard") {
+    state.onboarding.completed = true;
+    safeLocalStorage()?.setItem(SETUP_KEY, "true");
+  }
   removeCard(cardId);
   render();
 }
@@ -493,8 +599,9 @@ function correctCard(cardId) {
 }
 
 function rejectCard(cardId) {
+  const card = state.cards.find((item) => item.id === cardId);
   removeCard(cardId);
-  addFeed("system", "Cancelled.");
+  if (card?.type === "OnboardingCard") state.onboarding.started = false;
   render();
 }
 
@@ -582,6 +689,18 @@ function savedReplyFor(card) {
   return "Saved.";
 }
 
+function setupComplete() {
+  return safeLocalStorage()?.getItem(SETUP_KEY) === "true";
+}
+
+function safeLocalStorage() {
+  try {
+    return window.localStorage || null;
+  } catch {
+    return null;
+  }
+}
+
 function stockReplyLine(card) {
   const stockLeft = Number(card.fields?.stockLeft);
   const quantity = Number(card.fields?.quantity || 0);
@@ -623,6 +742,32 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function hideReplitBadge() {
+  const patterns = /made with replit|build for free|replit/i;
+  document.querySelectorAll("iframe, a, button, div, span").forEach((element) => {
+    if (element.id === "app" || element.classList.contains("chat-app")) return;
+    const text = element.textContent || "";
+    const ownText = Array.from(element.childNodes)
+      .filter((node) => node.nodeType === Node.TEXT_NODE)
+      .map((node) => node.textContent || "")
+      .join(" ");
+    const attrs = [
+      element.getAttribute("aria-label"),
+      element.getAttribute("title"),
+      element.getAttribute("src"),
+      element.getAttribute("href"),
+      element.id,
+      element.className
+    ].join(" ");
+    const directMatch = patterns.test(`${ownText} ${attrs}`);
+    const shortTextMatch = text.trim().length <= 90 && patterns.test(text);
+    const outsideAppMatch = !element.closest("#app") && patterns.test(`${text} ${attrs}`);
+    if (directMatch || shortTextMatch || outsideAppMatch) {
+      element.style.setProperty("display", "none", "important");
+    }
+  });
+}
+
 window.addEventListener("online", render);
 window.addEventListener("offline", render);
 
@@ -630,6 +775,7 @@ void sourceBrain.lookupMedicine("demo");
 void aiFallback.enabled;
 
 render();
+window.setInterval(hideReplitBadge, 1500);
 if (shouldAutoProbeBackend()) {
   void refreshLiveStatus({ silent: true });
 }
