@@ -103,11 +103,18 @@ DEFAULT_PUBLIC_BASE_URL = "https://pharmareen--pal895.replit.app"
 OFFLINE_BUILD_VERSION = "pharmareen-tap-talk-first-attempt-v2026-06-08"
 OFFLINE_FRONTEND_MARKER = f"PHARMAREEN REAL PATH BUILD {OFFLINE_BUILD_VERSION}"
 OFFLINE_APP_DIR = PROJECT_ROOT / "static" / "offline_app"
+MAIN_APP_DIR = PROJECT_ROOT / "ms20-main-app"
 OFFLINE_NO_CACHE_HEADERS = {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
     "Pragma": "no-cache",
     "Expires": "0",
     "X-PharMareen-Offline-Version": OFFLINE_BUILD_VERSION,
+}
+MAIN_APP_NO_CACHE_HEADERS = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+    "X-MS20-Main-App": "true",
 }
 whatsapp_bridge_runtime_status: dict[str, Any] = {
     "state": "unknown",
@@ -320,6 +327,62 @@ async def admin_medicine_catalog_import(request: Request) -> dict[str, Any]:
     if result["records_received"] == 0:
         raise HTTPException(status_code=400, detail="No medicines found to import.")
     return result
+
+
+def main_app_file_response(relative_path: str) -> FileResponse:
+    safe_path = Path(relative_path)
+    if safe_path.is_absolute() or ".." in safe_path.parts:
+        raise HTTPException(status_code=404, detail="Main App asset not found.")
+    file_path = MAIN_APP_DIR / safe_path
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="Main App asset not found.")
+    media_types = {
+        ".html": "text/html",
+        ".js": "application/javascript",
+        ".css": "text/css",
+        ".json": "application/json",
+        ".svg": "image/svg+xml",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".ico": "image/x-icon",
+        ".map": "application/json",
+        ".txt": "text/plain",
+        ".woff2": "font/woff2",
+    }
+    return FileResponse(
+        file_path,
+        media_type=media_types.get(file_path.suffix.lower(), "application/octet-stream"),
+        headers=MAIN_APP_NO_CACHE_HEADERS,
+    )
+
+
+@app.get("/main-app", include_in_schema=False)
+async def main_app_redirect() -> RedirectResponse:
+    return RedirectResponse(url="/main-app/")
+
+
+@app.get("/main-app/", include_in_schema=False)
+async def main_app_index() -> FileResponse:
+    return main_app_file_response("index.html")
+
+
+@app.get("/debug/main-app")
+async def debug_main_app() -> dict[str, Any]:
+    return {
+        "status": "ok" if (MAIN_APP_DIR / "index.html").exists() else "missing",
+        "main_app_installed": (MAIN_APP_DIR / "package.json").exists(),
+        "main_app_route": "/main-app/",
+        "served_index_path": str(MAIN_APP_DIR / "index.html"),
+        "write_mode": "safe_queue_only",
+        "ai_used": False,
+    }
+
+
+@app.get("/main-app/{asset_path:path}", include_in_schema=False)
+async def main_app_asset(asset_path: str) -> FileResponse:
+    return main_app_file_response(asset_path or "index.html")
 
 
 @app.get("/offline_app/index.html", include_in_schema=False)

@@ -10,16 +10,21 @@ ms20-main-app/
 
 The Main App uses editable cards, offline-first queue behavior, local-first parsing, and safe backend route metadata. Confirmed Main App cards are protected as `safe_queue_only` until live write sync is deliberately enabled and tested.
 
-For Replit live testing, pull the latest GitHub update in Replit, then run:
+For Replit live testing, pull the latest GitHub update in Replit, then verify:
 
 ```bash
 cd ms20-main-app
 npm run verify
 npm run check
-PORT=${PORT:-5177} npm run serve
 ```
 
-Use the Replit dev/public URL shown by `REPLIT_DEV_DOMAIN` for phone testing. Do not use desktop `127.0.0.1` as live readiness proof.
+Use the backend-served Main App route for phone testing:
+
+```text
+https://$REPLIT_DEV_DOMAIN/main-app/
+```
+
+The bare Replit domain can remain the backend status route. Do not use desktop `127.0.0.1` as live readiness proof.
 
 WhatsApp/Baileys below is preserved as an optional external integration layer. Do not start or test it during Main App live testing unless explicitly requested.
 

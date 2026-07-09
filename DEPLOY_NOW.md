@@ -8,20 +8,21 @@ The current product to test and sell is the MS2.0 Main App:
 ms20-main-app/
 ```
 
-For Replit live testing on phone, pull the latest repo update into Replit and run:
+For Replit live testing on phone, pull the latest repo update into Replit and verify:
 
 ```bash
 cd ms20-main-app
 npm run verify
 npm run check
-PORT=${PORT:-5177} npm run serve
 ```
 
 Then open:
 
 ```text
-https://$REPLIT_DEV_DOMAIN/
+https://$REPLIT_DEV_DOMAIN/main-app/
 ```
+
+The bare Replit domain may show backend status JSON. That is expected when the backend owns the public port.
 
 Main App live testing must stay local-first and zero-token by default:
 

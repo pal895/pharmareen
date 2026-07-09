@@ -4,16 +4,15 @@ Use this handoff when a fresh Codex chat gets stuck testing only `127.0.0.1` fro
 
 ## Current Transfer Status
 
-As of 2026-07-09, `ms20-main-app/` has been added to the GitHub/Replit project as the Main App-first product surface. After pulling the latest `origin/main` in Replit, run the Main App from Replit Shell:
+As of 2026-07-09, `ms20-main-app/` has been added to the GitHub/Replit project as the Main App-first product surface. After pulling the latest `origin/main` in Replit, verify the Main App from Replit Shell:
 
 ```bash
 cd ms20-main-app
 npm run verify
 npm run check
-PORT=${PORT:-5177} npm run serve
 ```
 
-Use `https://$REPLIT_DEV_DOMAIN/` as the phone-openable link when Replit exposes it.
+Use `https://$REPLIT_DEV_DOMAIN/main-app/` as the phone-openable link. The bare Replit domain can remain the preserved backend status route.
 
 ## Copy-Paste Script Title
 
@@ -220,16 +219,16 @@ Backend compile verification pattern from repo root:
 python -m py_compile app/main.py app/live_runtime.py app/local_first_parser.py app/sheets.py
 
 Start Main App in Replit:
-- `ms20-main-app/tools/serve.mjs` already binds to `0.0.0.0` when `REPLIT_DEV_DOMAIN` exists.
-- Use the Replit Shell.
-- Prefer starting Main App without WhatsApp/Baileys.
+- Prefer the backend-served Main App route for phone testing: `/main-app/`.
+- Restart the Replit app after pulling backend route changes so `app/main.py` is reloaded.
+- Use the Replit Shell for verification.
 - Do not enable WhatsApp bridge.
 
-Command pattern:
+Standalone Main App server pattern for focused module checks only:
 
 cd ms20-main-app && PORT=${PORT:-5177} npm run serve
 
-If Replit has a reserved `$PORT`, respect it. If not, port 5177 is acceptable.
+If Replit has a reserved `$PORT`, respect it. If not, port 5177 is acceptable for local-in-Replit checks. It may not be the public phone route when the backend owns the Replit domain.
 
 Find the Replit phone-openable URL:
 
@@ -237,21 +236,21 @@ python - <<'PY'
 import os
 domain = os.environ.get("REPLIT_DEV_DOMAIN")
 if domain:
-    print("https://" + domain)
+    print("https://" + domain + "/main-app/")
 else:
     print("REPLIT_DEV_DOMAIN missing. Use the Replit Webview/Open in new tab URL shown by Replit.")
 PY
 
 Expected Main App Replit URL shape:
-- `https://$REPLIT_DEV_DOMAIN/`
-- If the app is served from `ms20-main-app`, `/` and `/index.html` should both load.
+- `https://$REPLIT_DEV_DOMAIN/main-app/`
+- If the bare domain returns `{"status":"running"}`, the backend is active and the owner should open `/main-app/`.
 
 Backend route verification pattern:
 If backend is running separately on port 5000, verify:
 
 python - <<'PY'
 import urllib.request
-for path in ["/health", "/debug/version", "/status", "/live/readiness", "/offline_app/index.html"]:
+for path in ["/health", "/debug/version", "/debug/main-app", "/main-app/", "/status", "/live/readiness", "/offline_app/index.html"]:
     url = "http://127.0.0.1:5000" + path
     print("\n" + path)
     try:
@@ -263,8 +262,8 @@ for path in ["/health", "/debug/version", "/status", "/live/readiness", "/offlin
         print("ERROR", repr(e))
 PY
 
-Main App route verification pattern:
-If Main App is running on `$PORT` or 5177, verify:
+Standalone Main App route verification pattern:
+If the standalone Main App server is running on `$PORT` or 5177, verify:
 
 python - <<'PY'
 import os, urllib.request
@@ -282,7 +281,7 @@ for path in ["/", "/index.html", "/manifest.json"]:
 PY
 
 Browser verification:
-- Open the Replit public/dev URL, not local-only `127.0.0.1`.
+- Open the Replit public/dev Main App URL, not local-only `127.0.0.1`: `https://$REPLIT_DEV_DOMAIN/main-app/`.
 - Confirm title says `MS2.0 Main App`.
 - Confirm dashboard loads.
 - Confirm backend status strip appears.
@@ -293,6 +292,7 @@ Browser verification:
 Phone-openable link requirement:
 - Always give the user the Replit URL, not `http://127.0.0.1`.
 - The user needs a phone-openable URL.
+- Use `/main-app/` when the backend owns the bare Replit domain.
 - If only localhost is available, report BLOCKED: Replit public/dev URL not available, and give the exact Replit action needed.
 
 Preservation rules:

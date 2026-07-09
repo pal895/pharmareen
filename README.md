@@ -18,20 +18,21 @@ WhatsApp/Baileys remains preserved in this repo as an optional external channel 
 
 ## Replit Main App Live Testing
 
-After pulling this update into Replit, verify and start the Main App only:
+After pulling this update into Replit, verify the Main App:
 
 ```bash
 cd ms20-main-app
 npm run verify
 npm run check
-PORT=${PORT:-5177} npm run serve
 ```
 
-When Replit sets `REPLIT_DEV_DOMAIN`, `tools/serve.mjs` binds safely for the Replit dev URL and prints the phone-openable URL:
+The Replit public URL is normally owned by the existing backend on port 5000. The backend now serves the Main App through a safe static adapter at:
 
 ```text
-https://$REPLIT_DEV_DOMAIN/
+https://$REPLIT_DEV_DOMAIN/main-app/
 ```
+
+Restart the Replit app after pulling so `app/main.py` loads the route. The bare Replit domain may still return backend status JSON; that is expected. Use `/main-app/` for phone testing.
 
 Main App live testing rules:
 

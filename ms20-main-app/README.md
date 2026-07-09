@@ -14,6 +14,14 @@ npm run serve
 
 Open `http://127.0.0.1:5177`.
 
+In Replit phone testing, open the backend-served route instead:
+
+```text
+https://$REPLIT_DEV_DOMAIN/main-app/
+```
+
+The bare Replit domain may show backend status JSON because the existing backend owns the public port.
+
 No dependency install is required.
 
 ## What Works Now

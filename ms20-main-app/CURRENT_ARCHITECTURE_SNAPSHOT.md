@@ -25,6 +25,14 @@ Local app URL used during verification:
 http://127.0.0.1:5177/index.html
 ```
 
+Replit phone testing URL:
+
+```text
+https://$REPLIT_DEV_DOMAIN/main-app/
+```
+
+The existing backend owns the bare Replit domain, so opening `https://$REPLIT_DEV_DOMAIN/` may show backend status JSON. Use `/main-app/` for Main App live product tests.
+
 Backend URL normally expected:
 
 ```text
@@ -163,4 +171,3 @@ Continue with Main App live product testing only:
 5. Fix only verified friction.
 6. Preserve backend/offline/Baileys/Sheets systems.
 7. Keep OpenAI/API usage at zero unless explicitly required.
-

@@ -154,6 +154,8 @@ Browser UI click automation through the in-app browser tool timed out. This was 
 
 - Main App runs locally at `http://127.0.0.1:5177/index.html`.
 - Backend route exists separately, normally at `http://127.0.0.1:5000`.
+- Replit phone testing route is `https://$REPLIT_DEV_DOMAIN/main-app/` after the backend is restarted.
+- The bare Replit domain may show `{"status":"running"}` because it is the preserved backend status route.
 - Offline app route exists separately at `/offline_app/index.html` on the backend.
 - Main App currently connects through safe adapters and placeholders.
 - Main App does not yet directly mutate live production sale/stock data from every screen.
@@ -221,7 +223,8 @@ Current completed state:
 - No OpenAI/API usage was introduced.
 
 Important current architecture:
-- Main App route: `http://127.0.0.1:5177/index.html`.
+- Main App local verification route: `http://127.0.0.1:5177/index.html`.
+- Main App Replit phone route: `https://$REPLIT_DEV_DOMAIN/main-app/`.
 - Backend route normally: `http://127.0.0.1:5000`.
 - Offline app route on backend: `/offline_app/index.html`.
 - Main App uses safe adapters/placeholders and `safe_queue_only` backend metadata.
@@ -300,4 +303,3 @@ Do not:
 First action for the new Codex chat:
 Inspect `ms20-main-app`, run `npm run verify`, start `npm run serve`, open the Main App, then begin the LIVE_APP_TEST_PLAN from Dashboard.
 ```
-

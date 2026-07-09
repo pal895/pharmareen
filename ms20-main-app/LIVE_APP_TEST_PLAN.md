@@ -15,8 +15,29 @@ This plan is for Main App live product testing only. Do not return to WhatsApp l
 
 ## Startup
 
-1. Open a shell in the workspace root.
-2. Run:
+### Replit Phone Testing
+
+1. Pull the latest repo update into Replit.
+2. Verify:
+
+```bash
+cd ms20-main-app
+npm run verify
+npm run check
+```
+
+3. Restart the Replit app so the backend loads the Main App static route.
+4. Open:
+
+```text
+https://$REPLIT_DEV_DOMAIN/main-app/
+```
+
+The bare Replit domain may show `{"status":"running"}` because it is the backend status route.
+
+### Standalone Local Check
+
+For focused local module checks only:
 
 ```bash
 cd ms20-main-app
@@ -24,7 +45,7 @@ npm run verify
 npm run serve
 ```
 
-3. Open:
+Then open:
 
 ```text
 http://127.0.0.1:5177/index.html
@@ -262,4 +283,3 @@ For every verified friction:
 4. Do not alter backend/offline/Baileys unless required.
 5. Run focused checks.
 6. Continue the test plan.
-

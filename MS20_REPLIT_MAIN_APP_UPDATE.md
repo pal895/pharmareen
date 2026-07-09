@@ -72,19 +72,27 @@ python -m py_compile app/main.py app/live_runtime.py app/local_first_parser.py a
 
 ## Start Main App In Replit
 
-From the Replit Shell:
+For live phone testing, use the backend-served Main App route after restarting the Replit app:
+
+```text
+https://$REPLIT_DEV_DOMAIN/main-app/
+```
+
+Why: the existing Replit public URL is normally bound to the preserved backend on port 5000. The bare domain can return:
+
+```text
+{"status":"running"}
+```
+
+That is backend health/status, not a Main App failure. The Main App is exposed through `/main-app/` by `app/main.py`.
+
+The standalone Main App server remains available for focused local module checks:
 
 ```bash
 cd ms20-main-app && PORT=${PORT:-5177} npm run serve
 ```
 
-When Replit provides `REPLIT_DEV_DOMAIN`, the server binds to `0.0.0.0` and prints:
-
-```text
-MS2.0 Replit URL: https://$REPLIT_DEV_DOMAIN
-```
-
-Use that public/dev URL for phone testing. Do not use desktop localhost as live proof.
+Do not use desktop localhost as live proof.
 
 ## Main App Live Test Rules
 

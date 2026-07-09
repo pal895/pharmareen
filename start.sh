@@ -49,6 +49,12 @@ if ! curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
   echo "Backend health: NOT READY"
 fi
 
+if [ -n "${REPLIT_DEV_DOMAIN:-}" ]; then
+  echo "MS2.0 Main App: https://${REPLIT_DEV_DOMAIN}/main-app/"
+else
+  echo "MS2.0 Main App: http://127.0.0.1:${PORT}/main-app/"
+fi
+
 if [ "$WHATSAPP_BRIDGE_ENABLED" = "true" ]; then
   echo "WhatsApp bridge requested."
   if ! command -v node >/dev/null 2>&1; then
