@@ -500,7 +500,8 @@ function paymentLabel(payment) {
 function shouldAutoProbeBackend() {
   if (typeof window === "undefined") return false;
   if (window.__MS20_AUTO_PROBE_BACKEND__ === true) return true;
-  return window.location.port === "5000";
+  const { pathname, port } = window.location;
+  return port === "5000" || pathname === "/main-app" || pathname.startsWith("/main-app/");
 }
 
 function escapeHtml(value) {

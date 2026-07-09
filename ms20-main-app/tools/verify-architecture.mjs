@@ -74,6 +74,7 @@ assert(contracts.includes("/live/readiness"), "Live readiness route missing");
 assert(contracts.includes("cloud"), "Cloud memory contract missing");
 assert(contracts.includes("Baileys WhatsApp bridge"), "External channel compatibility missing");
 assert(liveGatewaySource.includes("127.0.0.1:5000"), "Local backend gateway fallback missing");
+assert(appSource.includes("pathname.startsWith(\"/main-app/\")"), "Replit /main-app backend auto-probe missing");
 assert(backendAdapterSource.includes("safe_queue_only"), "Live backend writes must remain queue-only in this merge");
 for (const pattern of [/api\.openai/i, /new OpenAI/i, /responses\.create/i, /chat\/completions/i, /OPENAI_API_KEY/]) {
   assert(!pattern.test(runtimeSources), `Unsafe provider call pattern found: ${pattern}`);
