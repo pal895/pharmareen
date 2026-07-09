@@ -26,10 +26,10 @@ No dependency install is required.
 
 ## What Works Now
 
-- Dashboard with pharmacy placeholder, online/offline state, sync state, today totals, quick actions, and pending queue count.
-- Live backend status strip for health, Google Sheets readiness, Baileys readiness, and offline app availability.
-- Offline app button that links to the existing live backend offline app route when the backend is running.
-- Chat/action feed for low-typing text commands, Tap & Talk demo, photo demo, barcode placeholder, invoice demo, reports, setup, and sync.
+- Messaging-first owner workspace with a quiet MS2.0 greeting and one command composer.
+- Technical status, route slots, totals, queue state, and contracts are moved behind collapsed Settings/Diagnostics/Admin controls.
+- Offline app button remains available through Diagnostics and links to the existing live backend offline app route when the backend is running.
+- Conversation flow for low-typing text commands, Tap & Talk demo, photo demo, barcode placeholder, invoice demo, reports, setup, and sync.
 - Editable Card Workspace with reusable cards:
   - SaleCard
   - InvoiceCard
@@ -55,9 +55,11 @@ No dependency install is required.
 
 The owner path is designed around three steps or less:
 
-1. Open MS2.0 and type, speak, scan, or upload.
-2. Review the editable card.
+1. Open MS2.0 and type, speak, scan, or upload in the conversation.
+2. Review the editable card that appears below the conversation.
 3. Confirm, correct, or cancel.
+
+The owner home screen should not show backend, Sheets, queue, token, route, or adapter details. Those belong in Settings, Diagnostics, Admin, or Developer Mode.
 
 ## Cloud Memory And Recovery
 

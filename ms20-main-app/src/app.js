@@ -33,119 +33,80 @@ function render() {
   state.sync.online = navigator.onLine;
   state.sync.pending = queue.pendingCount();
   root.innerHTML = `
-    <aside class="side-nav" aria-label="Main navigation">
-      <div class="brand-mark">MS2.0</div>
-      <button class="nav-button active" data-action="focus-chat">Action</button>
-      <button class="nav-button" data-action="demo-onboarding">Setup</button>
-      <button class="nav-button" data-action="demo-report">Reports</button>
-      <button class="nav-button" data-action="demo-sync">Sync</button>
-    </aside>
-    <main class="workspace">
-      ${dashboardTemplate()}
-      <section class="work-grid">
-        ${actionFeedTemplate()}
-        ${cardWorkspaceTemplate()}
+    <main class="message-os">
+      <section class="conversation-shell" aria-label="MS2.0 pharmacy conversation">
+        ${conversationHeaderTemplate()}
+        ${conversationStreamTemplate()}
+        ${composerTemplate()}
+        ${reviewCardsTemplate()}
+        ${diagnosticsTemplate()}
       </section>
     </main>
   `;
   bindEvents();
 }
 
-function dashboardTemplate() {
-  const onlineText = state.sync.online ? "Online" : "Offline";
-  const offlineSlot = resolveOfflineSlot(state.liveBackend);
-  const live = state.liveBackend || {};
-  const readiness = live.readinessSummary || {};
+function conversationHeaderTemplate() {
+  const greeting = greetingText();
   return `
-    <section class="dashboard" aria-label="Dashboard">
-      <div>
-        <p class="eyebrow">Pharmacy workspace</p>
-        <h1>${escapeHtml(state.pharmacy.name)}</h1>
-        <p class="muted">Cloud memory is the source of truth. This device is cache and queue only.</p>
+    <header class="conversation-header">
+      <div class="brand-lockup">
+        <span class="brand-mark">MS2.0</span>
+        <span class="brand-subtitle">Pharmacy operating intelligence</span>
       </div>
-      <div class="status-strip">
-        <span class="status-pill ${state.sync.online ? "ok" : "warn"}">${onlineText}</span>
-        <span class="status-pill ${live.health?.ok ? "ok" : "warn"}">Backend: ${live.health?.ok ? "OK" : "Check"}</span>
-        <span class="status-pill ${readiness.sheets ? "ok" : "warn"}">Sheets: ${readiness.sheets ? "OK" : "Check"}</span>
-        <span class="status-pill ${readiness.baileys ? "ok" : "warn"}">Baileys: ${readiness.baileys ? "OK" : "Check"}</span>
-        <span class="status-pill">Cloud: ${cloudGateway.status().mode}</span>
-        <span class="status-pill">Queue: ${state.sync.pending}</span>
+      <div class="conversation-prompt">
+        <p class="eyebrow">${escapeHtml(state.pharmacy.name)}</p>
+        <h1>${greeting}</h1>
+        <p>How can I help today?</p>
       </div>
-      <div class="metric-row">
-        <div class="metric"><span>Today</span><strong>KES ${state.today.sales}</strong></div>
-        <div class="metric"><span>Cash</span><strong>${state.today.cash}</strong></div>
-        <div class="metric"><span>M-Pesa</span><strong>${state.today.mpesa}</strong></div>
-        <div class="metric"><span>Credit</span><strong>${state.today.credit}</strong></div>
-      </div>
-      <div class="quick-row">
-        <button data-action="demo-sale">Sale</button>
-        <button data-action="demo-voice">Tap & Talk</button>
-        <button data-action="demo-photo">Photo</button>
-        <button data-action="demo-invoice">Invoice</button>
-        <button data-action="demo-stock-correction">Stock fix</button>
-        <button data-action="refresh-live-status">Live status</button>
-        <a class="button-link" href="${escapeHtml(offlineSlot.url)}" target="_blank" rel="noreferrer">Offline app</a>
-      </div>
-      <p class="micro-copy">Offline route: ${offlineSlot.liveCompatibility}. Backend mode: ${escapeHtml(live.writeMode || "safe_queue_only")}.</p>
-    </section>
+    </header>
   `;
 }
 
-function actionFeedTemplate() {
+function conversationStreamTemplate() {
   return `
-    <section class="panel action-panel" aria-label="Action feed">
-      <div class="panel-header">
-        <div>
-          <p class="eyebrow">Fast flow</p>
-          <h2>Talk, type, scan</h2>
-        </div>
-        <span class="tiny-badge">Zero-token first</span>
-      </div>
-      <div class="feed" id="feed">
+    <section class="conversation-panel" aria-label="Conversation">
+      <div class="feed conversation-stream" id="feed">
         ${state.feed.map(feedItemTemplate).join("")}
       </div>
-      <form class="command-bar" id="commandForm">
-        <button type="button" title="Tap and talk" data-action="demo-voice">Voice</button>
-        <button type="button" title="Upload photo" data-action="demo-photo">Photo</button>
-        <button type="button" title="Barcode placeholder" data-action="demo-barcode">Scan</button>
-        <input id="commandInput" type="text" autocomplete="off" placeholder="Try: Panadol 2 cash">
-        <button type="submit">Go</button>
-      </form>
-      <input id="photoInput" class="hidden-input" type="file" accept="image/*">
     </section>
   `;
 }
 
 function feedItemTemplate(item) {
   return `
-    <article class="feed-item ${item.type}">
-      <span>${escapeHtml(item.time)}</span>
+    <article class="feed-item ${item.type}" aria-label="${item.type === "owner" ? "You" : "MS2.0"} message">
+      <span>${item.type === "owner" ? "You" : "MS2.0"} · ${escapeHtml(item.time)}</span>
       <p>${escapeHtml(item.text)}</p>
     </article>
   `;
 }
 
-function cardWorkspaceTemplate() {
+function composerTemplate() {
   return `
-    <section class="panel card-panel" aria-label="Editable card workspace">
-      <div class="panel-header">
-        <div>
-          <p class="eyebrow">Editable cards</p>
-          <h2>Confirm before saving</h2>
-        </div>
-        <button data-action="sync-now">Sync ${queue.pendingCount()}</button>
+    <section class="composer-panel" aria-label="Send a pharmacy instruction">
+      <form class="command-bar" id="commandForm">
+        <input id="commandInput" type="text" autocomplete="off" inputmode="text" placeholder="Type here, e.g. Panadol 2 cash">
+        <button type="submit">Send</button>
+      </form>
+      <div class="quick-row" aria-label="Common actions">
+        <button type="button" data-action="demo-sale">Sale</button>
+        <button type="button" data-action="demo-voice">Tap & Talk</button>
+        <button type="button" data-action="demo-photo">Photo</button>
+        <button type="button" data-action="demo-invoice">Invoice</button>
+        <button type="button" data-action="demo-stock-correction">Stock fix</button>
       </div>
+      <input id="photoInput" class="hidden-input" type="file" accept="image/*">
+    </section>
+  `;
+}
+
+function reviewCardsTemplate() {
+  return `
+    <section class="review-panel" aria-label="Review cards">
       <div class="card-list">
         ${state.cards.length ? state.cards.map(cardTemplate).join("") : emptyCardTemplate()}
       </div>
-      <details class="contracts">
-        <summary>Integration contracts</summary>
-        <div class="contract-grid">
-          <pre>${escapeHtml(JSON.stringify(TokenPolicy, null, 2))}</pre>
-          <pre>${escapeHtml(JSON.stringify(CloudMemoryContract, null, 2))}</pre>
-          <pre>${escapeHtml(JSON.stringify(listRouteSlots(state.liveBackend), null, 2))}</pre>
-        </div>
-      </details>
     </section>
   `;
 }
@@ -153,9 +114,50 @@ function cardWorkspaceTemplate() {
 function emptyCardTemplate() {
   return `
     <div class="empty-state">
-      <strong>No active card</strong>
-      <p>Send a command, tap voice, upload a photo, or start setup.</p>
+      <strong>No card waiting.</strong>
+      <p>Send a message, speak, or scan when you need something done.</p>
     </div>
+  `;
+}
+
+function diagnosticsTemplate() {
+  const onlineText = state.sync.online ? "Online" : "Offline";
+  const live = state.liveBackend || {};
+  const readiness = live.readinessSummary || {};
+  const offlineSlot = resolveOfflineSlot(state.liveBackend);
+  return `
+    <details class="diagnostics-panel">
+      <summary>Settings, diagnostics, and admin</summary>
+      <div class="diagnostic-grid">
+        <span class="status-pill ${state.sync.online ? "ok" : "warn"}">${onlineText}</span>
+        <span class="status-pill ${live.health?.ok ? "ok" : "warn"}">Backend: ${live.health?.ok ? "OK" : "Check"}</span>
+        <span class="status-pill ${readiness.sheets ? "ok" : "warn"}">Sheets: ${readiness.sheets ? "OK" : "Check"}</span>
+        <span class="status-pill ${readiness.baileys ? "ok" : "warn"}">Baileys: ${readiness.baileys ? "OK" : "Check"}</span>
+        <span class="status-pill">Queue: ${state.sync.pending}</span>
+      </div>
+      <div class="admin-actions">
+        <button type="button" data-action="demo-onboarding">Setup</button>
+        <button type="button" data-action="demo-report">Reports</button>
+        <button type="button" data-action="demo-sync">Sync review</button>
+        <button type="button" data-action="refresh-live-status">Check system</button>
+        <button type="button" data-action="sync-now">Sync ${queue.pendingCount()}</button>
+        <a class="button-link" href="${escapeHtml(offlineSlot.url)}" target="_blank" rel="noreferrer">Offline app</a>
+      </div>
+      <div class="metric-row">
+        <div class="metric"><span>Today</span><strong>KES ${state.today.sales}</strong></div>
+        <div class="metric"><span>Cash</span><strong>${state.today.cash}</strong></div>
+        <div class="metric"><span>M-Pesa</span><strong>${state.today.mpesa}</strong></div>
+        <div class="metric"><span>Credit</span><strong>${state.today.credit}</strong></div>
+      </div>
+      <details class="developer-mode">
+        <summary>Developer mode</summary>
+        <div class="contract-grid">
+          <pre>${escapeHtml(JSON.stringify(TokenPolicy, null, 2))}</pre>
+          <pre>${escapeHtml(JSON.stringify(CloudMemoryContract, null, 2))}</pre>
+          <pre>${escapeHtml(JSON.stringify(listRouteSlots(state.liveBackend), null, 2))}</pre>
+        </div>
+      </details>
+    </details>
   `;
 }
 
@@ -167,21 +169,25 @@ function cardTemplate(card) {
     <article class="editable-card ${card.status}" data-card-id="${card.id}">
       <div class="card-top">
         <div>
-          <span class="card-type">${escapeHtml(card.type)}</span>
+          <span class="card-type">${escapeHtml(friendlyCardLabel(card))}</span>
           <h3>${escapeHtml(card.title)}</h3>
         </div>
-        <span class="confidence">${Math.round((card.confidence || 0) * 100)}%</span>
       </div>
       ${card.source ? `<p class="source-line">From: ${escapeHtml(card.source)}</p>` : ""}
-      ${card.parser ? `<p class="source-line">Parser: ${escapeHtml(card.parser)}</p>` : ""}
-      ${card.integration ? `<p class="integration-line">Backend: ${escapeHtml(card.integration.summary)}</p>` : ""}
       <div class="field-grid">
         ${displayed.map((field) => fieldTemplate(card, field)).join("")}
       </div>
       ${!queued && (card.type === "SaleCard" || card.type === "VoiceReviewCard") ? paymentToolbar(card) : ""}
       ${!queued && (card.type === "SaleCard" || card.type === "RestockCard") ? quantityToolbar(card) : ""}
-      <div class="validation ${card.aiRequired ? "warn" : "ok"}">${escapeHtml(card.validation || "")}</div>
+      <div class="validation ${card.aiRequired ? "warn" : "ok"}">${escapeHtml(ownerCardNote(card))}</div>
       ${queued ? queuedActionsTemplate() : activeActionsTemplate(card)}
+      <details class="card-technical">
+        <summary>Details</summary>
+        <p>Type: ${escapeHtml(card.type)}. Confidence: ${Math.round((card.confidence || 0) * 100)}%.</p>
+        ${card.parser ? `<p>Parser: ${escapeHtml(card.parser)}</p>` : ""}
+        ${card.integration ? `<p>${escapeHtml(card.integration.summary)}</p>` : ""}
+        ${card.validation ? `<p>${escapeHtml(card.validation)}</p>` : ""}
+      </details>
     </article>
   `;
 }
@@ -285,7 +291,7 @@ function handleAction(dataset) {
 function handleCommand(text) {
   const trimmed = String(text || "").trim();
   if (!trimmed) {
-    addFeed("system", "Type a command like Panadol 2 cash, or tap a quick action.");
+    addFeed("system", "Tell me the medicine, quantity, and payment. Example: Panadol 2 cash.");
     render();
     return;
   }
@@ -294,7 +300,7 @@ function handleCommand(text) {
   card.integration = backendAdapters.prepareBackendAction(card, state.liveBackend);
   card.validation = `${card.validation || ""} ${card.integration.summary}`.trim();
   addFeed("owner", trimmed);
-  addFeed("system", `${card.title} created locally. ${card.integration.summary} No AI token used.`);
+  addFeed("system", `${card.title} is ready. Please review it before saving.`);
   addCard(card);
 }
 
@@ -307,14 +313,14 @@ function addVoiceCard() {
     confidence: 0.76,
     validation: "Voice capture placeholder. Local parser runs before AI."
   });
-  addFeed("system", "Voice review card ready. Confirm or edit.");
+  addFeed("system", "I prepared the voice result. Please review it before saving.");
   addCard(card);
 }
 
 function addPhotoCards(fileName, scanType) {
   const result = runVisualPipeline({ fileName, scanType });
   const visualCard = buildPhotoReviewCard(result);
-  addFeed("system", `${scanType === "invoice" ? "Invoice" : "Photo"} scan card ready. No AI token used.`);
+  addFeed("system", `${scanType === "invoice" ? "Invoice" : "Photo"} review is ready. Please check the details.`);
   addCard(visualCard);
   if (scanType !== "invoice") {
     addCard(createEditableCard({
@@ -442,7 +448,7 @@ function confirmCard(cardId) {
     else if (card.fields.payment === "credit") state.today.credit += amount;
     else state.today.cash += amount;
   }
-  addFeed("system", result.duplicate ? "Duplicate action blocked." : "Saved to offline queue. Sync when ready.");
+  addFeed("system", result.duplicate ? "I already saved that card once." : savedReplyFor(card));
   render();
 }
 
@@ -476,7 +482,7 @@ function bumpQuantity(cardId, amount) {
 async function syncNow() {
   const result = await syncAdapter.syncPending();
   state.sync.lastSync = result.lastSync || "Not synced";
-  addFeed("system", `Synced ${result.synced.length} queued action(s).`);
+  addFeed("system", `Synced ${result.synced.length} saved item(s).`);
   render();
 }
 
@@ -485,11 +491,63 @@ async function refreshLiveStatus({ silent = false } = {}) {
   state.liveBackend = snapshot;
   if (!silent) {
     const sheets = snapshot.readinessSummary?.sheets ? "Sheets OK" : "Sheets check needed";
-    const offline = snapshot.offlineApp?.ok ? "offline app linked" : "offline app not reachable";
-    addFeed("system", `Live status: backend ${snapshot.health?.ok ? "OK" : "not reachable"}, ${sheets}, ${offline}.`);
+    const offline = snapshot.offlineApp?.ok ? "offline mode linked" : "offline mode not reachable";
+    addFeed("system", `System check complete: backend ${snapshot.health?.ok ? "OK" : "not reachable"}, ${sheets}, ${offline}.`);
   }
   render();
   return snapshot;
+}
+
+function friendlyCardLabel(card) {
+  const labels = {
+    SaleCard: "Sale",
+    InvoiceCard: "Invoice",
+    RestockCard: "Restock",
+    OnboardingCard: "Setup",
+    StockCorrectionCard: "Stock fix",
+    ReportCard: "Report",
+    VoiceReviewCard: "Voice",
+    PhotoReviewCard: "Photo",
+    MedicineMatchCard: "Medicine check",
+    VisualScanCard: "Scan",
+    SyncReviewCard: "Sync"
+  };
+  return labels[card.type] || "Review";
+}
+
+function ownerCardNote(card) {
+  if (card.status === "queued") return "Saved safely. It will sync when ready.";
+  if (card.status === "needs_correction") return "Please edit the fields, then confirm.";
+  if (card.type === "SaleCard") return "Check the sale details before saving.";
+  if (card.type === "VoiceReviewCard") return "Check the voice result before saving.";
+  if (card.type === "InvoiceCard") return "Check the invoice details before saving.";
+  if (card.type === "PhotoReviewCard" || card.type === "VisualScanCard") return "Check the photo details before saving.";
+  if (card.type === "ReportCard") return "Review the report request before saving.";
+  if (card.type === "SyncReviewCard") return "Review saved work before syncing.";
+  return card.aiRequired ? "Needs review before saving." : "Review before saving.";
+}
+
+function savedReplyFor(card) {
+  if (card.type === "SaleCard" || card.type === "VoiceReviewCard") {
+    const medicine = card.fields?.medicine || "Sale";
+    const quantity = card.fields?.quantity || "1";
+    const payment = paymentLabel(String(card.fields?.payment || "cash").toLowerCase());
+    const stockLeft = card.fields?.stockLeft;
+    const stockText = Number.isFinite(Number(stockLeft)) ? ` Stock left: ${stockLeft}.` : "";
+    return `${medicine} x${quantity} recorded. ${payment} received.${stockText}`;
+  }
+  if (card.type === "StockCorrectionCard") return "Stock correction saved for sync.";
+  if (card.type === "RestockCard") return "Restock saved for sync.";
+  if (card.type === "OnboardingCard") return "Setup saved.";
+  if (card.type === "ReportCard") return "Report request saved.";
+  return "Saved safely.";
+}
+
+function greetingText() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning.";
+  if (hour < 17) return "Good afternoon.";
+  return "Good evening.";
 }
 
 function paymentLabel(payment) {

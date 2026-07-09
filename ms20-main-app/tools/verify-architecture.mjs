@@ -63,7 +63,9 @@ const oldBrand = ["Phar", "Mareen"].join("");
 assert(html.includes("MS2.0 Main App"), "HTML title is not branded MS2.0");
 assert(!appSource.includes(oldBrand), "User-facing app source still contains old brand");
 assert(!html.includes(oldBrand), "HTML still contains old brand");
-assert(css.includes("@media (max-width: 880px)"), "Mobile responsive layout missing");
+assert(css.includes("@media (max-width: 720px)"), "Mobile responsive layout missing");
+assert(appSource.includes("conversationHeaderTemplate"), "Messaging-first shell missing");
+assert(css.includes(".message-os"), "Messaging-first CSS shell missing");
 
 for (const card of requiredCards) {
   assert(appSource.includes(card) || contracts.includes(card), `Missing card type ${card}`);

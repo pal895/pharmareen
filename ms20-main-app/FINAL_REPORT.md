@@ -31,10 +31,11 @@ The new isolated app was created in:
 
 ## Working Now
 
-- Dashboard shell
+- Messaging-first owner shell
 - Read-only live backend status checks for `/health`, `/debug/version`, `/live/readiness`, and `/offline_app/index.html`
-- Offline app route button pointing to the existing live backend offline app
-- Chat/action feed
+- Technical diagnostics moved behind collapsed Settings/Diagnostics/Admin
+- Offline app route button pointing to the existing live backend offline app from Diagnostics
+- Conversation/action feed
 - Editable card workspace
 - Text command to SaleCard demo
 - Tap & Talk to VoiceReviewCard demo

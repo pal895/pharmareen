@@ -56,24 +56,24 @@ Expected:
 - App loads.
 - Brand shows MS2.0.
 - No browser console errors.
-- Offline app link is visible.
-- Backend/Screens status strip is visible.
+- A calm messaging-first home is visible.
+- Backend, Sheets, queue, totals, and route diagnostics are not shown on the owner home.
+- Settings/Diagnostics/Admin is collapsed and available if needed.
 
-## Dashboard
+## Messaging Home
 
 Test:
 
-- Dashboard loads on first screen.
-- Owner can see today totals.
-- Owner can see cash, M-Pesa, credit sections.
-- Owner can see online/offline state.
-- Owner can see queue count.
-- Owner can reach common actions in one tap.
+- Owner sees MS2.0, a greeting, and a clear composer.
+- Owner can type a sale without reading technical status.
+- Owner can reach common actions without a noisy dashboard.
+- Diagnostics remain collapsed.
 
 Pass criteria:
 
-- Common action visible immediately.
+- Common action path is visible immediately.
 - No confusing old PharMareen user-facing brand.
+- No backend, Sheets, token, queue, route, or adapter details on the owner home.
 - No layout overlap.
 - No console errors.
 
@@ -246,7 +246,7 @@ Pass criteria:
 Test:
 
 - Use browser mobile viewport if available.
-- Confirm dashboard fits.
+- Confirm messaging home fits.
 - Confirm editable cards fit.
 - Confirm action buttons are reachable.
 - Confirm text does not overlap.
@@ -278,8 +278,12 @@ Pass criteria:
 For every verified friction:
 
 1. Write down the friction.
-2. Identify root cause.
-3. Patch the smallest safe Main App file.
-4. Do not alter backend/offline/Baileys unless required.
-5. Run focused checks.
-6. Continue the test plan.
+2. Read the existing project files.
+3. Understand the existing architecture.
+4. Locate the existing implementation.
+5. Do not rebuild working systems.
+6. Identify the real root cause.
+7. Fix the root cause everywhere the same problem could appear.
+8. Verify automatically.
+9. Resume testing exactly where it paused.
+10. If project files or routing cannot be located, stop and report the blocker.

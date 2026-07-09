@@ -26,13 +26,7 @@ export const demoState = {
     {
       id: "feed-welcome",
       type: "system",
-      text: "Welcome to MS2.0 setup. Let's set up your pharmacy quickly.",
-      time: "Now"
-    },
-    {
-      id: "feed-principle",
-      type: "system",
-      text: "Open, speak or type, review the card, confirm. Three steps or less.",
+      text: "I am ready. Type, speak, or scan when you need something.",
       time: "Now"
     }
   ],

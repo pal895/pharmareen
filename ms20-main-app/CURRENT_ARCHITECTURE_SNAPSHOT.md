@@ -4,14 +4,15 @@ Snapshot date: 2026-07-09
 
 ## Product Direction
 
-MS2.0 is now centered on the Main App as the primary pharmacy product. The intended owner experience is:
+MS2.0 is now centered on the Main App as the primary pharmacy product. The owner experience is messaging-first:
 
-- Open the app.
-- Type, tap, speak, scan, or upload.
+- Open MS2.0.
+- See a quiet greeting, not a technical dashboard.
+- Type, tap, speak, scan, or upload in the conversation.
 - Review an editable card.
 - Confirm, correct, or cancel.
 
-The owner should not need to think in chatbot commands. WhatsApp/Baileys remains a preserved optional integration layer for later.
+The owner should not need to think about backend, Sheets, queues, route slots, tokens, adapters, or system diagnostics. Those details are available only behind Settings/Diagnostics/Admin. WhatsApp/Baileys remains a preserved optional integration layer for later.
 
 ## Current Main App Location
 
@@ -47,7 +48,7 @@ Existing offline app route expected on backend:
 
 ## Main App Modules
 
-- `src/app.js`: Main UI shell, dashboard, feed, editable cards, actions, queue handling, live status display.
+- `src/app.js`: Messaging-first Main UI shell, feed, editable cards, actions, queue handling, and collapsed diagnostics.
 - `src/contracts/integrationContracts.js`: Card types, token policy, cloud memory contract, live backend routes, adapter slot names.
 - `src/cards/editableCards.js`: Card field mappings and editable card helpers.
 - `src/routes/routeRegistry.js`: Frontend route slots plus live backend route status/link mapping.
@@ -65,8 +66,8 @@ Existing offline app route expected on backend:
 ## Connected Safely
 
 - Main App shell.
-- Dashboard.
-- Chat/action feed.
+- Messaging-first owner workspace.
+- Conversation/action feed.
 - Editable card workspace.
 - Local deterministic sale parser.
 - Offline queue.
@@ -165,7 +166,7 @@ Not yet complete:
 Continue with Main App live product testing only:
 
 1. Start the Main App.
-2. Test every Main App screen.
+2. Test the messaging-first home.
 3. Test every Main App workflow.
 4. Record friction.
 5. Fix only verified friction.
