@@ -342,6 +342,17 @@ input:disabled {
   gap: 10px;
 }
 
+.medicine-detail-grid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(248, 251, 248, 0.75);
+}
+
 .catalog-onboarding-prompt {
   display: grid;
   gap: 8px;
@@ -366,34 +377,78 @@ input:disabled {
 
 .catalog-import-editor {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   margin-top: 14px;
 }
 
-.catalog-import-editor label span {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--muted);
-  font-size: 0.82em;
-  font-weight: 750;
+.catalog-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #fff;
+  -webkit-overflow-scrolling: touch;
 }
 
-.catalog-import-editor textarea {
+.catalog-import-table {
   width: 100%;
-  min-height: 250px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 13px;
+  min-width: 1080px;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.catalog-import-table tr {
+  display: grid;
+  grid-template-columns: var(--catalog-columns);
+}
+
+.catalog-import-table th,
+.catalog-import-table td {
+  padding: 8px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.catalog-import-table th:last-child,
+.catalog-import-table td:last-child {
+  border-right: 0;
+}
+
+.catalog-import-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.catalog-import-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-size: 0.78em;
+  font-weight: 850;
+}
+
+.catalog-import-table input {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 9px 10px;
   color: var(--ink);
   background: #fff;
-  line-height: 1.38;
   outline: none;
-  resize: vertical;
 }
 
-.catalog-import-editor textarea:focus {
+.catalog-import-table input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(24, 95, 85, 0.12);
+}
+
+.secondary-action {
+  justify-self: start;
+  border-radius: 999px;
 }
 
 .catalog-import-editor p {
@@ -403,7 +458,8 @@ input:disabled {
   line-height: 1.35;
 }
 
-.field-grid label span {
+.field-grid label span,
+.medicine-detail-grid label span {
   display: block;
   margin-bottom: 5px;
   font-size: 0.75em;
@@ -412,6 +468,8 @@ input:disabled {
 
 .field-grid input,
 .field-grid textarea,
+.medicine-detail-grid input,
+.medicine-detail-grid textarea,
 .message-form input {
   width: 100%;
   min-height: 44px;
@@ -423,7 +481,8 @@ input:disabled {
   outline: none;
 }
 
-.field-grid textarea {
+.field-grid textarea,
+.medicine-detail-grid textarea {
   min-height: 88px;
   resize: vertical;
   line-height: 1.35;
@@ -431,6 +490,8 @@ input:disabled {
 
 .field-grid input:focus,
 .field-grid textarea:focus,
+.medicine-detail-grid input:focus,
+.medicine-detail-grid textarea:focus,
 .message-form input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(24, 95, 85, 0.12);
@@ -653,7 +714,8 @@ pre {
     max-width: 88%;
   }
 
-  .field-grid {
+  .field-grid,
+  .medicine-detail-grid {
     grid-template-columns: 1fr;
   }
 

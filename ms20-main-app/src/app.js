@@ -40,6 +40,76 @@ const NOTIFICATION_KEY = "ms20-main-app:notifications";
 const CARD_FONT_SCALE_MIN = 0.85;
 const CARD_FONT_SCALE_MAX = 1.25;
 const CARD_FONT_SCALE_STEP = 0.1;
+const CATALOG_TABLE_COLUMNS = [
+  { key: "name", label: "Medicine", min: 180 },
+  { key: "form", label: "Form", min: 110 },
+  { key: "unit", label: "Unit", min: 110 },
+  { key: "stock", label: "Quantity", min: 100, inputMode: "numeric" },
+  { key: "cost_price", label: "Buying price", min: 120, inputMode: "decimal" },
+  { key: "selling_price", label: "Selling price", min: 120, inputMode: "decimal" },
+  { key: "supplier", label: "Supplier", min: 130 },
+  { key: "batch", label: "Batch", min: 110 },
+  { key: "expiry", label: "Expiry", min: 120 }
+];
+const MEDICINE_DETAIL_CARD_TYPES = new Set([
+  "InvoiceCard",
+  "RestockCard",
+  "StockCorrectionCard",
+  "PhotoReviewCard",
+  "MedicineMatchCard",
+  "VisualScanCard"
+]);
+const MEDICINE_DETAIL_FIELD_ORDER = [
+  "medicine",
+  "form",
+  "unit",
+  "pack_size",
+  "quantity",
+  "stock",
+  "current_stock",
+  "correct_stock",
+  "cost_price",
+  "selling_price",
+  "supplier",
+  "barcode",
+  "batch",
+  "expiry",
+  "shelf",
+  "category",
+  "reason",
+  "alias",
+  "file",
+  "scan_type",
+  "total",
+  "payment"
+];
+const FIELD_LABELS = {
+  medicine: "Medicine",
+  form: "Form",
+  unit: "Unit",
+  pack_size: "Pack size",
+  quantity: "Quantity",
+  stock: "Quantity",
+  current_stock: "Current stock",
+  correct_stock: "Correct stock",
+  stockLeft: "Stock left",
+  cost_price: "Buying price",
+  selling_price: "Selling price",
+  supplier: "Supplier",
+  barcode: "Barcode",
+  batch: "Batch",
+  expiry: "Expiry",
+  shelf: "Shelf",
+  category: "Category",
+  reason: "Reason",
+  alias: "Alias",
+  file: "File",
+  scan_type: "Scan type",
+  total: "Total",
+  payment: "Payment",
+  transcript: "Transcript",
+  backend_route: "Backend route"
+};
 let activeRecognition = null;
 
 state.ui = { screen: "home", workspace: "operations" };
@@ -286,15 +356,10 @@ function cardBodyTemplate(card, displayed) {
     `;
   }
   if (card.type === "CatalogImportCard") {
-    return `
-      <div class="catalog-import-editor">
-        <label>
-          <span>Medicine list</span>
-          <textarea data-card-id="${card.id}" data-field="items_text" rows="11">${escapeHtml(String(card.fields?.items_text || ""))}</textarea>
-        </label>
-        <p>One medicine per line. Put the selling price at the end if you know it.</p>
-      </div>
-    `;
+    return catalogImportTableTemplate(card);
+  }
+  if (MEDICINE_DETAIL_CARD_TYPES.has(card.type)) {
+    return medicineDetailTemplate(card, displayed);
   }
   return `
     <div class="field-grid">
@@ -306,14 +371,66 @@ function cardBodyTemplate(card, displayed) {
 function fieldTemplate(card, field) {
   const value = card.fields?.[field] ?? "";
   const longFields = new Set(["items_text", "choices", "notes", "mapping", "message", "action", "missing_columns"]);
+  const inputMode = inputModeForField(field);
   const control = longFields.has(field)
     ? `<textarea data-card-id="${card.id}" data-field="${field}" rows="${field === "items_text" ? 8 : 3}">${escapeHtml(String(value))}</textarea>`
-    : `<input data-card-id="${card.id}" data-field="${field}" value="${escapeHtml(String(value))}">`;
+    : `<input data-card-id="${card.id}" data-field="${field}" ${inputMode ? `inputmode="${inputMode}"` : ""} value="${escapeHtml(String(value))}">`;
   return `
     <label>
-      <span>${escapeHtml(field.replaceAll("_", " "))}</span>
+      <span>${escapeHtml(fieldLabel(field))}</span>
       ${control}
     </label>
+  `;
+}
+
+function medicineDetailTemplate(card, displayed) {
+  const ordered = orderedMedicineFields(displayed);
+  return `
+    <div class="medicine-detail-grid">
+      ${ordered.map((field) => fieldTemplate(card, field)).join("")}
+    </div>
+  `;
+}
+
+function catalogImportTableTemplate(card) {
+  const rows = catalogRowsForCard(card);
+  const columnTemplate = CATALOG_TABLE_COLUMNS
+    .map((column) => `${column.min}px`)
+    .join(" ");
+  return `
+    <div class="catalog-import-editor">
+      <div class="catalog-table-wrap" style="--catalog-columns: ${columnTemplate};">
+        <table class="catalog-import-table" aria-label="Medicine catalog review">
+          <thead>
+            <tr>
+              ${CATALOG_TABLE_COLUMNS.map((column) => `<th scope="col">${escapeHtml(column.label)}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((row, index) => catalogImportRowTemplate(card.id, row, index)).join("")}
+          </tbody>
+        </table>
+      </div>
+      <button class="secondary-action" type="button" data-action="add-catalog-row" data-card-id="${card.id}">Add medicine row</button>
+      <p>Edit each row like a stock sheet. Empty names are ignored when you approve.</p>
+    </div>
+  `;
+}
+
+function catalogImportRowTemplate(cardId, row, index) {
+  return `
+    <tr>
+      ${CATALOG_TABLE_COLUMNS.map((column) => `
+        <td data-label="${escapeHtml(column.label)}">
+          <input
+            data-card-id="${cardId}"
+            data-catalog-row="${index}"
+            data-catalog-field="${column.key}"
+            ${column.inputMode ? `inputmode="${column.inputMode}"` : ""}
+            value="${escapeHtml(String(row[column.key] ?? ""))}">
+        </td>
+      `).join("")}
+    </tr>
   `;
 }
 
@@ -418,6 +535,10 @@ function bindEvents() {
     input.addEventListener("input", () => updateCardField(input.dataset.cardId, input.dataset.field, input.value));
   });
 
+  root.querySelectorAll("[data-catalog-field]").forEach((input) => {
+    input.addEventListener("input", () => updateCatalogImportCell(input.dataset.cardId, input.dataset.catalogRow, input.dataset.catalogField, input.value));
+  });
+
   root.querySelector("#photoInput")?.addEventListener("change", (event) => {
     const file = event.target.files?.[0];
     addPhotoCards(file?.name || "camera-photo.jpg", state.pendingScanType || "medicine_photo");
@@ -474,6 +595,7 @@ function handleAction(dataset) {
     root.querySelector("#cameraInput")?.click();
   }
   if (action === "start-catalog-paste") addCard(createPasteImportCard());
+  if (action === "add-catalog-row") addCatalogImportRow(dataset.cardId);
   if (action === "start-catalog-file") root.querySelector("#documentInput")?.click();
   if (action === "start-sale-learning") addMissingMedicineCard();
   if (action === "export-catalog-csv") exportCatalogCsv();
@@ -804,6 +926,25 @@ function updateCardField(cardId, field, value) {
   const card = state.cards.find((item) => item.id === cardId);
   if (!card) return;
   card.fields[field] = value;
+}
+
+function updateCatalogImportCell(cardId, rowIndex, field, value) {
+  const card = state.cards.find((item) => item.id === cardId);
+  if (!card || card.type !== "CatalogImportCard") return;
+  const rows = catalogRowsForCard(card);
+  const index = Number(rowIndex);
+  if (!Number.isInteger(index) || index < 0 || index >= rows.length) return;
+  rows[index][field] = value;
+  persistCatalogRows(card, rows);
+}
+
+function addCatalogImportRow(cardId) {
+  const card = state.cards.find((item) => item.id === cardId);
+  if (!card || card.type !== "CatalogImportCard") return;
+  const rows = catalogRowsForCard(card);
+  rows.push(emptyCatalogRow());
+  persistCatalogRows(card, rows);
+  render();
 }
 
 function confirmCard(cardId) {
@@ -1210,6 +1351,69 @@ function looksLikeMedicineList(text) {
   const lines = String(text || "").split(/\r?\n/).filter((line) => line.trim());
   if (lines.length >= 2) return true;
   return /^list\s*:/i.test(String(text || ""));
+}
+
+function catalogRowsForCard(card) {
+  const cached = readCachedCatalogRows(card);
+  if (cached.length) return cached;
+  const text = card.fields?.items_text || "";
+  const parsed = String(text).includes("|")
+    ? parseCatalogText(text)
+    : parseBulkMedicineList(text, sourceBrain).items;
+  const rows = parsed.map(normalizeCatalogRow).filter((row) => row.name);
+  return rows.length ? rows : [emptyCatalogRow()];
+}
+
+function readCachedCatalogRows(card) {
+  try {
+    const rows = JSON.parse(card.fields?.catalog_rows || "[]");
+    return Array.isArray(rows) ? rows.map(normalizeCatalogRow) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistCatalogRows(card, rows) {
+  const cleanRows = rows.map(normalizeCatalogRow);
+  card.fields.catalog_rows = JSON.stringify(cleanRows);
+  card.fields.items_text = catalogItemsToText(cleanRows.filter((row) => row.name));
+}
+
+function normalizeCatalogRow(row = {}) {
+  return {
+    name: row.name || row.medicine || "",
+    form: row.form || first(row.forms),
+    unit: row.unit || first(row.units) || row.form || "",
+    stock: row.stock ?? row.current_stock ?? row.quantity ?? row.stockLeft ?? "",
+    cost_price: row.cost_price ?? row.costPrice ?? "",
+    selling_price: row.selling_price ?? row.sellingPrice ?? "",
+    supplier: row.supplier || "",
+    batch: row.batch || first(row.batches)?.batch || "",
+    expiry: row.expiry || first(row.batches)?.expiry || "",
+    barcode: row.barcode || "",
+    source: row.source || "owner_review"
+  };
+}
+
+function emptyCatalogRow() {
+  return normalizeCatalogRow({});
+}
+
+function orderedMedicineFields(fields) {
+  const available = new Set(fields);
+  const ordered = MEDICINE_DETAIL_FIELD_ORDER.filter((field) => available.has(field));
+  const rest = fields.filter((field) => !ordered.includes(field));
+  return [...ordered, ...rest];
+}
+
+function fieldLabel(field) {
+  return FIELD_LABELS[field] || field.replaceAll("_", " ");
+}
+
+function inputModeForField(field) {
+  if (["quantity", "stock", "current_stock", "correct_stock", "stockLeft"].includes(field)) return "numeric";
+  if (["selling_price", "cost_price", "total"].includes(field)) return "decimal";
+  return "";
 }
 
 function readCardFontScale() {
