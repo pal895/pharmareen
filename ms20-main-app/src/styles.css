@@ -289,6 +289,12 @@ input:disabled {
   align-items: start;
 }
 
+.card-top-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
 .card-heading {
   display: grid;
   min-width: 0;
@@ -333,6 +339,27 @@ input:disabled {
   font-size: 0.72em;
   font-weight: 750;
   text-align: center;
+}
+
+.card-close-button {
+  display: inline-grid;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  place-items: center;
+  padding: 0;
+  border-radius: 999px;
+  color: var(--muted);
+  background: #fff;
+  font-size: 0.95em;
+  font-weight: 850;
+}
+
+.card-close-button:focus,
+.card-close-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .field-grid {

@@ -103,11 +103,14 @@ assert(appSource.includes("capture=\"environment\""), "Direct camera capture inp
 assert(appSource.includes("CARD_FONT_SCALE_KEY"), "Editable card text-size persistence missing");
 assert(appSource.includes("increase-card-font"), "Editable card zoom-in control missing");
 assert(appSource.includes("decrease-card-font"), "Editable card zoom-out control missing");
+assert(appSource.includes("dismiss-card"), "Editable card close control missing");
+assert(appSource.includes("catalogRequired"), "Notification catalog gate missing");
 assert(appSource.includes("pharmacyBrain.findMedicine"), "Instant sale must require pharmacy catalog match");
 assert(!appSource.includes("demo-voice"), "Fake voice demo action must not be present");
 assert(!appSource.includes("Cancelled."), "Cancel must silently remove cards without chat noise");
 assert(css.includes("replit-badge"), "Replit badge suppression CSS missing");
 assert(css.includes(".card-font-controls"), "Editable card font controls CSS missing");
+assert(css.includes(".card-close-button"), "Editable card close CSS missing");
 
 for (const card of requiredCards) {
   assert(appSource.includes(card) || contracts.includes(card), `Missing card type ${card}`);
@@ -133,7 +136,7 @@ const { runVisualPipeline } = await import(pathToFileURL(path.join(root, "src/se
 const { BackendAdapterRegistry } = await import(pathToFileURL(path.join(root, "src/services/backendAdapters.js")));
 const { SourceBrain, PharmacyBrain } = await import(pathToFileURL(path.join(root, "src/services/brainAdapters.js")));
 const { parseBulkMedicineList, parseDelimitedInventory } = await import(pathToFileURL(path.join(root, "src/services/catalogOnboarding.js")));
-const { buildDeterministicNotifications } = await import(pathToFileURL(path.join(root, "src/services/notificationCenter.js")));
+const { buildDeterministicNotifications, mergeNotifications } = await import(pathToFileURL(path.join(root, "src/services/notificationCenter.js")));
 const { buildCatalogCsv } = await import(pathToFileURL(path.join(root, "src/services/documentGenerator.js")));
 
 const sale = parseLocalCommand("panadol2cash");
@@ -171,6 +174,15 @@ assert(pharmacyBrain.findMedicine("Ceftriaxone").status === "matched", "Catalog 
 const notifications = buildDeterministicNotifications({ catalog: [{ name: "Cefixime", stockLeft: 2, batches: [{ batch: "B1", expiry: "2026-07-20" }] }] });
 assert(notifications.some((item) => item.category === "Inventory"), "Low-stock notification missing");
 assert(notifications.some((item) => item.category === "Expiry"), "Expiry notification missing");
+const blankStockNotifications = buildDeterministicNotifications({ catalog: [{ name: "Zinc", stockLeft: "" }] });
+assert(!blankStockNotifications.some((item) => item.category === "Inventory"), "Blank stock must not create out-of-stock notifications");
+const setupNotifications = buildDeterministicNotifications({ catalog: [], catalogRequired: false });
+assert(!setupNotifications.some((item) => item.id === "learning-catalog-empty"), "Catalog notification must wait until setup is complete");
+const prunedNotifications = mergeNotifications(
+  [{ id: "learning-catalog-empty", category: "Learning", title: "Medicine catalog needed", status: "unread", createdAt: "2026-01-01T00:00:00.000Z" }],
+  []
+);
+assert(prunedNotifications.length === 0, "Resolved generated notifications must be pruned");
 
 const csv = buildCatalogCsv(pharmacyBrain.catalog);
 assert(csv.includes("Metformin"), "Catalog CSV export missing medicine");

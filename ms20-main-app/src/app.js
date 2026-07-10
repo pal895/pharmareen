@@ -327,7 +327,10 @@ function cardTemplate(card) {
           <span class="card-type">${escapeHtml(friendlyCardLabel(card))}</span>
           <strong>${escapeHtml(card.title)}</strong>
         </span>
-        ${cardFontControlsTemplate()}
+        <span class="card-top-actions">
+          ${cardFontControlsTemplate()}
+          <button class="card-close-button" type="button" data-action="dismiss-card" data-card-id="${card.id}" aria-label="Close ${escapeHtml(friendlyCardLabel(card))} card">x</button>
+        </span>
       </div>
       ${cardBodyTemplate(card, displayed)}
       ${(card.type === "SaleCard" || card.type === "VoiceReviewCard") ? paymentToolbar(card) : ""}
@@ -642,6 +645,7 @@ function handleAction(dataset) {
   if (action === "confirm-card") confirmCard(dataset.cardId);
   if (action === "correct-card") correctCard(dataset.cardId);
   if (action === "reject-card") rejectCard(dataset.cardId);
+  if (action === "dismiss-card") dismissCard(dataset.cardId);
   if (action === "set-payment") setPayment(dataset.cardId, dataset.payment);
   if (action === "bump-quantity") bumpQuantity(dataset.cardId, Number(dataset.amount));
 }
@@ -886,11 +890,24 @@ function ensureCatalogOnboardingStarted() {
 }
 
 function resetOnboarding() {
-  safeLocalStorage()?.removeItem(SETUP_KEY);
+  const storage = safeLocalStorage();
+  storage?.removeItem(SETUP_KEY);
+  storage?.removeItem(CATALOG_KEY);
+  storage?.removeItem(NOTIFICATION_KEY);
   state.onboarding.completed = false;
   state.onboarding.started = false;
-  state.cards = state.cards.filter((card) => card.type !== "OnboardingCard");
+  state.catalog.items = [];
+  state.notifications = [];
+  state.feed = [];
+  pharmacyBrain.loadCatalog([]);
+  state.cards = state.cards.filter((card) => ![
+    "OnboardingCard",
+    "CatalogOnboardingCard",
+    "CatalogImportCard",
+    "DocumentExportCard"
+  ].includes(card.type));
   ensureOnboardingStarted();
+  refreshNotifications();
   render();
 }
 
@@ -986,6 +1003,7 @@ function confirmCard(cardId) {
   if (card.type === "CatalogImportCard") {
     approveCatalogImport(card);
     removeCard(cardId);
+    refreshNotifications();
     render();
     return;
   }
@@ -1193,6 +1211,20 @@ function rejectCard(cardId) {
   const card = state.cards.find((item) => item.id === cardId);
   removeCard(cardId);
   if (card?.type === "OnboardingCard") state.onboarding.started = false;
+  refreshNotifications();
+  render();
+}
+
+function dismissCard(cardId) {
+  const notificationCard = activeNotificationCards().find((item) => item.id === cardId);
+  if (notificationCard) {
+    dismissNotification(notificationIdFromCard(notificationCard));
+    return;
+  }
+  const card = state.cards.find((item) => item.id === cardId);
+  removeCard(cardId);
+  if (card?.type === "OnboardingCard") state.onboarding.started = false;
+  refreshNotifications();
   render();
 }
 
@@ -1242,7 +1274,8 @@ async function refreshLiveStatus({ silent = false } = {}) {
 function refreshNotifications() {
   const generated = buildDeterministicNotifications({
     catalog: pharmacyBrain.catalog,
-    pendingCards: state.cards
+    pendingCards: state.cards,
+    catalogRequired: state.onboarding.completed
   });
   state.notifications = mergeNotifications(state.notifications || [], generated);
   safeLocalStorage()?.setItem(NOTIFICATION_KEY, JSON.stringify(state.notifications));

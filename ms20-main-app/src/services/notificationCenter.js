@@ -1,10 +1,12 @@
 const DEFAULT_MIN_STOCK = 5;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export function buildDeterministicNotifications({ catalog = [], pendingCards = [], now = new Date() } = {}) {
+export function buildDeterministicNotifications({ catalog = [], pendingCards = [], now = new Date(), catalogRequired = true } = {}) {
   const notifications = [];
+  const catalogItems = Array.isArray(catalog) ? catalog : [];
+  const cards = Array.isArray(pendingCards) ? pendingCards : [];
 
-  if (catalog.length === 0) {
+  if (catalogRequired && catalogItems.length === 0) {
     notifications.push(createNotification({
       category: "Learning",
       key: "catalog-empty",
@@ -14,7 +16,7 @@ export function buildDeterministicNotifications({ catalog = [], pendingCards = [
     }));
   }
 
-  for (const item of catalog) {
+  for (const item of catalogItems) {
     const name = item.name || item.medicine || "Medicine";
     const stock = numberOrNull(item.stockLeft ?? item.stock ?? item.current_stock);
     if (stock !== null && stock <= 0) {
@@ -53,7 +55,7 @@ export function buildDeterministicNotifications({ catalog = [], pendingCards = [
     }
   }
 
-  for (const card of pendingCards) {
+  for (const card of cards) {
     if (card.type === "InvoiceCard" || card.type === "PhotoReviewCard" || card.type === "VisualScanCard") {
       notifications.push(createNotification({
         category: "System",
@@ -80,15 +82,17 @@ export function buildDeterministicNotifications({ catalog = [], pendingCards = [
 export function mergeNotifications(existing = [], generated = []) {
   const byId = new Map();
   for (const item of existing) byId.set(item.id, item);
+  const merged = [];
   for (const item of generated) {
     const previous = byId.get(item.id);
-    if (previous?.status && previous.status !== "unread") {
-      byId.set(item.id, previous);
-    } else {
-      byId.set(item.id, { ...previous, ...item, status: previous?.status || "unread" });
-    }
+    merged.push({
+      ...item,
+      createdAt: previous?.createdAt || item.createdAt,
+      status: previous?.status || "unread",
+      completedAt: previous?.completedAt
+    });
   }
-  return [...byId.values()].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  return merged.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }
 
 export function notificationToCard(notification) {
@@ -155,6 +159,8 @@ function parseDate(value) {
 }
 
 function numberOrNull(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
