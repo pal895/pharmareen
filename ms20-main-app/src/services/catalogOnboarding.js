@@ -180,6 +180,14 @@ export function buildImportSummary(items, unclear = []) {
   ].join(" ");
 }
 
+export function buildCatalogSavedSummary(items, unclear = []) {
+  return [
+    `${items.length} medicine(s) saved.`,
+    unclear.length ? `${unclear.length} line(s) still need attention.` : "No unclear lines found.",
+    "Catalog is ready for daily sales."
+  ].join(" ");
+}
+
 export function sampleMedicineList() {
   return [
     "Cefixime tablets 120",

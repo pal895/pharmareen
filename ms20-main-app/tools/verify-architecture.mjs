@@ -135,7 +135,7 @@ const { CloudMemoryGateway } = await import(pathToFileURL(path.join(root, "src/s
 const { runVisualPipeline } = await import(pathToFileURL(path.join(root, "src/services/visualPipeline.js")));
 const { BackendAdapterRegistry } = await import(pathToFileURL(path.join(root, "src/services/backendAdapters.js")));
 const { SourceBrain, PharmacyBrain } = await import(pathToFileURL(path.join(root, "src/services/brainAdapters.js")));
-const { parseBulkMedicineList, parseDelimitedInventory } = await import(pathToFileURL(path.join(root, "src/services/catalogOnboarding.js")));
+const { parseBulkMedicineList, parseDelimitedInventory, buildCatalogSavedSummary } = await import(pathToFileURL(path.join(root, "src/services/catalogOnboarding.js")));
 const { buildDeterministicNotifications, mergeNotifications } = await import(pathToFileURL(path.join(root, "src/services/notificationCenter.js")));
 const { buildCatalogCsv } = await import(pathToFileURL(path.join(root, "src/services/documentGenerator.js")));
 
@@ -157,6 +157,9 @@ assert(cefixime.status === "matched", "Source brain did not recognize Cefixime")
 const catalogImport = parseBulkMedicineList("Cefixime tablets 120\nCeftriaxone vial 180\nZinc syrup 70", sourceBrain);
 assert(catalogImport.aiRequired === false, "Bulk import must be zero-token");
 assert(catalogImport.items.length === 3, "Bulk medicine import did not parse three lines");
+const savedCatalogSummary = buildCatalogSavedSummary(catalogImport.items, catalogImport.unclear);
+assert(savedCatalogSummary.includes("saved"), "Approved catalog summary must confirm saved state");
+assert(!savedCatalogSummary.includes("ready for review"), "Approved catalog summary must not repeat review-state copy");
 
 const delimited = parseDelimitedInventory("medicine,form,selling price,stock,batch,expiry\nMetformin,tablets,15,20,B1,2026-12-31", sourceBrain);
 assert(delimited.items.length === 1, "CSV inventory import did not parse one row");

@@ -12,7 +12,8 @@ import {
   parseCatalogText,
   parseDelimitedInventory,
   catalogItemsToText,
-  buildImportSummary
+  buildImportSummary,
+  buildCatalogSavedSummary
 } from "./services/catalogOnboarding.js";
 import { buildDeterministicNotifications, mergeNotifications, notificationToCard } from "./services/notificationCenter.js";
 import { buildCatalogCsv, buildBulkPasteTemplate, buildDocumentCard, downloadTextFile } from "./services/documentGenerator.js";
@@ -1040,7 +1041,7 @@ function approveCatalogImport(card) {
   const text = card.fields?.items_text || "";
   const parsed = text.includes("|") ? { items: parseCatalogText(text), unclear: [] } : parseBulkMedicineList(text, sourceBrain);
   const saved = saveCatalogItems(parsed.items);
-  const summary = buildImportSummary(saved, parsed.unclear || []);
+  const summary = buildCatalogSavedSummary(saved, parsed.unclear || []);
   addFeed("system", `Catalog saved. ${summary}`);
   addCard(buildDocumentCard({
     title: "Catalog export ready",
