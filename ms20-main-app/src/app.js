@@ -259,9 +259,7 @@ function cardTemplate(card) {
         </span>
         ${cardFontControlsTemplate()}
       </div>
-      <div class="field-grid">
-        ${displayed.map((field) => fieldTemplate(card, field)).join("")}
-      </div>
+      ${cardBodyTemplate(card, displayed)}
       ${(card.type === "SaleCard" || card.type === "VoiceReviewCard") ? paymentToolbar(card) : ""}
       ${(card.type === "SaleCard" || card.type === "RestockCard") ? quantityToolbar(card) : ""}
       <p class="card-note">${escapeHtml(ownerCardNote(card))}</p>
@@ -275,6 +273,22 @@ function cardTemplate(card) {
         ${card.validation ? `<p>${escapeHtml(card.validation)}</p>` : ""}
       </details>
     </article>
+  `;
+}
+
+function cardBodyTemplate(card, displayed) {
+  if (card.type === "CatalogOnboardingCard") {
+    return `
+      <div class="catalog-onboarding-prompt">
+        <p>${escapeHtml(card.fields?.question || "How would you like to show me your pharmacy?")}</p>
+        <span>Choose one option below. MS2.0 will prepare a review card before saving anything.</span>
+      </div>
+    `;
+  }
+  return `
+    <div class="field-grid">
+      ${displayed.map((field) => fieldTemplate(card, field)).join("")}
+    </div>
   `;
 }
 

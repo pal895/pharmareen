@@ -77,6 +77,7 @@ assert(appSource.includes("chatHomeTemplate"), "Messaging app home missing");
 assert(appSource.includes("chatScreenTemplate"), "Messaging app conversation screen missing");
 assert(appSource.includes("Notifications"), "Separate Notifications workspace missing");
 assert(appSource.includes("CatalogOnboardingCard"), "Catalog onboarding card flow missing");
+assert(appSource.includes("catalog-onboarding-prompt"), "Catalog onboarding prompt must not render as generic editable fields");
 assert(appSource.includes("CatalogImportCard"), "Catalog import card flow missing");
 assert(appSource.includes("exportCatalogCsv"), "Catalog CSV export action missing");
 assert(appSource.includes("speechSynthesis"), "Local read-aloud support missing");
@@ -84,6 +85,7 @@ assert(appSource.includes("canRecordInstantly"), "Instant complete-sale behavior
 assert(css.includes(".chat-app"), "Messaging app CSS shell missing");
 assert(css.includes(".conversation-row"), "Chat home conversation row missing");
 assert(css.includes(".message-bubble"), "Chat message bubbles missing");
+assert(css.includes(".catalog-onboarding-prompt"), "Catalog onboarding prompt CSS missing");
 assert(appSource.includes("ensureOnboardingStarted"), "First-run onboarding guard missing");
 assert(appSource.includes("startVoiceCapture"), "Browser voice capture path missing");
 assert(appSource.includes("capture=\"environment\""), "Direct camera capture input missing");

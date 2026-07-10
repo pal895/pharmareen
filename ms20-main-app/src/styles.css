@@ -342,6 +342,28 @@ input:disabled {
   gap: 10px;
 }
 
+.catalog-onboarding-prompt {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-soft);
+}
+
+.catalog-onboarding-prompt p {
+  margin: 0;
+  font-size: 1.05em;
+  line-height: 1.35;
+}
+
+.catalog-onboarding-prompt span {
+  color: var(--muted);
+  font-size: 0.9em;
+  line-height: 1.35;
+}
+
 .field-grid label span {
   display: block;
   margin-bottom: 5px;
