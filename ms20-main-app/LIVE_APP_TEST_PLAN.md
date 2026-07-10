@@ -95,6 +95,7 @@ Pass criteria:
 - No old demo messages or previous test cards are visible after refresh.
 - Confirming setup marks the assistant Ready.
 - Cancel removes the setup card quietly without adding a `Cancelled.` chat bubble.
+- The `-` and `+` controls resize card text and apply to future editable cards.
 
 ## Chat Workspace
 
@@ -120,6 +121,7 @@ Pass criteria:
 Test:
 
 - Confirm fields: medicine, quantity, payment.
+- Use `-` and `+` to adjust card text size.
 - Change quantity.
 - Change payment mode.
 - Cancel card.
@@ -285,6 +287,7 @@ Test:
 Pass criteria:
 
 - Owner can complete common workflow on phone.
+- Card text can be enlarged or reduced without browser zoom.
 - No layout shift that blocks core actions.
 
 ## Owner Usability Review

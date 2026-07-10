@@ -76,6 +76,7 @@ Existing offline app route expected on backend:
 - Browser speech capture from the Mic button.
 - Direct camera capture and photo library upload.
 - Silent card cancel with no chat noise.
+- Persistent editable-card text-size controls.
 - Instant complete-sale receipt path.
 - Editable card workspace.
 - Local deterministic sale parser.

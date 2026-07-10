@@ -22,7 +22,7 @@ The daily owner workflow stays three steps or less:
 
 Complete sale commands record instantly through the existing safe queue path. Missing or ambiguous commands become editable cards. The owner home should stay free of backend, Sheets, queue, token, route, and adapter diagnostics. Those belong in Settings, Diagnostics, Admin, or Developer Mode.
 
-The Main App uses real browser voice capture from the Mic button, direct camera/photo upload from the composer attach menu, and quiet card cancellation with no extra chat noise.
+The Main App uses real browser voice capture from the Mic button, direct camera/photo upload from the composer attach menu, quiet card cancellation with no extra chat noise, and persistent `-`/`+` text-size controls on editable cards.
 
 WhatsApp/Baileys remains preserved in this repo as an optional external channel for later. Do not use WhatsApp live testing as proof of Main App readiness.
 

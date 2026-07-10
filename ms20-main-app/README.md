@@ -32,6 +32,7 @@ No dependency install is required.
 - Complete high-confidence sale commands such as `Panadol 2 cash` record immediately through the existing safe queue path.
 - Missing or ambiguous commands show editable cards directly, without extra narration.
 - Cancel removes review cards quietly without adding a chat message.
+- Every editable card has `-` and `+` text-size controls, and the chosen size is remembered on the device.
 - Technical status, route slots, totals, queue state, and contracts are moved behind hidden Settings/Diagnostics/Admin controls.
 - Offline app button remains available through Diagnostics and links to the existing live backend offline app route when the backend is running.
 - Conversation flow for low-typing text commands, browser speech capture, direct camera/photo upload, barcode placeholder, invoice review, reports, setup, and sync.

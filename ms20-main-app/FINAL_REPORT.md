@@ -44,6 +44,7 @@ The new isolated app was created in:
 - Browser Mic capture uses the same local-first path without fake demo text
 - Direct camera capture and photo library upload to VisualScanCard and PhotoReviewCard
 - Cancel removes cards silently without adding chat noise
+- Editable cards include persistent `-` and `+` text-size controls
 - Invoice review to InvoiceCard
 - First-run setup to OnboardingCard
 - Offline queue and duplicate/idempotency demo

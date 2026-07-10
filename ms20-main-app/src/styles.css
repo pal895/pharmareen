@@ -265,6 +265,7 @@ input:disabled {
   border-radius: 20px;
   background: var(--surface);
   box-shadow: 0 12px 30px rgba(16, 34, 28, 0.08);
+  font-size: calc(16px * var(--card-font-scale, 1));
 }
 
 .card-message.needs_correction {
@@ -274,16 +275,55 @@ input:disabled {
 
 .card-top {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px;
+  align-items: start;
+}
+
+.card-heading {
+  display: grid;
+  min-width: 0;
   gap: 3px;
 }
 
 .card-top strong {
-  font-size: 20px;
+  font-size: 1.25em;
+  line-height: 1.16;
 }
 
 .card-type {
-  font-size: 13px;
+  font-size: 0.82em;
   font-weight: 750;
+}
+
+.card-font-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+}
+
+.card-font-controls button {
+  display: inline-grid;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  place-items: center;
+  padding: 0;
+  font-size: 1em;
+  font-weight: 850;
+}
+
+.card-font-controls span {
+  min-width: 38px;
+  color: var(--muted);
+  font-size: 0.72em;
+  font-weight: 750;
+  text-align: center;
 }
 
 .field-grid {
@@ -296,7 +336,7 @@ input:disabled {
 .field-grid label span {
   display: block;
   margin-bottom: 5px;
-  font-size: 12px;
+  font-size: 0.75em;
   text-transform: capitalize;
 }
 
@@ -345,10 +385,12 @@ input:disabled {
   border-radius: 16px;
   color: var(--good);
   background: var(--good-soft);
+  font-size: 0.95em;
 }
 
 .card-technical {
   margin-top: 12px;
+  font-size: 0.86em;
 }
 
 .card-technical summary,

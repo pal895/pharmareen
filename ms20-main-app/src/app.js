@@ -18,11 +18,16 @@ const pharmacyBrain = new PharmacyBrain({ pharmacyId: state.pharmacy.id });
 const sourceBrain = new SourceBrain();
 const aiFallback = new AIFallbackAdapter();
 const SETUP_KEY = "ms20-main-app:onboarding-complete";
+const CARD_FONT_SCALE_KEY = "ms20-main-app:card-font-scale";
+const CARD_FONT_SCALE_MIN = 0.85;
+const CARD_FONT_SCALE_MAX = 1.25;
+const CARD_FONT_SCALE_STEP = 0.1;
 let activeRecognition = null;
 
 state.ui = { screen: "home" };
 state.voice = { listening: false, status: "" };
 state.onboarding = { started: false, completed: setupComplete() };
+state.cardFontScale = readCardFontScale();
 state.liveBackend = {
   baseUrl: backendAdapters.liveBackendGateway.baseUrl,
   health: { ok: false, status: 0 },
@@ -38,7 +43,7 @@ function render() {
   state.sync.online = navigator.onLine;
   state.sync.pending = queue.pendingCount();
   root.innerHTML = `
-    <main class="chat-app">
+    <main class="chat-app" style="--card-font-scale: ${state.cardFontScale};">
       ${state.ui.screen === "chat" ? chatScreenTemplate() : chatHomeTemplate()}
     </main>
   `;
@@ -184,8 +189,11 @@ function cardTemplate(card) {
   return `
     <article class="card-message ${card.status}" data-card-id="${card.id}">
       <div class="card-top">
-        <span class="card-type">${escapeHtml(friendlyCardLabel(card))}</span>
-        <strong>${escapeHtml(card.title)}</strong>
+        <span class="card-heading">
+          <span class="card-type">${escapeHtml(friendlyCardLabel(card))}</span>
+          <strong>${escapeHtml(card.title)}</strong>
+        </span>
+        ${cardFontControlsTemplate()}
       </div>
       <div class="field-grid">
         ${displayed.map((field) => fieldTemplate(card, field)).join("")}
@@ -222,6 +230,16 @@ function activeActionsTemplate(card) {
       <button data-action="confirm-card" data-card-id="${card.id}">Confirm</button>
       <button data-action="correct-card" data-card-id="${card.id}">Correct</button>
       <button data-action="reject-card" data-card-id="${card.id}">Cancel</button>
+    </div>
+  `;
+}
+
+function cardFontControlsTemplate() {
+  return `
+    <div class="card-font-controls" aria-label="Card text size">
+      <button type="button" data-action="decrease-card-font" aria-label="Make card text smaller">-</button>
+      <span>${Math.round(state.cardFontScale * 100)}%</span>
+      <button type="button" data-action="increase-card-font" aria-label="Make card text bigger">+</button>
     </div>
   `;
 }
@@ -304,6 +322,8 @@ function handleAction(dataset) {
   if (action === "refresh-live-status") void refreshLiveStatus();
   if (action === "sync-now") syncNow();
   if (action === "reset-onboarding") resetOnboarding();
+  if (action === "decrease-card-font") adjustCardFontScale(-CARD_FONT_SCALE_STEP);
+  if (action === "increase-card-font") adjustCardFontScale(CARD_FONT_SCALE_STEP);
   if (action === "confirm-card") confirmCard(dataset.cardId);
   if (action === "correct-card") correctCard(dataset.cardId);
   if (action === "reject-card") rejectCard(dataset.cardId);
@@ -605,6 +625,14 @@ function rejectCard(cardId) {
   render();
 }
 
+function adjustCardFontScale(delta) {
+  const next = clampCardFontScale(state.cardFontScale + delta);
+  if (next === state.cardFontScale) return;
+  state.cardFontScale = next;
+  safeLocalStorage()?.setItem(CARD_FONT_SCALE_KEY, String(next));
+  render();
+}
+
 function removeCard(cardId) {
   const index = state.cards.findIndex((item) => item.id === cardId);
   if (index >= 0) state.cards.splice(index, 1);
@@ -691,6 +719,17 @@ function savedReplyFor(card) {
 
 function setupComplete() {
   return safeLocalStorage()?.getItem(SETUP_KEY) === "true";
+}
+
+function readCardFontScale() {
+  const stored = Number(safeLocalStorage()?.getItem(CARD_FONT_SCALE_KEY));
+  if (!Number.isFinite(stored)) return 1;
+  return clampCardFontScale(stored);
+}
+
+function clampCardFontScale(value) {
+  const clamped = Math.min(CARD_FONT_SCALE_MAX, Math.max(CARD_FONT_SCALE_MIN, value));
+  return Math.round(clamped * 100) / 100;
 }
 
 function safeLocalStorage() {
