@@ -9,31 +9,14 @@ export class PharmacyBrain {
   }
 
   loadCatalog(items) {
-    this.catalog = items.map((item) => ({
-      id: item.id || `catalog-${normalize(item.name)}-${Date.now()}`,
-      name: item.name || item.medicine || "",
-      aliases: item.aliases || [],
-      forms: item.forms || (item.form ? [item.form] : []),
-      units: item.units || (item.unit ? [item.unit] : []),
-      packSizes: item.packSizes || (item.pack_size ? [item.pack_size] : []),
-      category: item.category || "",
-      sellingPrice: item.sellingPrice ?? item.selling_price ?? "",
-      costPrice: item.costPrice ?? item.cost_price ?? "",
-      supplier: item.supplier || "",
-      barcode: item.barcode || "",
-      batches: item.batches || [],
-      expiry: item.expiry || "",
-      shelf: item.shelf || item.location || "",
-      stockLeft: item.stockLeft ?? item.current_stock ?? item.stock ?? null,
-      source: item.source || "pharmacy_catalog"
-    }));
+    this.catalog = items.map((item) => normalizeCatalogItem(item));
     return this.catalog;
   }
 
   upsertCatalogItem(item) {
     const name = item.name || item.medicine || "";
     const existingIndex = this.catalog.findIndex((record) => sameMedicine(record.name, name));
-    const normalized = this.loadCatalog([item])[0];
+    const normalized = normalizeCatalogItem(item);
     if (existingIndex >= 0) {
       this.catalog[existingIndex] = mergeCatalogItems(this.catalog[existingIndex], normalized);
       return this.catalog[existingIndex];
@@ -115,6 +98,27 @@ function normalize(value) {
 
 function sameMedicine(left, right) {
   return normalize(left) === normalize(right);
+}
+
+function normalizeCatalogItem(item) {
+  return {
+    id: item.id || `catalog-${normalize(item.name || item.medicine)}-${Date.now()}`,
+    name: item.name || item.medicine || "",
+    aliases: item.aliases || [],
+    forms: item.forms || (item.form ? [item.form] : []),
+    units: item.units || (item.unit ? [item.unit] : []),
+    packSizes: item.packSizes || (item.pack_size ? [item.pack_size] : []),
+    category: item.category || "",
+    sellingPrice: item.sellingPrice ?? item.selling_price ?? "",
+    costPrice: item.costPrice ?? item.cost_price ?? "",
+    supplier: item.supplier || "",
+    barcode: item.barcode || "",
+    batches: item.batches || [],
+    expiry: item.expiry || "",
+    shelf: item.shelf || item.location || "",
+    stockLeft: item.stockLeft ?? item.current_stock ?? item.stock ?? null,
+    source: item.source || "pharmacy_catalog"
+  };
 }
 
 function mergeCatalogItems(existing, incoming) {
