@@ -81,6 +81,8 @@ assert(appSource.includes("catalog-onboarding-prompt"), "Catalog onboarding prom
 assert(appSource.includes("CatalogImportCard"), "Catalog import card flow missing");
 assert(appSource.includes("catalog-import-editor"), "Catalog import card must use owner-friendly paste editor");
 assert(appSource.includes("catalog-import-table"), "Catalog import card must expose column editing");
+assert(appSource.includes("catalogImportMobileRowTemplate"), "Catalog import card must expose mobile medicine rows");
+assert(appSource.includes("catalog-mobile-rows"), "Catalog import card must render mobile-friendly rows");
 assert(appSource.includes("data-catalog-field"), "Catalog table cells must be editable");
 assert(appSource.includes("updateCatalogImportCell"), "Catalog table edits must update the approved payload");
 assert(appSource.includes("MEDICINE_DETAIL_CARD_TYPES"), "Reusable medicine-detail card layout missing");
@@ -93,6 +95,7 @@ assert(css.includes(".message-bubble"), "Chat message bubbles missing");
 assert(css.includes(".catalog-onboarding-prompt"), "Catalog onboarding prompt CSS missing");
 assert(css.includes(".catalog-import-editor"), "Catalog import editor CSS missing");
 assert(css.includes(".catalog-import-table"), "Catalog import table CSS missing");
+assert(css.includes(".catalog-mobile-row"), "Catalog mobile row CSS missing");
 assert(css.includes(".medicine-detail-grid"), "Medicine detail grid CSS missing");
 assert(appSource.includes("ensureOnboardingStarted"), "First-run onboarding guard missing");
 assert(appSource.includes("startVoiceCapture"), "Browser voice capture path missing");

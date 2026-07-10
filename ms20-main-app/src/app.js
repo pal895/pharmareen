@@ -411,8 +411,11 @@ function catalogImportTableTemplate(card) {
           </tbody>
         </table>
       </div>
+      <div class="catalog-mobile-rows" aria-label="Medicine catalog mobile review">
+        ${rows.map((row, index) => catalogImportMobileRowTemplate(card.id, row, index)).join("")}
+      </div>
       <button class="secondary-action" type="button" data-action="add-catalog-row" data-card-id="${card.id}">Add medicine row</button>
-      <p>Edit each row like a stock sheet. Empty names are ignored when you approve.</p>
+      <p>Edit each medicine, then approve. Empty medicine names are ignored.</p>
     </div>
   `;
 }
@@ -431,6 +434,31 @@ function catalogImportRowTemplate(cardId, row, index) {
         </td>
       `).join("")}
     </tr>
+  `;
+}
+
+function catalogImportMobileRowTemplate(cardId, row, index) {
+  const title = row.name || `Medicine ${index + 1}`;
+  return `
+    <section class="catalog-mobile-row" aria-label="${escapeHtml(title)}">
+      <div class="catalog-mobile-row-title">
+        <strong>${escapeHtml(title)}</strong>
+        <span>Row ${index + 1}</span>
+      </div>
+      <div class="catalog-mobile-fields">
+        ${CATALOG_TABLE_COLUMNS.map((column) => `
+          <label>
+            <span>${escapeHtml(column.label)}</span>
+            <input
+              data-card-id="${cardId}"
+              data-catalog-row="${index}"
+              data-catalog-field="${column.key}"
+              ${column.inputMode ? `inputmode="${column.inputMode}"` : ""}
+              value="${escapeHtml(String(row[column.key] ?? ""))}">
+          </label>
+        `).join("")}
+      </div>
+    </section>
   `;
 }
 
