@@ -364,6 +364,45 @@ input:disabled {
   line-height: 1.35;
 }
 
+.catalog-import-editor {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.catalog-import-editor label span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.82em;
+  font-weight: 750;
+}
+
+.catalog-import-editor textarea {
+  width: 100%;
+  min-height: 250px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 13px;
+  color: var(--ink);
+  background: #fff;
+  line-height: 1.38;
+  outline: none;
+  resize: vertical;
+}
+
+.catalog-import-editor textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(24, 95, 85, 0.12);
+}
+
+.catalog-import-editor p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9em;
+  line-height: 1.35;
+}
+
 .field-grid label span {
   display: block;
   margin-bottom: 5px;

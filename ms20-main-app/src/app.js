@@ -285,6 +285,17 @@ function cardBodyTemplate(card, displayed) {
       </div>
     `;
   }
+  if (card.type === "CatalogImportCard") {
+    return `
+      <div class="catalog-import-editor">
+        <label>
+          <span>Medicine list</span>
+          <textarea data-card-id="${card.id}" data-field="items_text" rows="11">${escapeHtml(String(card.fields?.items_text || ""))}</textarea>
+        </label>
+        <p>One medicine per line. Put the selling price at the end if you know it.</p>
+      </div>
+    `;
+  }
   return `
     <div class="field-grid">
       ${displayed.map((field) => fieldTemplate(card, field)).join("")}
@@ -1130,13 +1141,13 @@ function friendlyCardLabel(card) {
 }
 
 function ownerCardNote(card) {
+  if (card.type === "CatalogImportCard") return "Review the list, edit if needed, then approve.";
   if (card.status === "needs_correction") return "Edit anything that looks wrong, then confirm.";
   if (card.type === "SaleCard") return "Complete the sale details, then confirm.";
   if (card.type === "VoiceReviewCard") return "Check the voice result, then confirm.";
   if (card.type === "InvoiceCard") return "Check the invoice before saving.";
   if (card.type === "PhotoReviewCard" || card.type === "VisualScanCard") return "Check the photo details before saving.";
   if (card.type === "CatalogOnboardingCard") return "Choose the easiest way to add medicines.";
-  if (card.type === "CatalogImportCard") return "Check names, forms, prices, stock, batch, and expiry before approving.";
   if (card.type === "ImportMappingCard") return "Map the columns once, then MS2.0 can reuse the pattern.";
   if (card.type === "NotificationCard") return "Generated locally from pharmacy records.";
   if (card.type === "DocumentExportCard") return "Download or print when ready.";
