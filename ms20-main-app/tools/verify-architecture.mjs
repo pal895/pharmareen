@@ -85,6 +85,8 @@ assert(appSource.includes("catalogImportMobileRowTemplate"), "Catalog import car
 assert(appSource.includes("catalog-mobile-rows"), "Catalog import card must render mobile-friendly rows");
 assert(appSource.includes("data-catalog-field"), "Catalog table cells must be editable");
 assert(appSource.includes("updateCatalogImportCell"), "Catalog table edits must update the approved payload");
+assert(appSource.includes("pruneCatalogOnboardingCards"), "Saved catalog must prune stale onboarding cards");
+assert(appSource.includes("removeCardsByType([\"CatalogOnboardingCard\"]"), "Catalog import paths must remove stale catalog choice cards");
 assert(appSource.includes("MEDICINE_DETAIL_CARD_TYPES"), "Reusable medicine-detail card layout missing");
 assert(appSource.includes("exportCatalogCsv"), "Catalog CSV export action missing");
 assert(appSource.includes("speechSynthesis"), "Local read-aloud support missing");

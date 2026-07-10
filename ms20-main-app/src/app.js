@@ -619,17 +619,28 @@ function handleAction(dataset) {
   if (action === "demo-invoice") addPhotoCards("supplier-invoice.jpg", "invoice");
   if (action === "demo-onboarding") addOnboardingCard();
   if (action === "start-catalog-invoice") {
+    removeCardsByType(["CatalogOnboardingCard"]);
     state.pendingScanType = "invoice";
     root.querySelector("#cameraInput")?.click();
   }
   if (action === "start-catalog-scan") {
+    removeCardsByType(["CatalogOnboardingCard"]);
     state.pendingScanType = "medicine_photo";
     root.querySelector("#cameraInput")?.click();
   }
-  if (action === "start-catalog-paste") addCard(createPasteImportCard());
+  if (action === "start-catalog-paste") {
+    removeCardsByType(["CatalogOnboardingCard"]);
+    addCard(createPasteImportCard());
+  }
   if (action === "add-catalog-row") addCatalogImportRow(dataset.cardId);
-  if (action === "start-catalog-file") root.querySelector("#documentInput")?.click();
-  if (action === "start-sale-learning") addMissingMedicineCard();
+  if (action === "start-catalog-file") {
+    removeCardsByType(["CatalogOnboardingCard"]);
+    root.querySelector("#documentInput")?.click();
+  }
+  if (action === "start-sale-learning") {
+    removeCardsByType(["CatalogOnboardingCard"]);
+    addMissingMedicineCard();
+  }
   if (action === "export-catalog-csv") exportCatalogCsv();
   if (action === "download-template") downloadBulkPasteTemplate();
   if (action === "read-card") readCardAloud(dataset.cardId);
@@ -875,6 +886,7 @@ function createOnboardingCard() {
 
 function ensureOnboardingStarted() {
   if (state.onboarding.completed) {
+    pruneCatalogOnboardingCards();
     ensureCatalogOnboardingStarted();
     return;
   }
@@ -885,9 +897,19 @@ function ensureOnboardingStarted() {
 
 function ensureCatalogOnboardingStarted() {
   if (!state.onboarding.completed) return;
-  if (pharmacyBrain.catalog.length > 0) return;
+  pruneCatalogOnboardingCards();
+  if (catalogHasItems()) return;
   if (state.cards.some((card) => card.type === "CatalogOnboardingCard" || card.type === "CatalogImportCard")) return;
   state.cards.unshift(createCatalogChoiceCard());
+}
+
+function catalogHasItems() {
+  return pharmacyBrain.catalog.length > 0 || state.catalog.items.length > 0;
+}
+
+function pruneCatalogOnboardingCards() {
+  if (!catalogHasItems()) return;
+  removeCardsByType(["CatalogOnboardingCard"]);
 }
 
 function resetOnboarding() {
@@ -959,6 +981,7 @@ function addStockCorrectionCard() {
 }
 
 function addCard(card) {
+  if (card.type === "CatalogImportCard") removeCardsByType(["CatalogOnboardingCard"]);
   state.cards.unshift(card);
   cloudGateway.saveCardHistory(card);
   render();
@@ -1032,6 +1055,7 @@ function confirmCard(cardId) {
   }
   recordCard(card);
   removeCard(cardId);
+  pruneCatalogOnboardingCards();
   if (card.type === "OnboardingCard") ensureCatalogOnboardingStarted();
   refreshNotifications();
   render();
@@ -1041,6 +1065,7 @@ function approveCatalogImport(card) {
   const text = card.fields?.items_text || "";
   const parsed = text.includes("|") ? { items: parseCatalogText(text), unclear: [] } : parseBulkMedicineList(text, sourceBrain);
   const saved = saveCatalogItems(parsed.items);
+  pruneCatalogOnboardingCards();
   const summary = buildCatalogSavedSummary(saved, parsed.unclear || []);
   addFeed("system", `Catalog saved. ${summary}`);
   addCard(buildDocumentCard({
@@ -1088,6 +1113,7 @@ function saveCatalogItems(items = []) {
   state.catalog.items = pharmacyBrain.catalog;
   safeLocalStorage()?.setItem(CATALOG_KEY, JSON.stringify(state.catalog.items));
   void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);
+  pruneCatalogOnboardingCards();
   refreshNotifications();
   return saved;
 }
@@ -1240,6 +1266,10 @@ function adjustCardFontScale(delta) {
 function removeCard(cardId) {
   const index = state.cards.findIndex((item) => item.id === cardId);
   if (index >= 0) state.cards.splice(index, 1);
+}
+
+function removeCardsByType(types) {
+  state.cards = state.cards.filter((card) => !types.includes(card.type));
 }
 
 function setPayment(cardId, payment) {
