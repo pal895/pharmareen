@@ -1,15 +1,20 @@
 export function cardFieldsFor(type) {
   const base = {
     SaleCard: ["medicine", "quantity", "payment", "stockLeft"],
-    InvoiceCard: ["supplier", "medicine", "quantity", "unit", "total", "payment"],
+    InvoiceCard: ["supplier", "medicine", "quantity", "unit", "total", "payment", "batch", "expiry"],
     RestockCard: ["medicine", "quantity", "unit", "supplier"],
     OnboardingCard: ["pharmacy", "owner", "branch", "location", "payments"],
     StockCorrectionCard: ["medicine", "current_stock", "correct_stock", "reason"],
     ReportCard: ["period", "focus", "backend_route"],
     VoiceReviewCard: ["transcript", "medicine", "quantity", "payment"],
-    PhotoReviewCard: ["file", "medicine", "form", "unit", "pack_size"],
-    MedicineMatchCard: ["message", "medicine", "quantity", "payment", "choice", "alias"],
-    VisualScanCard: ["scan_type", "medicine", "form", "unit", "pack_size", "category"],
+    PhotoReviewCard: ["file", "medicine", "form", "unit", "pack_size", "barcode", "batch", "expiry", "shelf"],
+    MedicineMatchCard: ["message", "medicine", "form", "unit", "selling_price", "quantity", "payment", "stock", "cost_price", "supplier", "batch", "expiry", "alias"],
+    VisualScanCard: ["scan_type", "medicine", "form", "unit", "pack_size", "quantity", "selling_price", "cost_price", "supplier", "barcode", "batch", "expiry", "shelf", "category"],
+    CatalogOnboardingCard: ["question", "choices"],
+    CatalogImportCard: ["method", "items_text", "notes"],
+    ImportMappingCard: ["file", "mapping", "missing_columns", "notes"],
+    NotificationCard: ["category", "message", "action", "status"],
+    DocumentExportCard: ["document", "format", "items", "status"],
     SyncReviewCard: ["pending", "last_sync", "conflict", "backend", "sheets", "baileys"]
   };
   return base[type] || [];

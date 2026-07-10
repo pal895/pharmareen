@@ -1,15 +1,16 @@
 # MS2.0 Current Architecture Snapshot
 
-Snapshot date: 2026-07-09
+Snapshot date: 2026-07-10
 
 ## Product Direction
 
 MS2.0 is now centered on the Main App as the primary pharmacy product. The owner experience is messaging-first:
 
 - Open MS2.0.
-- See one MS2.0 Assistant conversation row, not a technical dashboard.
+- See MS2.0 Assistant and Notifications conversations, not a technical dashboard.
 - Tap into the permanent MS2.0 conversation.
 - Complete first-run setup before daily workflows on a fresh device.
+- Complete medicine catalog onboarding before the paused sale test.
 - Type, speak, scan, or upload in the chat.
 - Complete sales record instantly through the safe queue path.
 - Missing or ambiguous work becomes an editable card for confirm, correct, or cancel.
@@ -58,6 +59,10 @@ Existing offline app route expected on backend:
 - `src/services/backendAdapters.js`: Adapter registry for parser, medicine brain, sale, stock, report, invoice, onboarding, sync, cloud, and external channel slots.
 - `src/services/localIntelligence.js`: Local deterministic parser and known command handling.
 - `src/services/brainAdapters.js`: Pharmacy Brain, Source Brain, and AI fallback placeholders.
+- `src/data/sourceMedicines.js`: Seed Source Brain medicine/form/unit knowledge for onboarding tests.
+- `src/services/catalogOnboarding.js`: Catalog onboarding choices, bulk paste parser, CSV/text import parser, catalog text review format.
+- `src/services/notificationCenter.js`: Local deterministic Digital Operations Assistant rules and notification cards.
+- `src/services/documentGenerator.js`: Local CSV/template document generation and download helpers.
 - `src/services/offlineQueue.js`: Local queue and duplicate/idempotency behavior.
 - `src/services/syncAdapter.js`: Queue sync placeholder.
 - `src/services/cloudGateway.js`: Cloud memory placeholder.
@@ -70,6 +75,7 @@ Existing offline app route expected on backend:
 - Main App shell.
 - Messaging app home.
 - Permanent MS2.0 Assistant conversation.
+- Separate Notifications workspace.
 - Chat bubbles and bottom composer.
 - Hidden attach/actions menu.
 - First-run onboarding card.
@@ -77,7 +83,13 @@ Existing offline app route expected on backend:
 - Direct camera capture and photo library upload.
 - Silent card cancel with no chat noise.
 - Persistent editable-card text-size controls.
-- Instant complete-sale receipt path.
+- Instant complete-sale receipt path only for medicines already in the pharmacy catalog.
+- Onboarding-first catalog flow after setup.
+- Bulk paste and CSV/text catalog import cards.
+- CSV catalog export and bulk-paste template download.
+- Local read-aloud action through browser/device speech synthesis.
+- Batch, expiry, barcode, supplier, shelf, price, and stock fields on scanner/import paths.
+- Deterministic notifications for catalog needed, low stock, out of stock, expiry windows, and pending review items.
 - Editable card workspace.
 - Local deterministic sale parser.
 - Offline queue.
@@ -88,8 +100,8 @@ Existing offline app route expected on backend:
 - Baileys route exposed as external channel route metadata.
 - Report route metadata.
 - Onboarding card placeholder.
-- Medicine catalog onboarding path placeholder.
-- Photo/invoice review-first placeholders.
+- Medicine catalog onboarding foundation.
+- Photo/invoice review-first scanner adapter foundation.
 
 ## Preserved Existing Systems
 
@@ -131,6 +143,8 @@ Verification checks confirmed:
 - No OpenAI provider client in runtime sources.
 - Known sale parser path is local-first.
 - Visual/photo placeholder does not call AI.
+- Bulk paste and CSV/text imports do not call AI.
+- Notifications and expiry calculations do not call AI.
 - Backend status probes only local/current backend endpoints.
 
 ## Branding
@@ -151,11 +165,13 @@ Passed:
 - `npm run verify`
 - `npm run check`
 - `node --check src/services/liveBackendGateway.js`
+- `node --check src/services/catalogOnboarding.js`
+- `node --check src/services/notificationCenter.js`
 - `python -m py_compile app/main.py app/live_runtime.py app/local_first_parser.py app/sheets.py`
 - HTTP 200 for `http://127.0.0.1:5177/index.html`
 - Browser load inspection
 - Browser console error check
-- Deterministic `Panadol 2 cash` instant sale proof
+- Deterministic architecture proof for source brain lookup, bulk paste import, CSV import, notification rules, CSV export, visual token control, and zero OpenAI/API use
 
 Known caveat:
 
@@ -166,6 +182,8 @@ Known caveat:
 Not yet complete:
 
 - Direct production write sync from every confirmed Main App card.
+- Real OCR, barcode decoding, PDF extraction, binary Excel parsing, and near-duplicate image recognition are adapter-ready but not fully implemented.
+- PDF/Excel document generation is reserved for the document adapter path.
 - Full live Main App workflow validation.
 - Full mobile usability validation.
 - Real owner friction review.
@@ -176,9 +194,22 @@ Not yet complete:
 Continue with Main App live product testing only:
 
 1. Start the Main App.
-2. Test the chat home.
-3. Test the chat screen and every Main App workflow.
-4. Record friction.
-5. Fix only verified friction.
-6. Preserve backend/offline/Baileys/Sheets systems.
-7. Keep OpenAI/API usage at zero unless explicitly required.
+2. Resume from onboarding, not sale testing.
+3. Verify setup then medicine catalog onboarding choices.
+4. Test paste/CSV/photo/scan/import paths one at a time.
+5. Record friction.
+6. Fix only verified friction.
+7. Preserve backend/offline/Baileys/Sheets systems.
+8. Keep OpenAI/API usage at zero unless explicitly required.
+
+Paused original sale test remains:
+
+```text
+Test 1.4: Panadol 2 cash
+```
+
+Replacement next test is onboarding:
+
+```text
+Onboarding Test A.1: open the MS2.0 Assistant and confirm catalog onboarding choices appear before sale testing.
+```

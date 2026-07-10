@@ -5,9 +5,25 @@ import { SyncAdapter } from "./services/syncAdapter.js";
 import { BackendAdapterRegistry } from "./services/backendAdapters.js";
 import { PharmacyBrain, SourceBrain, AIFallbackAdapter } from "./services/brainAdapters.js";
 import { runVisualPipeline, buildPhotoReviewCard } from "./services/visualPipeline.js";
+import {
+  createCatalogChoiceCard,
+  createPasteImportCard,
+  parseBulkMedicineList,
+  parseCatalogText,
+  parseDelimitedInventory,
+  catalogItemsToText,
+  buildImportSummary
+} from "./services/catalogOnboarding.js";
+import { buildDeterministicNotifications, mergeNotifications, notificationToCard } from "./services/notificationCenter.js";
+import { buildCatalogCsv, buildBulkPasteTemplate, buildDocumentCard, downloadTextFile } from "./services/documentGenerator.js";
 import { cardFieldsFor, createEditableCard, paymentOptions, quantityBumps } from "./cards/editableCards.js";
 import { listRouteSlots, resolveOfflineSlot } from "./routes/routeRegistry.js";
-import { TokenPolicy, CloudMemoryContract } from "./contracts/integrationContracts.js";
+import {
+  TokenPolicy,
+  CloudMemoryContract,
+  IntelligenceSeparationContract,
+  WorkspaceContract
+} from "./contracts/integrationContracts.js";
 
 const state = structuredClone(demoState);
 const cloudGateway = new CloudMemoryGateway();
@@ -19,15 +35,20 @@ const sourceBrain = new SourceBrain();
 const aiFallback = new AIFallbackAdapter();
 const SETUP_KEY = "ms20-main-app:onboarding-complete";
 const CARD_FONT_SCALE_KEY = "ms20-main-app:card-font-scale";
+const CATALOG_KEY = "ms20-main-app:pharmacy-catalog";
+const NOTIFICATION_KEY = "ms20-main-app:notifications";
 const CARD_FONT_SCALE_MIN = 0.85;
 const CARD_FONT_SCALE_MAX = 1.25;
 const CARD_FONT_SCALE_STEP = 0.1;
 let activeRecognition = null;
 
-state.ui = { screen: "home" };
+state.ui = { screen: "home", workspace: "operations" };
 state.voice = { listening: false, status: "" };
+state.pendingScanType = "medicine_photo";
 state.onboarding = { started: false, completed: setupComplete() };
 state.cardFontScale = readCardFontScale();
+state.catalog = { items: readCatalog() };
+state.notifications = readNotifications();
 state.liveBackend = {
   baseUrl: backendAdapters.liveBackendGateway.baseUrl,
   health: { ok: false, status: 0 },
@@ -36,6 +57,8 @@ state.liveBackend = {
   writeMode: "safe_queue_only",
   tokenImpact: "zero_openai_api_tokens"
 };
+pharmacyBrain.loadCatalog(state.catalog.items);
+refreshNotifications();
 
 const root = document.querySelector("#app");
 
@@ -53,7 +76,9 @@ function render() {
 }
 
 function chatHomeTemplate() {
-  const setupReady = state.onboarding.completed;
+  const statusText = onboardingStatusText();
+  const unread = unreadNotifications();
+  const notificationPreview = latestNotificationPreview();
   return `
     <section class="chat-home" aria-label="MS2.0 chat home">
       <header class="home-header">
@@ -62,12 +87,21 @@ function chatHomeTemplate() {
           <span>Pharmacy operating intelligence</span>
         </div>
       </header>
-      <button class="conversation-row" type="button" data-action="open-chat" aria-label="Open MS2.0 Assistant">
+      <button class="conversation-row" type="button" data-action="open-chat" data-workspace="operations" aria-label="Open MS2.0 Operations">
         <span class="assistant-avatar">M</span>
         <span class="conversation-copy">
           <strong>MS2.0 Assistant</strong>
-          <small>${setupReady ? "Ready" : "Setup needed"}</small>
-          <span>${setupReady ? "Ask, record, scan, or manage your pharmacy." : "Set up your pharmacy to begin."}</span>
+          <small>${statusText}</small>
+          <span>${state.onboarding.completed ? pharmacyBrain.catalog.length ? "Sales, scans, invoices, reports, and approvals." : "Add your medicine catalog to begin." : "Set up your pharmacy to begin."}</span>
+        </span>
+        <span class="row-arrow">Open</span>
+      </button>
+      <button class="conversation-row notifications-row" type="button" data-action="open-chat" data-workspace="notifications" aria-label="Open notifications">
+        <span class="assistant-avatar notification-avatar">${unread}</span>
+        <span class="conversation-copy">
+          <strong>Notifications</strong>
+          <small>${unread ? `${unread} unread` : "Quiet"}</small>
+          <span>${escapeHtml(notificationPreview)}</span>
         </span>
         <span class="row-arrow">Open</span>
       </button>
@@ -76,33 +110,48 @@ function chatHomeTemplate() {
 }
 
 function chatScreenTemplate() {
+  const isNotifications = state.ui.workspace === "notifications";
   return `
-    <section class="chat-screen" aria-label="MS2.0 assistant conversation">
+    <section class="chat-screen" aria-label="${isNotifications ? "MS2.0 notifications conversation" : "MS2.0 assistant conversation"}">
       <header class="chat-header">
         <button class="icon-button" type="button" data-action="back-home" aria-label="Back to chat home">&lt;</button>
         <span class="assistant-avatar">M</span>
         <span class="chat-title">
-          <strong>MS2.0</strong>
-          <small>${state.sync.online ? "Online" : "Offline"} / ${state.onboarding.completed ? "Ready" : "Setup needed"}</small>
+          <strong>${isNotifications ? "Notifications" : "MS2.0"}</strong>
+          <small>${state.sync.online ? "Online" : "Offline"} / ${isNotifications ? `${unreadNotifications()} unread` : onboardingStatusText()}</small>
         </span>
         ${adminMenuTemplate()}
       </header>
       <section class="chat-body" id="chatBody" aria-label="Messages">
         <div class="message-list">
           ${chatMessageTemplates()}
-          ${state.cards.map(cardTemplate).join("")}
+          ${isNotifications ? "" : state.cards.map(cardTemplate).join("")}
         </div>
       </section>
-      ${composerTemplate()}
+      ${isNotifications ? notificationsFooterTemplate() : composerTemplate()}
     </section>
   `;
 }
 
 function chatMessageTemplates() {
+  if (state.ui.workspace === "notifications") {
+    const intro = {
+      id: "notifications-intro",
+      type: "system",
+      text: "Notifications stay here, separate from daily sales.",
+      time: "Now"
+    };
+    const cards = activeNotificationCards();
+    return [intro].map(feedItemTemplate).join("") + cards.map(cardTemplate).join("");
+  }
   const intro = {
     id: "intro",
     type: "system",
-    text: state.onboarding.completed ? `${greetingText()} How can I help today?` : "Welcome. Let's set up your pharmacy first.",
+    text: state.onboarding.completed
+      ? pharmacyBrain.catalog.length
+        ? `${greetingText()} How can I help today?`
+        : "Let's add your medicines quickly. How would you like to show me your pharmacy?"
+      : "Welcome. Let's set up your pharmacy first.",
     time: "Now"
   };
   return [intro, ...state.feed].map(feedItemTemplate).join("");
@@ -125,10 +174,13 @@ function composerTemplate() {
         <div class="attach-sheet">
           <button type="button" data-action="take-photo">Camera</button>
           <button type="button" data-action="upload-photo">Photo library</button>
+          <button type="button" data-action="upload-document">File</button>
           <button type="button" data-action="demo-invoice">Invoice</button>
-          <button type="button" data-action="demo-barcode">Scan</button>
+          <button type="button" data-action="demo-barcode">Scan barcode</button>
+          <button type="button" data-action="start-catalog-paste">Paste list</button>
           <button type="button" data-action="demo-stock-correction">Stock fix</button>
           <button type="button" data-action="demo-report">Report</button>
+          <button type="button" data-action="export-catalog-csv">Export CSV</button>
           <button type="button" data-action="demo-onboarding">Setup</button>
         </div>
       </details>
@@ -142,6 +194,16 @@ function composerTemplate() {
       ${state.voice.status ? `<p class="composer-hint">${escapeHtml(state.voice.status)}</p>` : ""}
       <input id="photoInput" class="hidden-input" type="file" accept="image/*">
       <input id="cameraInput" class="hidden-input" type="file" accept="image/*" capture="environment">
+      <input id="documentInput" class="hidden-input" type="file" accept=".csv,.txt,.tsv,.xls,.xlsx,.pdf,image/*,text/csv,text/plain">
+    </footer>
+  `;
+}
+
+function notificationsFooterTemplate() {
+  return `
+    <footer class="chat-composer notification-footer" aria-label="Notifications controls">
+      <button type="button" data-action="back-home">Back</button>
+      <button type="button" data-action="mark-notifications-read">Mark read</button>
     </footer>
   `;
 }
@@ -175,6 +237,8 @@ function adminMenuTemplate() {
           <div class="contract-grid">
             <pre>${escapeHtml(JSON.stringify(TokenPolicy, null, 2))}</pre>
             <pre>${escapeHtml(JSON.stringify(CloudMemoryContract, null, 2))}</pre>
+            <pre>${escapeHtml(JSON.stringify(IntelligenceSeparationContract, null, 2))}</pre>
+            <pre>${escapeHtml(JSON.stringify(WorkspaceContract, null, 2))}</pre>
             <pre>${escapeHtml(JSON.stringify(listRouteSlots(state.liveBackend), null, 2))}</pre>
           </div>
         </details>
@@ -216,15 +280,60 @@ function cardTemplate(card) {
 
 function fieldTemplate(card, field) {
   const value = card.fields?.[field] ?? "";
+  const longFields = new Set(["items_text", "choices", "notes", "mapping", "message", "action", "missing_columns"]);
+  const control = longFields.has(field)
+    ? `<textarea data-card-id="${card.id}" data-field="${field}" rows="${field === "items_text" ? 8 : 3}">${escapeHtml(String(value))}</textarea>`
+    : `<input data-card-id="${card.id}" data-field="${field}" value="${escapeHtml(String(value))}">`;
   return `
     <label>
       <span>${escapeHtml(field.replaceAll("_", " "))}</span>
-      <input data-card-id="${card.id}" data-field="${field}" value="${escapeHtml(String(value))}">
+      ${control}
     </label>
   `;
 }
 
 function activeActionsTemplate(card) {
+  if (card.type === "CatalogOnboardingCard") {
+    return `
+      <div class="card-actions onboarding-actions">
+        <button data-action="start-catalog-invoice" data-card-id="${card.id}">Invoice/photo</button>
+        <button data-action="start-catalog-scan" data-card-id="${card.id}">Scan shelves</button>
+        <button data-action="start-catalog-paste" data-card-id="${card.id}">Paste list</button>
+        <button data-action="start-catalog-file" data-card-id="${card.id}">Upload file</button>
+        <button data-action="start-sale-learning" data-card-id="${card.id}">Add while selling</button>
+      </div>
+    `;
+  }
+  if (card.type === "CatalogImportCard") {
+    return `
+      <div class="card-actions">
+        <button data-action="confirm-card" data-card-id="${card.id}">Approve catalog</button>
+        <button data-action="download-template">Template</button>
+        <button data-action="read-card" data-card-id="${card.id}">Read</button>
+        <button data-action="correct-card" data-card-id="${card.id}">Correct</button>
+        <button data-action="reject-card" data-card-id="${card.id}">Cancel</button>
+      </div>
+    `;
+  }
+  if (card.type === "NotificationCard") {
+    return `
+      <div class="card-actions">
+        <button data-action="dismiss-notification" data-notification-id="${notificationIdFromCard(card)}">Done</button>
+        <button data-action="read-card" data-card-id="${card.id}">Read</button>
+      </div>
+    `;
+  }
+  if (card.type === "ReportCard" || card.type === "DocumentExportCard") {
+    return `
+      <div class="card-actions">
+        <button data-action="confirm-card" data-card-id="${card.id}">Confirm</button>
+        <button data-action="read-card" data-card-id="${card.id}">Read</button>
+        <button data-action="export-catalog-csv">Download CSV</button>
+        <button data-action="correct-card" data-card-id="${card.id}">Correct</button>
+        <button data-action="reject-card" data-card-id="${card.id}">Cancel</button>
+      </div>
+    `;
+  }
   return `
     <div class="card-actions">
       <button data-action="confirm-card" data-card-id="${card.id}">Confirm</button>
@@ -286,12 +395,19 @@ function bindEvents() {
 
   root.querySelector("#photoInput")?.addEventListener("change", (event) => {
     const file = event.target.files?.[0];
-    addPhotoCards(file?.name || "camera-photo.jpg", "medicine_photo");
+    addPhotoCards(file?.name || "camera-photo.jpg", state.pendingScanType || "medicine_photo");
+    state.pendingScanType = "medicine_photo";
   });
 
   root.querySelector("#cameraInput")?.addEventListener("change", (event) => {
     const file = event.target.files?.[0];
-    addPhotoCards(file?.name || "camera-photo.jpg", "medicine_photo");
+    addPhotoCards(file?.name || "camera-photo.jpg", state.pendingScanType || "medicine_photo");
+    state.pendingScanType = "medicine_photo";
+  });
+
+  root.querySelector("#documentInput")?.addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    if (file) void handleDocumentFile(file);
   });
 }
 
@@ -299,7 +415,8 @@ function handleAction(dataset) {
   const action = dataset.action;
   if (action === "open-chat") {
     state.ui.screen = "chat";
-    ensureOnboardingStarted();
+    state.ui.workspace = dataset.workspace || "operations";
+    if (state.ui.workspace === "operations") ensureOnboardingStarted();
     render();
     return;
   }
@@ -311,11 +428,34 @@ function handleAction(dataset) {
   if (action === "focus-chat") root.querySelector("#commandInput")?.focus();
   if (action === "demo-sale") handleCommand("Panadol 2 cash");
   if (action === "start-voice") startVoiceCapture();
-  if (action === "take-photo") root.querySelector("#cameraInput")?.click();
-  if (action === "upload-photo") root.querySelector("#photoInput")?.click();
+  if (action === "take-photo") {
+    state.pendingScanType = dataset.scanType || "medicine_photo";
+    root.querySelector("#cameraInput")?.click();
+  }
+  if (action === "upload-photo") {
+    state.pendingScanType = dataset.scanType || "medicine_photo";
+    root.querySelector("#photoInput")?.click();
+  }
+  if (action === "upload-document") root.querySelector("#documentInput")?.click();
   if (action === "demo-barcode") addBarcodeCard();
   if (action === "demo-invoice") addPhotoCards("supplier-invoice.jpg", "invoice");
   if (action === "demo-onboarding") addOnboardingCard();
+  if (action === "start-catalog-invoice") {
+    state.pendingScanType = "invoice";
+    root.querySelector("#cameraInput")?.click();
+  }
+  if (action === "start-catalog-scan") {
+    state.pendingScanType = "medicine_photo";
+    root.querySelector("#cameraInput")?.click();
+  }
+  if (action === "start-catalog-paste") addCard(createPasteImportCard());
+  if (action === "start-catalog-file") root.querySelector("#documentInput")?.click();
+  if (action === "start-sale-learning") addMissingMedicineCard();
+  if (action === "export-catalog-csv") exportCatalogCsv();
+  if (action === "download-template") downloadBulkPasteTemplate();
+  if (action === "read-card") readCardAloud(dataset.cardId);
+  if (action === "mark-notifications-read") markNotificationsRead();
+  if (action === "dismiss-notification") dismissNotification(dataset.notificationId);
   if (action === "demo-report") addReportCard();
   if (action === "demo-sync") addSyncCard();
   if (action === "demo-stock-correction") addStockCorrectionCard();
@@ -333,6 +473,7 @@ function handleAction(dataset) {
 
 function handleCommand(text) {
   state.ui.screen = "chat";
+  state.ui.workspace = "operations";
   const trimmed = String(text || "").trim();
   if (!state.onboarding.completed) {
     ensureOnboardingStarted();
@@ -340,13 +481,25 @@ function handleCommand(text) {
     return;
   }
   if (!trimmed) {
-    addFeed("system", "Please add medicine, quantity, and payment. Example: Panadol 2 cash.");
+    addFeed("system", "Type a sale, stock question, report request, or paste a medicine list.");
+    render();
+    return;
+  }
+  if (looksLikeMedicineList(trimmed)) {
+    addFeed("owner", "Pasted medicine list");
+    addCard(createPasteImportCard(trimmed.replace(/^list\s*:/i, "").trim()));
+    return;
+  }
+  if (pharmacyBrain.catalog.length === 0) {
+    addFeed("owner", trimmed);
+    ensureCatalogOnboardingStarted();
     render();
     return;
   }
 
   const card = buildCommandCard(trimmed);
   addFeed("owner", trimmed);
+  prepareUnknownMedicineFallback(card, trimmed);
   if (canRecordInstantly(card, trimmed)) {
     recordCard(card);
     render();
@@ -357,20 +510,35 @@ function handleCommand(text) {
 
 function handleVoiceTranscript(text) {
   state.ui.screen = "chat";
+  state.ui.workspace = "operations";
+  if (!state.onboarding.completed) {
+    ensureOnboardingStarted();
+    render();
+    return;
+  }
+  if (pharmacyBrain.catalog.length === 0) {
+    addFeed("owner", text);
+    ensureCatalogOnboardingStarted();
+    render();
+    return;
+  }
   const card = buildCommandCard(text);
   addFeed("owner", text);
+  prepareUnknownMedicineFallback(card, text);
   if (canRecordInstantly(card, text)) {
     recordCard(card);
     render();
   } else {
-    card.type = "VoiceReviewCard";
-    card.title = "Check voice result";
-    card.fields = {
-      transcript: text,
-      medicine: card.fields?.medicine || "",
-      quantity: card.fields?.quantity || "",
-      payment: card.fields?.payment || ""
-    };
+    if (card.type !== "MedicineMatchCard") {
+      card.type = "VoiceReviewCard";
+      card.title = "Check voice result";
+      card.fields = {
+        transcript: text,
+        medicine: card.fields?.medicine || "",
+        quantity: card.fields?.quantity || "",
+        payment: card.fields?.payment || ""
+      };
+    }
     addCard(card);
   }
 }
@@ -445,7 +613,35 @@ function canRecordInstantly(card, sourceText) {
   if (!commandHasExplicitPayment(sourceText)) return false;
   if (String(card.fields?.medicine || "").trim().length < 3) return false;
   if (!Number.isFinite(Number(card.fields?.quantity)) || Number(card.fields.quantity) <= 0) return false;
+  if (pharmacyBrain.findMedicine(card.fields.medicine).status !== "matched") return false;
   return ["cash", "mpesa", "credit", "mixed"].includes(String(card.fields?.payment || "").toLowerCase());
+}
+
+function prepareUnknownMedicineFallback(card, sourceText) {
+  if (card.type !== "SaleCard") return card;
+  if (pharmacyBrain.findMedicine(card.fields?.medicine).status === "matched") return card;
+  const sourceMatch = sourceBrain.lookupMedicine(card.fields?.medicine);
+  card.type = "MedicineMatchCard";
+  card.title = "Add new medicine";
+  card.status = "needs_correction";
+  card.confidence = 0.68;
+  card.fields = {
+    message: "This medicine is not in your pharmacy catalog yet.",
+    medicine: sourceMatch.status === "matched" ? sourceMatch.name : card.fields?.medicine || sourceText,
+    form: first(sourceMatch.forms),
+    unit: first(sourceMatch.units),
+    selling_price: sellingPriceFromText(sourceText),
+    quantity: card.fields?.quantity || "1",
+    payment: card.fields?.payment || "cash",
+    stock: "",
+    cost_price: "",
+    supplier: "",
+    batch: "",
+    expiry: "",
+    alias: ""
+  };
+  card.validation = "Approve to save this medicine locally before repeat sales.";
+  return card;
 }
 
 function commandHasExplicitPayment(text) {
@@ -454,6 +650,7 @@ function commandHasExplicitPayment(text) {
 
 function addPhotoCards(fileName, scanType) {
   state.ui.screen = "chat";
+  state.ui.workspace = "operations";
   const result = runVisualPipeline({ fileName, scanType });
   const visualCard = buildPhotoReviewCard(result);
   addCard(visualCard);
@@ -462,11 +659,12 @@ function addPhotoCards(fileName, scanType) {
       type: "PhotoReviewCard",
       title: "Check photo details",
       source: fileName,
-      fields: { file: fileName, medicine: "", form: "", unit: "", pack_size: "" },
+      fields: { file: fileName, medicine: "", form: "", unit: "", pack_size: "", barcode: "", batch: "", expiry: "", shelf: "" },
       confidence: result.confidence,
       validation: "Owner correction will save to pharmacy visual memory."
     }));
   }
+  refreshNotifications();
 }
 
 function addBarcodeCard() {
@@ -496,9 +694,20 @@ function createOnboardingCard() {
 }
 
 function ensureOnboardingStarted() {
-  if (state.onboarding.completed || state.onboarding.started) return;
+  if (state.onboarding.completed) {
+    ensureCatalogOnboardingStarted();
+    return;
+  }
+  if (state.onboarding.started) return;
   state.cards.unshift(createOnboardingCard());
   state.onboarding.started = true;
+}
+
+function ensureCatalogOnboardingStarted() {
+  if (!state.onboarding.completed) return;
+  if (pharmacyBrain.catalog.length > 0) return;
+  if (state.cards.some((card) => card.type === "CatalogOnboardingCard" || card.type === "CatalogImportCard")) return;
+  state.cards.unshift(createCatalogChoiceCard());
 }
 
 function resetOnboarding() {
@@ -575,13 +784,181 @@ function updateCardField(cardId, field, value) {
 function confirmCard(cardId) {
   const card = state.cards.find((item) => item.id === cardId);
   if (!card) return;
-  recordCard(card);
+  if (card.type === "CatalogOnboardingCard") {
+    removeCard(cardId);
+    addCard(createPasteImportCard());
+    return;
+  }
+  if (card.type === "CatalogImportCard") {
+    approveCatalogImport(card);
+    removeCard(cardId);
+    render();
+    return;
+  }
+  if (card.type === "VisualScanCard" || card.type === "PhotoReviewCard" || card.type === "InvoiceCard") {
+    saveCatalogFromReviewCard(card);
+  }
+  if (card.type === "MedicineMatchCard" && card.fields?.medicine) {
+    saveCatalogItems([{
+      name: card.fields.medicine,
+      form: card.fields.form,
+      unit: card.fields.unit,
+      selling_price: card.fields.selling_price,
+      stock: card.fields.stock,
+      cost_price: card.fields.cost_price,
+      supplier: card.fields.supplier,
+      batch: card.fields.batch,
+      expiry: card.fields.expiry,
+      aliases: card.fields.alias ? [card.fields.alias] : [],
+      source: "sale_time_learning"
+    }]);
+  }
   if (card.type === "OnboardingCard") {
     state.onboarding.completed = true;
     safeLocalStorage()?.setItem(SETUP_KEY, "true");
   }
+  recordCard(card);
   removeCard(cardId);
+  if (card.type === "OnboardingCard") ensureCatalogOnboardingStarted();
+  refreshNotifications();
   render();
+}
+
+function approveCatalogImport(card) {
+  const text = card.fields?.items_text || "";
+  const parsed = text.includes("|") ? { items: parseCatalogText(text), unclear: [] } : parseBulkMedicineList(text, sourceBrain);
+  const saved = saveCatalogItems(parsed.items);
+  const summary = buildImportSummary(saved, parsed.unclear || []);
+  addFeed("system", `Catalog saved. ${summary}`);
+  addCard(buildDocumentCard({
+    title: "Catalog export ready",
+    document: "Pharmacy medicine catalog",
+    format: "CSV",
+    itemCount: pharmacyBrain.catalog.length
+  }));
+}
+
+function saveCatalogFromReviewCard(card) {
+  const fields = card.fields || {};
+  if (!fields.medicine) return;
+  saveCatalogItems([{
+    name: fields.medicine,
+    form: fields.form,
+    unit: fields.unit,
+    pack_size: fields.pack_size,
+    selling_price: fields.selling_price,
+    cost_price: fields.cost_price,
+    stock: fields.quantity || fields.stock || "",
+    supplier: fields.supplier,
+    barcode: fields.barcode,
+    batch: fields.batch,
+    expiry: fields.expiry,
+    shelf: fields.shelf,
+    source: card.type === "InvoiceCard" ? "invoice_review" : "scan_review"
+  }]);
+  pharmacyBrain.saveVisualMemory({
+    cardId: card.id,
+    medicine: fields.medicine,
+    barcode: fields.barcode || "",
+    batch: fields.batch || "",
+    expiry: fields.expiry || "",
+    savedAt: new Date().toISOString()
+  });
+}
+
+function saveCatalogItems(items = []) {
+  const saved = [];
+  for (const item of items) {
+    if (!item?.name) continue;
+    saved.push(pharmacyBrain.upsertCatalogItem(item));
+  }
+  state.catalog.items = pharmacyBrain.catalog;
+  safeLocalStorage()?.setItem(CATALOG_KEY, JSON.stringify(state.catalog.items));
+  void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);
+  refreshNotifications();
+  return saved;
+}
+
+async function handleDocumentFile(file) {
+  const name = file.name || "upload";
+  const lower = name.toLowerCase();
+  state.ui.screen = "chat";
+  state.ui.workspace = "operations";
+  if (file.type.startsWith("image/") || lower.endsWith(".pdf")) {
+    addPhotoCards(name, "invoice");
+    return;
+  }
+  if (lower.endsWith(".xls") || lower.endsWith(".xlsx")) {
+    addCard(createEditableCard({
+      type: "ImportMappingCard",
+      title: "Map Excel import",
+      source: name,
+      fields: {
+        file: name,
+        mapping: "Export this file as CSV for the current zero-token import path.",
+        missing_columns: "Excel binary parsing adapter is reserved.",
+        notes: "CSV/text import is supported now. Excel mapping will use the same catalog review card after adapter wiring."
+      },
+      confidence: 0.62,
+      status: "needs_correction",
+      validation: "No AI or backend call was used."
+    }));
+    return;
+  }
+  const text = await file.text();
+  if (lower.endsWith(".csv") || lower.endsWith(".tsv") || text.includes(",")) {
+    const parsed = parseDelimitedInventory(text, sourceBrain);
+    addCard(createPasteImportCard(catalogItemsToText(parsed.items)));
+    return;
+  }
+  addCard(createPasteImportCard(text));
+}
+
+function addMissingMedicineCard() {
+  addCard(createEditableCard({
+    type: "MedicineMatchCard",
+    title: "Add missing medicine",
+    source: "Sale-time fallback",
+    fields: {
+      message: "Use this only for a medicine that is missing during a sale.",
+      medicine: "",
+      quantity: "1",
+      payment: "cash",
+      choice: "Add and record sale",
+      alias: ""
+    },
+    confidence: 0.7,
+    status: "needs_correction",
+    validation: "Approved missing medicines save to this pharmacy before repeat sales."
+  }));
+}
+
+function exportCatalogCsv() {
+  const csv = buildCatalogCsv(pharmacyBrain.catalog);
+  downloadTextFile({
+    filename: "ms20-pharmacy-catalog.csv",
+    contents: csv,
+    mime: "text/csv;charset=utf-8"
+  });
+  addFeed("system", "Catalog CSV downloaded.");
+  render();
+}
+
+function downloadBulkPasteTemplate() {
+  downloadTextFile({
+    filename: "ms20-bulk-paste-template.txt",
+    contents: buildBulkPasteTemplate()
+  });
+}
+
+function readCardAloud(cardId) {
+  const card = state.cards.find((item) => item.id === cardId) || activeNotificationCards().find((item) => item.id === cardId);
+  if (!card || !window.speechSynthesis) return;
+  const fields = Object.entries(card.fields || {}).map(([key, value]) => `${key.replaceAll("_", " ")} ${value}`).join(". ");
+  const utterance = new SpeechSynthesisUtterance(`${card.title}. ${fields}`);
+  utterance.lang = "en-KE";
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
 }
 
 function recordCard(card) {
@@ -596,7 +973,7 @@ function recordCard(card) {
     aiUsed: false
   };
   const result = syncAdapter.queueAction(action);
-  if (result.added && (card.type === "SaleCard" || card.type === "VoiceReviewCard")) {
+  if (result.added && (card.type === "SaleCard" || card.type === "VoiceReviewCard" || card.type === "MedicineMatchCard")) {
     updateTodayTotals(card);
   }
   addFeed("system", result.duplicate ? "Already saved." : savedReplyFor(card));
@@ -668,6 +1045,54 @@ async function refreshLiveStatus({ silent = false } = {}) {
   return snapshot;
 }
 
+function refreshNotifications() {
+  const generated = buildDeterministicNotifications({
+    catalog: pharmacyBrain.catalog,
+    pendingCards: state.cards
+  });
+  state.notifications = mergeNotifications(state.notifications || [], generated);
+  safeLocalStorage()?.setItem(NOTIFICATION_KEY, JSON.stringify(state.notifications));
+}
+
+function activeNotificationCards() {
+  return (state.notifications || [])
+    .filter((item) => item.status !== "dismissed" && item.status !== "complete")
+    .map(notificationToCard);
+}
+
+function unreadNotifications() {
+  return (state.notifications || []).filter((item) => item.status === "unread").length;
+}
+
+function latestNotificationPreview() {
+  const latest = (state.notifications || []).find((item) => item.status !== "dismissed" && item.status !== "complete");
+  return latest ? latest.title : "No urgent alerts.";
+}
+
+function onboardingStatusText() {
+  if (!state.onboarding.completed) return "Setup needed";
+  if (pharmacyBrain.catalog.length === 0) return "Catalog needed";
+  return "Ready";
+}
+
+function markNotificationsRead() {
+  state.notifications = (state.notifications || []).map((item) => ({ ...item, status: item.status === "unread" ? "read" : item.status }));
+  safeLocalStorage()?.setItem(NOTIFICATION_KEY, JSON.stringify(state.notifications));
+  render();
+}
+
+function dismissNotification(notificationId) {
+  state.notifications = (state.notifications || []).map((item) => (
+    item.id === notificationId ? { ...item, status: "complete", completedAt: new Date().toISOString() } : item
+  ));
+  safeLocalStorage()?.setItem(NOTIFICATION_KEY, JSON.stringify(state.notifications));
+  render();
+}
+
+function notificationIdFromCard(card) {
+  return String(card.id || "").replace(/^card-notification-/, "");
+}
+
 function friendlyCardLabel(card) {
   const labels = {
     SaleCard: "Sale",
@@ -680,6 +1105,11 @@ function friendlyCardLabel(card) {
     PhotoReviewCard: "Photo",
     MedicineMatchCard: "Medicine check",
     VisualScanCard: "Scan",
+    CatalogOnboardingCard: "Onboarding",
+    CatalogImportCard: "Catalog",
+    ImportMappingCard: "Import",
+    NotificationCard: "Notification",
+    DocumentExportCard: "Document",
     SyncReviewCard: "Sync"
   };
   return labels[card.type] || "Review";
@@ -691,6 +1121,11 @@ function ownerCardNote(card) {
   if (card.type === "VoiceReviewCard") return "Check the voice result, then confirm.";
   if (card.type === "InvoiceCard") return "Check the invoice before saving.";
   if (card.type === "PhotoReviewCard" || card.type === "VisualScanCard") return "Check the photo details before saving.";
+  if (card.type === "CatalogOnboardingCard") return "Choose the easiest way to add medicines.";
+  if (card.type === "CatalogImportCard") return "Check names, forms, prices, stock, batch, and expiry before approving.";
+  if (card.type === "ImportMappingCard") return "Map the columns once, then MS2.0 can reuse the pattern.";
+  if (card.type === "NotificationCard") return "Generated locally from pharmacy records.";
+  if (card.type === "DocumentExportCard") return "Download or print when ready.";
   if (card.type === "ReportCard") return "Check the report request before saving.";
   if (card.type === "SyncReviewCard") return "Review saved work before syncing.";
   return "Check the details, then confirm.";
@@ -710,15 +1145,46 @@ function savedReplyFor(card) {
     if (stockLine) lines.push(stockLine);
     return lines.join("\n");
   }
+  if (card.type === "MedicineMatchCard") {
+    const medicine = card.fields?.medicine || "Medicine";
+    const quantity = card.fields?.quantity || "1";
+    const payment = paymentLabel(String(card.fields?.payment || "cash").toLowerCase());
+    return `${medicine} added.\nSale recorded.\n${medicine} x${quantity}\nPayment: ${payment}`;
+  }
   if (card.type === "StockCorrectionCard") return "Stock correction saved.";
   if (card.type === "RestockCard") return "Restock saved.";
   if (card.type === "OnboardingCard") return "Setup saved.";
+  if (card.type === "CatalogImportCard") return "Catalog saved.";
+  if (card.type === "VisualScanCard" || card.type === "PhotoReviewCard") return "Medicine details saved.";
+  if (card.type === "InvoiceCard") return "Invoice review saved.";
   if (card.type === "ReportCard") return "Report request saved.";
   return "Saved.";
 }
 
 function setupComplete() {
   return safeLocalStorage()?.getItem(SETUP_KEY) === "true";
+}
+
+function readCatalog() {
+  try {
+    return JSON.parse(safeLocalStorage()?.getItem(CATALOG_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function readNotifications() {
+  try {
+    return JSON.parse(safeLocalStorage()?.getItem(NOTIFICATION_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function looksLikeMedicineList(text) {
+  const lines = String(text || "").split(/\r?\n/).filter((line) => line.trim());
+  if (lines.length >= 2) return true;
+  return /^list\s*:/i.test(String(text || ""));
 }
 
 function readCardFontScale() {
@@ -758,6 +1224,16 @@ function greetingText() {
 function paymentLabel(payment) {
   if (payment === "mpesa") return "M-Pesa";
   return payment.charAt(0).toUpperCase() + payment.slice(1);
+}
+
+function sellingPriceFromText(text) {
+  const withoutPayment = String(text || "").replace(/\b(cash|mpesa|m-pesa|credit|mixed)\b/ig, "").trim();
+  const numbers = withoutPayment.match(/\d+(?:\.\d+)?/g) || [];
+  return numbers.length > 1 ? numbers.at(-1) : "";
+}
+
+function first(values = []) {
+  return Array.isArray(values) ? values[0] || "" : "";
 }
 
 function scrollChatToBottom() {

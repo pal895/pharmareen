@@ -35,6 +35,24 @@ https://$REPLIT_DEV_DOMAIN/main-app/
 
 The bare Replit domain may show `{"status":"running"}` because it is the backend status route.
 
+## Current Pause And Resume Rule
+
+The previous paused sale test was:
+
+```text
+Test 1.4: Panadol 2 cash
+```
+
+Do not resume that sale test yet.
+
+Replacement first live test:
+
+```text
+Onboarding Test A.1: open MS2.0 Assistant and confirm the owner sees medicine onboarding choices before any sale test.
+```
+
+Only after at least one medicine is approved into the pharmacy catalog should the team return to the paused sale test.
+
 ### Standalone Local Check
 
 For focused local module checks only:
@@ -57,8 +75,9 @@ Expected:
 - Brand shows MS2.0.
 - No browser console errors.
 - A calm chat home is visible.
-- The only owner-facing item is the MS2.0 Assistant conversation row.
+- Owner-facing items are MS2.0 Assistant and Notifications only.
 - A fresh device shows setup as the first required step.
+- After setup, a catalog onboarding card appears before sales.
 - Backend, Sheets, queue, totals, and route diagnostics are not shown on the owner home.
 - Settings/Diagnostics/Admin is hidden behind the chat menu.
 
@@ -67,7 +86,8 @@ Expected:
 Test:
 
 - Owner sees MS2.0 and the subtitle.
-- Owner sees one row: MS2.0 Assistant, Setup needed or Ready, and the preview text.
+- Owner sees MS2.0 Assistant plus Notifications.
+- MS2.0 Assistant shows Setup needed, Catalog needed, or Ready.
 - Owner taps the row to open the chat.
 - No composer, stats, quick action grid, or diagnostics are visible on the home screen.
 
@@ -97,7 +117,53 @@ Pass criteria:
 - Cancel removes the setup card quietly without adding a `Cancelled.` chat bubble.
 - The `-` and `+` controls resize card text and apply to future editable cards.
 
-## Chat Workspace
+## Medicine Catalog Onboarding
+
+Test:
+
+- Complete setup or use an already setup test device with an empty catalog.
+- Confirm MS2.0 asks how to add medicines.
+- Confirm choices are invoice/photo, scan, paste list, upload file, and add while selling.
+- Tap Paste list.
+- Paste a clean list:
+
+```text
+Cefixime tablets 120
+Ceftriaxone vial 180
+Salbutamol inhaler 250
+Metformin tablets 15
+Omeprazole capsules 20
+Diclofenac gel 180
+Hydrocortisone cream 180
+Azithromycin suspension 350
+Zinc syrup 70
+```
+
+Pass criteria:
+
+- A CatalogImportCard appears.
+- Owner can edit the list.
+- Approving saves medicines to the pharmacy catalog.
+- Notifications stay separate from Operations Chat.
+- No OpenAI/API call.
+
+## Scanner And Invoice Onboarding
+
+Test:
+
+- Use Invoice/photo.
+- Use Scan shelves.
+- Use file upload with CSV/text.
+- Confirm each path creates a review card with batch and expiry where relevant.
+
+Pass criteria:
+
+- Review cards do not claim real OCR/barcode extraction unless actually available.
+- Owner can correct and approve.
+- Confirmed data saves to the pharmacy catalog.
+- Repeated known information should be reused locally.
+
+## Chat Workspace After Catalog Approval
 
 Test:
 

@@ -17,9 +17,13 @@ const requiredFiles = [
   "src/services/localIntelligence.js",
   "src/services/visualPipeline.js",
   "src/services/brainAdapters.js",
+  "src/services/catalogOnboarding.js",
+  "src/services/notificationCenter.js",
+  "src/services/documentGenerator.js",
   "src/services/liveBackendGateway.js",
   "src/services/backendAdapters.js",
   "src/routes/routeRegistry.js",
+  "src/data/sourceMedicines.js",
   "src/data/demoState.js",
   "README.md",
   "FINAL_REPORT.md"
@@ -36,6 +40,11 @@ const requiredCards = [
   "PhotoReviewCard",
   "MedicineMatchCard",
   "VisualScanCard",
+  "CatalogOnboardingCard",
+  "CatalogImportCard",
+  "ImportMappingCard",
+  "NotificationCard",
+  "DocumentExportCard",
   "SyncReviewCard"
 ];
 
@@ -66,6 +75,11 @@ assert(!html.includes(oldBrand), "HTML still contains old brand");
 assert(css.includes("@media (max-width: 720px)"), "Mobile responsive layout missing");
 assert(appSource.includes("chatHomeTemplate"), "Messaging app home missing");
 assert(appSource.includes("chatScreenTemplate"), "Messaging app conversation screen missing");
+assert(appSource.includes("Notifications"), "Separate Notifications workspace missing");
+assert(appSource.includes("CatalogOnboardingCard"), "Catalog onboarding card flow missing");
+assert(appSource.includes("CatalogImportCard"), "Catalog import card flow missing");
+assert(appSource.includes("exportCatalogCsv"), "Catalog CSV export action missing");
+assert(appSource.includes("speechSynthesis"), "Local read-aloud support missing");
 assert(appSource.includes("canRecordInstantly"), "Instant complete-sale behavior missing");
 assert(css.includes(".chat-app"), "Messaging app CSS shell missing");
 assert(css.includes(".conversation-row"), "Chat home conversation row missing");
@@ -76,6 +90,7 @@ assert(appSource.includes("capture=\"environment\""), "Direct camera capture inp
 assert(appSource.includes("CARD_FONT_SCALE_KEY"), "Editable card text-size persistence missing");
 assert(appSource.includes("increase-card-font"), "Editable card zoom-in control missing");
 assert(appSource.includes("decrease-card-font"), "Editable card zoom-out control missing");
+assert(appSource.includes("pharmacyBrain.findMedicine"), "Instant sale must require pharmacy catalog match");
 assert(!appSource.includes("demo-voice"), "Fake voice demo action must not be present");
 assert(!appSource.includes("Cancelled."), "Cancel must silently remove cards without chat noise");
 assert(css.includes("replit-badge"), "Replit badge suppression CSS missing");
@@ -87,6 +102,8 @@ for (const card of requiredCards) {
 
 assert(contracts.includes("/api/ms20"), "MS2.0 API route slot missing");
 assert(contracts.includes("/live/readiness"), "Live readiness route missing");
+assert(contracts.includes("IntelligenceSeparationContract"), "Brain/catalog separation contract missing");
+assert(contracts.includes("WorkspaceContract"), "Operations/notifications contract missing");
 assert(contracts.includes("cloud"), "Cloud memory contract missing");
 assert(contracts.includes("Baileys WhatsApp bridge"), "External channel compatibility missing");
 assert(liveGatewaySource.includes("127.0.0.1:5000"), "Local backend gateway fallback missing");
@@ -101,6 +118,10 @@ const { OfflineQueue } = await import(pathToFileURL(path.join(root, "src/service
 const { CloudMemoryGateway } = await import(pathToFileURL(path.join(root, "src/services/cloudGateway.js")));
 const { runVisualPipeline } = await import(pathToFileURL(path.join(root, "src/services/visualPipeline.js")));
 const { BackendAdapterRegistry } = await import(pathToFileURL(path.join(root, "src/services/backendAdapters.js")));
+const { SourceBrain, PharmacyBrain } = await import(pathToFileURL(path.join(root, "src/services/brainAdapters.js")));
+const { parseBulkMedicineList, parseDelimitedInventory } = await import(pathToFileURL(path.join(root, "src/services/catalogOnboarding.js")));
+const { buildDeterministicNotifications } = await import(pathToFileURL(path.join(root, "src/services/notificationCenter.js")));
+const { buildCatalogCsv } = await import(pathToFileURL(path.join(root, "src/services/documentGenerator.js")));
 
 const sale = parseLocalCommand("panadol2cash");
 assert(sale.kind === "sale", "Demo text command did not create a sale parse");
@@ -110,6 +131,31 @@ assert(sale.aiRequired === false, "Known structured sale should be zero-token");
 const invoice = runVisualPipeline({ fileName: "invoice.jpg", scanType: "invoice" });
 assert(invoice.outputCardType === "InvoiceCard", "Invoice scan did not route to InvoiceCard");
 assert(invoice.aiRequired === false, "Photo placeholder should not call AI");
+assert(invoice.tokenControl?.aiUsed === false, "Visual pipeline token-control proof missing");
+assert(invoice.steps.some((step) => step.name === "local_fingerprint"), "Visual fingerprint step missing");
+
+const sourceBrain = new SourceBrain();
+const cefixime = sourceBrain.lookupMedicine("Cefixime");
+assert(cefixime.status === "matched", "Source brain did not recognize Cefixime");
+
+const catalogImport = parseBulkMedicineList("Cefixime tablets 120\nCeftriaxone vial 180\nZinc syrup 70", sourceBrain);
+assert(catalogImport.aiRequired === false, "Bulk import must be zero-token");
+assert(catalogImport.items.length === 3, "Bulk medicine import did not parse three lines");
+
+const delimited = parseDelimitedInventory("medicine,form,selling price,stock,batch,expiry\nMetformin,tablets,15,20,B1,2026-12-31", sourceBrain);
+assert(delimited.items.length === 1, "CSV inventory import did not parse one row");
+assert(delimited.aiRequired === false, "CSV inventory import must be zero-token");
+
+const pharmacyBrain = new PharmacyBrain({ pharmacyId: "verify" });
+pharmacyBrain.loadCatalog(delimited.items);
+assert(pharmacyBrain.findMedicine("Metformin").status === "matched", "Pharmacy catalog lookup failed after import");
+
+const notifications = buildDeterministicNotifications({ catalog: [{ name: "Cefixime", stockLeft: 2, batches: [{ batch: "B1", expiry: "2026-07-20" }] }] });
+assert(notifications.some((item) => item.category === "Inventory"), "Low-stock notification missing");
+assert(notifications.some((item) => item.category === "Expiry"), "Expiry notification missing");
+
+const csv = buildCatalogCsv(pharmacyBrain.catalog);
+assert(csv.includes("Metformin"), "Catalog CSV export missing medicine");
 
 const queue = new OfflineQueue(null);
 const queued = queue.add({ id: "verify-action-1", type: "SaleCard" });

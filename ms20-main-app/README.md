@@ -26,10 +26,17 @@ No dependency install is required.
 
 ## What Works Now
 
-- Messaging app home with one MS2.0 Assistant conversation row.
+- Messaging app home with separate MS2.0 Assistant and Notifications conversations.
 - First-run owner onboarding starts before daily sale/report/photo workflows.
+- After setup, medicine catalog onboarding starts before sale testing.
+- Catalog onboarding supports invoice/photo, medicine/shelf scan, bulk paste, CSV/text upload, and sale-time fallback.
+- Bulk paste and CSV/text imports are parsed deterministically into a catalog review card.
+- Source Brain and Pharmacy Catalog are kept separate; approved medicines save to the pharmacy catalog, not directly into global knowledge.
+- Local Digital Operations Assistant notifications are separate from Operations Chat.
+- CSV catalog export and bulk-paste template download are available from the Main App.
+- Scan/invoice cards now include reusable batch, expiry, barcode, supplier, shelf, price, and stock fields.
 - Focused chat screen with header, message bubbles, bottom composer, browser voice button, and hidden attach/actions menu.
-- Complete high-confidence sale commands such as `Panadol 2 cash` record immediately through the existing safe queue path.
+- Complete high-confidence sale commands record immediately only after the medicine exists in the pharmacy catalog.
 - Missing or ambiguous commands show editable cards directly, without extra narration.
 - Cancel removes review cards quietly without adding a chat message.
 - Every editable card has `-` and `+` text-size controls, and the chosen size is remembered on the device.
@@ -47,6 +54,11 @@ No dependency install is required.
   - PhotoReviewCard
   - MedicineMatchCard
   - VisualScanCard
+  - CatalogOnboardingCard
+  - CatalogImportCard
+  - ImportMappingCard
+  - NotificationCard
+  - DocumentExportCard
   - SyncReviewCard
 - Text command `Panadol 2 cash` or `panadol2cash` records a sale locally and queues it safely.
 - Incomplete commands such as `Panadol` or `Panadol 2` create editable review cards.
@@ -64,7 +76,7 @@ The first-run owner path is designed around three steps:
 
 1. Open MS2.0 and tap the MS2.0 Assistant conversation.
 2. Complete the setup card.
-3. Confirm setup.
+3. Choose how to add medicines, then review and approve.
 
 The daily owner path stays three steps or less:
 
@@ -72,7 +84,7 @@ The daily owner path stays three steps or less:
 2. Type, speak, scan, or upload in the chat.
 3. Get an instant receipt, or review the editable card only when MS2.0 needs owner judgement.
 
-Complete sale commands skip cards and return a concise sale receipt. The owner home and chat flow should not show backend, Sheets, queue, token, route, or adapter details. Those belong in Settings, Diagnostics, Admin, or Developer Mode.
+Complete known-medicine sale commands skip cards and return a concise sale receipt. Unknown medicines show a clean editable learning card so the pharmacy catalog improves safely. The owner home and chat flow should not show backend, Sheets, queue, token, route, or adapter details. Those belong in Settings, Diagnostics, Admin, or Developer Mode.
 
 ## Cloud Memory And Recovery
 
@@ -99,13 +111,16 @@ The placeholder brain adapters live in `src/services/brainAdapters.js`.
 
 ## Medicine Catalog Onboarding Path
 
-The foundation already has a clean catalog path:
+The foundation now starts catalog onboarding before sale testing:
 
-1. Bulk medicine list is saved through `CloudMemoryGateway.saveCatalog(pharmacyId, catalogItems)`.
-2. `PharmacyBrain.loadCatalog(items)` accepts name, aliases, forms, units, pack sizes, category, and stock.
-3. `parseLocalCommand(text, catalog)` checks the pharmacy catalog before AI.
-4. Ambiguous matches route to MedicineMatchCard.
-5. Confirmed aliases can be saved per pharmacy with `PharmacyBrain.saveOwnerAlias`.
+1. Setup saves the pharmacy profile.
+2. MS2.0 asks how the owner wants to show the pharmacy: invoice/photo, scan, paste list, CSV/text/POS export, or add while selling.
+3. Bulk paste and CSV/text files create a `CatalogImportCard`.
+4. Approved catalog items are saved through `CloudMemoryGateway.saveCatalog(pharmacyId, catalogItems)` and the local pharmacy cache.
+5. `PharmacyBrain.loadCatalog(items)` accepts name, aliases, forms, units, pack sizes, prices, stock, supplier, barcode, batches, expiry, and shelf.
+6. `parseLocalCommand(text, catalog)` checks the pharmacy catalog before allowing instant known sales.
+7. Ambiguous or missing medicines route to MedicineMatchCard.
+8. Confirmed aliases can be saved per pharmacy with `PharmacyBrain.saveOwnerAlias`.
 
 No hardcoded pharmacy medicines are required.
 
@@ -113,15 +128,20 @@ No hardcoded pharmacy medicines are required.
 
 `src/services/visualPipeline.js` defines the safe future path:
 
-1. Local image preprocessing
-2. Local OCR placeholder
-3. Barcode extraction placeholder
-4. Packaging visual match placeholder
-5. Pharmacy catalog match
-6. Source brain lookup
-7. Confidence scoring
-8. Visual memory save
-9. AI fallback adapter only if explicitly needed later
+1. Local fingerprint
+2. Exact duplicate lookup
+3. Near duplicate lookup where practical
+4. Previous confirmed result lookup
+5. Local image preprocessing
+6. Local OCR adapter
+7. Barcode extraction adapter
+8. Packaging visual match adapter
+9. Pharmacy catalog match
+10. Source brain lookup
+11. Supplier template lookup for invoices
+12. Confidence scoring
+13. Visual memory save
+14. AI fallback adapter only if explicitly needed later
 
 Supported future photo types include packaging, strips, cartons, shelf photos, stock photos, invoices, reports, onboarding documents, and supplier documents.
 
@@ -168,3 +188,5 @@ This foundation does not rebuild the existing offline app. It only links/mounts 
 This foundation uses zero OpenAI/API tokens. It performs no OpenAI/API provider calls and includes no AI provider client. The only runtime network calls are local/current backend readiness probes used to detect the existing live MS2.0 system.
 
 Zero-token flows should include known sales, aliases, confirmed packaging, cached invoice layouts, repeated documents, stock checks, reports, simple analytics, and barcode scans.
+
+See `MS20_ONBOARDING_AND_OPERATIONS_INTELLIGENCE.md` for the persistent onboarding, source brain, catalog, notifications, scanner, document, and live-test continuation architecture.

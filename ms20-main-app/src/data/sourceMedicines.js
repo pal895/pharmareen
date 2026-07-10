@@ -1,0 +1,72 @@
+export const SourceMedicineList = [
+  medicine("Acyclovir", ["acyclovir"], ["tablet", "cream", "suspension"], ["tablet", "tube", "bottle"]),
+  medicine("Albendazole", ["alben", "abendazole"], ["tablet", "suspension"], ["tablet", "bottle"]),
+  medicine("Amitriptyline", ["amitrip"], ["tablet"], ["tablet", "strip"]),
+  medicine("Amlodipine", ["amlod"], ["tablet"], ["tablet", "strip"]),
+  medicine("Artemether Lumefantrine", ["al", "lumartem", "coartem", "artemether"], ["tablet", "suspension"], ["tablet", "strip", "bottle"]),
+  medicine("Aspirin", ["asa"], ["tablet"], ["tablet", "strip"]),
+  medicine("Atenolol", ["aten"], ["tablet"], ["tablet", "strip"]),
+  medicine("Azithromycin", ["azithro", "zithro"], ["tablet", "capsule", "suspension"], ["tablet", "capsule", "bottle"]),
+  medicine("Betamethasone", ["beta"], ["cream", "ointment", "injection"], ["tube", "vial"]),
+  medicine("Brufen", ["ibuprofen", "brufen"], ["tablet", "suspension"], ["tablet", "bottle"]),
+  medicine("Cefixime", ["cefix", "cefexime"], ["tablet", "capsule", "suspension"], ["tablet", "capsule", "bottle"]),
+  medicine("Ceftriaxone", ["ceftriax", "ceftriazone"], ["injection", "vial"], ["vial"]),
+  medicine("Chloramphenicol", ["chloram", "chloramphenicol eye"], ["eye drops", "capsule"], ["bottle", "capsule"]),
+  medicine("Ciprofloxacin", ["cipro"], ["tablet", "eye drops", "ear drops"], ["tablet", "bottle"]),
+  medicine("Clotrimazole", ["clotrim"], ["cream", "pessary", "solution"], ["tube", "pessary", "bottle"]),
+  medicine("Diclofenac", ["diclo"], ["tablet", "gel", "injection"], ["tablet", "tube", "ampoule"]),
+  medicine("Doxycycline", ["doxy"], ["capsule", "tablet"], ["capsule", "tablet", "strip"]),
+  medicine("Erythromycin", ["erythro"], ["tablet", "suspension", "eye ointment"], ["tablet", "bottle", "tube"]),
+  medicine("Fluconazole", ["fluco"], ["capsule", "suspension"], ["capsule", "bottle"]),
+  medicine("Folic Acid", ["folic"], ["tablet"], ["tablet", "strip"]),
+  medicine("Hydrocortisone", ["hydro cort", "hydrocort"], ["cream", "ointment", "injection"], ["tube", "vial"]),
+  medicine("Ibuprofen", ["brufen", "ibu"], ["tablet", "suspension"], ["tablet", "bottle"]),
+  medicine("Loperamide", ["lope"], ["capsule", "tablet"], ["capsule", "tablet"]),
+  medicine("Loratadine", ["lorat"], ["tablet", "syrup"], ["tablet", "bottle"]),
+  medicine("Losartan", ["losar"], ["tablet"], ["tablet", "strip"]),
+  medicine("Metformin", ["met"], ["tablet"], ["tablet", "strip"]),
+  medicine("Metronidazole", ["metro"], ["tablet", "suspension", "injection"], ["tablet", "bottle", "vial"]),
+  medicine("Omeprazole", ["omep", "ome"], ["capsule", "tablet"], ["capsule", "tablet"]),
+  medicine("Prednisolone", ["pred"], ["tablet", "syrup", "eye drops"], ["tablet", "bottle"]),
+  medicine("Salbutamol", ["salbu", "ventolin"], ["inhaler", "syrup", "nebulule", "tablet"], ["inhaler", "bottle", "nebulule"]),
+  medicine("Septrin", ["cotrimoxazole", "co-trimoxazole"], ["tablet", "suspension"], ["tablet", "bottle"]),
+  medicine("Zinc", ["zinc syrup", "zn"], ["tablet", "syrup"], ["tablet", "bottle"])
+];
+
+export const SupportedForms = [
+  "tablet",
+  "capsule",
+  "syrup",
+  "suspension",
+  "cream",
+  "ointment",
+  "gel",
+  "eye drops",
+  "ear drops",
+  "injection",
+  "vial",
+  "ampoule",
+  "inhaler",
+  "nebulule",
+  "sachet",
+  "strip",
+  "blister",
+  "bottle",
+  "tube",
+  "box",
+  "pack",
+  "pessary",
+  "solution"
+];
+
+function medicine(name, aliases, forms, units) {
+  return {
+    name,
+    aliases,
+    forms,
+    units,
+    strengths: [],
+    category: "",
+    promotionStatus: "approved_source_brain"
+  };
+}

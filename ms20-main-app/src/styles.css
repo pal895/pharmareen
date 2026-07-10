@@ -39,7 +39,8 @@ body {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
@@ -139,6 +140,14 @@ input:disabled {
   text-align: left;
   background: var(--surface);
   box-shadow: 0 10px 28px rgba(16, 34, 28, 0.08);
+}
+
+.notifications-row {
+  margin-top: 14px;
+}
+
+.notification-avatar {
+  background: var(--accent-deep);
 }
 
 .assistant-avatar {
@@ -341,6 +350,7 @@ input:disabled {
 }
 
 .field-grid input,
+.field-grid textarea,
 .message-form input {
   width: 100%;
   min-height: 44px;
@@ -352,7 +362,14 @@ input:disabled {
   outline: none;
 }
 
+.field-grid textarea {
+  min-height: 88px;
+  resize: vertical;
+  line-height: 1.35;
+}
+
 .field-grid input:focus,
+.field-grid textarea:focus,
 .message-form input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(24, 95, 85, 0.12);
@@ -365,6 +382,19 @@ input:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.onboarding-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.onboarding-actions button {
+  border-radius: 16px;
+}
+
+.notification-footer {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .button-row,

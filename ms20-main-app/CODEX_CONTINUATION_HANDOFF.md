@@ -46,6 +46,28 @@ Completed:
 - No production WhatsApp runtime modified.
 - No OpenAI/API usage introduced.
 
+## Latest Main App Onboarding Update
+
+Completed after the messaging-first UI work:
+
+- MS2.0 home has separate Operations and Notifications conversations.
+- Setup completion now leads into medicine catalog onboarding before sale tests.
+- The original paused sale test `Panadol 2 cash` remains paused.
+- New next test is Onboarding Test A.1.
+- Source Brain and Pharmacy Catalog are separated in code and documentation.
+- Seed Source Brain medicine data exists in `src/data/sourceMedicines.js`.
+- Catalog onboarding choices exist through `CatalogOnboardingCard`.
+- Bulk paste and CSV/text import create `CatalogImportCard`.
+- Approved catalog imports save to local pharmacy cache and `CloudMemoryGateway.saveCatalog`.
+- Complete sale commands record instantly only when the medicine exists in the pharmacy catalog.
+- Unknown sale-time medicines show `MedicineMatchCard` and can be added locally.
+- Scan/invoice review cards include batch, expiry, barcode, supplier, shelf, price, and stock fields.
+- Visual pipeline records local fingerprint and token-control metadata.
+- Notifications are generated locally by `notificationCenter.js` and do not interrupt Operations Chat.
+- CSV catalog export and bulk-paste template download are available.
+- Read-aloud uses local/browser speech synthesis where supported.
+- Real OCR, barcode decoding, PDF extraction, binary Excel parsing, and near-duplicate image recognition are adapter-ready but not fully implemented.
+
 The merge deliberately kept live production writes disabled from the new Main App. Confirmed cards carry backend target metadata but remain `safe_queue_only` until live write sync is intentionally enabled and tested.
 
 ## Files Changed In The Last Merge
@@ -69,9 +91,13 @@ Related foundation files present in `ms20-main-app`:
 - `ms20-main-app/manifest.json`
 - `ms20-main-app/package.json`
 - `ms20-main-app/src/data/demoState.js`
+- `ms20-main-app/src/data/sourceMedicines.js`
 - `ms20-main-app/src/services/brainAdapters.js`
+- `ms20-main-app/src/services/catalogOnboarding.js`
 - `ms20-main-app/src/services/cloudGateway.js`
+- `ms20-main-app/src/services/documentGenerator.js`
 - `ms20-main-app/src/services/localIntelligence.js`
+- `ms20-main-app/src/services/notificationCenter.js`
 - `ms20-main-app/src/services/offlineQueue.js`
 - `ms20-main-app/src/services/syncAdapter.js`
 - `ms20-main-app/src/services/visualPipeline.js`
@@ -106,6 +132,20 @@ Result: PASS.
 ```bash
 cd ms20-main-app
 node --check src/services/liveBackendGateway.js
+```
+
+Result: PASS.
+
+```bash
+cd ms20-main-app
+node --check src/services/catalogOnboarding.js
+```
+
+Result: PASS.
+
+```bash
+cd ms20-main-app
+node --check src/services/notificationCenter.js
 ```
 
 Result: PASS.
@@ -160,22 +200,26 @@ Browser UI click automation through the in-app browser tool timed out. This was 
 - Main App currently connects through safe adapters and placeholders.
 - Main App does not yet directly mutate live production sale/stock data from every screen.
 - This is expected after a safe merge.
-- Next job is live testing the Main App screens and workflows, then wiring missing actions safely.
+- Next job is live testing onboarding first, then wiring verified missing actions safely.
+- Current pause: `Panadol 2 cash` sale test is paused until catalog onboarding passes.
 - Current desktop workspace has a `.git` directory with missing `HEAD` and `config`; local `git status` failed here. Do not try to repair git unless the user explicitly asks.
 
 ## Next Phase
 
-The next Codex chat must do Main App live product testing only:
+The next Codex chat must do Main App live product testing only, beginning with onboarding:
 
 1. Confirm current files and app routes.
 2. Start Main App.
-3. Test every Main App screen.
-4. Test every Main App workflow.
-5. Find friction.
-6. Record friction clearly.
-7. Fix only verified friction.
-8. Preserve stable backend/offline systems.
-9. Keep API usage at zero unless explicitly required.
+3. Open MS2.0 Assistant.
+4. Confirm setup/catalog onboarding choices.
+5. Test catalog onboarding before sale testing.
+6. Only after catalog approval resume the paused `Panadol 2 cash` sale test.
+7. Test every Main App workflow.
+8. Find friction.
+9. Record friction clearly.
+10. Fix only verified friction.
+11. Preserve stable backend/offline systems.
+12. Keep API usage at zero unless explicitly required.
 
 Do not return to WhatsApp live testing in the next phase.
 
