@@ -23,10 +23,10 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
     try:
         with Image.open(io.BytesIO(image_bytes)) as source:
             image = ImageOps.exif_transpose(source).convert("L")
-            image.thumbnail((1400, 1400))
+            image.thumbnail((1800, 1800))
             image = ImageOps.autocontrast(image)
             image = ImageEnhance.Contrast(image).enhance(1.5)
-            visible_text = pytesseract.image_to_string(image, config="--psm 6")
+            visible_text = pytesseract.image_to_string(image, config="--psm 4")
     except Exception:
         return _failed(fingerprint, "I could not read this photo. Try again in good light with the whole page visible.")
 
@@ -46,6 +46,15 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
         "ocr_engine": "local_tesseract",
         "visible_text": visible_text[:8000],
     })
+    invoice_total = _invoice_total_from_text(visible_text)
+    extracted_total = sum(float(item.get("line_total") or 0) for item in extraction.get("items") or [])
+    extraction["invoice_total"] = invoice_total
+    extraction["extracted_line_total"] = extracted_total
+    extraction["complete"] = bool(
+        extraction.get("items")
+        and all(_row_has_required_invoice_fields(item) for item in extraction["items"])
+        and (invoice_total is None or abs(invoice_total - extracted_total) < 0.01)
+    )
     if not extraction.get("items"):
         extraction["message"] = "I could not find clear medicine rows. Try a clearer photo."
     return extraction
@@ -181,12 +190,25 @@ def _best_known_value(line: str, values: list[str]) -> str:
     exact = next((value for value in values if _contains_name(line, value)), "")
     if exact:
         return exact
-    normalized_line = re.sub(r"[^a-z]", "", line.lower())
-    ranked = sorted(
-        ((SequenceMatcher(None, re.sub(r"[^a-z]", "", value.lower()), normalized_line).quick_ratio(), value) for value in values),
-        reverse=True,
-    )
-    return ranked[0][1] if ranked and ranked[0][0] >= 0.3 else ""
+    singular_line = re.sub(r"\bdrops\b", "drop", line.lower())
+    return next((value for value in values if _contains_name(singular_line, re.sub(r"\bdrops\b", "drop", value.lower()))), "")
+
+
+def _invoice_total_from_text(text: str) -> float | None:
+    match = re.search(r"invoice\s+total\D{0,20}(?:KES|KSH)?\s*([\d,]+(?:\.\d{2})?)", text, flags=re.I)
+    return float(match.group(1).replace(",", "")) if match else None
+
+
+def _row_has_required_invoice_fields(item: dict[str, Any]) -> bool:
+    return all([
+        item.get("medicine_name"),
+        item.get("form"),
+        item.get("unit"),
+        item.get("quantity"),
+        item.get("unit_cost") is not None,
+        item.get("batch_number"),
+        item.get("expiry_date"),
+    ])
 
 
 def _failed(fingerprint: str, message: str) -> dict[str, Any]:

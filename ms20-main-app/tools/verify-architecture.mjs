@@ -210,7 +210,10 @@ assert(!appSource.includes('title: "Check photo details"'), "One camera capture 
 assert(appSource.includes('invoiceMode ? "Approve medicines" : "Approve catalog"'), "Invoice review must use simple invoice-specific approval wording");
 assert(appSource.includes('state.voice.status = "Reading invoice…"'), "Invoice capture must show immediate progress feedback");
 assert(appSource.includes("openLightweightCamera"), "Camera actions must use the memory-safe in-app camera");
-assert(appSource.includes('width: { ideal: 1280, max: 1280 }'), "In-app camera must limit capture resolution");
+assert(appSource.includes('width: { ideal: 1920, max: 1920 }'), "In-app camera must keep invoice text readable while limiting capture resolution");
+assert(appSource.includes('Math.min(1, 1800 / Math.max(video.videoWidth, video.videoHeight))'), "Invoice capture must preserve enough detail for local OCR");
+assert(appSource.includes('card.fields.import_incomplete'), "Incomplete local invoice reads must be marked unsafe to approve");
+assert(appSource.includes('This scan is missing invoice details.'), "Incomplete invoice approval must be blocked at the action boundary");
 assert(appSource.includes("closeCameraStream()"), "In-app camera must release memory after capture or cancel");
 assert(css.includes(".camera-overlay"), "Memory-safe camera preview UI missing");
 assert(appSource.includes('status.textContent = "Ready — hold still and tap Capture."'), "Camera preview must clearly say when capture is ready");

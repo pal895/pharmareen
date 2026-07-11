@@ -528,9 +528,12 @@ function activeActionsTemplate(card) {
   }
   if (card.type === "CatalogImportCard") {
     const invoiceMode = card.fields?.import_mode === "invoice_ocr";
+    const incompleteInvoice = invoiceMode && card.fields?.import_incomplete === "true";
     return `
       <div class="card-actions">
-        <button data-action="confirm-card" data-card-id="${card.id}">${invoiceMode ? "Approve medicines" : "Approve catalog"}</button>
+        ${incompleteInvoice
+          ? '<button data-action="capture-invoice">Scan again</button>'
+          : `<button data-action="confirm-card" data-card-id="${card.id}">${invoiceMode ? "Approve medicines" : "Approve catalog"}</button>`}
         ${invoiceMode ? "" : '<button data-action="download-template">Template</button>'}
         <button data-action="read-card" data-card-id="${card.id}">Read</button>
         <button data-action="correct-card" data-card-id="${card.id}">Correct</button>
@@ -941,8 +944,8 @@ async function openLightweightCamera(scanType = "medicine_photo") {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: { ideal: "environment" },
-        width: { ideal: 1280, max: 1280 },
-        height: { ideal: 720, max: 960 }
+        width: { ideal: 1920, max: 1920 },
+        height: { ideal: 1080, max: 1440 }
       },
       audio: false
     });
@@ -981,7 +984,7 @@ async function captureLightweightCameraFrame() {
     if (status) status.textContent = state.camera.status;
     return;
   }
-  const scale = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight));
+  const scale = Math.min(1, 1800 / Math.max(video.videoWidth, video.videoHeight));
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
   canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
@@ -1034,9 +1037,12 @@ async function readInvoicePhoto(file) {
     }));
     const card = createPasteImportCard(catalogItemsToText(rows));
     card.fields.import_mode = "invoice_ocr";
+    card.fields.import_incomplete = result.complete === false ? "true" : "false";
     card.title = "Check invoice medicines";
     card.source = `${result.supplier_name || "Supplier invoice"}${result.invoice_number ? ` · ${result.invoice_number}` : ""}`;
-    card.validation = "I read this on your device. Check the medicines, then approve.";
+    card.validation = result.complete === false
+      ? "Some invoice details are missing or do not add up. Check the photo and scan again."
+      : "I read this on your device. Check the medicines, then approve.";
     state.voice.status = "";
     addCard(card);
   } catch (error) {
@@ -1269,6 +1275,12 @@ function confirmCard(cardId) {
     return;
   }
   if (card.type === "CatalogImportCard") {
+    if (card.fields?.import_mode === "invoice_ocr" && card.fields?.import_incomplete === "true") {
+      card.validation = "This scan is missing invoice details. Scan the whole invoice again before approving.";
+      persistActiveCards();
+      render();
+      return;
+    }
     approveCatalogImport(card);
     removeCard(cardId);
     refreshNotifications();
