@@ -106,6 +106,16 @@ assert(appSource.includes("CARD_FONT_SCALE_KEY"), "Editable card text-size persi
 assert(appSource.includes("increase-card-font"), "Editable card zoom-in control missing");
 assert(appSource.includes("decrease-card-font"), "Editable card zoom-out control missing");
 assert(appSource.includes("dismiss-card"), "Editable card close control missing");
+assert(appSource.includes("FEED_KEY"), "Conversation feed resume persistence missing");
+assert(appSource.includes("ACTIVE_CARDS_KEY"), "Active editable-card resume persistence missing");
+assert(appSource.includes("hydrateResumeState"), "Resume-state hydration missing");
+assert(appSource.includes("setupComplete() || catalogItems.length > 0"), "Saved catalog must self-heal setup completion on resume");
+assert(appSource.includes("persistFeed();"), "Conversation feed must persist after local changes");
+assert(appSource.includes("persistActiveCards();"), "Editable cards must persist after local changes");
+assert(appSource.includes("storage?.removeItem(FEED_KEY)"), "Reset setup must clear persisted conversation feed");
+assert(appSource.includes("storage?.removeItem(ACTIVE_CARDS_KEY)"), "Reset setup must clear persisted active cards");
+assert(appSource.includes("removeCardsByType([\"CatalogOnboardingCard\"]);"), "Saved catalog should remove only stale catalog prompts on resume");
+assert(!appSource.includes("removeCardsByType([\"CatalogOnboardingCard\", \"CatalogImportCard\"]"), "Resume must not delete active catalog review cards");
 assert(appSource.includes("catalogRequired"), "Notification catalog gate missing");
 assert(appSource.includes("pharmacyBrain.findMedicine"), "Instant sale must require pharmacy catalog match");
 assert(!appSource.includes("demo-voice"), "Fake voice demo action must not be present");
