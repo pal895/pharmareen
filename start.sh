@@ -11,6 +11,14 @@ BRIDGE_LOG="${BRIDGE_LOG:-bridge.log}"
 WHATSAPP_BRIDGE_ENABLED="${WHATSAPP_BRIDGE_ENABLED:-false}"
 BRIDGE_SCRIPT="${BRIDGE_SCRIPT:-local_whatsapp_bridge.js}"
 
+if ! command -v tesseract >/dev/null 2>&1 && [ "${MS20_NIX_OCR_READY:-false}" != "true" ]; then
+  if command -v nix-shell >/dev/null 2>&1; then
+    echo "Loading the local invoice reader..."
+    exec nix-shell -p tesseract --run "MS20_NIX_OCR_READY=true WHATSAPP_BRIDGE_ENABLED=$WHATSAPP_BRIDGE_ENABLED bash start.sh"
+  fi
+  echo "Local invoice reader is unavailable: tesseract was not found."
+fi
+
 if [ ! -x "$PYTHON_BIN" ]; then
   echo "Creating the project Python environment..."
   python -m venv .ms20-venv
