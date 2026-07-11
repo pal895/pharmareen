@@ -137,6 +137,7 @@ let activeRecognition = null;
 
 state.ui = { screen: "home", workspace: "operations" };
 state.voice = { listening: false, status: "" };
+state.camera = { open: false, scanType: "medicine_photo", stream: null, status: "" };
 state.pendingScanType = "medicine_photo";
 state.cardFontScale = readCardFontScale();
 hydrateResumeState();
@@ -159,6 +160,7 @@ function render() {
   root.innerHTML = `
     <main class="chat-app" style="--card-font-scale: ${state.cardFontScale};">
       ${state.ui.screen === "chat" ? chatScreenTemplate() : chatHomeTemplate()}
+      ${cameraOverlayTemplate()}
     </main>
   `;
   bindEvents();
@@ -295,6 +297,24 @@ function composerTemplate() {
       <input id="cameraInput" class="hidden-input" type="file" accept="image/*" capture="environment">
       <input id="documentInput" class="hidden-input" type="file" accept=".csv,.txt,.tsv,.xls,.xlsx,.pdf,image/*,text/csv,text/plain">
     </footer>
+  `;
+}
+
+function cameraOverlayTemplate() {
+  if (!state.camera.open) return "";
+  return `
+    <section class="camera-overlay" aria-label="MS2.0 camera">
+      <div class="camera-panel">
+        <h2>${state.camera.scanType === "invoice" ? "Photograph invoice" : "Photograph medicine"}</h2>
+        <p>Keep the whole item clear inside the frame.</p>
+        <video id="ms20CameraPreview" autoplay muted playsinline></video>
+        <p class="camera-status" aria-live="polite">${escapeHtml(state.camera.status)}</p>
+        <div class="camera-actions">
+          <button type="button" data-action="close-camera">Cancel</button>
+          <button class="primary-action" type="button" data-action="capture-camera-frame">Capture</button>
+        </div>
+      </div>
+    </section>
   `;
 }
 
@@ -648,8 +668,7 @@ function handleAction(dataset) {
   if (action === "demo-sale") handleCommand("Panadol 2 cash");
   if (action === "start-voice") startVoiceCapture();
   if (action === "take-photo") {
-    state.pendingScanType = dataset.scanType || "medicine_photo";
-    root.querySelector("#cameraInput")?.click();
+    void openLightweightCamera(dataset.scanType || "medicine_photo");
   }
   if (action === "upload-photo") {
     state.pendingScanType = dataset.scanType || "medicine_photo";
@@ -658,9 +677,10 @@ function handleAction(dataset) {
   if (action === "upload-document") root.querySelector("#documentInput")?.click();
   if (action === "demo-barcode") addBarcodeCard();
   if (action === "capture-invoice") {
-    state.pendingScanType = "invoice";
-    root.querySelector("#cameraInput")?.click();
+    void openLightweightCamera("invoice");
   }
+  if (action === "close-camera") closeLightweightCamera();
+  if (action === "capture-camera-frame") void captureLightweightCameraFrame();
   if (action === "demo-onboarding") addOnboardingCard();
   if (action === "start-catalog-invoice") {
     removeCardsByType(["CatalogOnboardingCard"]);
@@ -909,6 +929,74 @@ function addPhotoCards(fileName, scanType) {
   const visualCard = buildPhotoReviewCard(result);
   addCard(visualCard);
   refreshNotifications();
+}
+
+async function openLightweightCamera(scanType = "medicine_photo") {
+  closeCameraStream();
+  state.camera.open = true;
+  state.camera.scanType = scanType;
+  state.camera.status = "Opening camera…";
+  render();
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1280, max: 1280 },
+        height: { ideal: 720, max: 960 }
+      },
+      audio: false
+    });
+    state.camera.stream = stream;
+    state.camera.status = "";
+    const video = root.querySelector("#ms20CameraPreview");
+    if (video) {
+      video.srcObject = stream;
+      await video.play();
+    }
+  } catch {
+    state.camera.status = "Camera did not open. Allow camera access and try again.";
+    render();
+  }
+}
+
+function closeLightweightCamera() {
+  closeCameraStream();
+  state.camera.open = false;
+  state.camera.status = "";
+  render();
+}
+
+function closeCameraStream() {
+  state.camera.stream?.getTracks?.().forEach((track) => track.stop());
+  state.camera.stream = null;
+}
+
+async function captureLightweightCameraFrame() {
+  const video = root.querySelector("#ms20CameraPreview");
+  if (!video || !video.videoWidth || !video.videoHeight) {
+    state.camera.status = "Camera is still opening. Try Capture again.";
+    const status = root.querySelector(".camera-status");
+    if (status) status.textContent = state.camera.status;
+    return;
+  }
+  const scale = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+  canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+  canvas.getContext("2d", { alpha: false }).drawImage(video, 0, 0, canvas.width, canvas.height);
+  const scanType = state.camera.scanType;
+  const blob = await new Promise((resolve, reject) => canvas.toBlob(
+    (value) => value ? resolve(value) : reject(new Error("I could not capture this photo.")),
+    "image/jpeg",
+    0.8
+  ));
+  closeCameraStream();
+  state.camera.open = false;
+  state.camera.status = "";
+  render();
+  const file = new File([blob], `${scanType}-${Date.now()}.jpg`, { type: "image/jpeg" });
+  if (scanType === "invoice") await readInvoicePhoto(file);
+  else addPhotoCards(file.name, scanType);
 }
 
 async function readInvoicePhoto(file) {

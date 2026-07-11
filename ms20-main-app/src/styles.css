@@ -781,6 +781,48 @@ pre {
   display: none;
 }
 
+.camera-overlay {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(5, 20, 17, 0.88);
+}
+
+.camera-panel {
+  width: min(620px, 100%);
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 22px;
+  background: var(--surface);
+}
+
+.camera-panel h2,
+.camera-panel p {
+  margin: 0;
+}
+
+.camera-panel video {
+  width: 100%;
+  max-height: 65dvh;
+  object-fit: contain;
+  border-radius: 16px;
+  background: #07120f;
+}
+
+.camera-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.camera-status {
+  color: var(--warn);
+}
+
 @media (max-width: 720px) {
   .chat-app {
     width: 100%;

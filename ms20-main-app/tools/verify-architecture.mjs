@@ -209,6 +209,10 @@ assert(appSource.includes('source: "local_invoice_ocr"'), "Invoice review rows m
 assert(!appSource.includes('title: "Check photo details"'), "One camera capture must not create duplicate empty review cards");
 assert(appSource.includes('invoiceMode ? "Approve medicines" : "Approve catalog"'), "Invoice review must use simple invoice-specific approval wording");
 assert(appSource.includes('state.voice.status = "Reading invoice…"'), "Invoice capture must show immediate progress feedback");
+assert(appSource.includes("openLightweightCamera"), "Camera actions must use the memory-safe in-app camera");
+assert(appSource.includes('width: { ideal: 1280, max: 1280 }'), "In-app camera must limit capture resolution");
+assert(appSource.includes("closeCameraStream()"), "In-app camera must release memory after capture or cancel");
+assert(css.includes(".camera-overlay"), "Memory-safe camera preview UI missing");
 assert(css.includes("overscroll-behavior-y: contain"), "Chat scrolling must stay inside the message area");
 assert(css.includes("height: 100dvh"), "Mobile app shell must follow the visible device viewport");
 assert(appSource.includes("applyLocalRestockStock(card)"), "Confirmed restock must update local catalog stock");
