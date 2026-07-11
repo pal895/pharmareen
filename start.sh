@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
 PORT="${PORT:-5000}"
-PYTHON_BIN="${PYTHON_BIN:-./.pythonlibs/bin/python}"
+PYTHON_BIN="${PYTHON_BIN:-./.ms20-venv/bin/python}"
 BACKEND_LOG="${BACKEND_LOG:-server.log}"
 BRIDGE_LOG="${BRIDGE_LOG:-bridge.log}"
 WHATSAPP_BRIDGE_ENABLED="${WHATSAPP_BRIDGE_ENABLED:-false}"
@@ -13,8 +13,8 @@ BRIDGE_SCRIPT="${BRIDGE_SCRIPT:-local_whatsapp_bridge.js}"
 
 if [ ! -x "$PYTHON_BIN" ]; then
   echo "Creating the project Python environment..."
-  python -m venv .pythonlibs
-  PYTHON_BIN="./.pythonlibs/bin/python"
+  python -m venv .ms20-venv
+  PYTHON_BIN="./.ms20-venv/bin/python"
 fi
 
 if ! "$PYTHON_BIN" -c "import uvicorn, PIL, pytesseract" >/dev/null 2>&1; then

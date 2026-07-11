@@ -153,6 +153,7 @@ activemq-data/
 .env
 .envrc
 .venv
+.ms20-venv/
 env/
 venv/
 ENV/
