@@ -788,14 +788,19 @@ pre {
   display: grid;
   place-items: center;
   padding: 16px;
+  overflow: hidden;
   background: rgba(5, 20, 17, 0.88);
 }
 
 .camera-panel {
   width: min(620px, 100%);
+  max-height: calc(100dvh - 32px);
   display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   gap: 12px;
   padding: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border-radius: 22px;
   background: var(--surface);
 }
@@ -807,7 +812,9 @@ pre {
 
 .camera-panel video {
   width: 100%;
-  max-height: 65dvh;
+  height: 100%;
+  min-height: 0;
+  max-height: 55dvh;
   object-fit: contain;
   border-radius: 16px;
   background: #07120f;
@@ -815,12 +822,37 @@ pre {
 
 .camera-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+  position: sticky;
+  bottom: 0;
+  padding-top: 2px;
+  background: var(--surface);
 }
 
 .camera-status {
   color: var(--warn);
+}
+
+@media (max-width: 420px), (max-height: 700px) {
+  .camera-overlay {
+    place-items: stretch;
+    padding: 8px;
+  }
+
+  .camera-panel {
+    max-height: calc(100dvh - 16px);
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .camera-panel video {
+    max-height: 48dvh;
+  }
+
+  .camera-actions {
+    gap: 6px;
+  }
 }
 
 @media (max-width: 720px) {

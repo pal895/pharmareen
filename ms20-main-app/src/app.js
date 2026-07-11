@@ -998,12 +998,19 @@ async function toggleCameraLight() {
   const next = !state.camera.lightOn;
   try {
     await track.applyConstraints({ advanced: [{ torch: next }] });
+    const applied = track.getSettings?.().torch;
+    if (typeof applied === "boolean" && applied !== next) {
+      throw new Error("Camera did not apply the light setting");
+    }
     state.camera.lightOn = next;
     const button = root.querySelector('[data-action="toggle-camera-light"]');
     if (button) button.textContent = next ? "Light off" : "Light on";
   } catch {
     state.camera.lightAvailable = false;
     root.querySelector('[data-action="toggle-camera-light"]')?.remove();
+    state.camera.status = "Camera light is not available on this phone. Use room light and avoid reflections.";
+    const status = root.querySelector(".camera-status");
+    if (status) status.textContent = state.camera.status;
   }
 }
 

@@ -219,6 +219,9 @@ assert(css.includes(".camera-overlay"), "Memory-safe camera preview UI missing")
 assert(appSource.includes('status.textContent = "Ready — avoid reflections, hold still, then tap Capture."'), "Camera preview must clearly say when capture is ready");
 assert(appSource.includes('data-action="toggle-camera-light"'), "Camera light must be an optional owner control");
 assert(!appSource.includes('capabilities.torch) advanced.push({ torch: true })'), "Camera light must never turn on automatically");
+assert(appSource.includes('track.getSettings?.().torch'), "Camera light must verify that the phone actually applied the torch setting");
+assert(css.includes('max-height: calc(100dvh - 32px)'), "Camera panel must fit inside the visible phone viewport");
+assert(css.includes('grid-template-columns: repeat(3, minmax(0, 1fr))'), "All camera actions must stay on one visible row");
 assert(css.includes("overscroll-behavior-y: contain"), "Chat scrolling must stay inside the message area");
 assert(css.includes("height: 100dvh"), "Mobile app shell must follow the visible device viewport");
 assert(appSource.includes("applyLocalRestockStock(card)"), "Confirmed restock must update local catalog stock");
