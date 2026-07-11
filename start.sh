@@ -12,7 +12,9 @@ WHATSAPP_BRIDGE_ENABLED="${WHATSAPP_BRIDGE_ENABLED:-false}"
 BRIDGE_SCRIPT="${BRIDGE_SCRIPT:-local_whatsapp_bridge.js}"
 
 if [ ! -x "$PYTHON_BIN" ]; then
-  PYTHON_BIN="python"
+  echo "Creating the project Python environment..."
+  python -m venv .pythonlibs
+  PYTHON_BIN="./.pythonlibs/bin/python"
 fi
 
 if ! "$PYTHON_BIN" -c "import uvicorn, PIL, pytesseract" >/dev/null 2>&1; then
