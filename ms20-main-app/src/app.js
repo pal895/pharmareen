@@ -975,6 +975,7 @@ async function openLightweightCamera(scanType = "medicine_photo") {
       lightButton.type = "button";
       lightButton.dataset.action = "toggle-camera-light";
       lightButton.textContent = "Light on";
+      lightButton.addEventListener("click", () => void toggleCameraLight());
       actions.insertBefore(lightButton, actions.lastElementChild);
     }
   } catch {
