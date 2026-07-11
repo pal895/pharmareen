@@ -57,6 +57,9 @@ const CATALOG_TABLE_COLUMNS = [
   { key: "batch", label: "Batch", min: 110 },
   { key: "expiry", label: "Expiry", min: 120 }
 ];
+const INVOICE_TABLE_COLUMNS = CATALOG_TABLE_COLUMNS.filter((column) =>
+  !["selling_price", "supplier", "barcode"].includes(column.key)
+);
 const MEDICINE_DETAIL_CARD_TYPES = new Set([
   "InvoiceCard",
   "RestockCard",
@@ -447,7 +450,9 @@ function medicineDetailTemplate(card, displayed) {
 
 function catalogImportTableTemplate(card) {
   const rows = catalogRowsForCard(card);
-  const columnTemplate = CATALOG_TABLE_COLUMNS
+  const invoiceMode = card.fields?.import_mode === "invoice_ocr";
+  const columns = invoiceMode ? INVOICE_TABLE_COLUMNS : CATALOG_TABLE_COLUMNS;
+  const columnTemplate = columns
     .map((column) => `${column.min}px`)
     .join(" ");
   return `
@@ -456,27 +461,29 @@ function catalogImportTableTemplate(card) {
         <table class="catalog-import-table" aria-label="Medicine catalog review">
           <thead>
             <tr>
-              ${CATALOG_TABLE_COLUMNS.map((column) => `<th scope="col">${escapeHtml(column.label)}</th>`).join("")}
+              ${columns.map((column) => `<th scope="col">${escapeHtml(column.label)}</th>`).join("")}
             </tr>
           </thead>
           <tbody>
-            ${rows.map((row, index) => catalogImportRowTemplate(card.id, row, index)).join("")}
+            ${rows.map((row, index) => catalogImportRowTemplate(card.id, row, index, columns)).join("")}
           </tbody>
         </table>
       </div>
       <div class="catalog-mobile-rows" aria-label="Medicine catalog mobile review">
-        ${rows.map((row, index) => catalogImportMobileRowTemplate(card.id, row, index)).join("")}
+        ${rows.map((row, index) => catalogImportMobileRowTemplate(card.id, row, index, columns)).join("")}
       </div>
       <button class="secondary-action" type="button" data-action="add-catalog-row" data-card-id="${card.id}">Add medicine row</button>
-      <p>Edit each medicine, then approve. Empty medicine names are ignored.</p>
+      <p>${invoiceMode && card.fields?.import_incomplete === "true"
+        ? "Some details are missing. Scan again before approving."
+        : "Edit each medicine, then approve. Empty medicine names are ignored."}</p>
     </div>
   `;
 }
 
-function catalogImportRowTemplate(cardId, row, index) {
+function catalogImportRowTemplate(cardId, row, index, columns = CATALOG_TABLE_COLUMNS) {
   return `
     <tr>
-      ${CATALOG_TABLE_COLUMNS.map((column) => `
+      ${columns.map((column) => `
         <td data-label="${escapeHtml(column.label)}">
           <input
             data-card-id="${cardId}"
@@ -490,7 +497,7 @@ function catalogImportRowTemplate(cardId, row, index) {
   `;
 }
 
-function catalogImportMobileRowTemplate(cardId, row, index) {
+function catalogImportMobileRowTemplate(cardId, row, index, columns = CATALOG_TABLE_COLUMNS) {
   const title = row.name || `Medicine ${index + 1}`;
   return `
     <section class="catalog-mobile-row" aria-label="${escapeHtml(title)}">
@@ -499,7 +506,7 @@ function catalogImportMobileRowTemplate(cardId, row, index) {
         <span>Row ${index + 1}</span>
       </div>
       <div class="catalog-mobile-fields">
-        ${CATALOG_TABLE_COLUMNS.map((column) => `
+        ${columns.map((column) => `
           <label>
             <span>${escapeHtml(column.label)}</span>
             <input
@@ -1086,7 +1093,7 @@ async function readInvoicePhoto(file) {
     card.title = "Check invoice medicines";
     card.source = `${result.supplier_name || "Supplier invoice"}${result.invoice_number ? ` · ${result.invoice_number}` : ""}`;
     card.validation = result.complete === false
-      ? "Some invoice details are missing or do not add up. Check the photo and scan again."
+      ? "This scan is incomplete and cannot be approved. Check the photo and scan again."
       : "I read this on your device. Check the medicines, then approve.";
     state.voice.status = "";
     addCard(card);

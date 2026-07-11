@@ -26,12 +26,28 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
             image.thumbnail((1800, 1800))
             image = ImageOps.autocontrast(image)
             image = ImageEnhance.Contrast(image).enhance(1.5)
-            visible_text = pytesseract.image_to_string(image, config="--psm 4")
+            threshold = image.point(lambda value: 255 if value > 165 else 0)
+            ocr_texts = [
+                pytesseract.image_to_string(image, config="--psm 4"),
+                pytesseract.image_to_string(image, config="--psm 6"),
+                pytesseract.image_to_string(threshold, config="--psm 6"),
+            ]
+            visible_text = max(ocr_texts, key=len, default="")
     except Exception:
         return _failed(fingerprint, "I could not read this photo. Try again in good light with the whole page visible.")
 
-    extraction = extract_supplier_invoice_from_text(visible_text)
-    table_items = extract_source_brain_invoice_items(visible_text)
+    combined_text = "\n".join(ocr_texts)
+    extractions = [extract_supplier_invoice_from_text(text) for text in ocr_texts]
+    extraction = extract_supplier_invoice_from_text(combined_text)
+    extraction["supplier_name"] = _best_ocr_metadata_value(
+        [item.get("supplier_name") for item in extractions],
+        extraction.get("supplier_name"),
+    )
+    extraction["invoice_number"] = _best_ocr_metadata_value(
+        [item.get("invoice_number") for item in extractions],
+        extraction.get("invoice_number"),
+    )
+    table_items = merge_source_brain_invoice_items(ocr_texts)
     if table_items:
         extraction["items"] = table_items
         extraction["confidence"] = 0.88
@@ -46,7 +62,7 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
         "ocr_engine": "local_tesseract",
         "visible_text": visible_text[:8000],
     })
-    invoice_total = _invoice_total_from_text(visible_text)
+    invoice_total = _invoice_total_from_text(combined_text)
     extracted_total = sum(float(item.get("line_total") or 0) for item in extraction.get("items") or [])
     extraction["invoice_total"] = invoice_total
     extraction["extracted_line_total"] = extracted_total
@@ -58,6 +74,43 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
     if not extraction.get("items"):
         extraction["message"] = "I could not find clear medicine rows. Try a clearer photo."
     return extraction
+
+
+def merge_source_brain_invoice_items(texts: list[str]) -> list[dict[str, Any]]:
+    """Merge complementary deterministic OCR passes without duplicating medicines."""
+    candidates: dict[str, list[dict[str, Any]]] = {}
+    for text in texts:
+        for item in extract_source_brain_invoice_items(text):
+            candidates.setdefault(str(item["medicine_name"]), []).append(item)
+    return [_merge_item_candidates(items) for items in candidates.values()]
+
+
+def _merge_item_candidates(items: list[dict[str, Any]]) -> dict[str, Any]:
+    ranked = sorted(items, key=_item_completeness, reverse=True)
+    merged = dict(ranked[0])
+    for field in ("form", "unit", "quantity", "unit_cost", "line_total", "batch_number", "expiry_date"):
+        if merged.get(field) in (None, "", 0):
+            merged[field] = next((item.get(field) for item in ranked if item.get(field) not in (None, "", 0)), merged.get(field))
+    merged["confidence"] = max(float(item.get("confidence") or 0) for item in items)
+    return merged
+
+
+def _item_completeness(item: dict[str, Any]) -> tuple[int, float]:
+    fields = ("form", "unit", "quantity", "unit_cost", "line_total", "batch_number", "expiry_date")
+    return sum(item.get(field) not in (None, "", 0) for field in fields), float(item.get("confidence") or 0)
+
+
+def _best_ocr_metadata_value(values: list[Any], fallback: Any = "") -> str:
+    candidates = [" ".join(str(value).split()) for value in values if str(value or "").strip()]
+    if not candidates:
+        return str(fallback or "").strip()
+
+    def quality(value: str) -> tuple[int, int, int]:
+        isolated_letters = len(re.findall(r"\b[A-Za-z]\b", value))
+        readable_words = len(re.findall(r"\b[A-Za-z]{3,}\b", value))
+        return -isolated_letters, readable_words, len(value)
+
+    return max(candidates, key=quality)
 
 
 def extract_invoice_table_items(text: str) -> list[dict[str, Any]]:
