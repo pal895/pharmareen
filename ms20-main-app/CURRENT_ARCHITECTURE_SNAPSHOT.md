@@ -213,3 +213,24 @@ Replacement next test is onboarding:
 ```text
 Onboarding Test A.1: open the MS2.0 Assistant and confirm catalog onboarding choices appear before sale testing.
 ```
+
+## 2026-07-11 Architecture Continuation
+
+The Main App now has one reusable catalog spelling resolver used by parsing and pharmacy lookup. Canonical catalog names flow into sale/restock cards and confirmations. Accepted next architecture work extends this same resolver—rather than parallel matchers—for autocomplete, voice, scanning, imports, duplicate checks, medicine action cards, and canonical reporting.
+
+Implemented and live-verified:
+
+- Unique spelling variation resolution (`Cefimixe` → `Cefixime`).
+- Simple sale and restock confirmations with stock left.
+- One-time local sale deduction and restock addition through queue idempotency.
+- Catalog stock persistence across refresh.
+- Fixed mobile app shell with internal conversation scrolling.
+
+Planned at their proper test stages:
+
+- Pharmacy-specific alias/correction learning and strength/form-aware ambiguity.
+- Local autocomplete in the normal chat composer.
+- Shared live medicine action card.
+- Deterministic packaging/unit navigation.
+- Canonical reporting/export proof.
+- Full onboarding, scanner/import, document, completion-state, token-log, offline/reconnect, and representative device coverage already accepted in the live plan.

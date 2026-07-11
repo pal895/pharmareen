@@ -387,3 +387,22 @@ For every verified friction:
 8. Verify automatically.
 9. Resume testing exactly where it paused.
 10. If project files or routing cannot be located, stop and report the blocker.
+
+## Integrated Human Input And Medicine Card Coverage
+
+Add this coverage at the relevant upcoming catalog, operations, scanner, import, reporting, and device stages. Do not restart passed tests or send the entire plan to the owner at once.
+
+- Shared local resolver: exact catalog name, pharmacy alias/shorthand/learning, Source Brain name/alias/brand/generic, strength/form/unit, spelling/fuzzy/phonetic match, usage ranking, and safe ambiguity.
+- Human input: exact, light/heavy typo, missing spaces, compact commands, capitalization, incomplete names, aliases, brand/generic names, shorthand, prior corrections, unknown input, and unsafe ambiguity.
+- Autocomplete: catalog-first and Source Brain suggestions, touch/keyboard, preserve quantity/payment, ignore/select behavior, offline use, small ranked result set, and no unwanted insertion or API call.
+- Live medicine action card: open from typing, autocomplete, voice, and scanner; show only available useful identity, stock, price, supplier, barcode, batch/expiry, shelf, aliases, and activity; test Sell, Restock, Stock, updates, history, reports, cancel, queue, sync, and duplicate prevention.
+- Units and packaging: tablet, strip, box, capsule, bottle, vial, ampoule, tube, inhaler, sachet, and pack where catalog conversion data exists; never guess missing conversions.
+- Canonical records: misspellings and shorthand must resolve to the correct catalog identity in receipts, stock, reports, and exports.
+- Layout/state: phone portrait/landscape where practical, tablet, desktop, keyboard, touch, refresh, reopen, offline, and reconnect.
+- All normal matching, autocomplete, cards, calculations, canonicalization, and duplicate checks remain local and zero-token.
+
+Current live continuation after the 2026-07-11 restock pass:
+
+```text
+Cefixime stock is 25 after a verified +6 tablet restock. Continue with the next not-yet-tested onboarding method using a new Source Brain medicine not already in Zuri Pharmacy.
+```

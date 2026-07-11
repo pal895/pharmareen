@@ -347,3 +347,37 @@ Do not:
 First action for the new Codex chat:
 Inspect `ms20-main-app`, run `npm run verify`, start `npm run serve`, open the Main App, then begin the LIVE_APP_TEST_PLAN from Dashboard.
 ```
+
+## Live Continuation Update — 2026-07-11
+
+This section supersedes only stale pause instructions above. It does not remove historical context or accepted tests.
+
+Current verified live state:
+
+- Zuri Pharmacy setup and catalog resume state passed.
+- Catalog spelling variation `Cefimixe` resolves locally to canonical `Cefixime`.
+- Sale confirmation passed: `✅ Cefixime x1 recorded • Cash`, stock left 19.
+- Restock confirmation passed: `✅ Cefixime +6 tablets added`, stock left 25.
+- Mobile compact-shell test passed: the header/composer remain inside the fixed app and only chat content scrolls.
+- Latest verified commit at this continuation point: `094d029 Persist restocks and show stock left`.
+- OpenAI/API usage for these actions: zero.
+
+Exact continuation point:
+
+- The basic restock test has passed. Do not repeat it unless related code changes.
+- Continue the expanded onboarding sequence one action at a time.
+- Before the next onboarding method, read Zuri Pharmacy's current catalog, exclude onboarded medicines, and select suitable new test medicines from the trusted Source Brain.
+
+Accepted additions that must remain integrated:
+
+- Test every onboarding method, duplicates, scanner/photo/invoice, paste, CSV, Excel, POS/stock sheets, persistence, reports, documents, and completion state.
+- Maintain onboarding, friction, fixed, regression, catalog, duplicate, scanner, document/export, API/token, AI fallback, and blocked/incomplete logs; update only what changed.
+- Use simple English suitable for a 12-year-old.
+- Use a shared local medicine resolver across typing, voice, autocomplete, cards, onboarding, scans, imports, stock, sales, reports, and duplicate detection.
+- Resolution order: pharmacy exact/aliases/learning first, then Source Brain aliases and canonical relationships, then strength/form-aware spelling/fuzzy/phonetic ranking, then safe ambiguity; AI only for genuinely unresolved portions.
+- Permanent records, receipts, stock, reports, and exports must use canonical medicine identity even when input is misspelled or shorthand.
+- Add local, offline autocomplete that never changes text without selection and preserves quantity/payment text.
+- Add a calm live medicine action card with relevant identity, stock, price, supplier, batch/expiry, location, aliases, and activity only when data exists; primary actions are Sell, Restock, and Stock.
+- Test safe unit/pack conversions, no negative stock, no double deduction, durable card state, offline queue, reconnect/sync, and duplicate submission protection.
+- Test representative phone, tablet, and desktop layouts without claiming untested universal device support.
+- Fix each friction in the shared reusable component, run focused related regression checks, and return to the interrupted live action.
