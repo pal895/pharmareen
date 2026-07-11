@@ -914,6 +914,8 @@ function addPhotoCards(fileName, scanType) {
 async function readInvoicePhoto(file) {
   state.ui.screen = "chat";
   state.ui.workspace = "operations";
+  state.voice.status = "Reading invoice…";
+  render();
   try {
     const upload = await resizeImageForReading(file);
     const body = new FormData();
@@ -923,6 +925,7 @@ async function readInvoicePhoto(file) {
     if (!response.ok) throw new Error(result.detail || "I could not read this invoice.");
     if (!Array.isArray(result.items) || result.items.length === 0) {
       addFeed("system", result.message || "I could not find clear medicine rows. Try a clearer photo.");
+      state.voice.status = "";
       render();
       return;
     }
@@ -944,8 +947,10 @@ async function readInvoicePhoto(file) {
     card.title = "Check invoice medicines";
     card.source = `${result.supplier_name || "Supplier invoice"}${result.invoice_number ? ` · ${result.invoice_number}` : ""}`;
     card.validation = "I read this on your device. Check the medicines, then approve.";
+    state.voice.status = "";
     addCard(card);
   } catch (error) {
+    state.voice.status = "";
     addFeed("system", error?.message || "I could not read this invoice. Try a clearer photo.");
     render();
   }
@@ -953,7 +958,7 @@ async function readInvoicePhoto(file) {
 
 async function resizeImageForReading(file) {
   const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
+  const scale = Math.min(1, 1400 / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(bitmap.width * scale));
   canvas.height = Math.max(1, Math.round(bitmap.height * scale));

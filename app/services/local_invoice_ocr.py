@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import re
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +23,7 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
     try:
         with Image.open(io.BytesIO(image_bytes)) as source:
             image = ImageOps.exif_transpose(source).convert("L")
-            image.thumbnail((1800, 1800))
+            image.thumbnail((1400, 1400))
             image = ImageOps.autocontrast(image)
             image = ImageEnhance.Contrast(image).enhance(1.5)
             visible_text = pytesseract.image_to_string(image, config="--psm 6")
@@ -84,14 +85,21 @@ def extract_source_brain_invoice_items(text: str) -> list[dict[str, Any]]:
     medicines = load_source_brain_medicines()
     rows: list[dict[str, Any]] = []
     normalized_lines = [" ".join(line.replace("|", " ").split()) for line in text.splitlines()]
-    for medicine in medicines:
-        aliases = [medicine["name"], *medicine["aliases"]]
-        matched_line = next((line for line in normalized_lines if any(_contains_name(line, alias) for alias in aliases)), "")
-        if not matched_line:
+    used_medicines: set[str] = set()
+    for line in normalized_lines:
+        ranked = sorted(
+            ((_medicine_line_score(line, medicine), medicine) for medicine in medicines),
+            key=lambda item: item[0],
+            reverse=True,
+        )
+        best_score, medicine = ranked[0]
+        next_score = ranked[1][0] if len(ranked) > 1 else 0.0
+        if best_score < 0.76 or best_score - next_score < 0.08 or medicine["name"] in used_medicines:
             continue
-        row = _parse_source_brain_row(matched_line, medicine)
+        row = _parse_source_brain_row(line, medicine)
         if row:
             rows.append(row)
+            used_medicines.add(medicine["name"])
     return rows[:50]
 
 
@@ -117,9 +125,27 @@ def _contains_name(line: str, name: str) -> bool:
     return bool(re.search(rf"(?<![A-Za-z]){re.escape(name)}(?![A-Za-z])", line, flags=re.I))
 
 
+def _medicine_line_score(line: str, medicine: dict[str, Any]) -> float:
+    words = re.findall(r"[A-Za-z]+", line.lower())
+    if not words:
+        return 0.0
+    scores: list[float] = []
+    for name in [medicine["name"], *medicine["aliases"]]:
+        target_words = re.findall(r"[A-Za-z]+", name.lower())
+        if not target_words:
+            continue
+        target = "".join(target_words)
+        width = len(target_words)
+        for start in range(min(3, len(words))):
+            candidate = "".join(words[start:start + width])
+            if candidate:
+                scores.append(SequenceMatcher(None, target, candidate).ratio())
+    return max(scores, default=0.0)
+
+
 def _parse_source_brain_row(line: str, medicine: dict[str, Any]) -> dict[str, Any] | None:
-    form = next((value for value in medicine["forms"] if _contains_name(line, value)), "")
-    unit = next((value for value in medicine["units"] if _contains_name(line, value)), "")
+    form = _best_known_value(line, medicine["forms"])
+    unit = _best_known_value(line, medicine["units"])
     expiry_match = re.search(r"\b(20\d{2})[-/](0[1-9]|1[0-2])\b", line)
     batch_match = re.search(r"\b(?=[A-Z0-9-]*[A-Z])(?=[A-Z0-9-]*\d)[A-Z0-9]+(?:-[A-Z0-9]+)+\b", line, flags=re.I)
     clean = line
@@ -149,6 +175,18 @@ def _parse_source_brain_row(line: str, medicine: dict[str, Any]) -> dict[str, An
         "expiry_date": expiry_match.group(0).replace("/", "-") if expiry_match else "",
         "confidence": 0.92 if form and unit and batch_match and expiry_match else 0.78,
     }
+
+
+def _best_known_value(line: str, values: list[str]) -> str:
+    exact = next((value for value in values if _contains_name(line, value)), "")
+    if exact:
+        return exact
+    normalized_line = re.sub(r"[^a-z]", "", line.lower())
+    ranked = sorted(
+        ((SequenceMatcher(None, re.sub(r"[^a-z]", "", value.lower()), normalized_line).quick_ratio(), value) for value in values),
+        reverse=True,
+    )
+    return ranked[0][1] if ranked and ranked[0][0] >= 0.3 else ""
 
 
 def _failed(fingerprint: str, message: str) -> dict[str, Any]:
