@@ -60,12 +60,20 @@ export function parseLocalCommand(input, catalog = []) {
   }
 
   if (text.includes("restock")) {
+    const enteredMedicine = raw.replace(/restock/gi, "").trim();
+    const medicineMatch = matchMedicineName(enteredMedicine, catalog);
     return {
       kind: "restock",
       cardType: "RestockCard",
       aiRequired: false,
-      confidence: 0.82,
-      fields: { medicine: raw.replace(/restock/gi, "").trim(), quantity: "1", unit: "pack" }
+      confidence: medicineMatch.status === "matched" ? 0.94 : 0.72,
+      fields: {
+        medicine: medicineMatch.matches[0]?.name || enteredMedicine,
+        quantity: "1",
+        unit: medicineMatch.matches[0]?.units?.[0] || "pack",
+        supplier: medicineMatch.matches[0]?.supplier || ""
+      },
+      medicineMatch
     };
   }
 

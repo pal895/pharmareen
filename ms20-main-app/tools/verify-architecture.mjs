@@ -191,6 +191,10 @@ assert(pharmacyBrain.findMedicine("Meta").status === "not_in_catalog", "Short pa
 const spellingSale = parseLocalCommand("Cefimixe 1 cash", pharmacyBrain.catalog);
 assert(spellingSale.fields.medicine === "Cefixime", "Spelling variation sale must use the saved catalog medicine name");
 assert(Number(spellingSale.fields.stockLeft) === 20, "Sale parse must carry saved catalog stock into the local action");
+const spellingRestock = parseLocalCommand("restock cefimixe", pharmacyBrain.catalog);
+assert(spellingRestock.fields.medicine === "Cefixime", "Spelling variation restock must use the saved catalog medicine name");
+assert(css.includes("overscroll-behavior-y: contain"), "Chat scrolling must stay inside the message area");
+assert(css.includes("height: 100dvh"), "Mobile app shell must follow the visible device viewport");
 
 const notifications = buildDeterministicNotifications({ catalog: [{ name: "Cefixime", stockLeft: 2, batches: [{ batch: "B1", expiry: "2026-07-20" }] }] });
 assert(notifications.some((item) => item.category === "Inventory"), "Low-stock notification missing");
