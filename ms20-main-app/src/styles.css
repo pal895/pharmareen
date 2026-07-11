@@ -813,10 +813,6 @@ pre {
   background: #07120f;
 }
 
-.camera-panel video {
-  filter: brightness(1.12) contrast(1.06);
-}
-
 .camera-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;

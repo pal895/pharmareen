@@ -216,7 +216,9 @@ assert(appSource.includes('card.fields.import_incomplete'), "Incomplete local in
 assert(appSource.includes('This scan is missing invoice details.'), "Incomplete invoice approval must be blocked at the action boundary");
 assert(appSource.includes("closeCameraStream()"), "In-app camera must release memory after capture or cancel");
 assert(css.includes(".camera-overlay"), "Memory-safe camera preview UI missing");
-assert(appSource.includes('status.textContent = "Ready — hold still and tap Capture."'), "Camera preview must clearly say when capture is ready");
+assert(appSource.includes('status.textContent = "Ready — avoid reflections, hold still, then tap Capture."'), "Camera preview must clearly say when capture is ready");
+assert(appSource.includes('data-action="toggle-camera-light"'), "Camera light must be an optional owner control");
+assert(!appSource.includes('capabilities.torch) advanced.push({ torch: true })'), "Camera light must never turn on automatically");
 assert(css.includes("overscroll-behavior-y: contain"), "Chat scrolling must stay inside the message area");
 assert(css.includes("height: 100dvh"), "Mobile app shell must follow the visible device viewport");
 assert(appSource.includes("applyLocalRestockStock(card)"), "Confirmed restock must update local catalog stock");

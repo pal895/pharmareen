@@ -137,7 +137,7 @@ let activeRecognition = null;
 
 state.ui = { screen: "home", workspace: "operations" };
 state.voice = { listening: false, status: "" };
-state.camera = { open: false, scanType: "medicine_photo", stream: null, status: "" };
+state.camera = { open: false, scanType: "medicine_photo", stream: null, status: "", lightAvailable: false, lightOn: false };
 state.pendingScanType = "medicine_photo";
 state.cardFontScale = readCardFontScale();
 hydrateResumeState();
@@ -311,6 +311,7 @@ function cameraOverlayTemplate() {
         <p class="camera-status" aria-live="polite">${escapeHtml(state.camera.status)}</p>
         <div class="camera-actions">
           <button type="button" data-action="close-camera">Cancel</button>
+          ${state.camera.lightAvailable ? `<button type="button" data-action="toggle-camera-light">${state.camera.lightOn ? "Light off" : "Light on"}</button>` : ""}
           <button class="primary-action" type="button" data-action="capture-camera-frame">Capture</button>
         </div>
       </div>
@@ -683,6 +684,7 @@ function handleAction(dataset) {
     void openLightweightCamera("invoice");
   }
   if (action === "close-camera") closeLightweightCamera();
+  if (action === "toggle-camera-light") void toggleCameraLight();
   if (action === "capture-camera-frame") void captureLightweightCameraFrame();
   if (action === "demo-onboarding") addOnboardingCard();
   if (action === "start-catalog-invoice") {
@@ -957,15 +959,24 @@ async function openLightweightCamera(scanType = "medicine_photo") {
     if (capabilities.focusMode?.includes?.("continuous")) advanced.push({ focusMode: "continuous" });
     if (capabilities.exposureMode?.includes?.("continuous")) advanced.push({ exposureMode: "continuous" });
     if (capabilities.whiteBalanceMode?.includes?.("continuous")) advanced.push({ whiteBalanceMode: "continuous" });
-    if (state.camera.scanType === "invoice" && capabilities.torch) advanced.push({ torch: true });
     if (advanced.length) await track.applyConstraints({ advanced }).catch(() => {});
+    state.camera.lightAvailable = Boolean(capabilities.torch);
+    state.camera.lightOn = false;
     const video = root.querySelector("#ms20CameraPreview");
     if (video) {
       video.srcObject = stream;
       await video.play();
     }
     const status = root.querySelector(".camera-status");
-    if (status) status.textContent = "Ready — hold still and tap Capture.";
+    if (status) status.textContent = "Ready — avoid reflections, hold still, then tap Capture.";
+    const actions = root.querySelector(".camera-actions");
+    if (actions && state.camera.lightAvailable && !actions.querySelector('[data-action="toggle-camera-light"]')) {
+      const lightButton = document.createElement("button");
+      lightButton.type = "button";
+      lightButton.dataset.action = "toggle-camera-light";
+      lightButton.textContent = "Light on";
+      actions.insertBefore(lightButton, actions.lastElementChild);
+    }
   } catch {
     state.camera.status = "Camera did not open. Allow camera access and try again.";
     render();
@@ -976,7 +987,24 @@ function closeLightweightCamera() {
   closeCameraStream();
   state.camera.open = false;
   state.camera.status = "";
+  state.camera.lightAvailable = false;
+  state.camera.lightOn = false;
   render();
+}
+
+async function toggleCameraLight() {
+  const track = state.camera.stream?.getVideoTracks?.()[0];
+  if (!track || !state.camera.lightAvailable) return;
+  const next = !state.camera.lightOn;
+  try {
+    await track.applyConstraints({ advanced: [{ torch: next }] });
+    state.camera.lightOn = next;
+    const button = root.querySelector('[data-action="toggle-camera-light"]');
+    if (button) button.textContent = next ? "Light off" : "Light on";
+  } catch {
+    state.camera.lightAvailable = false;
+    root.querySelector('[data-action="toggle-camera-light"]')?.remove();
+  }
 }
 
 function closeCameraStream() {
@@ -997,7 +1025,6 @@ async function captureLightweightCameraFrame() {
   canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
   canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
   const context = canvas.getContext("2d", { alpha: false });
-  context.filter = "brightness(1.12) contrast(1.08)";
   context.drawImage(video, 0, 0, canvas.width, canvas.height);
   const scanType = state.camera.scanType;
   const blob = await new Promise((resolve, reject) => canvas.toBlob(
