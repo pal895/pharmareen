@@ -185,6 +185,9 @@ pharmacyBrain.upsertCatalogItem({ name: "Ceftriaxone", form: "vial", selling_pri
 pharmacyBrain.upsertCatalogItem({ name: "Salbutamol", form: "inhaler", selling_price: "250", stock: "5" });
 assert(pharmacyBrain.catalog.length === 4, "Catalog upsert must append medicines without replacing previous records");
 assert(pharmacyBrain.findMedicine("Ceftriaxone").status === "matched", "Catalog upsert lookup failed for added medicine");
+const spellingMatch = pharmacyBrain.findMedicine("Cefimixe");
+assert(spellingMatch.status === "matched" && spellingMatch.matchType === "spelling_variation", "Unique catalog spelling variation should match locally");
+assert(pharmacyBrain.findMedicine("Meta").status === "not_in_catalog", "Short partial names must not fuzzy-match catalog medicines");
 
 const notifications = buildDeterministicNotifications({ catalog: [{ name: "Cefixime", stockLeft: 2, batches: [{ batch: "B1", expiry: "2026-07-20" }] }] });
 assert(notifications.some((item) => item.category === "Inventory"), "Low-stock notification missing");

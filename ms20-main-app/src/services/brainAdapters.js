@@ -34,6 +34,16 @@ export class PharmacyBrain {
     });
     if (matches.length === 1) return { status: "matched", confidence: 0.96, matches };
     if (matches.length > 1) return { status: "ambiguous", confidence: 0.55, matches };
+    const spellingMatches = this.catalog.filter((item) => {
+      const aliases = [item.name, ...(item.aliases || [])].map(normalize);
+      return aliases.some((alias) => isCloseSpelling(alias, wanted));
+    });
+    if (spellingMatches.length === 1) {
+      return { status: "matched", confidence: 0.88, matches: spellingMatches, matchType: "spelling_variation" };
+    }
+    if (spellingMatches.length > 1) {
+      return { status: "ambiguous", confidence: 0.52, matches: spellingMatches, matchType: "spelling_variation" };
+    }
     return { status: "not_in_catalog", confidence: 0.2, matches: [] };
   }
 
@@ -98,6 +108,35 @@ function normalize(value) {
 
 function sameMedicine(left, right) {
   return normalize(left) === normalize(right);
+}
+
+function isCloseSpelling(left, right) {
+  if (!left || !right || left.includes(" ") || right.includes(" ")) return false;
+  const longest = Math.max(left.length, right.length);
+  if (longest < 5 || Math.abs(left.length - right.length) > 2) return false;
+  const allowedEdits = longest >= 8 ? 2 : 1;
+  return editDistanceWithin(left, right, allowedEdits);
+}
+
+function editDistanceWithin(left, right, limit) {
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let row = 1; row <= left.length; row += 1) {
+    const current = [row];
+    let rowMinimum = row;
+    for (let column = 1; column <= right.length; column += 1) {
+      const cost = left[row - 1] === right[column - 1] ? 0 : 1;
+      const value = Math.min(
+        current[column - 1] + 1,
+        previous[column] + 1,
+        previous[column - 1] + cost
+      );
+      current.push(value);
+      rowMinimum = Math.min(rowMinimum, value);
+    }
+    if (rowMinimum > limit) return false;
+    previous = current;
+  }
+  return previous[right.length] <= limit;
 }
 
 function normalizeCatalogItem(item) {
