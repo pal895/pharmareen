@@ -19,8 +19,9 @@ fi
 
 if ! "$PYTHON_BIN" -c "import uvicorn, PIL, pytesseract" >/dev/null 2>&1; then
   echo "Installing Python requirements from requirements.txt..."
+  export PIP_USER=false
   "$PYTHON_BIN" -m ensurepip --upgrade >/dev/null 2>&1 || true
-  "$PYTHON_BIN" -m pip install -r requirements.txt
+  "$PYTHON_BIN" -m pip install --no-user -r requirements.txt
 fi
 
 mkdir -p data
