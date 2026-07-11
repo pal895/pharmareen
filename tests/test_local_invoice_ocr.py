@@ -1,4 +1,4 @@
-from app.services.local_invoice_ocr import _best_ocr_metadata_value, merge_source_brain_invoice_items
+from app.services.local_invoice_ocr import _best_ocr_metadata_value, _ocr_money, merge_source_brain_invoice_items
 
 
 def test_multiple_ocr_passes_merge_all_canonical_invoice_rows_and_fields():
@@ -27,3 +27,10 @@ def test_supplier_metadata_prefers_readable_pass_over_fragmented_ocr():
         "Af k M Supplies Ltd",
         "AfyaLink Medical Supplies Ltd",
     ]) == "AfyaLink Medical Supplies Ltd"
+
+
+def test_ocr_money_restores_dropped_printed_decimal_places():
+    assert _ocr_money("18000") == 180.0
+    assert _ocr_money("9500") == 95.0
+    assert _ocr_money("18.00") == 18.0
+    assert _ocr_money("140") == 140.0

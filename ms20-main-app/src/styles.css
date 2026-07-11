@@ -432,6 +432,19 @@ input:disabled {
   margin-top: 14px;
 }
 
+.invoice-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 420px) {
+  .invoice-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
 .catalog-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--line);

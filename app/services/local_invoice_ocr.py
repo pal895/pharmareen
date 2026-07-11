@@ -206,9 +206,10 @@ def _medicine_line_score(line: str, medicine: dict[str, Any]) -> float:
 
 
 def _parse_source_brain_row(line: str, medicine: dict[str, Any]) -> dict[str, Any] | None:
+    line = re.sub(r"(?<=\d)[—–_:](?=\d)", "-", line)
     form = _best_known_value(line, medicine["forms"])
     unit = _best_known_value(line, medicine["units"])
-    expiry_match = re.search(r"\b(20\d{2})[-/](0[1-9]|1[0-2])\b", line)
+    expiry_match = re.search(r"\b(20\d{2})\s*[-/., ]\s*(0[1-9]|1[0-2])\b", line)
     batch_match = re.search(r"\b(?=[A-Z0-9-]*[A-Z])(?=[A-Z0-9-]*\d)[A-Z0-9]+(?:-[A-Z0-9]+)+\b", line, flags=re.I)
     clean = line
     for value in [medicine["name"], *medicine["aliases"], form, unit]:
@@ -218,14 +219,14 @@ def _parse_source_brain_row(line: str, medicine: dict[str, Any]) -> dict[str, An
         clean = clean.replace(expiry_match.group(0), " ")
     if batch_match:
         clean = clean.replace(batch_match.group(0), " ")
-    numbers = [value.replace(",", "") for value in re.findall(r"\b\d[\d,]*(?:\.\d{2})?\b", clean)]
+    numbers = re.findall(r"\b\d[\d,]*(?:\.\d{2})?\b", clean)
     if not numbers:
         return None
-    quantity = int(float(numbers[0]))
+    quantity = int(float(numbers[0].replace(",", "")))
     if quantity <= 0 or quantity > 100000:
         return None
-    unit_cost = float(numbers[1]) if len(numbers) > 1 else None
-    line_total = float(numbers[2]) if len(numbers) > 2 else None
+    unit_cost = _ocr_money(numbers[1]) if len(numbers) > 1 else None
+    line_total = _ocr_money(numbers[2]) if len(numbers) > 2 else None
     return {
         "medicine_name": medicine["name"],
         "form": form,
@@ -234,9 +235,17 @@ def _parse_source_brain_row(line: str, medicine: dict[str, Any]) -> dict[str, An
         "unit_cost": unit_cost,
         "line_total": line_total,
         "batch_number": batch_match.group(0) if batch_match else "",
-        "expiry_date": expiry_match.group(0).replace("/", "-") if expiry_match else "",
+        "expiry_date": f"{expiry_match.group(1)}-{expiry_match.group(2)}" if expiry_match else "",
         "confidence": 0.92 if form and unit and batch_match and expiry_match else 0.78,
     }
+
+
+def _ocr_money(token: str) -> float:
+    compact = token.replace(",", "")
+    value = float(compact)
+    if "." not in compact and len(compact) >= 3 and compact.endswith("00"):
+        return value / 100
+    return value
 
 
 def _best_known_value(line: str, values: list[str]) -> str:
@@ -244,7 +253,21 @@ def _best_known_value(line: str, values: list[str]) -> str:
     if exact:
         return exact
     singular_line = re.sub(r"\bdrops\b", "drop", line.lower())
-    return next((value for value in values if _contains_name(singular_line, re.sub(r"\bdrops\b", "drop", value.lower()))), "")
+    singular = next((value for value in values if _contains_name(singular_line, re.sub(r"\bdrops\b", "drop", value.lower()))), "")
+    if singular:
+        return singular
+    words = re.findall(r"[A-Za-z]+", singular_line)
+    ranked: list[tuple[float, str]] = []
+    for value in values:
+        target_words = re.findall(r"[A-Za-z]+", re.sub(r"\bdrops\b", "drop", value.lower()))
+        width = len(target_words)
+        target = "".join(target_words)
+        score = max((SequenceMatcher(None, target, "".join(words[i:i + width])).ratio() for i in range(len(words))), default=0.0)
+        ranked.append((score, value))
+    ranked.sort(reverse=True)
+    if ranked and ranked[0][0] >= 0.78 and (len(ranked) == 1 or ranked[0][0] - ranked[1][0] >= 0.08):
+        return ranked[0][1]
+    return ""
 
 
 def _invoice_total_from_text(text: str) -> float | None:

@@ -214,6 +214,8 @@ assert(appSource.includes('width: { ideal: 1920, max: 1920 }'), "In-app camera m
 assert(appSource.includes('Math.min(1, 1800 / Math.max(video.videoWidth, video.videoHeight))'), "Invoice capture must preserve enough detail for local OCR");
 assert(appSource.includes('card.fields.import_incomplete'), "Incomplete local invoice reads must be marked unsafe to approve");
 assert(appSource.includes('const INVOICE_TABLE_COLUMNS'), "Invoice review must use purchase-specific fields");
+assert(appSource.includes('line_total: item.line_total'), "Invoice review must expose line totals for owner cross-checking");
+assert(appSource.includes('invoiceSummaryTemplate(card)'), "Invoice review must show invoice-level metadata once");
 assert(appSource.includes('This scan is incomplete and cannot be approved.'), "Incomplete invoice review must explain the blocked approval plainly");
 assert(appSource.includes('This scan is missing invoice details.'), "Incomplete invoice approval must be blocked at the action boundary");
 assert(appSource.includes("closeCameraStream()"), "In-app camera must release memory after capture or cancel");

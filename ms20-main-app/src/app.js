@@ -57,9 +57,10 @@ const CATALOG_TABLE_COLUMNS = [
   { key: "batch", label: "Batch", min: 110 },
   { key: "expiry", label: "Expiry", min: 120 }
 ];
-const INVOICE_TABLE_COLUMNS = CATALOG_TABLE_COLUMNS.filter((column) =>
-  !["selling_price", "supplier", "barcode"].includes(column.key)
-);
+const INVOICE_TABLE_COLUMNS = [
+  ...CATALOG_TABLE_COLUMNS.filter((column) => !["selling_price", "supplier", "barcode"].includes(column.key)),
+  { key: "line_total", label: "Line total", min: 120, inputMode: "decimal" }
+];
 const MEDICINE_DETAIL_CARD_TYPES = new Set([
   "InvoiceCard",
   "RestockCard",
@@ -120,6 +121,11 @@ const FIELD_LABELS = {
   correct_stock: "Correct stock",
   stockLeft: "Stock left",
   cost_price: "Buying price",
+  line_total: "Line total",
+  invoice_supplier: "Supplier",
+  invoice_number: "Invoice number",
+  invoice_date: "Invoice date",
+  invoice_total: "Invoice total",
   selling_price: "Selling price",
   supplier: "Supplier",
   barcode: "Barcode",
@@ -457,6 +463,7 @@ function catalogImportTableTemplate(card) {
     .join(" ");
   return `
     <div class="catalog-import-editor">
+      ${invoiceMode ? invoiceSummaryTemplate(card) : ""}
       <div class="catalog-table-wrap" style="--catalog-columns: ${columnTemplate};">
         <table class="catalog-import-table" aria-label="Medicine catalog review">
           <thead>
@@ -472,10 +479,19 @@ function catalogImportTableTemplate(card) {
       <div class="catalog-mobile-rows" aria-label="Medicine catalog mobile review">
         ${rows.map((row, index) => catalogImportMobileRowTemplate(card.id, row, index, columns)).join("")}
       </div>
-      <button class="secondary-action" type="button" data-action="add-catalog-row" data-card-id="${card.id}">Add medicine row</button>
+      ${invoiceMode && card.fields?.import_incomplete === "true" ? "" : `<button class="secondary-action" type="button" data-action="add-catalog-row" data-card-id="${card.id}">Add medicine row</button>`}
       <p>${invoiceMode && card.fields?.import_incomplete === "true"
         ? "Some details are missing. Scan again before approving."
         : "Edit each medicine, then approve. Empty medicine names are ignored."}</p>
+    </div>
+  `;
+}
+
+function invoiceSummaryTemplate(card) {
+  return `
+    <div class="invoice-summary" aria-label="Invoice details">
+      ${["invoice_supplier", "invoice_number", "invoice_date", "invoice_total"]
+        .map((field) => fieldTemplate(card, field)).join("")}
     </div>
   `;
 }
@@ -544,7 +560,7 @@ function activeActionsTemplate(card) {
           : `<button data-action="confirm-card" data-card-id="${card.id}">${invoiceMode ? "Approve medicines" : "Approve catalog"}</button>`}
         ${invoiceMode ? "" : '<button data-action="download-template">Template</button>'}
         <button data-action="read-card" data-card-id="${card.id}">Read</button>
-        <button data-action="correct-card" data-card-id="${card.id}">Correct</button>
+        ${incompleteInvoice ? "" : `<button data-action="correct-card" data-card-id="${card.id}">Correct</button>`}
         <button data-action="reject-card" data-card-id="${card.id}">Cancel</button>
       </div>
     `;
@@ -1080,6 +1096,7 @@ async function readInvoicePhoto(file) {
       unit: item.unit || "",
       stock: item.quantity ?? "",
       cost_price: item.unit_cost ?? "",
+      line_total: item.line_total ?? "",
       selling_price: "",
       supplier: result.supplier_name || "",
       barcode: item.barcode || "",
@@ -1088,8 +1105,13 @@ async function readInvoicePhoto(file) {
       source: "local_invoice_ocr"
     }));
     const card = createPasteImportCard(catalogItemsToText(rows));
+    card.fields.catalog_rows = JSON.stringify(rows);
     card.fields.import_mode = "invoice_ocr";
     card.fields.import_incomplete = result.complete === false ? "true" : "false";
+    card.fields.invoice_supplier = result.supplier_name || "";
+    card.fields.invoice_number = result.invoice_number || "";
+    card.fields.invoice_date = result.invoice_date || "";
+    card.fields.invoice_total = result.invoice_total ?? "";
     card.title = "Check invoice medicines";
     card.source = `${result.supplier_name || "Supplier invoice"}${result.invoice_number ? ` · ${result.invoice_number}` : ""}`;
     card.validation = result.complete === false
@@ -1893,6 +1915,7 @@ function normalizeCatalogRow(row = {}) {
     unit: row.unit || first(row.units) || row.form || "",
     stock: row.stock ?? row.current_stock ?? row.quantity ?? row.stockLeft ?? "",
     cost_price: row.cost_price ?? row.costPrice ?? "",
+    line_total: row.line_total ?? row.lineTotal ?? "",
     selling_price: row.selling_price ?? row.sellingPrice ?? "",
     supplier: row.supplier || "",
     batch: row.batch || first(row.batches)?.batch || "",
@@ -1919,7 +1942,7 @@ function fieldLabel(field) {
 
 function inputModeForField(field) {
   if (["quantity", "stock", "current_stock", "correct_stock", "stockLeft"].includes(field)) return "numeric";
-  if (["selling_price", "cost_price", "total"].includes(field)) return "decimal";
+  if (["selling_price", "cost_price", "line_total", "invoice_total", "total"].includes(field)) return "decimal";
   return "";
 }
 
