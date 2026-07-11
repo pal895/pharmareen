@@ -249,10 +249,18 @@ function chatMessageTemplates() {
 }
 
 function feedItemTemplate(item) {
+  if (item.type === "owner") {
+    return `
+      <button class="message-bubble owner reusable-command" type="button" data-action="reuse-command" data-command="${escapeHtml(item.text)}" aria-label="Use this command again">
+        <p>${escapeHtml(item.text)}</p>
+        <span>You / ${escapeHtml(item.time)} · Tap to use again</span>
+      </button>
+    `;
+  }
   return `
-    <article class="message-bubble ${item.type}" aria-label="${item.type === "owner" ? "You" : "MS2.0"} message">
+    <article class="message-bubble ${item.type}" aria-label="MS2.0 message">
       <p>${escapeHtml(item.text)}</p>
-      <span>${item.type === "owner" ? "You" : "MS2.0"} / ${escapeHtml(item.time)}</span>
+      <span>MS2.0 / ${escapeHtml(item.time)}</span>
     </article>
   `;
 }
@@ -611,6 +619,14 @@ function bindEvents() {
 
 function handleAction(dataset) {
   const action = dataset.action;
+  if (action === "reuse-command") {
+    const input = root.querySelector("#commandInput");
+    if (!input) return;
+    input.value = dataset.command || "";
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+    return;
+  }
   if (action === "open-chat") {
     state.ui.screen = "chat";
     state.ui.workspace = dataset.workspace || "operations";

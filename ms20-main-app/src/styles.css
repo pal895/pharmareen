@@ -265,6 +265,20 @@ input:disabled {
   background: var(--accent-soft);
 }
 
+.reusable-command {
+  display: block;
+  min-height: 0;
+  color: var(--ink);
+  text-align: left;
+  border-radius: 18px;
+}
+
+.reusable-command:hover,
+.reusable-command:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
 .message-bubble p {
   margin: 0;
   white-space: pre-line;
