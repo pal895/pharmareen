@@ -141,7 +141,7 @@ for (const pattern of [/api\.openai/i, /new OpenAI/i, /responses\.create/i, /cha
   assert(!pattern.test(runtimeSources), `Unsafe provider call pattern found: ${pattern}`);
 }
 
-const { parseLocalCommand } = await import(pathToFileURL(path.join(root, "src/services/localIntelligence.js")));
+const { parseLocalCommand, resolveStockCheck } = await import(pathToFileURL(path.join(root, "src/services/localIntelligence.js")));
 const { OfflineQueue } = await import(pathToFileURL(path.join(root, "src/services/offlineQueue.js")));
 const { CloudMemoryGateway } = await import(pathToFileURL(path.join(root, "src/services/cloudGateway.js")));
 const { runVisualPipeline } = await import(pathToFileURL(path.join(root, "src/services/visualPipeline.js")));
@@ -193,6 +193,10 @@ assert(spellingSale.fields.medicine === "Cefixime", "Spelling variation sale mus
 assert(Number(spellingSale.fields.stockLeft) === 20, "Sale parse must carry saved catalog stock into the local action");
 const spellingRestock = parseLocalCommand("restock cefimixe", pharmacyBrain.catalog);
 assert(spellingRestock.fields.medicine === "Cefixime", "Spelling variation restock must use the saved catalog medicine name");
+const stockCheck = resolveStockCheck("Cefimixe stock", pharmacyBrain.catalog);
+assert(stockCheck.status === "matched" && stockCheck.medicine.name === "Cefixime", "Stock check must resolve spelling variations to the saved medicine");
+assert(Number(stockCheck.medicine.stockLeft) === 20, "Stock check must return the saved catalog stock directly");
+assert(appSource.includes("stockCheckReply(stockCheck.medicine)"), "Known stock checks must answer immediately without a report card");
 assert(css.includes("overscroll-behavior-y: contain"), "Chat scrolling must stay inside the message area");
 assert(css.includes("height: 100dvh"), "Mobile app shell must follow the visible device viewport");
 assert(appSource.includes("applyLocalRestockStock(card)"), "Confirmed restock must update local catalog stock");

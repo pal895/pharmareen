@@ -18,6 +18,7 @@ import {
 import { buildDeterministicNotifications, mergeNotifications, notificationToCard } from "./services/notificationCenter.js";
 import { buildCatalogCsv, buildBulkPasteTemplate, buildDocumentCard, downloadTextFile } from "./services/documentGenerator.js";
 import { cardFieldsFor, createEditableCard, paymentOptions, quantityBumps } from "./cards/editableCards.js";
+import { resolveStockCheck } from "./services/localIntelligence.js";
 import { listRouteSlots, resolveOfflineSlot } from "./routes/routeRegistry.js";
 import {
   TokenPolicy,
@@ -700,6 +701,13 @@ function handleCommand(text) {
     addCard(createPasteImportCard(trimmed.replace(/^list\s*:/i, "").trim()));
     return;
   }
+  const stockCheck = resolveStockCheck(trimmed, pharmacyBrain.catalog);
+  if (stockCheck.status === "matched") {
+    addFeed("owner", trimmed);
+    addFeed("system", stockCheckReply(stockCheck.medicine));
+    render();
+    return;
+  }
   if (pharmacyBrain.catalog.length === 0) {
     addFeed("owner", trimmed);
     ensureCatalogOnboardingStarted();
@@ -716,6 +724,18 @@ function handleCommand(text) {
   } else {
     addCard(card);
   }
+}
+
+function stockCheckReply(medicine) {
+  const rawStock = medicine?.stockLeft;
+  const unit = medicine?.units?.[0] || "item";
+  if (rawStock === null || rawStock === undefined || rawStock === "") {
+    return `📦 ${medicine.name}\nStock has not been set yet.`;
+  }
+  const stock = Number(rawStock);
+  if (!Number.isFinite(stock)) return `📦 ${medicine.name}\nStock has not been set yet.`;
+  const unitLabel = stock === 1 ? unit : `${unit}s`;
+  return `📦 ${medicine.name} stock left: ${stock} ${unitLabel}`;
 }
 
 function handleVoiceTranscript(text) {

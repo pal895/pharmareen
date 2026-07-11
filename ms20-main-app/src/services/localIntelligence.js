@@ -12,6 +12,24 @@ export function matchMedicineName(name, catalog = []) {
     : result;
 }
 
+export function resolveStockCheck(input, catalog = []) {
+  const raw = String(input || "").trim();
+  const medicineText = raw
+    .replace(/^\s*(?:check|show|what(?:'s| is))?\s*(?:the\s+)?stock\s+(?:for\s+)?/i, "")
+    .replace(/\s+(?:stock|stock left)\s*$/i, "")
+    .trim();
+  if (!/\bstock\b/i.test(raw) || !medicineText || medicineText === raw) return { status: "not_stock_check" };
+  const medicineMatch = matchMedicineName(medicineText, catalog);
+  if (medicineMatch.status !== "matched") return { status: medicineMatch.status, medicineText, medicineMatch };
+  const medicine = medicineMatch.matches[0];
+  return {
+    status: "matched",
+    medicine,
+    medicineText,
+    medicineMatch
+  };
+}
+
 export function parseLocalCommand(input, catalog = []) {
   const raw = String(input || "").trim();
   const text = normalize(raw);
