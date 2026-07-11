@@ -1277,6 +1277,9 @@ function recordCard(card) {
     applyLocalSaleStock(card);
     updateTodayTotals(card);
   }
+  if (result.added && card.type === "RestockCard") {
+    applyLocalRestockStock(card);
+  }
   addFeed("system", result.duplicate ? "Already saved." : savedReplyFor(card));
 }
 
@@ -1299,6 +1302,25 @@ function applyLocalSaleStock(card) {
   const remaining = Math.max(0, currentStock - quantity);
   medicine.stockLeft = remaining;
   card.fields.stockLeft = remaining;
+  state.catalog.items = pharmacyBrain.catalog;
+  safeLocalStorage()?.setItem(CATALOG_KEY, JSON.stringify(state.catalog.items));
+  void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);
+}
+
+function applyLocalRestockStock(card) {
+  const match = pharmacyBrain.findMedicine(card.fields?.medicine);
+  if (match.status !== "matched") return;
+  const medicine = match.matches[0];
+  const quantity = Number(card.fields?.quantity || 0);
+  card.fields.medicine = medicine.name;
+  if (!Number.isFinite(quantity) || quantity <= 0) return;
+  const currentStock = medicine.stockLeft === null || medicine.stockLeft === undefined || medicine.stockLeft === ""
+    ? 0
+    : Number(medicine.stockLeft);
+  if (!Number.isFinite(currentStock)) return;
+  const stockLeft = currentStock + quantity;
+  medicine.stockLeft = stockLeft;
+  card.fields.stockLeft = stockLeft;
   state.catalog.items = pharmacyBrain.catalog;
   safeLocalStorage()?.setItem(CATALOG_KEY, JSON.stringify(state.catalog.items));
   void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);
@@ -1499,7 +1521,15 @@ function savedReplyFor(card) {
     return `${medicine} added.\nSale recorded.\n${medicine} x${quantity}\nPayment: ${payment}`;
   }
   if (card.type === "StockCorrectionCard") return "Stock correction saved.";
-  if (card.type === "RestockCard") return "Restock saved.";
+  if (card.type === "RestockCard") {
+    const medicine = card.fields?.medicine || "Medicine";
+    const quantity = card.fields?.quantity || "0";
+    const unit = card.fields?.unit || "item";
+    const lines = [`✅ ${medicine} +${quantity} ${unit}${Number(quantity) === 1 ? "" : "s"} added`];
+    const stockLine = stockReplyLine(card);
+    if (stockLine) lines.push(stockLine);
+    return lines.join("\n");
+  }
   if (card.type === "OnboardingCard") return "Setup saved.";
   if (card.type === "CatalogImportCard") return "Catalog saved.";
   if (card.type === "VisualScanCard" || card.type === "PhotoReviewCard") return "Medicine details saved.";

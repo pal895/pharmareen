@@ -195,6 +195,9 @@ const spellingRestock = parseLocalCommand("restock cefimixe", pharmacyBrain.cata
 assert(spellingRestock.fields.medicine === "Cefixime", "Spelling variation restock must use the saved catalog medicine name");
 assert(css.includes("overscroll-behavior-y: contain"), "Chat scrolling must stay inside the message area");
 assert(css.includes("height: 100dvh"), "Mobile app shell must follow the visible device viewport");
+assert(appSource.includes("applyLocalRestockStock(card)"), "Confirmed restock must update local catalog stock");
+assert(appSource.includes("medicine.stockLeft = stockLeft"), "Restock must persist the new stock level");
+assert(appSource.includes("✅ ${medicine} +${quantity}"), "Restock confirmation must use simple MS2.0 wording");
 
 const notifications = buildDeterministicNotifications({ catalog: [{ name: "Cefixime", stockLeft: 2, batches: [{ batch: "B1", expiry: "2026-07-20" }] }] });
 assert(notifications.some((item) => item.category === "Inventory"), "Low-stock notification missing");
