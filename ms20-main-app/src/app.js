@@ -951,6 +951,14 @@ async function openLightweightCamera(scanType = "medicine_photo") {
     });
     state.camera.stream = stream;
     state.camera.status = "";
+    const track = stream.getVideoTracks()[0];
+    const capabilities = track?.getCapabilities?.() || {};
+    const advanced = [];
+    if (capabilities.focusMode?.includes?.("continuous")) advanced.push({ focusMode: "continuous" });
+    if (capabilities.exposureMode?.includes?.("continuous")) advanced.push({ exposureMode: "continuous" });
+    if (capabilities.whiteBalanceMode?.includes?.("continuous")) advanced.push({ whiteBalanceMode: "continuous" });
+    if (state.camera.scanType === "invoice" && capabilities.torch) advanced.push({ torch: true });
+    if (advanced.length) await track.applyConstraints({ advanced }).catch(() => {});
     const video = root.querySelector("#ms20CameraPreview");
     if (video) {
       video.srcObject = stream;
@@ -988,12 +996,14 @@ async function captureLightweightCameraFrame() {
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
   canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
-  canvas.getContext("2d", { alpha: false }).drawImage(video, 0, 0, canvas.width, canvas.height);
+  const context = canvas.getContext("2d", { alpha: false });
+  context.filter = "brightness(1.12) contrast(1.08)";
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
   const scanType = state.camera.scanType;
   const blob = await new Promise((resolve, reject) => canvas.toBlob(
     (value) => value ? resolve(value) : reject(new Error("I could not capture this photo.")),
     "image/jpeg",
-    0.8
+    0.92
   ));
   closeCameraStream();
   state.camera.open = false;
@@ -1054,7 +1064,7 @@ async function readInvoicePhoto(file) {
 
 async function resizeImageForReading(file) {
   const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 1400 / Math.max(bitmap.width, bitmap.height));
+  const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(bitmap.width * scale));
   canvas.height = Math.max(1, Math.round(bitmap.height * scale));
@@ -1064,7 +1074,7 @@ async function resizeImageForReading(file) {
   return new Promise((resolve, reject) => canvas.toBlob(
     (blob) => blob ? resolve(blob) : reject(new Error("I could not prepare this photo.")),
     "image/jpeg",
-    0.82
+    0.92
   ));
 }
 

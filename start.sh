@@ -34,11 +34,28 @@ fi
 
 mkdir -p data
 
+# Replace an older MS2.0 backend before starting the updated code. Without this,
+# port 5000 can keep serving an old Python environment after a successful pull.
+if curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
+  echo "Stopping the previous MS2.0 backend..."
+  pkill -f "uvicorn app.main:app" >/dev/null 2>&1 || true
+  for _ in $(seq 1 20); do
+    if ! curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then break; fi
+    sleep 0.25
+  done
+fi
+
 echo "Starting PharMareen backend on port $PORT..."
 "$PYTHON_BIN" -m uvicorn app.main:app --host 0.0.0.0 --port "$PORT" > "$BACKEND_LOG" 2>&1 &
 BACKEND_PID=$!
 echo "$BACKEND_PID" > server.pid
 echo "Backend logs: $BACKEND_LOG"
+
+sleep 0.5
+if ! kill -0 "$BACKEND_PID" >/dev/null 2>&1; then
+  echo "Backend did not start. Check $BACKEND_LOG."
+  exit 1
+fi
 
 cleanup() {
   if kill -0 "$BACKEND_PID" >/dev/null 2>&1; then
