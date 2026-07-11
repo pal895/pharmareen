@@ -26,25 +26,7 @@ export class PharmacyBrain {
   }
 
   findMedicine(name) {
-    const wanted = normalize(name);
-    if (!wanted) return { status: "missing_name", confidence: 0, matches: [] };
-    const matches = this.catalog.filter((item) => {
-      const aliases = [item.name, ...(item.aliases || [])].map(normalize);
-      return aliases.some((alias) => alias === wanted || alias.includes(wanted) || wanted.includes(alias));
-    });
-    if (matches.length === 1) return { status: "matched", confidence: 0.96, matches };
-    if (matches.length > 1) return { status: "ambiguous", confidence: 0.55, matches };
-    const spellingMatches = this.catalog.filter((item) => {
-      const aliases = [item.name, ...(item.aliases || [])].map(normalize);
-      return aliases.some((alias) => isCloseSpelling(alias, wanted));
-    });
-    if (spellingMatches.length === 1) {
-      return { status: "matched", confidence: 0.88, matches: spellingMatches, matchType: "spelling_variation" };
-    }
-    if (spellingMatches.length > 1) {
-      return { status: "ambiguous", confidence: 0.52, matches: spellingMatches, matchType: "spelling_variation" };
-    }
-    return { status: "not_in_catalog", confidence: 0.2, matches: [] };
+    return matchCatalogMedicine(name, this.catalog);
   }
 
   saveOwnerAlias(medicineName, alias) {
@@ -57,6 +39,28 @@ export class PharmacyBrain {
     this.visualMemory.push({ ...signature, pharmacyId: this.pharmacyId });
     return signature;
   }
+}
+
+export function matchCatalogMedicine(name, catalog = []) {
+  const wanted = normalize(name);
+  if (!wanted) return { status: "missing_name", confidence: 0, matches: [] };
+  const matches = catalog.filter((item) => {
+    const aliases = [item.name, ...(item.aliases || [])].map(normalize);
+    return aliases.some((alias) => alias === wanted || alias.includes(wanted) || wanted.includes(alias));
+  });
+  if (matches.length === 1) return { status: "matched", confidence: 0.96, matches };
+  if (matches.length > 1) return { status: "ambiguous", confidence: 0.55, matches };
+  const spellingMatches = catalog.filter((item) => {
+    const aliases = [item.name, ...(item.aliases || [])].map(normalize);
+    return aliases.some((alias) => isCloseSpelling(alias, wanted));
+  });
+  if (spellingMatches.length === 1) {
+    return { status: "matched", confidence: 0.88, matches: spellingMatches, matchType: "spelling_variation" };
+  }
+  if (spellingMatches.length > 1) {
+    return { status: "ambiguous", confidence: 0.52, matches: spellingMatches, matchType: "spelling_variation" };
+  }
+  return { status: "not_in_catalog", confidence: 0.2, matches: [] };
 }
 
 export class SourceBrain {

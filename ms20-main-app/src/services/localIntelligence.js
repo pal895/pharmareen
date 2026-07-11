@@ -6,21 +6,10 @@ function normalize(value) {
 }
 
 export function matchMedicineName(name, catalog = []) {
-  const wanted = normalize(name);
-  if (!wanted) {
-    return { status: "missing_name", confidence: 0, matches: [] };
-  }
-  const matches = catalog.filter((item) => {
-    const aliases = [item.name, ...(item.aliases || [])].map(normalize);
-    return aliases.some((alias) => alias === wanted || alias.includes(wanted) || wanted.includes(alias));
-  });
-  if (matches.length === 1) {
-    return { status: "matched", confidence: 0.96, matches };
-  }
-  if (matches.length > 1) {
-    return { status: "ambiguous", confidence: 0.52, matches };
-  }
-  return { status: "needs_pharmacy_catalog", confidence: 0.72, matches: [] };
+  const result = matchCatalogMedicine(name, catalog);
+  return result.status === "not_in_catalog"
+    ? { ...result, status: "needs_pharmacy_catalog", confidence: 0.72 }
+    : result;
 }
 
 export function parseLocalCommand(input, catalog = []) {
@@ -93,7 +82,7 @@ export function parseLocalCommand(input, catalog = []) {
       aiRequired: false,
       confidence: medicineMatch.status === "matched" ? 0.96 : medicineMatch.confidence,
       fields: {
-        medicine,
+        medicine: medicineMatch.matches[0]?.name || medicine,
         quantity,
         payment,
         stockLeft: medicineMatch.matches[0]?.stockLeft ?? "Catalog sync needed"
@@ -170,3 +159,4 @@ function validationFor(parse) {
   }
   return "Local-first route. No AI token needed.";
 }
+import { matchCatalogMedicine } from "./brainAdapters.js";

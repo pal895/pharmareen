@@ -1274,9 +1274,34 @@ function recordCard(card) {
   };
   const result = syncAdapter.queueAction(action);
   if (result.added && (card.type === "SaleCard" || card.type === "VoiceReviewCard" || card.type === "MedicineMatchCard")) {
+    applyLocalSaleStock(card);
     updateTodayTotals(card);
   }
   addFeed("system", result.duplicate ? "Already saved." : savedReplyFor(card));
+}
+
+function applyLocalSaleStock(card) {
+  if (card.type === "MedicineMatchCard") return;
+  const match = pharmacyBrain.findMedicine(card.fields?.medicine);
+  if (match.status !== "matched") return;
+  const medicine = match.matches[0];
+  card.fields.medicine = medicine.name;
+  if (medicine.stockLeft === null || medicine.stockLeft === undefined || medicine.stockLeft === "") {
+    card.fields.stockLeft = null;
+    return;
+  }
+  const currentStock = Number(medicine.stockLeft);
+  const quantity = Number(card.fields?.quantity || 0);
+  if (!Number.isFinite(currentStock) || !Number.isFinite(quantity)) {
+    card.fields.stockLeft = null;
+    return;
+  }
+  const remaining = Math.max(0, currentStock - quantity);
+  medicine.stockLeft = remaining;
+  card.fields.stockLeft = remaining;
+  state.catalog.items = pharmacyBrain.catalog;
+  safeLocalStorage()?.setItem(CATALOG_KEY, JSON.stringify(state.catalog.items));
+  void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);
 }
 
 function updateTodayTotals(card) {
@@ -1462,11 +1487,7 @@ function savedReplyFor(card) {
     const medicine = card.fields?.medicine || "Sale";
     const quantity = card.fields?.quantity || "1";
     const payment = paymentLabel(String(card.fields?.payment || "cash").toLowerCase());
-    const lines = [
-      "Sale recorded.",
-      `${medicine} x${quantity}`,
-      `Payment: ${payment}`
-    ];
+    const lines = [`✅ ${medicine} x${quantity} recorded • ${payment}`];
     const stockLine = stockReplyLine(card);
     if (stockLine) lines.push(stockLine);
     return lines.join("\n");
@@ -1643,11 +1664,10 @@ function safeLocalStorage() {
 }
 
 function stockReplyLine(card) {
-  const stockLeft = Number(card.fields?.stockLeft);
-  const quantity = Number(card.fields?.quantity || 0);
-  if (!Number.isFinite(stockLeft)) return "";
-  const remaining = Math.max(0, stockLeft - quantity);
-  return `Stock left: ${remaining}`;
+  const rawStock = card.fields?.stockLeft;
+  if (rawStock === null || rawStock === undefined || rawStock === "") return "Stock left: not set";
+  const stockLeft = Number(rawStock);
+  return Number.isFinite(stockLeft) ? `Stock left: ${stockLeft}` : "Stock left: not set";
 }
 
 function greetingText() {

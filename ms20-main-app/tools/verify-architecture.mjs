@@ -188,6 +188,9 @@ assert(pharmacyBrain.findMedicine("Ceftriaxone").status === "matched", "Catalog 
 const spellingMatch = pharmacyBrain.findMedicine("Cefimixe");
 assert(spellingMatch.status === "matched" && spellingMatch.matchType === "spelling_variation", "Unique catalog spelling variation should match locally");
 assert(pharmacyBrain.findMedicine("Meta").status === "not_in_catalog", "Short partial names must not fuzzy-match catalog medicines");
+const spellingSale = parseLocalCommand("Cefimixe 1 cash", pharmacyBrain.catalog);
+assert(spellingSale.fields.medicine === "Cefixime", "Spelling variation sale must use the saved catalog medicine name");
+assert(Number(spellingSale.fields.stockLeft) === 20, "Sale parse must carry saved catalog stock into the local action");
 
 const notifications = buildDeterministicNotifications({ catalog: [{ name: "Cefixime", stockLeft: 2, batches: [{ batch: "B1", expiry: "2026-07-20" }] }] });
 assert(notifications.some((item) => item.category === "Inventory"), "Low-stock notification missing");
