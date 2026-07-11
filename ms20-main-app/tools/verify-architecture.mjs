@@ -203,6 +203,10 @@ assert(css.includes(".reusable-command"), "Reusable owner messages must preserve
 assert(appSource.includes('data-action="capture-invoice"'), "Invoice menu must request a real owner capture");
 assert(!appSource.includes('data-action="demo-invoice"'), "Owner invoice menu must not create a fake demo invoice");
 assert(appSource.includes('state.pendingScanType = "invoice"'), "Invoice capture must enter the real invoice review path");
+assert(appSource.includes('fetch("/api/ms20/invoice-scan"'), "Invoice photos must reach the local OCR endpoint");
+assert(appSource.includes("resizeImageForReading(file)"), "Camera photos must be resized before OCR to protect phone memory");
+assert(appSource.includes('source: "local_invoice_ocr"'), "Invoice review rows must identify local deterministic extraction");
+assert(!appSource.includes('title: "Check photo details"'), "One camera capture must not create duplicate empty review cards");
 assert(css.includes("overscroll-behavior-y: contain"), "Chat scrolling must stay inside the message area");
 assert(css.includes("height: 100dvh"), "Mobile app shell must follow the visible device viewport");
 assert(appSource.includes("applyLocalRestockStock(card)"), "Confirmed restock must update local catalog stock");

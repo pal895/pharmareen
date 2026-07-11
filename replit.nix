@@ -10,5 +10,6 @@
     pkgs.python311Packages.pip
     pkgs.nodejs-20_x
     pkgs.nodePackages.npm
+    pkgs.tesseract
   ];
 }

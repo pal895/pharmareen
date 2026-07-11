@@ -607,7 +607,11 @@ function bindEvents() {
 
   root.querySelector("#cameraInput")?.addEventListener("change", (event) => {
     const file = event.target.files?.[0];
-    addPhotoCards(file?.name || "camera-photo.jpg", state.pendingScanType || "medicine_photo");
+    if (file && state.pendingScanType === "invoice") {
+      void readInvoicePhoto(file);
+    } else {
+      addPhotoCards(file?.name || "camera-photo.jpg", state.pendingScanType || "medicine_photo");
+    }
     state.pendingScanType = "medicine_photo";
   });
 
@@ -903,17 +907,62 @@ function addPhotoCards(fileName, scanType) {
   const result = runVisualPipeline({ fileName, scanType });
   const visualCard = buildPhotoReviewCard(result);
   addCard(visualCard);
-  if (scanType !== "invoice") {
-    addCard(createEditableCard({
-      type: "PhotoReviewCard",
-      title: "Check photo details",
-      source: fileName,
-      fields: { file: fileName, medicine: "", form: "", unit: "", pack_size: "", barcode: "", batch: "", expiry: "", shelf: "" },
-      confidence: result.confidence,
-      validation: "Owner correction will save to pharmacy visual memory."
-    }));
-  }
   refreshNotifications();
+}
+
+async function readInvoicePhoto(file) {
+  state.ui.screen = "chat";
+  state.ui.workspace = "operations";
+  try {
+    const upload = await resizeImageForReading(file);
+    const body = new FormData();
+    body.append("file", upload, file.name || "invoice.jpg");
+    const response = await fetch("/api/ms20/invoice-scan", { method: "POST", body });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || "I could not read this invoice.");
+    if (!Array.isArray(result.items) || result.items.length === 0) {
+      addFeed("system", result.message || "I could not find clear medicine rows. Try a clearer photo.");
+      render();
+      return;
+    }
+    const rows = result.items.map((item) => ({
+      name: item.medicine_name || item.name || "",
+      form: item.form || "",
+      unit: item.unit || "",
+      stock: item.quantity ?? "",
+      cost_price: item.unit_cost ?? "",
+      selling_price: "",
+      supplier: result.supplier_name || "",
+      barcode: item.barcode || "",
+      batch: item.batch_number || "",
+      expiry: item.expiry_date || "",
+      source: "local_invoice_ocr"
+    }));
+    const card = createPasteImportCard(catalogItemsToText(rows));
+    card.title = "Check invoice medicines";
+    card.source = `${result.supplier_name || "Supplier invoice"}${result.invoice_number ? ` · ${result.invoice_number}` : ""}`;
+    card.validation = "I read this on your device. Check the medicines, then approve.";
+    addCard(card);
+  } catch (error) {
+    addFeed("system", error?.message || "I could not read this invoice. Try a clearer photo.");
+    render();
+  }
+}
+
+async function resizeImageForReading(file) {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext("2d", { alpha: false });
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return new Promise((resolve, reject) => canvas.toBlob(
+    (blob) => blob ? resolve(blob) : reject(new Error("I could not prepare this photo.")),
+    "image/jpeg",
+    0.82
+  ));
 }
 
 function addBarcodeCard() {

@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
+from fastapi import FastAPI, File, Header, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -59,6 +59,7 @@ from app.services.medicine_catalog import (
     search_catalog_entries,
 )
 from app.services.medicine_onboarding import import_pharmacy_medicines
+from app.services.local_invoice_ocr import scan_invoice_locally
 from app.services.photo_intake import (
     append_photo_intake_log,
     build_invoice_extraction_placeholder,
@@ -88,6 +89,7 @@ offline_whatsapp_outbox: list[dict[str, Any]] = []
 offline_whatsapp_confirmation_history: list[dict[str, Any]] = []
 pending_voice_confirmations: dict[str, tuple[str, float]] = {}
 pending_invoice_reviews: dict[str, dict[str, Any]] = {}
+main_app_invoice_ocr_cache: dict[str, dict[str, Any]] = {}
 PENDING_VOICE_TTL_SECONDS = 600
 startup_status_printed = False
 XML_CONTENT_TYPE = "application/xml"
@@ -378,6 +380,25 @@ async def debug_main_app() -> dict[str, Any]:
         "write_mode": "safe_queue_only",
         "ai_used": False,
     }
+
+
+@app.post("/api/ms20/invoice-scan")
+async def main_app_invoice_scan(file: UploadFile = File(...)) -> dict[str, Any]:
+    image_bytes = await file.read()
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="Choose an invoice photo first.")
+    if len(image_bytes) > 8_000_000:
+        raise HTTPException(status_code=413, detail="This photo is too large. Take a normal clear photo and try again.")
+    fingerprint = hashlib.sha256(image_bytes).hexdigest()
+    cached = main_app_invoice_ocr_cache.get(fingerprint)
+    if cached is not None:
+        return {**cached, "from_cache": True}
+    result = scan_invoice_locally(image_bytes)
+    result.update({"file_name": file.filename or "invoice.jpg", "from_cache": False})
+    if len(main_app_invoice_ocr_cache) >= 24:
+        main_app_invoice_ocr_cache.pop(next(iter(main_app_invoice_ocr_cache)))
+    main_app_invoice_ocr_cache[fingerprint] = result
+    return result
 
 
 @app.get("/main-app/{asset_path:path}", include_in_schema=False)
