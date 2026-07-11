@@ -207,6 +207,7 @@ assert(appSource.includes('fetch("/api/ms20/invoice-scan"'), "Invoice photos mus
 assert(appSource.includes("resizeImageForReading(file)"), "Camera photos must be resized before OCR to protect phone memory");
 assert(appSource.includes('source: "local_invoice_ocr"'), "Invoice review rows must identify local deterministic extraction");
 assert(!appSource.includes('title: "Check photo details"'), "One camera capture must not create duplicate empty review cards");
+assert(appSource.includes('invoiceMode ? "Approve medicines" : "Approve catalog"'), "Invoice review must use simple invoice-specific approval wording");
 assert(css.includes("overscroll-behavior-y: contain"), "Chat scrolling must stay inside the message area");
 assert(css.includes("height: 100dvh"), "Mobile app shell must follow the visible device viewport");
 assert(appSource.includes("applyLocalRestockStock(card)"), "Confirmed restock must update local catalog stock");

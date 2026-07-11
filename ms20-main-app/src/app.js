@@ -507,10 +507,11 @@ function activeActionsTemplate(card) {
     `;
   }
   if (card.type === "CatalogImportCard") {
+    const invoiceMode = card.fields?.import_mode === "invoice_ocr";
     return `
       <div class="card-actions">
-        <button data-action="confirm-card" data-card-id="${card.id}">Approve catalog</button>
-        <button data-action="download-template">Template</button>
+        <button data-action="confirm-card" data-card-id="${card.id}">${invoiceMode ? "Approve medicines" : "Approve catalog"}</button>
+        ${invoiceMode ? "" : '<button data-action="download-template">Template</button>'}
         <button data-action="read-card" data-card-id="${card.id}">Read</button>
         <button data-action="correct-card" data-card-id="${card.id}">Correct</button>
         <button data-action="reject-card" data-card-id="${card.id}">Cancel</button>
@@ -939,6 +940,7 @@ async function readInvoicePhoto(file) {
       source: "local_invoice_ocr"
     }));
     const card = createPasteImportCard(catalogItemsToText(rows));
+    card.fields.import_mode = "invoice_ocr";
     card.title = "Check invoice medicines";
     card.source = `${result.supplier_name || "Supplier invoice"}${result.invoice_number ? ` · ${result.invoice_number}` : ""}`;
     card.validation = "I read this on your device. Check the medicines, then approve.";
