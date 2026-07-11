@@ -953,6 +953,8 @@ async function openLightweightCamera(scanType = "medicine_photo") {
       video.srcObject = stream;
       await video.play();
     }
+    const status = root.querySelector(".camera-status");
+    if (status) status.textContent = "Ready — hold still and tap Capture.";
   } catch {
     state.camera.status = "Camera did not open. Allow camera access and try again.";
     render();

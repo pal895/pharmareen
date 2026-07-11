@@ -213,6 +213,7 @@ assert(appSource.includes("openLightweightCamera"), "Camera actions must use the
 assert(appSource.includes('width: { ideal: 1280, max: 1280 }'), "In-app camera must limit capture resolution");
 assert(appSource.includes("closeCameraStream()"), "In-app camera must release memory after capture or cancel");
 assert(css.includes(".camera-overlay"), "Memory-safe camera preview UI missing");
+assert(appSource.includes('status.textContent = "Ready — hold still and tap Capture."'), "Camera preview must clearly say when capture is ready");
 assert(css.includes("overscroll-behavior-y: contain"), "Chat scrolling must stay inside the message area");
 assert(css.includes("height: 100dvh"), "Mobile app shell must follow the visible device viewport");
 assert(appSource.includes("applyLocalRestockStock(card)"), "Confirmed restock must update local catalog stock");
