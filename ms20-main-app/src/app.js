@@ -274,7 +274,7 @@ function composerTemplate() {
           <button type="button" data-action="take-photo">Camera</button>
           <button type="button" data-action="upload-photo">Photo library</button>
           <button type="button" data-action="upload-document">File</button>
-          <button type="button" data-action="demo-invoice">Invoice</button>
+          <button type="button" data-action="capture-invoice">Invoice</button>
           <button type="button" data-action="demo-barcode">Scan barcode</button>
           <button type="button" data-action="start-catalog-paste">Paste list</button>
           <button type="button" data-action="demo-stock-correction">Stock fix</button>
@@ -652,7 +652,10 @@ function handleAction(dataset) {
   }
   if (action === "upload-document") root.querySelector("#documentInput")?.click();
   if (action === "demo-barcode") addBarcodeCard();
-  if (action === "demo-invoice") addPhotoCards("supplier-invoice.jpg", "invoice");
+  if (action === "capture-invoice") {
+    state.pendingScanType = "invoice";
+    root.querySelector("#cameraInput")?.click();
+  }
   if (action === "demo-onboarding") addOnboardingCard();
   if (action === "start-catalog-invoice") {
     removeCardsByType(["CatalogOnboardingCard"]);

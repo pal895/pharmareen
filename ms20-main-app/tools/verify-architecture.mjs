@@ -200,6 +200,9 @@ assert(appSource.includes("stockCheckReply(stockCheck.medicine)"), "Known stock 
 assert(appSource.includes('data-action="reuse-command"'), "Owner messages must be reusable without adding chat clutter");
 assert(appSource.includes('input.value = dataset.command || ""'), "Reusing a command must fill the composer without running it automatically");
 assert(css.includes(".reusable-command"), "Reusable owner messages must preserve the simple chat-bubble layout");
+assert(appSource.includes('data-action="capture-invoice"'), "Invoice menu must request a real owner capture");
+assert(!appSource.includes('data-action="demo-invoice"'), "Owner invoice menu must not create a fake demo invoice");
+assert(appSource.includes('state.pendingScanType = "invoice"'), "Invoice capture must enter the real invoice review path");
 assert(css.includes("overscroll-behavior-y: contain"), "Chat scrolling must stay inside the message area");
 assert(css.includes("height: 100dvh"), "Mobile app shell must follow the visible device viewport");
 assert(appSource.includes("applyLocalRestockStock(card)"), "Confirmed restock must update local catalog stock");
