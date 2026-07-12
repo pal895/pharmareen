@@ -393,7 +393,20 @@ async def main_app_invoice_scan(file: UploadFile = File(...)) -> dict[str, Any]:
     cached = main_app_invoice_ocr_cache.get(fingerprint)
     if cached is not None:
         return {**cached, "from_cache": True}
-    result = scan_invoice_locally(image_bytes)
+    try:
+        result = scan_invoice_locally(image_bytes)
+    except Exception:
+        logger.exception("Local invoice scan failed")
+        result = {
+            "items": [],
+            "confidence": 0.0,
+            "extraction_status": "needs_clearer_photo",
+            "fingerprint": fingerprint,
+            "ai_used": False,
+            "ocr_engine": "local_tesseract",
+            "complete": False,
+            "message": "I could not finish reading this invoice. Please scan it again.",
+        }
     result.update({"file_name": file.filename or "invoice.jpg", "from_cache": False})
     if len(main_app_invoice_ocr_cache) >= 24:
         main_app_invoice_ocr_cache.pop(next(iter(main_app_invoice_ocr_cache)))

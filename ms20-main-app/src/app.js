@@ -1082,8 +1082,9 @@ async function readInvoicePhoto(file) {
     const body = new FormData();
     body.append("file", upload, file.name || "invoice.jpg");
     const response = await fetch("/api/ms20/invoice-scan", { method: "POST", body });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.detail || "I could not read this invoice.");
+    const contentType = response.headers.get("content-type") || "";
+    const result = contentType.includes("application/json") ? await response.json() : {};
+    if (!response.ok) throw new Error(result.detail || "I could not finish reading this invoice. Please scan it again.");
     if (!Array.isArray(result.items) || result.items.length === 0) {
       addFeed("system", result.message || "I could not find clear medicine rows. Try a clearer photo.");
       state.voice.status = "";

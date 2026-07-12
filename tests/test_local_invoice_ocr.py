@@ -57,3 +57,18 @@ def test_numeric_columns_are_reconstructed_by_invoice_arithmetic():
         "unit_cost": 2100,
         "line_total": 202710,
     }]) == {"quantity": 15, "unit_cost": 140.0, "line_total": 2100.0}
+
+
+def test_invoice_endpoint_returns_safe_json_when_reader_throws(monkeypatch):
+    from fastapi.testclient import TestClient
+    from app import main
+
+    main.main_app_invoice_ocr_cache.clear()
+    monkeypatch.setattr(main, "scan_invoice_locally", lambda _data: (_ for _ in ()).throw(RuntimeError("ocr failure")))
+    with TestClient(main.app) as client:
+        response = client.post("/api/ms20/invoice-scan", files={"file": ("invoice.jpg", b"image", "image/jpeg")})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.json()["complete"] is False
+    assert response.json()["message"] == "I could not finish reading this invoice. Please scan it again."

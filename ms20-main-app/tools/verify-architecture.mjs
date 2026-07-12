@@ -218,6 +218,7 @@ assert(appSource.includes('line_total: item.line_total'), "Invoice review must e
 assert(appSource.includes('invoiceSummaryTemplate(card)'), "Invoice review must show invoice-level metadata once");
 assert(appSource.includes('This scan is incomplete and cannot be approved.'), "Incomplete invoice review must explain the blocked approval plainly");
 assert(appSource.includes('This scan is incomplete. Scan again before saving anything.'), "Blocked invoice must not tell the owner to approve");
+assert(appSource.includes('response.headers.get("content-type")'), "Invoice scan errors must not expose raw JSON parser failures");
 assert(appSource.includes('This scan is missing invoice details.'), "Incomplete invoice approval must be blocked at the action boundary");
 assert(appSource.includes("closeCameraStream()"), "In-app camera must release memory after capture or cancel");
 assert(css.includes(".camera-overlay"), "Memory-safe camera preview UI missing");
