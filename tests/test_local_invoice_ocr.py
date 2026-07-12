@@ -1,4 +1,4 @@
-from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _ocr_money, merge_source_brain_invoice_items
+from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _ocr_money, merge_source_brain_invoice_items, reconstruct_invoice_rows_from_word_positions
 
 
 def test_multiple_ocr_passes_merge_all_canonical_invoice_rows_and_fields():
@@ -72,3 +72,18 @@ def test_invoice_endpoint_returns_safe_json_when_reader_throws(monkeypatch):
     assert response.headers["content-type"].startswith("application/json")
     assert response.json()["complete"] is False
     assert response.json()["message"] == "I could not finish reading this invoice. Please scan it again."
+
+
+def test_table_cells_are_rebuilt_from_word_coordinates_not_ocr_line_order():
+    words = ["Acyclovir", "cream", "tube", "12", "180.00", "2,160.00", "ACY-T01", "2028-06"]
+    data = {
+        "text": words,
+        "conf": [90] * len(words),
+        "left": [10, 120, 190, 250, 300, 390, 490, 570],
+        "top": [100, 102, 99, 101, 100, 103, 98, 101],
+        "width": [80, 50, 40, 20, 60, 70, 60, 60],
+        "height": [20] * len(words),
+    }
+    assert reconstruct_invoice_rows_from_word_positions(data) == [
+        "Acyclovir cream tube 12 180.00 2,160.00 ACY-T01 2028-06"
+    ]

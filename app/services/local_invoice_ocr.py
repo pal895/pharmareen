@@ -32,6 +32,10 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
                 pytesseract.image_to_string(image, config="--psm 6"),
                 pytesseract.image_to_string(threshold, config="--psm 6"),
             ]
+            word_data = pytesseract.image_to_data(image, config="--psm 6", output_type=pytesseract.Output.DICT)
+            geometry_text = "\n".join(reconstruct_invoice_rows_from_word_positions(word_data))
+            if geometry_text:
+                ocr_texts.append(geometry_text)
             visible_text = max(ocr_texts, key=len, default="")
     except Exception:
         return _failed(fingerprint, "I could not read this photo. Try again in good light with the whole page visible.")
@@ -76,6 +80,50 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
     if not extraction.get("items"):
         extraction["message"] = "I could not find clear medicine rows. Try a clearer photo."
     return extraction
+
+
+def reconstruct_invoice_rows_from_word_positions(data: dict[str, list[Any]]) -> list[str]:
+    """Rebuild medicine rows by y-position when Tesseract splits table cells into unrelated text lines."""
+    medicines = load_source_brain_medicines()
+    words: list[dict[str, Any]] = []
+    for index, raw_text in enumerate(data.get("text") or []):
+        text = " ".join(str(raw_text or "").split())
+        if not text:
+            continue
+        try:
+            confidence = float((data.get("conf") or [])[index])
+            left = int((data.get("left") or [])[index])
+            top = int((data.get("top") or [])[index])
+            width = int((data.get("width") or [])[index])
+            height = int((data.get("height") or [])[index])
+        except (ValueError, TypeError, IndexError):
+            continue
+        if confidence < 15:
+            continue
+        words.append({"text": text, "left": left, "right": left + width, "center_y": top + height / 2, "height": height})
+
+    rows: list[tuple[float, str]] = []
+    used_y: list[float] = []
+    for medicine in medicines:
+        anchors = sorted(
+            ((_medicine_line_score(word["text"], medicine), word) for word in words),
+            key=lambda item: item[0],
+            reverse=True,
+        )
+        if not anchors or anchors[0][0] < 0.68:
+            continue
+        score, anchor = anchors[0]
+        if len(anchors) > 1 and score - anchors[1][0] < 0.04 and abs(anchor["center_y"] - anchors[1][1]["center_y"]) > anchor["height"] * 2:
+            continue
+        tolerance = max(10.0, anchor["height"] * 0.9)
+        if any(abs(anchor["center_y"] - known_y) <= tolerance for known_y in used_y):
+            continue
+        band = [word for word in words if abs(word["center_y"] - anchor["center_y"]) <= tolerance]
+        line = " ".join(word["text"] for word in sorted(band, key=lambda word: word["left"]))
+        if line:
+            rows.append((anchor["center_y"], line))
+            used_y.append(anchor["center_y"])
+    return [line for _, line in sorted(rows)]
 
 
 def merge_source_brain_invoice_items(texts: list[str]) -> list[dict[str, Any]]:
