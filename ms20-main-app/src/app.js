@@ -1166,12 +1166,17 @@ function mergeRememberedInvoiceReview(rows, result) {
   const numericChoices = [...groups.values()].map((versions) => versions.filter(invoiceRowArithmeticValid).slice(0, 8));
   const exactSet = chooseInvoiceRowsByTotal(numericChoices, targetTotal);
   const chosenByName = new Map((exactSet || []).map((row) => [normalizeMedicineKey(row.name), row]));
+  const invoiceMonth = invoiceMonthValue(result.invoice_date || rememberedMetadata.invoice_date);
   const merged = [...groups.entries()].map(([key, versions]) => {
     const strongest = [...versions].sort((left, right) => invoiceRowEvidenceScore(right) - invoiceRowEvidenceScore(left))[0];
     const combined = { ...(chosenByName.get(key) || strongest) };
     for (const field of ["form", "unit", "batch", "expiry"]) {
       const counts = evidence.rows?.[key]?.fields?.[field];
-      const consensus = strongestInvoiceEvidenceValue(counts);
+      const consensus = strongestInvoiceEvidenceValue(counts, (value, count) => {
+        if (field === "batch") return invoiceBatchBelongsToMedicine(evidence, key, value, count);
+        if (field === "expiry") return invoiceExpiryNotBefore(value, invoiceMonth);
+        return true;
+      });
       if (consensus) combined[field] = consensus;
       else if (Object.keys(counts || {}).length > 1) combined[field] = "";
     }
@@ -1239,11 +1244,31 @@ function addInvoiceObservation(evidence, rows) {
   });
 }
 
-function strongestInvoiceEvidenceValue(counts) {
-  const ranked = Object.entries(counts || {}).sort((left, right) => right[1] - left[1]);
+function strongestInvoiceEvidenceValue(counts, usable = () => true) {
+  const ranked = Object.entries(counts || {}).filter(([value, count]) => usable(value, Number(count || 0)))
+    .sort((left, right) => right[1] - left[1]);
   if (!ranked.length) return "";
   if (ranked.length > 1 && ranked[0][1] === ranked[1][1]) return "";
   return ranked[0][0];
+}
+
+function invoiceBatchBelongsToMedicine(evidence, medicineKey, batch, ownCount) {
+  return !Object.entries(evidence.rows || {}).some(([otherKey, row]) => otherKey !== medicineKey
+    && Number(row.fields?.batch?.[batch] || 0) > ownCount);
+}
+
+function invoiceMonthValue(value) {
+  const parsed = Date.parse(String(value || ""));
+  if (!Number.isFinite(parsed)) return 0;
+  const date = new Date(parsed);
+  return date.getUTCFullYear() * 12 + date.getUTCMonth();
+}
+
+function invoiceExpiryNotBefore(value, invoiceMonth) {
+  const match = /^(20\d{2})-(0[1-9]|1[0-2])$/.exec(String(value || ""));
+  if (!match) return false;
+  const expiryMonth = Number(match[1]) * 12 + Number(match[2]) - 1;
+  return !invoiceMonth || expiryMonth >= invoiceMonth;
 }
 
 function strongestInvoiceOrder(counts) {
