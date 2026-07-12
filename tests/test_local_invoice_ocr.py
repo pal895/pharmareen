@@ -1,4 +1,4 @@
-from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _invoice_date_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, extract_positioned_row_fields, merge_source_brain_invoice_items, reconstruct_invoice_rows_from_word_positions
+from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _invoice_date_from_text, _invoice_total_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, extract_positioned_row_fields, merge_source_brain_invoice_items, reconstruct_bounded_invoice_rows, reconstruct_invoice_rows_from_word_positions
 
 
 def test_multiple_ocr_passes_merge_all_canonical_invoice_rows_and_fields():
@@ -113,3 +113,24 @@ def test_offset_expiry_is_assigned_without_widening_or_contaminating_rows():
         "Acyclovir": {"batch_number": "ACY-T01", "expiry_date": "2028-06"},
         "Doxycycline": {"batch_number": "DOX-C03", "expiry_date": "2027-12"},
     }
+
+
+def test_midpoint_bounded_rows_join_split_cells_without_crossing_neighbors():
+    words = [
+        "Acyclovir", "cream", "tube", "12", "180.00", "2,160.00", "ACY", "-", "T01", "2028", "-", "06",
+        "Clotrimazole", "pessary", "pessary", "20", "95.00", "1,900.00", "CLO-P02", "2028-09",
+    ]
+    first_count = 12
+    data = {
+        "text": words,
+        "left": list(range(0, first_count * 20, 20)) + list(range(0, (len(words) - first_count) * 20, 20)),
+        "top": [100, 101, 99, 103, 101, 99, 116, 116, 116, 117, 117, 117] + [180, 181, 179, 183, 181, 179, 196, 197],
+        "height": [20] * len(words),
+    }
+    rows = reconstruct_bounded_invoice_rows(data)
+    assert len(rows) == 2
+    parsed = merge_source_brain_invoice_items(rows)
+    assert parsed[0]["batch_number"] == "ACY-T01"
+    assert parsed[0]["expiry_date"] == "2028-06"
+    assert parsed[1]["medicine_name"] == "Clotrimazole"
+    assert _invoice_total_from_text("Invoice Total: KES 7 060 00") == 7060.0

@@ -35,7 +35,7 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
                 pytesseract.image_to_string(threshold, config="--psm 6"),
             ]
             word_data = pytesseract.image_to_data(image, config="--psm 6", output_type=pytesseract.Output.DICT)
-            geometry_rows = reconstruct_invoice_rows_from_word_positions(word_data)
+            geometry_rows = reconstruct_bounded_invoice_rows(word_data)
             geometry_text = "\n".join(geometry_rows)
             if geometry_text:
                 ocr_texts.append(geometry_text)
@@ -148,6 +148,48 @@ def reconstruct_invoice_rows_from_word_positions(data: dict[str, list[Any]]) -> 
     return [line for _, line in sorted(rows)]
 
 
+def reconstruct_bounded_invoice_rows(data: dict[str, list[Any]]) -> list[str]:
+    medicines = load_source_brain_medicines()
+    tokens: list[dict[str, Any]] = []
+    for index, raw_text in enumerate(data.get("text") or []):
+        text = " ".join(str(raw_text or "").split())
+        if not text:
+            continue
+        try:
+            left = int((data.get("left") or [])[index])
+            top = int((data.get("top") or [])[index])
+            height = int((data.get("height") or [])[index])
+        except (ValueError, TypeError, IndexError):
+            continue
+        tokens.append({"text": text, "left": left, "center_y": top + height / 2})
+    anchors = _unique_medicine_anchors(tokens, medicines)
+    if not anchors:
+        return []
+    typical_gap = min((anchors[index + 1][0] - anchors[index][0] for index in range(len(anchors) - 1)), default=60)
+    rows: list[str] = []
+    for index, (center_y, _name) in enumerate(anchors):
+        lower = (anchors[index - 1][0] + center_y) / 2 if index else center_y - typical_gap / 2
+        upper = (center_y + anchors[index + 1][0]) / 2 if index + 1 < len(anchors) else center_y + typical_gap / 2
+        row_tokens = [token for token in tokens if lower <= token["center_y"] < upper]
+        rows.append(" ".join(token["text"] for token in sorted(row_tokens, key=lambda token: token["left"])))
+    return rows
+
+
+def _unique_medicine_anchors(tokens: list[dict[str, Any]], medicines: list[dict[str, Any]]) -> list[tuple[float, str]]:
+    best_by_medicine: dict[str, tuple[float, float]] = {}
+    for token in tokens:
+        if len(re.sub(r"[^A-Za-z]", "", token["text"])) < 5:
+            continue
+        ranked = sorted(((_medicine_line_score(token["text"], medicine), medicine["name"]) for medicine in medicines), reverse=True)
+        if not ranked or ranked[0][0] < 0.78 or (len(ranked) > 1 and ranked[0][0] - ranked[1][0] < 0.08):
+            continue
+        score, name = ranked[0]
+        current = best_by_medicine.get(name)
+        if current is None or score > current[0]:
+            best_by_medicine[name] = (score, token["center_y"])
+    return sorted((center_y, name) for name, (_score, center_y) in best_by_medicine.items())
+
+
 def _medicine_order_from_lines(lines: list[str]) -> list[str]:
     medicines = load_source_brain_medicines()
     order: list[str] = []
@@ -171,12 +213,7 @@ def extract_positioned_row_fields(data: dict[str, list[Any]]) -> dict[str, dict[
         except (ValueError, TypeError, IndexError):
             continue
         tokens.append({"text": text, "center_y": top + height / 2})
-    anchors: list[tuple[float, str]] = []
-    for medicine in medicines:
-        ranked = sorted(((_medicine_line_score(token["text"], medicine), token) for token in tokens), key=lambda pair: pair[0], reverse=True)
-        if ranked and ranked[0][0] >= 0.68:
-            anchors.append((ranked[0][1]["center_y"], medicine["name"]))
-    anchors.sort()
+    anchors = _unique_medicine_anchors(tokens, medicines)
     row_gap = min((anchors[index + 1][0] - anchors[index][0] for index in range(len(anchors) - 1)), default=80)
     result: dict[str, dict[str, str]] = {name: {} for _, name in anchors}
     for token in tokens:
@@ -418,6 +455,7 @@ def _medicine_line_score(line: str, medicine: dict[str, Any]) -> float:
 
 
 def _parse_source_brain_row(line: str, medicine: dict[str, Any]) -> dict[str, Any] | None:
+    line = re.sub(r"\s*-\s*", "-", line)
     line = re.sub(r"(?<=\d)[—–_:](?=\d)", "-", line)
     form = _best_known_value(line, medicine["forms"])
     unit = _best_known_value(line, medicine["units"])
@@ -483,8 +521,14 @@ def _best_known_value(line: str, values: list[str]) -> str:
 
 
 def _invoice_total_from_text(text: str) -> float | None:
-    match = re.search(r"invoice\s+total\D{0,20}(?:KES|KSH)?\s*([\d,]+(?:\.\d{2})?)", text, flags=re.I)
-    return float(match.group(1).replace(",", "")) if match else None
+    for line in text.splitlines():
+        if not re.search(r"invoice\s+total", line, flags=re.I):
+            continue
+        tail = re.split(r"invoice\s+total", line, maxsplit=1, flags=re.I)[-1]
+        digits = "".join(re.findall(r"\d", tail))
+        if digits:
+            return _ocr_money(digits)
+    return None
 
 
 def _invoice_date_from_text(text: str) -> str:
