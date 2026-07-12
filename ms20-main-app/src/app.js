@@ -1142,6 +1142,12 @@ function mergeRememberedInvoiceReview(rows, result) {
     return sameNumber || sameSignature;
   });
   const rememberedRows = candidates.flatMap((card) => catalogRowsForCard(card));
+  const rememberedMetadata = {
+    supplier_name: firstRememberedInvoiceValue(candidates, "invoice_supplier"),
+    invoice_number: firstRememberedInvoiceValue(candidates, "invoice_number"),
+    invoice_date: firstRememberedInvoiceValue(candidates, "invoice_date"),
+    invoice_total: firstRememberedInvoiceValue(candidates, "invoice_total")
+  };
   const allRows = [...rows, ...rememberedRows];
   const groups = new Map();
   allRows.forEach((row) => {
@@ -1150,7 +1156,7 @@ function mergeRememberedInvoiceReview(rows, result) {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(row);
   });
-  const targetTotal = Number(result.invoice_total || candidates[0]?.fields?.invoice_total || 0);
+  const targetTotal = Number(result.invoice_total || rememberedMetadata.invoice_total || 0);
   const numericChoices = [...groups.values()].map((versions) => versions.filter(invoiceRowArithmeticValid).slice(0, 8));
   const exactSet = chooseInvoiceRowsByTotal(numericChoices, targetTotal);
   const chosenByName = new Map((exactSet || []).map((row) => [normalizeMedicineKey(row.name), row]));
@@ -1168,16 +1174,19 @@ function mergeRememberedInvoiceReview(rows, result) {
   const sourceOrder = new Map(orderSource.map((row, index) => [normalizeMedicineKey(row.name), index]));
   merged.sort((left, right) => (sourceOrder.get(normalizeMedicineKey(left.name)) ?? 999) - (sourceOrder.get(normalizeMedicineKey(right.name)) ?? 999));
   normalizeRememberedBatchDigits(merged);
-  const priorCard = candidates[0];
   return {
     rows: merged,
     metadata: {
-      supplier_name: result.supplier_name || priorCard?.fields?.invoice_supplier || "",
-      invoice_number: result.invoice_number || priorCard?.fields?.invoice_number || "",
-      invoice_date: result.invoice_date || priorCard?.fields?.invoice_date || "",
-      invoice_total: result.invoice_total ?? priorCard?.fields?.invoice_total ?? ""
+      supplier_name: result.supplier_name || rememberedMetadata.supplier_name || "",
+      invoice_number: result.invoice_number || rememberedMetadata.invoice_number || "",
+      invoice_date: result.invoice_date || rememberedMetadata.invoice_date || "",
+      invoice_total: result.invoice_total || rememberedMetadata.invoice_total || ""
     }
   };
+}
+
+function firstRememberedInvoiceValue(cards, field) {
+  return cards.map((card) => card.fields?.[field]).find((value) => ![undefined, null, ""].includes(value)) ?? "";
 }
 
 function invoiceRowArithmeticValid(row) {

@@ -223,6 +223,7 @@ assert(appSource.includes('mergeRememberedInvoiceReview(rows, result)'), "Repeat
 assert(appSource.includes('invoiceRowsComplete(rows, result.invoice_total)'), "Remembered invoice evidence must pass row arithmetic and total checks before approval");
 assert(appSource.includes('chooseInvoiceRowsByTotal(numericChoices, targetTotal)'), "Repeated invoice scans must select the row combination that matches the invoice total");
 assert(appSource.includes('const allRows = [...rows, ...rememberedRows]'), "A medicine omitted by the newest scan must be recoverable from matching prior scans");
+assert(appSource.includes('firstRememberedInvoiceValue(candidates, "invoice_total")'), "Invoice merge must search all matching reviews for a nonblank total");
 assert(appSource.includes('This scan is missing invoice details.'), "Incomplete invoice approval must be blocked at the action boundary");
 assert(appSource.includes("closeCameraStream()"), "In-app camera must release memory after capture or cancel");
 assert(css.includes(".camera-overlay"), "Memory-safe camera preview UI missing");
