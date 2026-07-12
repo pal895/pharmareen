@@ -227,9 +227,12 @@ assert(appSource.includes('firstRememberedInvoiceValue(candidates, "invoice_tota
 assert(appSource.includes('matchedCardIds: candidates.map((card) => card.id)'), "Matching invoice rescans must consolidate into one canonical review card");
 assert(appSource.includes('card.fields.invoice_evidence = JSON.stringify(remembered.evidence)'), "Canonical invoice review must persist medicine-scoped evidence across scans");
 assert(appSource.includes('strongestInvoiceOrder(evidence.rows?.[key]?.positions)'), "Invoice source order must use repeated medicine-scoped position evidence");
-assert(appSource.includes('else if (Object.keys(counts || {}).length > 1) combined[field] = ""'), "Conflicting invoice evidence must stay blank rather than contaminate another medicine row");
+assert(appSource.includes('const rememberedValue = rememberedRows.find'), "A blank rescan must preserve valid medicine-scoped canonical evidence");
 assert(appSource.includes('chooseUniqueInvoiceBatches(evidence, [...groups.keys()])'), "Repeated invoice evidence must assign batches globally without cross-medicine reuse");
 assert(appSource.includes('const currentRowsReconcile = rows.length === groups.size'), "A complete total-reconciled scan must restore photographed source order");
+assert(appSource.includes('moveCatalogImportRow(dataset.cardId, dataset.rowIndex, dataset.direction)'), "Invoice review must let the owner correct row order without rescanning");
+assert(appSource.includes('refreshInvoiceImportCompleteness(card, rows)'), "Invoice edits must immediately recalculate the approval safety gate");
+assert(css.includes('.invoice-row-order-controls'), "Mobile invoice rows must expose compact order controls");
 assert(appSource.includes('invoiceExpiryNotBefore(value, invoiceMonth)'), "Incoming invoice evidence must reject expiry dates older than the invoice");
 assert(appSource.includes('This scan is missing invoice details.'), "Incomplete invoice approval must be blocked at the action boundary");
 assert(appSource.includes("closeCameraStream()"), "In-app camera must release memory after capture or cancel");

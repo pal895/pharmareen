@@ -542,6 +542,18 @@ input:disabled {
   font-weight: 750;
 }
 
+.catalog-mobile-row-title .invoice-row-order-controls {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.invoice-row-order-controls button {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 4px 9px;
+  border-radius: 12px;
+}
+
 .catalog-mobile-fields {
   display: grid;
   gap: 8px;

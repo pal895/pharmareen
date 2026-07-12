@@ -477,7 +477,7 @@ function catalogImportTableTemplate(card) {
         </table>
       </div>
       <div class="catalog-mobile-rows" aria-label="Medicine catalog mobile review">
-        ${rows.map((row, index) => catalogImportMobileRowTemplate(card.id, row, index, columns)).join("")}
+        ${rows.map((row, index) => catalogImportMobileRowTemplate(card.id, row, index, columns, invoiceMode)).join("")}
       </div>
       ${invoiceMode && card.fields?.import_incomplete === "true" ? "" : `<button class="secondary-action" type="button" data-action="add-catalog-row" data-card-id="${card.id}">Add medicine row</button>`}
       <p>${invoiceMode && card.fields?.import_incomplete === "true"
@@ -513,13 +513,17 @@ function catalogImportRowTemplate(cardId, row, index, columns = CATALOG_TABLE_CO
   `;
 }
 
-function catalogImportMobileRowTemplate(cardId, row, index, columns = CATALOG_TABLE_COLUMNS) {
+function catalogImportMobileRowTemplate(cardId, row, index, columns = CATALOG_TABLE_COLUMNS, invoiceMode = false) {
   const title = row.name || `Medicine ${index + 1}`;
   return `
     <section class="catalog-mobile-row" aria-label="${escapeHtml(title)}">
       <div class="catalog-mobile-row-title">
         <strong>${escapeHtml(title)}</strong>
         <span>Row ${index + 1}</span>
+        ${invoiceMode ? `<span class="invoice-row-order-controls">
+          <button type="button" data-action="move-catalog-row" data-card-id="${cardId}" data-row-index="${index}" data-direction="-1" aria-label="Move ${escapeHtml(title)} up">↑</button>
+          <button type="button" data-action="move-catalog-row" data-card-id="${cardId}" data-row-index="${index}" data-direction="1" aria-label="Move ${escapeHtml(title)} down">↓</button>
+        </span>` : ""}
       </div>
       <div class="catalog-mobile-fields">
         ${columns.map((column) => `
@@ -725,6 +729,7 @@ function handleAction(dataset) {
     addCard(createPasteImportCard());
   }
   if (action === "add-catalog-row") addCatalogImportRow(dataset.cardId);
+  if (action === "move-catalog-row") moveCatalogImportRow(dataset.cardId, dataset.rowIndex, dataset.direction);
   if (action === "start-catalog-file") {
     removeCardsByType(["CatalogOnboardingCard"]);
     root.querySelector("#documentInput")?.click();
@@ -1179,15 +1184,22 @@ function mergeRememberedInvoiceReview(rows, result) {
         return true;
       });
       if (consensus) combined[field] = consensus;
-      else if (Object.keys(counts || {}).length > 1) combined[field] = "";
+      else {
+        const rememberedValue = rememberedRows.find((row) => normalizeMedicineKey(row.name) === key)?.[field] || "";
+        const rememberedUsable = field !== "expiry" || invoiceExpiryNotBefore(rememberedValue, invoiceMonth);
+        combined[field] = rememberedUsable ? rememberedValue : "";
+      }
     }
     return combined;
   });
+  const completeRememberedOrder = candidates.map((card) => catalogRowsForCard(card))
+    .find((candidateRows) => invoiceRowsComplete(candidateRows, targetTotal));
   const currentRowsReconcile = rows.length === groups.size && rows.every(invoiceRowArithmeticValid)
     && (!targetTotal || Math.abs(rows.reduce((sum, row) => sum + Number(row.line_total), 0) - targetTotal) < 0.01);
-  const sourceOrder = new Map((currentRowsReconcile ? rows : [...groups.keys()]).map((row, index) => {
+  const trustedOrder = completeRememberedOrder || (currentRowsReconcile ? rows : null);
+  const sourceOrder = new Map((trustedOrder || [...groups.keys()]).map((row, index) => {
     const key = typeof row === "string" ? row : normalizeMedicineKey(row.name);
-    return [key, currentRowsReconcile ? index : strongestInvoiceOrder(evidence.rows?.[key]?.positions)];
+    return [key, trustedOrder ? index : strongestInvoiceOrder(evidence.rows?.[key]?.positions)];
   }));
   merged.sort((left, right) => (sourceOrder.get(normalizeMedicineKey(left.name)) ?? 999) - (sourceOrder.get(normalizeMedicineKey(right.name)) ?? 999));
   normalizeRememberedBatchDigits(merged);
@@ -1555,7 +1567,31 @@ function updateCatalogImportCell(cardId, rowIndex, field, value) {
   if (!Number.isInteger(index) || index < 0 || index >= rows.length) return;
   rows[index][field] = value;
   persistCatalogRows(card, rows);
+  refreshInvoiceImportCompleteness(card, rows);
   persistActiveCards();
+}
+
+function moveCatalogImportRow(cardId, rowIndex, direction) {
+  const card = state.cards.find((item) => item.id === cardId);
+  if (!card || card.type !== "CatalogImportCard") return;
+  const rows = catalogRowsForCard(card);
+  const from = Number(rowIndex);
+  const to = from + Number(direction);
+  if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < 0 || from >= rows.length || to >= rows.length) return;
+  [rows[from], rows[to]] = [rows[to], rows[from]];
+  persistCatalogRows(card, rows);
+  refreshInvoiceImportCompleteness(card, rows);
+  persistActiveCards();
+  render();
+}
+
+function refreshInvoiceImportCompleteness(card, rows) {
+  if (card.fields?.import_mode !== "invoice_ocr") return;
+  const complete = invoiceRowsComplete(rows, card.fields.invoice_total);
+  card.fields.import_incomplete = complete ? "false" : "true";
+  card.validation = complete
+    ? "Review the list, edit if needed, then approve."
+    : "This scan is incomplete and cannot be approved. Check the missing fields or scan again.";
 }
 
 function addCatalogImportRow(cardId) {
