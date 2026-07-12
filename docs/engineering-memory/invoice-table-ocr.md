@@ -24,3 +24,5 @@ This method is supplier-agnostic, offline, zero-token, and reusable for invoices
 - Rightmost cells can sit slightly above or below the medicine baseline. Use a bounded row band wide enough to include them but narrower than the distance to the next medicine row.
 - Reconstruct document-level header and footer lines from word coordinates too; supplier, invoice date, and total can be lost by normal OCR line grouping.
 - Normalize ambiguous batch characters only from a pattern established by multiple batches on the same invoice. Never apply a global `O`/`0` guess.
+- Do not widen the shared row band to recover right-edge cells if stable numeric extraction regresses. Preserve the working row parser and assign expiry/batch tokens separately to the nearest medicine within midpoint row boundaries.
+- Derive display order from coordinate anchors, but do not prioritize a less-complete geometry candidate over stronger OCR candidates merely to obtain that order. Sort the final merged rows afterward.

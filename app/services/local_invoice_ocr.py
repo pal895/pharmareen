@@ -15,6 +15,8 @@ from app.services.photo_intake import extract_supplier_invoice_from_text
 
 def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
     fingerprint = hashlib.sha256(image_bytes).hexdigest()
+    positioned_fields: dict[str, dict[str, str]] = {}
+    geometry_order: list[str] = []
     try:
         import pytesseract
     except ImportError:
@@ -33,9 +35,12 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
                 pytesseract.image_to_string(threshold, config="--psm 6"),
             ]
             word_data = pytesseract.image_to_data(image, config="--psm 6", output_type=pytesseract.Output.DICT)
-            geometry_text = "\n".join(reconstruct_invoice_rows_from_word_positions(word_data))
+            geometry_rows = reconstruct_invoice_rows_from_word_positions(word_data)
+            geometry_text = "\n".join(geometry_rows)
             if geometry_text:
-                ocr_texts.insert(0, geometry_text)
+                ocr_texts.append(geometry_text)
+            geometry_order = _medicine_order_from_lines(geometry_rows)
+            positioned_fields = extract_positioned_row_fields(word_data)
             document_geometry_text = "\n".join(reconstruct_document_lines_from_word_positions(word_data))
             if document_geometry_text:
                 ocr_texts.append(document_geometry_text)
@@ -61,6 +66,13 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
     if not re.search(r"\d", str(extraction.get("invoice_number") or "")):
         extraction["invoice_number"] = ""
     table_items = merge_source_brain_invoice_items(ocr_texts)
+    for item in table_items:
+        for field, value in positioned_fields.get(str(item.get("medicine_name")), {}).items():
+            if not item.get(field):
+                item[field] = value
+    if geometry_order:
+        order = {name: index for index, name in enumerate(geometry_order)}
+        table_items.sort(key=lambda item: order.get(str(item.get("medicine_name")), len(order)))
     _normalize_batch_digits_by_invoice_pattern(table_items)
     if table_items:
         extraction["items"] = table_items
@@ -125,7 +137,7 @@ def reconstruct_invoice_rows_from_word_positions(data: dict[str, list[Any]]) -> 
         score, anchor = anchors[0]
         if len(anchors) > 1 and score - anchors[1][0] < 0.04 and abs(anchor["center_y"] - anchors[1][1]["center_y"]) > anchor["height"] * 2:
             continue
-        tolerance = max(14.0, anchor["height"] * 1.4)
+        tolerance = max(10.0, anchor["height"] * 0.9)
         if any(abs(anchor["center_y"] - known_y) <= tolerance for known_y in used_y):
             continue
         band = [word for word in words if abs(word["center_y"] - anchor["center_y"]) <= tolerance]
@@ -134,6 +146,52 @@ def reconstruct_invoice_rows_from_word_positions(data: dict[str, list[Any]]) -> 
             rows.append((anchor["center_y"], line))
             used_y.append(anchor["center_y"])
     return [line for _, line in sorted(rows)]
+
+
+def _medicine_order_from_lines(lines: list[str]) -> list[str]:
+    medicines = load_source_brain_medicines()
+    order: list[str] = []
+    for line in lines:
+        ranked = sorted(((_medicine_line_score(line, medicine), medicine["name"]) for medicine in medicines), reverse=True)
+        if ranked and ranked[0][0] >= 0.76 and ranked[0][1] not in order:
+            order.append(ranked[0][1])
+    return order
+
+
+def extract_positioned_row_fields(data: dict[str, list[Any]]) -> dict[str, dict[str, str]]:
+    medicines = load_source_brain_medicines()
+    tokens: list[dict[str, Any]] = []
+    for index, raw_text in enumerate(data.get("text") or []):
+        text = " ".join(str(raw_text or "").split())
+        if not text:
+            continue
+        try:
+            top = int((data.get("top") or [])[index])
+            height = int((data.get("height") or [])[index])
+        except (ValueError, TypeError, IndexError):
+            continue
+        tokens.append({"text": text, "center_y": top + height / 2})
+    anchors: list[tuple[float, str]] = []
+    for medicine in medicines:
+        ranked = sorted(((_medicine_line_score(token["text"], medicine), token) for token in tokens), key=lambda pair: pair[0], reverse=True)
+        if ranked and ranked[0][0] >= 0.68:
+            anchors.append((ranked[0][1]["center_y"], medicine["name"]))
+    anchors.sort()
+    row_gap = min((anchors[index + 1][0] - anchors[index][0] for index in range(len(anchors) - 1)), default=80)
+    result: dict[str, dict[str, str]] = {name: {} for _, name in anchors}
+    for token in tokens:
+        expiry = re.fullmatch(r"(20\d{2})\s*[-/.,:]\s*(0[1-9]|1[0-2])", token["text"])
+        batch = re.fullmatch(r"(?=[A-Z0-9-]*[A-Z])(?=[A-Z0-9-]*\d)[A-Z0-9]+-[A-Z0-9]+", token["text"], flags=re.I)
+        if not expiry and not batch:
+            continue
+        nearest_y, name = min(anchors, key=lambda anchor: abs(anchor[0] - token["center_y"]), default=(0, ""))
+        if not name or abs(nearest_y - token["center_y"]) > row_gap * 0.45:
+            continue
+        if expiry:
+            result[name]["expiry_date"] = f"{expiry.group(1)}-{expiry.group(2)}"
+        elif batch and not token["text"].startswith("20"):
+            result[name]["batch_number"] = token["text"]
+    return result
 
 
 def reconstruct_document_lines_from_word_positions(data: dict[str, list[Any]]) -> list[str]:

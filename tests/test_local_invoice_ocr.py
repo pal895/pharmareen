@@ -1,4 +1,4 @@
-from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _invoice_date_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, merge_source_brain_invoice_items, reconstruct_invoice_rows_from_word_positions
+from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _invoice_date_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, extract_positioned_row_fields, merge_source_brain_invoice_items, reconstruct_invoice_rows_from_word_positions
 
 
 def test_multiple_ocr_passes_merge_all_canonical_invoice_rows_and_fields():
@@ -100,3 +100,16 @@ def test_geometry_order_and_invoice_pattern_repairs_are_preserved():
     assert [row["medicine_name"] for row in rows] == ["Acyclovir", "Clotrimazole", "Doxycycline", "Chloramphenicol"]
     assert rows[0]["batch_number"] == "ACY-T01"
     assert _invoice_date_from_text("Invoice Date: 11 July 2026") == "11 July 2026"
+
+
+def test_offset_expiry_is_assigned_without_widening_or_contaminating_rows():
+    words = ["Acyclovir", "ACY-T01", "2028-06", "Doxycycline", "DOX-C03", "2027-12"]
+    data = {
+        "text": words,
+        "top": [100, 116, 118, 180, 196, 198],
+        "height": [20] * len(words),
+    }
+    assert extract_positioned_row_fields(data) == {
+        "Acyclovir": {"batch_number": "ACY-T01", "expiry_date": "2028-06"},
+        "Doxycycline": {"batch_number": "DOX-C03", "expiry_date": "2027-12"},
+    }
