@@ -1,4 +1,4 @@
-from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _fill_unique_source_pair_fields, _invoice_date_from_text, _invoice_total_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, extract_positioned_row_fields, merge_source_brain_invoice_items, reconstruct_bounded_invoice_rows, reconstruct_invoice_rows_from_word_positions
+from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _fill_unique_source_pair_fields, _invoice_date_from_text, _invoice_number_from_text, _invoice_total_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, extract_positioned_row_fields, merge_source_brain_invoice_items, reconstruct_bounded_invoice_rows, reconstruct_invoice_rows_from_word_positions
 
 
 def test_multiple_ocr_passes_merge_all_canonical_invoice_rows_and_fields():
@@ -140,3 +140,16 @@ def test_observed_unit_fills_only_a_unique_trusted_form_pair():
     items = [{"medicine_name": "Chloramphenicol", "form": "", "unit": "bottle"}]
     _fill_unique_source_pair_fields(items)
     assert items[0]["form"] == "eye drops"
+
+
+def test_compact_expiry_and_header_invoice_number_are_recovered():
+    rows = merge_source_brain_invoice_items([
+        "Acyclovir cream tube 12 180.00 2,160.00 ACY-TO1 202806\n"
+        "Clotrimazole pessary pessary 20 95.00 1,900.00 CLO-P02 202809\n"
+        "Doxycycline capsule capsule 50 18.00 900.00 DOX-C03 2027-12"
+    ])
+    _normalize_batch_digits_by_invoice_pattern(rows)
+    assert rows[0]["expiry_date"] == "2028-06"
+    assert rows[1]["expiry_date"] == "2028-09"
+    assert rows[0]["batch_number"] == "ACY-T01"
+    assert _invoice_number_from_text("Invoice No ALMS-TEST-110726") == "ALMS-TEST-110726"

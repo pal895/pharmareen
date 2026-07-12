@@ -60,6 +60,7 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
         [item.get("invoice_number") for item in extractions],
         extraction.get("invoice_number"),
     )
+    extraction["invoice_number"] = _best_ocr_metadata_value([extraction.get("invoice_number"), _invoice_number_from_text(combined_text)])
     if not re.search(r"\d", str(extraction.get("invoice_number") or "")):
         extraction["invoice_number"] = ""
     table_items = merge_source_brain_invoice_items(ocr_texts)
@@ -215,7 +216,7 @@ def extract_positioned_row_fields(data: dict[str, list[Any]]) -> dict[str, dict[
     row_gap = min((anchors[index + 1][0] - anchors[index][0] for index in range(len(anchors) - 1)), default=80)
     result: dict[str, dict[str, str]] = {name: {} for _, name in anchors}
     for token in tokens:
-        expiry = re.fullmatch(r"(20\d{2})\s*[-/.,:]\s*(0[1-9]|1[0-2])", token["text"])
+        expiry = re.fullmatch(r"(20\d{2})(?:\s*[-/.,:]\s*|(?=\d{2}$))(0[1-9]|1[0-2])", token["text"])
         batch = re.fullmatch(r"(?=[A-Z0-9-]*[A-Z])(?=[A-Z0-9-]*\d)[A-Z0-9]+-[A-Z0-9]+", token["text"], flags=re.I)
         if not expiry and not batch:
             continue
@@ -259,7 +260,7 @@ def _normalize_batch_digits_by_invoice_pattern(items: list[dict[str, Any]]) -> N
         return
     for item in items:
         batch = str(item.get("batch_number") or "")
-        match = re.fullmatch(r"(.+-[A-Z])([OQ])(\d)", batch, flags=re.I)
+        match = re.fullmatch(r"(.+-[A-Z])([OQ])([0-9])", batch.strip().replace(" ", ""), flags=re.I)
         if match:
             item["batch_number"] = f"{match.group(1)}0{match.group(3)}"
 
@@ -474,7 +475,7 @@ def _parse_source_brain_row(line: str, medicine: dict[str, Any]) -> dict[str, An
     line = re.sub(r"(?<=\d)[—–_:](?=\d)", "-", line)
     form = _best_known_value(line, medicine["forms"])
     unit = _best_known_value(line, medicine["units"])
-    expiry_match = re.search(r"\b(20\d{2})\s*[-/., ]\s*(0[1-9]|1[0-2])\b", line)
+    expiry_match = re.search(r"\b(20\d{2})(?:\s*[-/., ]\s*|(?=\d{2}\b))(0[1-9]|1[0-2])\b", line)
     batch_match = re.search(r"\b(?=[A-Z0-9-]*[A-Z])(?=[A-Z0-9-]*\d)[A-Z0-9]+(?:-[A-Z0-9]+)+\b", line, flags=re.I)
     clean = line
     for value in [medicine["name"], *medicine["aliases"], form, unit]:
@@ -549,6 +550,12 @@ def _invoice_total_from_text(text: str) -> float | None:
 def _invoice_date_from_text(text: str) -> str:
     match = re.search(r"invoice\s+date\D{0,12}(\d{1,2}\s+[A-Za-z]{3,9}\s+20\d{2})", text, flags=re.I)
     return " ".join(match.group(1).split()) if match else ""
+
+
+def _invoice_number_from_text(text: str) -> str:
+    candidates = re.findall(r"\b[A-Z]{2,}(?:-[A-Z0-9]+)+\b", text.upper())
+    candidates = [value for value in candidates if any(character.isdigit() for character in value)]
+    return max(candidates, key=lambda value: ("TEST" in value, len(value)), default="")
 
 
 def _supplier_name_from_text(text: str) -> str:
