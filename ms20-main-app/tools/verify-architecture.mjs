@@ -221,6 +221,8 @@ assert(appSource.includes('This scan is incomplete. Scan again before saving any
 assert(appSource.includes('response.headers.get("content-type")'), "Invoice scan errors must not expose raw JSON parser failures");
 assert(appSource.includes('mergeRememberedInvoiceReview(rows, result)'), "Repeated scans of the same invoice must reuse stronger prior local evidence");
 assert(appSource.includes('invoiceRowsComplete(rows, result.invoice_total)'), "Remembered invoice evidence must pass row arithmetic and total checks before approval");
+assert(appSource.includes('chooseInvoiceRowsByTotal(numericChoices, targetTotal)'), "Repeated invoice scans must select the row combination that matches the invoice total");
+assert(appSource.includes('const allRows = [...rows, ...rememberedRows]'), "A medicine omitted by the newest scan must be recoverable from matching prior scans");
 assert(appSource.includes('This scan is missing invoice details.'), "Incomplete invoice approval must be blocked at the action boundary");
 assert(appSource.includes("closeCameraStream()"), "In-app camera must release memory after capture or cancel");
 assert(css.includes(".camera-overlay"), "Memory-safe camera preview UI missing");

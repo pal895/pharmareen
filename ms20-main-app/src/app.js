@@ -1142,15 +1142,31 @@ function mergeRememberedInvoiceReview(rows, result) {
     return sameNumber || sameSignature;
   });
   const rememberedRows = candidates.flatMap((card) => catalogRowsForCard(card));
-  const merged = rows.map((row) => {
-    const prior = rememberedRows.find((item) => normalizeMedicineKey(item.name) === normalizeMedicineKey(row.name));
-    if (!prior) return row;
-    const combined = { ...row };
-    for (const field of ["form", "unit", "stock", "cost_price", "line_total", "batch", "expiry"]) {
-      if ([undefined, null, ""].includes(combined[field]) && ![undefined, null, ""].includes(prior[field])) combined[field] = prior[field];
+  const allRows = [...rows, ...rememberedRows];
+  const groups = new Map();
+  allRows.forEach((row) => {
+    const key = normalizeMedicineKey(row.name);
+    if (!key) return;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  });
+  const targetTotal = Number(result.invoice_total || candidates[0]?.fields?.invoice_total || 0);
+  const numericChoices = [...groups.values()].map((versions) => versions.filter(invoiceRowArithmeticValid).slice(0, 8));
+  const exactSet = chooseInvoiceRowsByTotal(numericChoices, targetTotal);
+  const chosenByName = new Map((exactSet || []).map((row) => [normalizeMedicineKey(row.name), row]));
+  const merged = [...groups.entries()].map(([key, versions]) => {
+    const strongest = [...versions].sort((left, right) => invoiceRowEvidenceScore(right) - invoiceRowEvidenceScore(left))[0];
+    const combined = { ...(chosenByName.get(key) || strongest) };
+    for (const field of ["form", "unit", "batch", "expiry"]) {
+      if ([undefined, null, ""].includes(combined[field])) {
+        combined[field] = versions.find((item) => ![undefined, null, ""].includes(item[field]))?.[field] || "";
+      }
     }
     return combined;
   });
+  const orderSource = candidates.map((card) => catalogRowsForCard(card)).sort((left, right) => right.length - left.length)[0] || rows;
+  const sourceOrder = new Map(orderSource.map((row, index) => [normalizeMedicineKey(row.name), index]));
+  merged.sort((left, right) => (sourceOrder.get(normalizeMedicineKey(left.name)) ?? 999) - (sourceOrder.get(normalizeMedicineKey(right.name)) ?? 999));
   normalizeRememberedBatchDigits(merged);
   const priorCard = candidates[0];
   return {
@@ -1162,6 +1178,33 @@ function mergeRememberedInvoiceReview(rows, result) {
       invoice_total: result.invoice_total ?? priorCard?.fields?.invoice_total ?? ""
     }
   };
+}
+
+function invoiceRowArithmeticValid(row) {
+  return Number(row.stock) > 0 && Number(row.cost_price) >= 0 && Number(row.line_total) > 0
+    && Math.abs(Number(row.stock) * Number(row.cost_price) - Number(row.line_total)) < 0.01;
+}
+
+function invoiceRowEvidenceScore(row) {
+  return ["name", "form", "unit", "stock", "cost_price", "line_total", "batch", "expiry"]
+    .filter((field) => ![undefined, null, ""].includes(row[field])).length + (invoiceRowArithmeticValid(row) ? 10 : 0);
+}
+
+function chooseInvoiceRowsByTotal(choiceGroups, targetTotal) {
+  if (!targetTotal || choiceGroups.some((choices) => choices.length === 0)) return null;
+  let best = null;
+  function visit(index, selected, total, score) {
+    if (index === choiceGroups.length) {
+      if (Math.abs(total - targetTotal) < 0.01 && (!best || score > best.score)) best = { rows: [...selected], score };
+      return;
+    }
+    for (const row of choiceGroups[index]) {
+      const nextTotal = total + Number(row.line_total);
+      if (nextTotal <= targetTotal + 0.01) visit(index + 1, [...selected, row], nextTotal, score + invoiceRowEvidenceScore(row));
+    }
+  }
+  visit(0, [], 0, 0);
+  return best?.rows || null;
 }
 
 function normalizeMedicineKey(value) {
