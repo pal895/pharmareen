@@ -28,11 +28,8 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
             image.thumbnail((1800, 1800))
             image = ImageOps.autocontrast(image)
             image = ImageEnhance.Contrast(image).enhance(1.5)
-            threshold = image.point(lambda value: 255 if value > 165 else 0)
             ocr_texts = [
                 pytesseract.image_to_string(image, config="--psm 4"),
-                pytesseract.image_to_string(image, config="--psm 6"),
-                pytesseract.image_to_string(threshold, config="--psm 6"),
             ]
             word_data = pytesseract.image_to_data(image, config="--psm 6", output_type=pytesseract.Output.DICT)
             geometry_rows = reconstruct_bounded_invoice_rows(word_data)
@@ -66,6 +63,7 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
     if not re.search(r"\d", str(extraction.get("invoice_number") or "")):
         extraction["invoice_number"] = ""
     table_items = merge_source_brain_invoice_items(ocr_texts)
+    _fill_unique_source_pair_fields(table_items)
     for item in table_items:
         for field, value in positioned_fields.get(str(item.get("medicine_name")), {}).items():
             if not item.get(field):
@@ -266,6 +264,23 @@ def _normalize_batch_digits_by_invoice_pattern(items: list[dict[str, Any]]) -> N
             item["batch_number"] = f"{match.group(1)}0{match.group(3)}"
 
 
+def _fill_unique_source_pair_fields(items: list[dict[str, Any]]) -> None:
+    medicines = {medicine["name"]: medicine for medicine in load_source_brain_medicines()}
+    for item in items:
+        medicine = medicines.get(str(item.get("medicine_name")))
+        if not medicine:
+            continue
+        pairs = list(zip(medicine.get("forms") or [], medicine.get("units") or []))
+        if not item.get("form") and item.get("unit"):
+            matches = [form for form, unit in pairs if unit == item["unit"]]
+            if len(set(matches)) == 1:
+                item["form"] = matches[0]
+        if not item.get("unit") and item.get("form"):
+            matches = [unit for form, unit in pairs if form == item["form"]]
+            if len(set(matches)) == 1:
+                item["unit"] = matches[0]
+
+
 def merge_source_brain_invoice_items(texts: list[str]) -> list[dict[str, Any]]:
     """Merge complementary deterministic OCR passes without duplicating medicines."""
     candidates: dict[str, list[dict[str, Any]]] = {}
@@ -350,7 +365,7 @@ def _item_completeness(item: dict[str, Any]) -> tuple[int, float]:
 
 
 def _best_ocr_metadata_value(values: list[Any], fallback: Any = "") -> str:
-    candidates = [" ".join(str(value).split()) for value in values if str(value or "").strip()]
+    candidates = [" ".join(str(value).split()).strip(" :;'\"") for value in values if str(value or "").strip()]
     if not candidates:
         return str(fallback or "").strip()
 

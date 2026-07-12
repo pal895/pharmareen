@@ -1,4 +1,4 @@
-from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _invoice_date_from_text, _invoice_total_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, extract_positioned_row_fields, merge_source_brain_invoice_items, reconstruct_bounded_invoice_rows, reconstruct_invoice_rows_from_word_positions
+from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _fill_unique_source_pair_fields, _invoice_date_from_text, _invoice_total_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, extract_positioned_row_fields, merge_source_brain_invoice_items, reconstruct_bounded_invoice_rows, reconstruct_invoice_rows_from_word_positions
 
 
 def test_multiple_ocr_passes_merge_all_canonical_invoice_rows_and_fields():
@@ -134,3 +134,9 @@ def test_midpoint_bounded_rows_join_split_cells_without_crossing_neighbors():
     assert parsed[0]["expiry_date"] == "2028-06"
     assert parsed[1]["medicine_name"] == "Clotrimazole"
     assert _invoice_total_from_text("Invoice Total: KES 7 060 00") == 7060.0
+
+
+def test_observed_unit_fills_only_a_unique_trusted_form_pair():
+    items = [{"medicine_name": "Chloramphenicol", "form": "", "unit": "bottle"}]
+    _fill_unique_source_pair_fields(items)
+    assert items[0]["form"] == "eye drops"

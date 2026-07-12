@@ -28,3 +28,5 @@ This method is supplier-agnostic, offline, zero-token, and reusable for invoices
 - Derive display order from coordinate anchors, but do not prioritize a less-complete geometry candidate over stronger OCR candidates merely to obtain that order. Sort the final merged rows afterward.
 - When cells span several baselines, reconstruct within midpoint boundaries between adjacent medicine anchors. This captures the whole visual row without crossing into its neighbor.
 - Join OCR tokens split around hyphens before parsing batches and expiries. Read invoice totals from all digits following the label, then restore printed decimal places.
+- Avoid paying for duplicate OCR representations. One layout text pass plus one coordinate-data pass is sufficient; derive bounded rows and document lines from the coordinate pass.
+- A missing form or unit may be filled only when the observed counterpart maps to exactly one trusted form–unit pair for that canonical medicine.
