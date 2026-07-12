@@ -155,6 +155,11 @@ Pass criteria:
 
 ## Scanner And Invoice Onboarding
 
+Numbered live status:
+
+- Test 1 — AfyaLink supplier invoice/photo onboarding: PASSED and preserved.
+- Test 2 — Dawa Bora second supplier invoice consistency: asset preparation complete; live test paused before acquiring the file.
+
 Test:
 
 - Use Invoice/photo.

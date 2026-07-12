@@ -1,5 +1,11 @@
 # Invoice table OCR engineering memory
 
+## Test 1 accepted baseline (2026-07-13)
+
+- The AfyaLink first supplier-invoice onboarding test passed end to end: four medicines, no unclear lines, approval, catalog save, export confirmation, and final Saved message.
+- Preserve strongest-evidence merging, medicine-scoped evidence, total consistency, editable correction, and manual row-order controls as the regression baseline.
+- Test 2 is the required final consistency invoice. Its asset is `ms20-main-app/fixtures/test-2-dawa-bora-invoice.png`, backed by a verified manifest and new Source Brain medicines excluded from Zuri Pharmacy's 13-item catalog.
+
 ## Reusable diagnosis
 
 Whole-page OCR text lines are not reliable table rows. Tesseract can recognize every cell but assign adjacent cells to different lines, reorder numeric columns, or omit one row from the linear text result. Repeated regular-expression and per-field merge changes cannot solve missing line structure.
