@@ -1167,13 +1167,14 @@ function mergeRememberedInvoiceReview(rows, result) {
   const exactSet = chooseInvoiceRowsByTotal(numericChoices, targetTotal);
   const chosenByName = new Map((exactSet || []).map((row) => [normalizeMedicineKey(row.name), row]));
   const invoiceMonth = invoiceMonthValue(result.invoice_date || rememberedMetadata.invoice_date);
+  const batchAssignments = chooseUniqueInvoiceBatches(evidence, [...groups.keys()]);
   const merged = [...groups.entries()].map(([key, versions]) => {
     const strongest = [...versions].sort((left, right) => invoiceRowEvidenceScore(right) - invoiceRowEvidenceScore(left))[0];
     const combined = { ...(chosenByName.get(key) || strongest) };
     for (const field of ["form", "unit", "batch", "expiry"]) {
       const counts = evidence.rows?.[key]?.fields?.[field];
       const consensus = strongestInvoiceEvidenceValue(counts, (value, count) => {
-        if (field === "batch") return invoiceBatchBelongsToMedicine(evidence, key, value, count);
+        if (field === "batch") return batchAssignments.get(key) === value;
         if (field === "expiry") return invoiceExpiryNotBefore(value, invoiceMonth);
         return true;
       });
@@ -1182,7 +1183,12 @@ function mergeRememberedInvoiceReview(rows, result) {
     }
     return combined;
   });
-  const sourceOrder = new Map([...groups.keys()].map((key) => [key, strongestInvoiceOrder(evidence.rows?.[key]?.positions)]));
+  const currentRowsReconcile = rows.length === groups.size && rows.every(invoiceRowArithmeticValid)
+    && (!targetTotal || Math.abs(rows.reduce((sum, row) => sum + Number(row.line_total), 0) - targetTotal) < 0.01);
+  const sourceOrder = new Map((currentRowsReconcile ? rows : [...groups.keys()]).map((row, index) => {
+    const key = typeof row === "string" ? row : normalizeMedicineKey(row.name);
+    return [key, currentRowsReconcile ? index : strongestInvoiceOrder(evidence.rows?.[key]?.positions)];
+  }));
   merged.sort((left, right) => (sourceOrder.get(normalizeMedicineKey(left.name)) ?? 999) - (sourceOrder.get(normalizeMedicineKey(right.name)) ?? 999));
   normalizeRememberedBatchDigits(merged);
   return {
@@ -1252,9 +1258,24 @@ function strongestInvoiceEvidenceValue(counts, usable = () => true) {
   return ranked[0][0];
 }
 
-function invoiceBatchBelongsToMedicine(evidence, medicineKey, batch, ownCount) {
-  return !Object.entries(evidence.rows || {}).some(([otherKey, row]) => otherKey !== medicineKey
-    && Number(row.fields?.batch?.[batch] || 0) > ownCount);
+function chooseUniqueInvoiceBatches(evidence, medicineKeys) {
+  const choices = medicineKeys.map((key) => Object.entries(evidence.rows?.[key]?.fields?.batch || {})
+    .map(([value, count]) => ({ value, count: Number(count || 0) }))
+    .sort((left, right) => right.count - left.count).slice(0, 6));
+  let best = { score: -1, values: [] };
+  function visit(index, used, values, score) {
+    if (index === choices.length) {
+      if (score > best.score) best = { score, values: [...values] };
+      return;
+    }
+    for (const choice of choices[index]) {
+      if (used.has(choice.value)) continue;
+      visit(index + 1, new Set([...used, choice.value]), [...values, choice.value], score + choice.count);
+    }
+    visit(index + 1, used, [...values, ""], score);
+  }
+  visit(0, new Set(), [], 0);
+  return new Map(medicineKeys.map((key, index) => [key, best.values[index] || ""]));
 }
 
 function invoiceMonthValue(value) {
