@@ -120,6 +120,15 @@ cd ms20-main-app
 npm run verify
 ```
 
+## Invoice Onboarding Continuation Update — 2026-07-12
+
+- Current stage remains invoice/photo onboarding; do not restart earlier onboarding, sale, restock, camera, or stock tests.
+- Current pause is the open original-invoice review card. Do not approve it until the canonical merged review is complete and total-consistent.
+- Preserve the verified fast two-pass local OCR, camera controls, source order, editable card, arithmetic checks, and zero-token behavior.
+- Matching rescans of one invoice must consolidate into one canonical review card so weaker rereads cannot replace stronger saved evidence or evict it through active-card limits.
+- After the original invoice passes and saves correctly, run one second-invoice consistency test using a different supplier/layout and new trusted Source Brain medicines not already in Zuri Pharmacy.
+- Only after both invoices pass extraction, review, approval, duplicate safety, catalog/stock persistence, reload, configured persistence, and zero-token checks may invoice onboarding be marked complete and the next existing onboarding option begin.
+
 Result: PASS.
 
 ```bash

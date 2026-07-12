@@ -1123,6 +1123,10 @@ async function readInvoicePhoto(file) {
       ? "This scan is incomplete and cannot be approved. Check the photo and scan again."
       : "I read this on your device. Check the medicines, then approve.";
     state.voice.status = "";
+    if (remembered.matchedCardIds.length) {
+      const matchedIds = new Set(remembered.matchedCardIds);
+      state.cards = state.cards.filter((item) => !matchedIds.has(item.id));
+    }
     addCard(card);
   } catch (error) {
     state.voice.status = "";
@@ -1170,17 +1174,19 @@ function mergeRememberedInvoiceReview(rows, result) {
     }
     return combined;
   });
-  const orderSource = candidates.map((card) => catalogRowsForCard(card)).sort((left, right) => right.length - left.length)[0] || rows;
+  const orderSource = candidates.map((card) => catalogRowsForCard(card))
+    .sort((left, right) => invoiceReviewEvidenceScore(right, targetTotal) - invoiceReviewEvidenceScore(left, targetTotal))[0] || rows;
   const sourceOrder = new Map(orderSource.map((row, index) => [normalizeMedicineKey(row.name), index]));
   merged.sort((left, right) => (sourceOrder.get(normalizeMedicineKey(left.name)) ?? 999) - (sourceOrder.get(normalizeMedicineKey(right.name)) ?? 999));
   normalizeRememberedBatchDigits(merged);
   return {
     rows: merged,
+    matchedCardIds: candidates.map((card) => card.id),
     metadata: {
-      supplier_name: result.supplier_name || rememberedMetadata.supplier_name || "",
-      invoice_number: result.invoice_number || rememberedMetadata.invoice_number || "",
-      invoice_date: result.invoice_date || rememberedMetadata.invoice_date || "",
-      invoice_total: result.invoice_total || rememberedMetadata.invoice_total || ""
+      supplier_name: rememberedMetadata.supplier_name || result.supplier_name || "",
+      invoice_number: rememberedMetadata.invoice_number || result.invoice_number || "",
+      invoice_date: rememberedMetadata.invoice_date || result.invoice_date || "",
+      invoice_total: rememberedMetadata.invoice_total || result.invoice_total || ""
     }
   };
 }
@@ -1197,6 +1203,12 @@ function invoiceRowArithmeticValid(row) {
 function invoiceRowEvidenceScore(row) {
   return ["name", "form", "unit", "stock", "cost_price", "line_total", "batch", "expiry"]
     .filter((field) => ![undefined, null, ""].includes(row[field])).length + (invoiceRowArithmeticValid(row) ? 10 : 0);
+}
+
+function invoiceReviewEvidenceScore(rows, targetTotal) {
+  const completeFields = rows.reduce((sum, row) => sum + invoiceRowEvidenceScore(row), 0);
+  const lineTotal = rows.reduce((sum, row) => sum + (invoiceRowArithmeticValid(row) ? Number(row.line_total) : 0), 0);
+  return completeFields + (targetTotal && Math.abs(lineTotal - targetTotal) < 0.01 ? 100 : 0);
 }
 
 function chooseInvoiceRowsByTotal(choiceGroups, targetTotal) {

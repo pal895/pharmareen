@@ -224,6 +224,8 @@ assert(appSource.includes('invoiceRowsComplete(rows, result.invoice_total)'), "R
 assert(appSource.includes('chooseInvoiceRowsByTotal(numericChoices, targetTotal)'), "Repeated invoice scans must select the row combination that matches the invoice total");
 assert(appSource.includes('const allRows = [...rows, ...rememberedRows]'), "A medicine omitted by the newest scan must be recoverable from matching prior scans");
 assert(appSource.includes('firstRememberedInvoiceValue(candidates, "invoice_total")'), "Invoice merge must search all matching reviews for a nonblank total");
+assert(appSource.includes('matchedCardIds: candidates.map((card) => card.id)'), "Matching invoice rescans must consolidate into one canonical review card");
+assert(appSource.includes('invoiceReviewEvidenceScore(right, targetTotal)'), "Invoice source order must come from the strongest complete matching review");
 assert(appSource.includes('This scan is missing invoice details.'), "Incomplete invoice approval must be blocked at the action boundary");
 assert(appSource.includes("closeCameraStream()"), "In-app camera must release memory after capture or cancel");
 assert(css.includes(".camera-overlay"), "Memory-safe camera preview UI missing");

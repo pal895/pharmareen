@@ -26,6 +26,12 @@ npm run verify
 npm run check
 ```
 
+## Final Invoice Consistency Gate
+
+At the current invoice/photo stage, first complete the original supplier invoice using one canonical total-consistent review card. Do not repeat earlier passed tests.
+
+Then, before moving to another onboarding option, create and live-test one different supplier invoice using new medicines confirmed in Source Brain and absent from the current Zuri Pharmacy catalog. Verify local extraction, clean editable review, corrections, approval, duplicate prevention, catalog/stock persistence, reload, configured persistence, saved invoice reuse, and zero unnecessary AI/API calls. Give one owner action at a time.
+
 3. Restart the Replit app so the backend loads the Main App static route.
 4. Open:
 
