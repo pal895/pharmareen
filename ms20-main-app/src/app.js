@@ -1091,7 +1091,7 @@ async function readInvoicePhoto(file) {
       render();
       return;
     }
-    const rows = result.items.map((item) => ({
+    let rows = result.items.map((item) => ({
       name: item.medicine_name || item.name || "",
       form: item.form || "",
       unit: item.unit || "",
@@ -1105,6 +1105,10 @@ async function readInvoicePhoto(file) {
       expiry: item.expiry_date || "",
       source: "local_invoice_ocr"
     }));
+    const remembered = mergeRememberedInvoiceReview(rows, result);
+    rows = remembered.rows;
+    Object.assign(result, remembered.metadata);
+    result.complete = invoiceRowsComplete(rows, result.invoice_total);
     const card = createPasteImportCard(catalogItemsToText(rows));
     card.fields.catalog_rows = JSON.stringify(rows);
     card.fields.import_mode = "invoice_ocr";
@@ -1125,6 +1129,59 @@ async function readInvoicePhoto(file) {
     addFeed("system", error?.message || "I could not read this invoice. Try a clearer photo.");
     render();
   }
+}
+
+function mergeRememberedInvoiceReview(rows, result) {
+  const candidates = state.cards.filter((card) => {
+    if (card.type !== "CatalogImportCard" || card.fields?.import_mode !== "invoice_ocr") return false;
+    const sameNumber = result.invoice_number && card.fields.invoice_number === result.invoice_number;
+    const sameSignature = result.supplier_name && result.invoice_date && result.invoice_total
+      && card.fields.invoice_supplier === result.supplier_name
+      && card.fields.invoice_date === result.invoice_date
+      && Number(card.fields.invoice_total) === Number(result.invoice_total);
+    return sameNumber || sameSignature;
+  });
+  const rememberedRows = candidates.flatMap((card) => catalogRowsForCard(card));
+  const merged = rows.map((row) => {
+    const prior = rememberedRows.find((item) => normalizeMedicineKey(item.name) === normalizeMedicineKey(row.name));
+    if (!prior) return row;
+    const combined = { ...row };
+    for (const field of ["form", "unit", "stock", "cost_price", "line_total", "batch", "expiry"]) {
+      if ([undefined, null, ""].includes(combined[field]) && ![undefined, null, ""].includes(prior[field])) combined[field] = prior[field];
+    }
+    return combined;
+  });
+  normalizeRememberedBatchDigits(merged);
+  const priorCard = candidates[0];
+  return {
+    rows: merged,
+    metadata: {
+      supplier_name: result.supplier_name || priorCard?.fields?.invoice_supplier || "",
+      invoice_number: result.invoice_number || priorCard?.fields?.invoice_number || "",
+      invoice_date: result.invoice_date || priorCard?.fields?.invoice_date || "",
+      invoice_total: result.invoice_total ?? priorCard?.fields?.invoice_total ?? ""
+    }
+  };
+}
+
+function normalizeMedicineKey(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function normalizeRememberedBatchDigits(rows) {
+  const patterned = rows.filter((row) => /^[A-Z0-9]+-[A-Z]\d{2}$/i.test(String(row.batch || ""))).length;
+  if (patterned < 2) return;
+  rows.forEach((row) => {
+    row.batch = String(row.batch || "").replace(/^(.+-[A-Z])[OQ](\d)$/i, (_match, prefix, digit) => `${prefix}0${digit}`);
+  });
+}
+
+function invoiceRowsComplete(rows, invoiceTotal) {
+  if (!rows.length || !rows.every((row) => row.name && row.form && row.unit && Number(row.stock) > 0
+    && Number(row.cost_price) >= 0 && row.batch && /^20\d{2}-\d{2}$/.test(row.expiry)
+    && Number(row.line_total) > 0 && Math.abs(Number(row.stock) * Number(row.cost_price) - Number(row.line_total)) < 0.01)) return false;
+  const linesTotal = rows.reduce((sum, row) => sum + Number(row.line_total), 0);
+  return invoiceTotal !== "" && Math.abs(linesTotal - Number(invoiceTotal)) < 0.01;
 }
 
 async function resizeImageForReading(file) {

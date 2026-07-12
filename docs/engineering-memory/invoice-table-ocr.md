@@ -31,3 +31,4 @@ This method is supplier-agnostic, offline, zero-token, and reusable for invoices
 - Avoid paying for duplicate OCR representations. One layout text pass plus one coordinate-data pass is sufficient; derive bounded rows and document lines from the coordinate pass.
 - A missing form or unit may be filled only when the observed counterpart maps to exactly one trusted form–unit pair for that canonical medicine.
 - Accept compact OCR expiries such as `202806` as `2028-06` only when the final two digits form a valid month. Recover invoice numbers from strict multi-segment alphanumeric identifiers rather than loose label text.
+- Repeated captures of the same invoice are complementary evidence, not replacements. Match by invoice number or supplier/date/total signature, fill only blank fields from stronger prior local reviews, preserve current valid values, then rerun every required-field, row-arithmetic, and invoice-total check before enabling approval.
