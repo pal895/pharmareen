@@ -35,7 +35,10 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
             word_data = pytesseract.image_to_data(image, config="--psm 6", output_type=pytesseract.Output.DICT)
             geometry_text = "\n".join(reconstruct_invoice_rows_from_word_positions(word_data))
             if geometry_text:
-                ocr_texts.append(geometry_text)
+                ocr_texts.insert(0, geometry_text)
+            document_geometry_text = "\n".join(reconstruct_document_lines_from_word_positions(word_data))
+            if document_geometry_text:
+                ocr_texts.append(document_geometry_text)
             visible_text = max(ocr_texts, key=len, default="")
     except Exception:
         return _failed(fingerprint, "I could not read this photo. Try again in good light with the whole page visible.")
@@ -47,6 +50,10 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
         [item.get("supplier_name") for item in extractions],
         extraction.get("supplier_name"),
     )
+    extraction["supplier_name"] = _best_ocr_metadata_value([
+        extraction.get("supplier_name"),
+        _supplier_name_from_text(combined_text),
+    ])
     extraction["invoice_number"] = _best_ocr_metadata_value(
         [item.get("invoice_number") for item in extractions],
         extraction.get("invoice_number"),
@@ -54,6 +61,7 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
     if not re.search(r"\d", str(extraction.get("invoice_number") or "")):
         extraction["invoice_number"] = ""
     table_items = merge_source_brain_invoice_items(ocr_texts)
+    _normalize_batch_digits_by_invoice_pattern(table_items)
     if table_items:
         extraction["items"] = table_items
         extraction["confidence"] = 0.88
@@ -71,6 +79,8 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
     invoice_total = _invoice_total_from_text(combined_text)
     extracted_total = sum(float(item.get("line_total") or 0) for item in extraction.get("items") or [])
     extraction["invoice_total"] = invoice_total
+    if not extraction.get("invoice_date"):
+        extraction["invoice_date"] = _invoice_date_from_text(combined_text)
     extraction["extracted_line_total"] = extracted_total
     extraction["complete"] = bool(
         extraction.get("items")
@@ -115,7 +125,7 @@ def reconstruct_invoice_rows_from_word_positions(data: dict[str, list[Any]]) -> 
         score, anchor = anchors[0]
         if len(anchors) > 1 and score - anchors[1][0] < 0.04 and abs(anchor["center_y"] - anchors[1][1]["center_y"]) > anchor["height"] * 2:
             continue
-        tolerance = max(10.0, anchor["height"] * 0.9)
+        tolerance = max(14.0, anchor["height"] * 1.4)
         if any(abs(anchor["center_y"] - known_y) <= tolerance for known_y in used_y):
             continue
         band = [word for word in words if abs(word["center_y"] - anchor["center_y"]) <= tolerance]
@@ -124,6 +134,41 @@ def reconstruct_invoice_rows_from_word_positions(data: dict[str, list[Any]]) -> 
             rows.append((anchor["center_y"], line))
             used_y.append(anchor["center_y"])
     return [line for _, line in sorted(rows)]
+
+
+def reconstruct_document_lines_from_word_positions(data: dict[str, list[Any]]) -> list[str]:
+    words: list[tuple[float, int, int, str]] = []
+    for index, raw_text in enumerate(data.get("text") or []):
+        text = " ".join(str(raw_text or "").split())
+        if not text:
+            continue
+        try:
+            top = int((data.get("top") or [])[index])
+            left = int((data.get("left") or [])[index])
+            height = int((data.get("height") or [])[index])
+        except (ValueError, TypeError, IndexError):
+            continue
+        words.append((top + height / 2, left, height, text))
+    lines: list[dict[str, Any]] = []
+    for center_y, left, height, text in sorted(words):
+        line = next((row for row in lines if abs(row["center_y"] - center_y) <= max(8, height * 0.8)), None)
+        if line is None:
+            line = {"center_y": center_y, "words": []}
+            lines.append(line)
+        line["words"].append((left, text))
+    return [" ".join(text for _, text in sorted(line["words"])) for line in sorted(lines, key=lambda row: row["center_y"])]
+
+
+def _normalize_batch_digits_by_invoice_pattern(items: list[dict[str, Any]]) -> None:
+    suffixes = [str(item.get("batch_number") or "").rsplit("-", 1)[-1] for item in items]
+    digit_pattern = sum(bool(re.fullmatch(r"[A-Z]\d{2}", suffix, flags=re.I)) for suffix in suffixes) >= 2
+    if not digit_pattern:
+        return
+    for item in items:
+        batch = str(item.get("batch_number") or "")
+        match = re.fullmatch(r"(.+-[A-Z])([OQ])(\d)", batch, flags=re.I)
+        if match:
+            item["batch_number"] = f"{match.group(1)}0{match.group(3)}"
 
 
 def merge_source_brain_invoice_items(texts: list[str]) -> list[dict[str, Any]]:
@@ -382,6 +427,21 @@ def _best_known_value(line: str, values: list[str]) -> str:
 def _invoice_total_from_text(text: str) -> float | None:
     match = re.search(r"invoice\s+total\D{0,20}(?:KES|KSH)?\s*([\d,]+(?:\.\d{2})?)", text, flags=re.I)
     return float(match.group(1).replace(",", "")) if match else None
+
+
+def _invoice_date_from_text(text: str) -> str:
+    match = re.search(r"invoice\s+date\D{0,12}(\d{1,2}\s+[A-Za-z]{3,9}\s+20\d{2})", text, flags=re.I)
+    return " ".join(match.group(1).split()) if match else ""
+
+
+def _supplier_name_from_text(text: str) -> str:
+    candidates = []
+    for line in text.splitlines():
+        clean = " ".join(line.split()).strip(" :-")
+        if re.search(r"\b(?:medical|pharma\w*)\s+suppl\w*\b", clean, flags=re.I):
+            clean = re.sub(r"^supplier\s*[:\-]?\s*", "", clean, flags=re.I)
+            candidates.append(clean)
+    return _best_ocr_metadata_value(candidates)
 
 
 def _row_has_required_invoice_fields(item: dict[str, Any]) -> bool:

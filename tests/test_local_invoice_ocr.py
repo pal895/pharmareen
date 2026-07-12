@@ -1,4 +1,4 @@
-from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _ocr_money, merge_source_brain_invoice_items, reconstruct_invoice_rows_from_word_positions
+from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _invoice_date_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, merge_source_brain_invoice_items, reconstruct_invoice_rows_from_word_positions
 
 
 def test_multiple_ocr_passes_merge_all_canonical_invoice_rows_and_fields():
@@ -87,3 +87,16 @@ def test_table_cells_are_rebuilt_from_word_coordinates_not_ocr_line_order():
     assert reconstruct_invoice_rows_from_word_positions(data) == [
         "Acyclovir cream tube 12 180.00 2,160.00 ACY-T01 2028-06"
     ]
+
+
+def test_geometry_order_and_invoice_pattern_repairs_are_preserved():
+    rows = merge_source_brain_invoice_items([
+        "Acyclovir cream tube 12 180.00 2,160.00 ACY-TO1 2028-06\n"
+        "Clotrimazole pessary pessary 20 95.00 1,900.00 CLO-P02 2028-09\n"
+        "Doxycycline capsule capsule 50 18.00 900.00 DOX-C03 2027-12\n"
+        "Chloramphenicol eye drops bottle 15 140.00 2,100.00 CHL-E04 2027-10"
+    ])
+    _normalize_batch_digits_by_invoice_pattern(rows)
+    assert [row["medicine_name"] for row in rows] == ["Acyclovir", "Clotrimazole", "Doxycycline", "Chloramphenicol"]
+    assert rows[0]["batch_number"] == "ACY-T01"
+    assert _invoice_date_from_text("Invoice Date: 11 July 2026") == "11 July 2026"
