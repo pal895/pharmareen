@@ -225,7 +225,9 @@ assert(appSource.includes('chooseInvoiceRowsByTotal(numericChoices, targetTotal)
 assert(appSource.includes('const allRows = [...rows, ...rememberedRows]'), "A medicine omitted by the newest scan must be recoverable from matching prior scans");
 assert(appSource.includes('firstRememberedInvoiceValue(candidates, "invoice_total")'), "Invoice merge must search all matching reviews for a nonblank total");
 assert(appSource.includes('matchedCardIds: candidates.map((card) => card.id)'), "Matching invoice rescans must consolidate into one canonical review card");
-assert(appSource.includes('invoiceReviewEvidenceScore(right, targetTotal)'), "Invoice source order must come from the strongest complete matching review");
+assert(appSource.includes('card.fields.invoice_evidence = JSON.stringify(remembered.evidence)'), "Canonical invoice review must persist medicine-scoped evidence across scans");
+assert(appSource.includes('strongestInvoiceOrder(evidence.rows?.[key]?.positions)'), "Invoice source order must use repeated medicine-scoped position evidence");
+assert(appSource.includes('else if (Object.keys(counts || {}).length > 1) combined[field] = ""'), "Conflicting invoice evidence must stay blank rather than contaminate another medicine row");
 assert(appSource.includes('This scan is missing invoice details.'), "Incomplete invoice approval must be blocked at the action boundary");
 assert(appSource.includes("closeCameraStream()"), "In-app camera must release memory after capture or cancel");
 assert(css.includes(".camera-overlay"), "Memory-safe camera preview UI missing");

@@ -1117,6 +1117,7 @@ async function readInvoicePhoto(file) {
     card.fields.invoice_number = result.invoice_number || "";
     card.fields.invoice_date = result.invoice_date || "";
     card.fields.invoice_total = result.invoice_total ?? "";
+    card.fields.invoice_evidence = JSON.stringify(remembered.evidence);
     card.title = "Check invoice medicines";
     card.source = `${result.supplier_name || "Supplier invoice"}${result.invoice_number ? ` · ${result.invoice_number}` : ""}`;
     card.validation = result.complete === false
@@ -1146,6 +1147,7 @@ function mergeRememberedInvoiceReview(rows, result) {
     return sameNumber || sameSignature;
   });
   const rememberedRows = candidates.flatMap((card) => catalogRowsForCard(card));
+  const evidence = mergeInvoiceEvidence(candidates, rows);
   const rememberedMetadata = {
     supplier_name: firstRememberedInvoiceValue(candidates, "invoice_supplier"),
     invoice_number: firstRememberedInvoiceValue(candidates, "invoice_number"),
@@ -1168,19 +1170,19 @@ function mergeRememberedInvoiceReview(rows, result) {
     const strongest = [...versions].sort((left, right) => invoiceRowEvidenceScore(right) - invoiceRowEvidenceScore(left))[0];
     const combined = { ...(chosenByName.get(key) || strongest) };
     for (const field of ["form", "unit", "batch", "expiry"]) {
-      if ([undefined, null, ""].includes(combined[field])) {
-        combined[field] = versions.find((item) => ![undefined, null, ""].includes(item[field]))?.[field] || "";
-      }
+      const counts = evidence.rows?.[key]?.fields?.[field];
+      const consensus = strongestInvoiceEvidenceValue(counts);
+      if (consensus) combined[field] = consensus;
+      else if (Object.keys(counts || {}).length > 1) combined[field] = "";
     }
     return combined;
   });
-  const orderSource = candidates.map((card) => catalogRowsForCard(card))
-    .sort((left, right) => invoiceReviewEvidenceScore(right, targetTotal) - invoiceReviewEvidenceScore(left, targetTotal))[0] || rows;
-  const sourceOrder = new Map(orderSource.map((row, index) => [normalizeMedicineKey(row.name), index]));
+  const sourceOrder = new Map([...groups.keys()].map((key) => [key, strongestInvoiceOrder(evidence.rows?.[key]?.positions)]));
   merged.sort((left, right) => (sourceOrder.get(normalizeMedicineKey(left.name)) ?? 999) - (sourceOrder.get(normalizeMedicineKey(right.name)) ?? 999));
   normalizeRememberedBatchDigits(merged);
   return {
     rows: merged,
+    evidence,
     matchedCardIds: candidates.map((card) => card.id),
     metadata: {
       supplier_name: rememberedMetadata.supplier_name || result.supplier_name || "",
@@ -1189,6 +1191,64 @@ function mergeRememberedInvoiceReview(rows, result) {
       invoice_total: rememberedMetadata.invoice_total || result.invoice_total || ""
     }
   };
+}
+
+function mergeInvoiceEvidence(cards, observedRows) {
+  const evidence = { version: 1, rows: {} };
+  cards.forEach((card) => {
+    const saved = parseInvoiceEvidence(card.fields?.invoice_evidence);
+    Object.entries(saved.rows || {}).forEach(([key, row]) => mergeInvoiceEvidenceRow(evidence, key, row));
+    if (!card.fields?.invoice_evidence) addInvoiceObservation(evidence, catalogRowsForCard(card));
+  });
+  addInvoiceObservation(evidence, observedRows);
+  return evidence;
+}
+
+function parseInvoiceEvidence(value) {
+  try {
+    const parsed = JSON.parse(value || "{}");
+    return parsed && typeof parsed === "object" ? parsed : { rows: {} };
+  } catch {
+    return { rows: {} };
+  }
+}
+
+function mergeInvoiceEvidenceRow(evidence, key, saved) {
+  const target = evidence.rows[key] ||= { fields: {}, positions: {} };
+  Object.entries(saved.fields || {}).forEach(([field, counts]) => {
+    const targetCounts = target.fields[field] ||= {};
+    Object.entries(counts || {}).forEach(([value, count]) => { targetCounts[value] = (targetCounts[value] || 0) + Number(count || 0); });
+  });
+  Object.entries(saved.positions || {}).forEach(([position, count]) => {
+    target.positions[position] = (target.positions[position] || 0) + Number(count || 0);
+  });
+}
+
+function addInvoiceObservation(evidence, rows) {
+  rows.forEach((row, position) => {
+    const key = normalizeMedicineKey(row.name);
+    if (!key) return;
+    const target = evidence.rows[key] ||= { fields: {}, positions: {} };
+    target.positions[position] = (target.positions[position] || 0) + 1;
+    for (const field of ["form", "unit", "batch", "expiry"]) {
+      const value = String(row[field] || "").trim();
+      if (!value) continue;
+      const counts = target.fields[field] ||= {};
+      counts[value] = (counts[value] || 0) + 1;
+    }
+  });
+}
+
+function strongestInvoiceEvidenceValue(counts) {
+  const ranked = Object.entries(counts || {}).sort((left, right) => right[1] - left[1]);
+  if (!ranked.length) return "";
+  if (ranked.length > 1 && ranked[0][1] === ranked[1][1]) return "";
+  return ranked[0][0];
+}
+
+function strongestInvoiceOrder(counts) {
+  const ranked = Object.entries(counts || {}).sort((left, right) => right[1] - left[1] || Number(left[0]) - Number(right[0]));
+  return ranked.length ? Number(ranked[0][0]) : 999;
 }
 
 function firstRememberedInvoiceValue(cards, field) {
