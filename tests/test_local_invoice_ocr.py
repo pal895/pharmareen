@@ -1,4 +1,4 @@
-from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _fill_unique_source_pair_fields, _invoice_date_from_text, _invoice_number_from_text, _invoice_total_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, extract_batch_vertical_positions, extract_positioned_row_fields, merge_source_brain_invoice_items, reconstruct_bounded_invoice_rows, reconstruct_invoice_rows_from_word_positions
+from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _fill_unique_source_pair_fields, _invoice_date_from_text, _invoice_number_from_text, _invoice_total_from_text, _medicine_order_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, extract_positioned_row_fields, merge_source_brain_invoice_items, reconstruct_bounded_invoice_rows, reconstruct_invoice_rows_from_word_positions
 
 
 def test_multiple_ocr_passes_merge_all_canonical_invoice_rows_and_fields():
@@ -155,11 +155,6 @@ def test_compact_expiry_and_header_invoice_number_are_recovered():
     assert _invoice_number_from_text("Invoice No ALMS-TEST-110726") == "ALMS-TEST-110726"
 
 
-def test_batch_vertical_positions_preserve_photographed_table_order():
-    data = {
-        "text": ["ACY-T01", "CLO-P02", "DOX-C03", "CHL-E04", "2027-10"],
-        "top": [100, 150, 200, 250, 252],
-        "height": [20, 20, 20, 20, 20],
-    }
-    positions = extract_batch_vertical_positions(data)
-    assert list(sorted(positions, key=positions.get)) == ["ACY-T01", "CLO-P02", "DOX-C03", "CHL-E04"]
+def test_primary_text_preserves_document_medicine_order():
+    text = "Acyclovir cream\nClotrimazole pessary\nDoxycycline capsule\nChloramphenicol eye drops"
+    assert _medicine_order_from_text(text) == ["Acyclovir", "Clotrimazole", "Doxycycline", "Chloramphenicol"]

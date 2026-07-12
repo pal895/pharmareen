@@ -17,7 +17,7 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
     fingerprint = hashlib.sha256(image_bytes).hexdigest()
     positioned_fields: dict[str, dict[str, str]] = {}
     geometry_order: list[str] = []
-    batch_positions: dict[str, float] = {}
+    primary_text_order: list[str] = []
     try:
         import pytesseract
     except ImportError:
@@ -32,6 +32,7 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
             ocr_texts = [
                 pytesseract.image_to_string(image, config="--psm 4"),
             ]
+            primary_text_order = _medicine_order_from_text(ocr_texts[0])
             word_data = pytesseract.image_to_data(image, config="--psm 6", output_type=pytesseract.Output.DICT)
             geometry_rows = reconstruct_bounded_invoice_rows(word_data)
             geometry_text = "\n".join(geometry_rows)
@@ -39,7 +40,6 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
                 ocr_texts.append(geometry_text)
             geometry_order = _medicine_order_from_lines(geometry_rows)
             positioned_fields = extract_positioned_row_fields(word_data)
-            batch_positions = extract_batch_vertical_positions(word_data)
             document_geometry_text = "\n".join(reconstruct_document_lines_from_word_positions(word_data))
             if document_geometry_text:
                 ocr_texts.append(document_geometry_text)
@@ -71,9 +71,10 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
         for field, value in positioned_fields.get(str(item.get("medicine_name")), {}).items():
             if not item.get(field):
                 item[field] = value
-    batches = [str(item.get("batch_number") or "").upper() for item in table_items]
-    if table_items and all(batch and batch in batch_positions for batch in batches):
-        table_items.sort(key=lambda item: batch_positions[str(item.get("batch_number") or "").upper()])
+    item_names = {str(item.get("medicine_name")) for item in table_items}
+    if item_names and item_names.issubset(set(primary_text_order)):
+        order = {name: index for index, name in enumerate(primary_text_order)}
+        table_items.sort(key=lambda item: order[str(item.get("medicine_name"))])
     elif geometry_order:
         order = {name: index for index, name in enumerate(geometry_order)}
         table_items.sort(key=lambda item: order.get(str(item.get("medicine_name")), len(order)))
@@ -204,6 +205,19 @@ def _medicine_order_from_lines(lines: list[str]) -> list[str]:
     return order
 
 
+def _medicine_order_from_text(text: str) -> list[str]:
+    """Preserve the primary OCR pass's document reading order for recognized medicines."""
+    medicines = load_source_brain_medicines()
+    found: list[tuple[int, str]] = []
+    lowered = text.lower()
+    for medicine in medicines:
+        positions = [lowered.find(name.lower()) for name in [medicine["name"], *medicine["aliases"]]]
+        positions = [position for position in positions if position >= 0]
+        if positions:
+            found.append((min(positions), medicine["name"]))
+    return [name for _, name in sorted(found)]
+
+
 def extract_positioned_row_fields(data: dict[str, list[Any]]) -> dict[str, dict[str, str]]:
     medicines = load_source_brain_medicines()
     tokens: list[dict[str, Any]] = []
@@ -233,24 +247,6 @@ def extract_positioned_row_fields(data: dict[str, list[Any]]) -> dict[str, dict[
         elif batch and not token["text"].startswith("20"):
             result[name]["batch_number"] = token["text"]
     return result
-
-
-def extract_batch_vertical_positions(data: dict[str, list[Any]]) -> dict[str, float]:
-    """Return visible batch identifiers keyed to their photographed vertical position."""
-    positions: dict[str, float] = {}
-    for index, raw_text in enumerate(data.get("text") or []):
-        text = "".join(str(raw_text or "").upper().split())
-        if not re.fullmatch(r"(?=[A-Z0-9-]*[A-Z])(?=[A-Z0-9-]*\d)[A-Z0-9]+-[A-Z0-9]+", text):
-            continue
-        if text.startswith("20"):
-            continue
-        try:
-            top = int((data.get("top") or [])[index])
-            height = int((data.get("height") or [])[index])
-        except (ValueError, TypeError, IndexError):
-            continue
-        positions[text] = top + height / 2
-    return positions
 
 
 def reconstruct_document_lines_from_word_positions(data: dict[str, list[Any]]) -> list[str]:
