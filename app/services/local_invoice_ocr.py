@@ -47,6 +47,8 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
         [item.get("invoice_number") for item in extractions],
         extraction.get("invoice_number"),
     )
+    if not re.search(r"\d", str(extraction.get("invoice_number") or "")):
+        extraction["invoice_number"] = ""
     table_items = merge_source_brain_invoice_items(ocr_texts)
     if table_items:
         extraction["items"] = table_items
@@ -88,11 +90,70 @@ def merge_source_brain_invoice_items(texts: list[str]) -> list[dict[str, Any]]:
 def _merge_item_candidates(items: list[dict[str, Any]]) -> dict[str, Any]:
     ranked = sorted(items, key=_item_completeness, reverse=True)
     merged = dict(ranked[0])
-    for field in ("form", "unit", "quantity", "unit_cost", "line_total", "batch_number", "expiry_date"):
+    for field in ("form", "unit", "batch_number", "expiry_date"):
         if merged.get(field) in (None, "", 0):
             merged[field] = next((item.get(field) for item in ranked if item.get(field) not in (None, "", 0)), merged.get(field))
+    numeric = _coherent_row_numbers(items)
+    if numeric:
+        merged.update(numeric)
+    else:
+        merged.update({"quantity": None, "unit_cost": None, "line_total": None})
     merged["confidence"] = max(float(item.get("confidence") or 0) for item in items)
     return merged
+
+
+def _coherent_row_numbers(items: list[dict[str, Any]]) -> dict[str, Any] | None:
+    observed = {
+        round(float(value), 2)
+        for item in items
+        for field in ("quantity", "unit_cost", "line_total")
+        if (value := item.get(field)) not in (None, "", 0)
+    }
+    money_values = observed | {value / 100 for value in observed if value >= 1000 and int(value) % 100 == 0}
+    quantity_values = observed | {
+        round(total / cost, 2)
+        for total in money_values
+        for cost in money_values
+        if cost and total > cost and total / cost <= 10000
+    }
+    matches: list[tuple[int, float, float, float]] = []
+    for quantity in quantity_values:
+        if quantity != int(quantity) or quantity > 10000:
+            continue
+        for unit_cost in money_values:
+            for line_total in money_values:
+                if abs(quantity * unit_cost - line_total) <= max(0.01, line_total * 0.001):
+                    role_support = sum(
+                        item.get("quantity") == quantity
+                        for item in items
+                    ) + sum(
+                        item.get("unit_cost") == unit_cost
+                        for item in items
+                    ) + sum(
+                        item.get("line_total") == line_total
+                        for item in items
+                    )
+                    role_support += 2 * sum(
+                        _same_number(unit_cost, _money_from_misplaced_quantity(item.get("quantity")))
+                        and _same_number(line_total, item.get("unit_cost"))
+                        for item in items
+                    )
+                    matches.append((role_support, quantity, unit_cost, line_total))
+    if not matches:
+        return None
+    _, quantity, unit_cost, line_total = max(matches, key=lambda row: (row[0], row[3], row[1] != 1))
+    return {"quantity": int(quantity), "unit_cost": unit_cost, "line_total": line_total}
+
+
+def _money_from_misplaced_quantity(value: Any) -> float | None:
+    if value in (None, "", 0):
+        return None
+    number = float(value)
+    return number / 100 if number >= 1000 and int(number) % 100 == 0 else number
+
+
+def _same_number(left: Any, right: Any) -> bool:
+    return left not in (None, "") and right not in (None, "") and abs(float(left) - float(right)) < 0.01
 
 
 def _item_completeness(item: dict[str, Any]) -> tuple[int, float]:

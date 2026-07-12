@@ -1760,6 +1760,7 @@ function friendlyCardLabel(card) {
 }
 
 function ownerCardNote(card) {
+  if (card.type === "CatalogImportCard" && card.fields?.import_incomplete === "true") return "This scan is incomplete. Scan again before saving anything.";
   if (card.type === "CatalogImportCard") return "Review the list, edit if needed, then approve.";
   if (card.status === "needs_correction") return "Edit anything that looks wrong, then confirm.";
   if (card.type === "SaleCard") return "Complete the sale details, then confirm.";

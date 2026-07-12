@@ -1,4 +1,4 @@
-from app.services.local_invoice_ocr import _best_ocr_metadata_value, _ocr_money, merge_source_brain_invoice_items
+from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _ocr_money, merge_source_brain_invoice_items
 
 
 def test_multiple_ocr_passes_merge_all_canonical_invoice_rows_and_fields():
@@ -34,3 +34,26 @@ def test_ocr_money_restores_dropped_printed_decimal_places():
     assert _ocr_money("9500") == 95.0
     assert _ocr_money("18.00") == 18.0
     assert _ocr_money("140") == 140.0
+
+
+def test_numeric_columns_are_reconstructed_by_invoice_arithmetic():
+    candidates = [
+        {"quantity": 9500, "unit_cost": 1900, "line_total": None},
+        {"quantity": 20, "unit_cost": 95, "line_total": 1900},
+    ]
+    assert _coherent_row_numbers(candidates) == {
+        "quantity": 20,
+        "unit_cost": 95.0,
+        "line_total": 1900.0,
+    }
+
+    assert _coherent_row_numbers([{
+        "quantity": 1800,
+        "unit_cost": 900,
+        "line_total": 1,
+    }]) == {"quantity": 50, "unit_cost": 18.0, "line_total": 900.0}
+    assert _coherent_row_numbers([{
+        "quantity": 140,
+        "unit_cost": 2100,
+        "line_total": 202710,
+    }]) == {"quantity": 15, "unit_cost": 140.0, "line_total": 2100.0}
