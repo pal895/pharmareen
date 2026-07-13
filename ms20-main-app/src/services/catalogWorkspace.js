@@ -33,7 +33,7 @@ export function createCatalogEditDraft(item = {}) {
     shelf: item.shelf || item.location || "",
     barcode: item.barcode || "",
     batch: item.batches?.[0]?.batch || item.batch || "",
-    expiry: item.batches?.[0]?.expiry || item.expiry || "",
+    expiry: normalizeExpiryValue(item.batches?.[0]?.expiry || item.expiry || ""),
     reorder_level: item.reorderLevel ?? item.reorder_level ?? "",
     aliases: (item.aliases || []).join(", ")
   };
@@ -68,8 +68,8 @@ export function applyApprovedCatalogEdit(catalog = [], originalId, draft = {}) {
     supplier: draft.supplier.trim(),
     shelf: draft.shelf.trim(),
     barcode: draft.barcode.trim(),
-    batches: draft.batch || draft.expiry ? [{ batch: draft.batch.trim(), expiry: draft.expiry.trim() }] : [],
-    expiry: draft.expiry.trim(),
+    batches: draft.batch || draft.expiry ? [{ batch: draft.batch.trim(), expiry: normalizeExpiryValue(draft.expiry) }] : [],
+    expiry: normalizeExpiryValue(draft.expiry),
     reorderLevel: draft.reorder_level,
     aliases,
     updatedAt: new Date().toISOString()
@@ -108,4 +108,4 @@ function normalize(value) {
   return normalizeMedicineText(value);
 }
 import { rankMedicineMatches, normalizeMedicineText } from "./medicineMatcher.js";
-import { CATALOG_MEDICINE_FIELD_KEYS } from "./medicineFieldSchema.js";
+import { CATALOG_MEDICINE_FIELD_KEYS, normalizeExpiryValue } from "./medicineFieldSchema.js";

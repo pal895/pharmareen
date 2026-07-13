@@ -453,15 +453,23 @@ function catalogWorkspaceTemplate(card) {
         <strong>${pharmacyBrain.catalog.length} medicines</strong>
         <span>Saved in this pharmacy</span>
       </div>
-      <label class="catalog-search">
-        <span>Search catalog</span>
-        <input type="search" data-catalog-search data-card-id="${card.id}" value="${escapeHtml(query)}" placeholder="Medicine, form, supplier, barcode">
-      </label>
+      ${catalogSearchTemplate(card, query, "top")}
       <p class="catalog-result-count">Showing ${items.length} of ${pharmacyBrain.catalog.length}</p>
       ${card.fields?.selected_id ? catalogMedicineEditorTemplate(card) : `<div class="catalog-workspace-list">
         ${items.length ? items.map(catalogWorkspaceItemTemplate).join("") : `<p class="catalog-empty">${pharmacyBrain.catalog.length ? "No medicines match this search." : "No medicines have been saved in this pharmacy yet."}</p>`}
-      </div>`}
+      </div>
+      ${catalogSearchTemplate(card, query, "bottom")}
+      <p class="catalog-result-count catalog-result-count-bottom">Showing ${items.length} of ${pharmacyBrain.catalog.length}</p>`}
     </section>
+  `;
+}
+
+function catalogSearchTemplate(card, query, placement) {
+  return `
+    <label class="catalog-search catalog-search-${placement}">
+      <span>${placement === "bottom" ? "Search catalog again" : "Search catalog"}</span>
+      <input type="search" data-catalog-search data-catalog-search-placement="${placement}" data-card-id="${card.id}" value="${escapeHtml(query)}" placeholder="Medicine, form, supplier, barcode">
+    </label>
   `;
 }
 
@@ -773,9 +781,9 @@ function bindEvents() {
     const file = event.target.files?.[0];
     if (file) void handleDocumentFile(file);
   });
-  root.querySelector("[data-catalog-search]")?.addEventListener("input", (event) => {
-    updateCatalogSearch(event.target.dataset.cardId, event.target.value);
-  });
+  root.querySelectorAll("[data-catalog-search]").forEach((input) => input.addEventListener("input", (event) => {
+    updateCatalogSearch(event.target.dataset.cardId, event.target.value, event.target);
+  }));
   root.querySelectorAll("[data-catalog-edit-field]").forEach((input) => {
     input.addEventListener("input", () => updateCatalogEditDraft(input.dataset.cardId, input.dataset.catalogEditField, input.value));
   });
@@ -1904,19 +1912,22 @@ function approveCatalogEdit(cardId) {
   render();
 }
 
-function updateCatalogSearch(cardId, value) {
+function updateCatalogSearch(cardId, value, sourceInput) {
   const card = state.cards.find((item) => item.id === cardId && item.type === "CatalogWorkspaceCard");
   if (!card) return;
   card.fields.query = value;
   persistActiveCards();
   const list = root.querySelector(".catalog-workspace-list");
-  const count = root.querySelector(".catalog-result-count");
+  const counts = root.querySelectorAll(".catalog-result-count");
   const items = catalogWorkspaceItems(pharmacyBrain.catalog, value);
   if (list) {
     list.innerHTML = items.length ? items.map(catalogWorkspaceItemTemplate).join("") : '<p class="catalog-empty">No medicines match this search.</p>';
     bindActionElements(list);
   }
-  if (count) count.textContent = `Showing ${items.length} of ${pharmacyBrain.catalog.length}`;
+  root.querySelectorAll("[data-catalog-search]").forEach((input) => {
+    if (input !== sourceInput) input.value = value;
+  });
+  counts.forEach((count) => { count.textContent = `Showing ${items.length} of ${pharmacyBrain.catalog.length}`; });
 }
 
 function saveCatalogFromReviewCard(card) {

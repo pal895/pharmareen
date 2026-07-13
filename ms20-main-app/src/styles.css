@@ -661,6 +661,15 @@ input:disabled {
   background: #fff;
 }
 
+.catalog-search-bottom {
+  display: block;
+  margin-top: 18px;
+}
+
+.catalog-result-count-bottom {
+  margin-bottom: 0;
+}
+
 .catalog-result-count {
   margin: 0;
   font-size: 0.82em;

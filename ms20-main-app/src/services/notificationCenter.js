@@ -1,3 +1,5 @@
+import { expiryDisplayLabel, expiryEndDate, normalizeExpiryValue } from "./medicineFieldSchema.js";
+
 const DEFAULT_MIN_STOCK = 5;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -38,18 +40,19 @@ export function buildDeterministicNotifications({ catalog = [], pendingCards = [
     }
 
     for (const expiryRecord of expiryRecords(item)) {
-      const expiry = parseDate(expiryRecord.expiry || expiryRecord.expiry_date || item.expiry);
+      const expiryValue = normalizeExpiryValue(expiryRecord.expiry || expiryRecord.expiry_date || item.expiry);
+      const expiry = expiryEndDate(expiryValue);
       if (!expiry) continue;
       const days = Math.ceil((expiry.getTime() - now.getTime()) / DAY_MS);
       const band = expiryBand(days);
       if (!band) continue;
       notifications.push(createNotification({
         category: "Expiry",
-        key: `expiry-${normalize(name)}-${expiry.toISOString().slice(0, 10)}-${band}`,
+        key: `expiry-${normalize(name)}-${expiryValue}-${band}`,
         title: expiryTitle(name, days),
         message: expiryRecord.batch
-          ? `Batch ${expiryRecord.batch} expires on ${expiry.toISOString().slice(0, 10)}.`
-          : `${name} expires on ${expiry.toISOString().slice(0, 10)}.`,
+          ? `Batch ${expiryRecord.batch} expires at ${expiryDisplayLabel(expiryValue)}.`
+          : `${name} expires at ${expiryDisplayLabel(expiryValue)}.`,
         action: "Review expiry"
       }));
     }
@@ -150,12 +153,6 @@ function expiryTitle(name, days) {
   if (days < 0) return `${name} has expired`;
   if (days === 0) return `${name} expires today`;
   return `${name} expires in ${days} day(s)`;
-}
-
-function parseDate(value) {
-  if (!value) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function numberOrNull(value) {

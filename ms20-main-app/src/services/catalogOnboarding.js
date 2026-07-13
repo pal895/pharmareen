@@ -1,4 +1,5 @@
 import { SupportedForms } from "../data/sourceMedicines.js";
+import { normalizeExpiryValue } from "./medicineFieldSchema.js";
 
 const CATALOG_TEXT_HEADER = "medicine | form | unit | selling price | cost price | stock | supplier | barcode | batch | expiry | strength | pack size | shelf";
 
@@ -229,7 +230,7 @@ function parseMedicineLine(line, sourceBrain) {
 
 function cleanCatalogItem(item) {
   const batch = item.batch || "";
-  const expiry = item.expiry || "";
+  const expiry = normalizeExpiryValue(item.expiry || "");
   return {
     name: titleCase(item.name || ""),
     strength: item.strength || "",

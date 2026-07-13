@@ -1,5 +1,6 @@
 import { SourceMedicineList } from "../data/sourceMedicines.js";
 import { matchMedicine, normalizeMedicineText } from "./medicineMatcher.js";
+import { normalizeExpiryValue } from "./medicineFieldSchema.js";
 
 export class PharmacyBrain {
   constructor({ pharmacyId, catalog = [], aliases = [], visualMemory = [] }) {
@@ -103,8 +104,8 @@ function normalizeCatalogItem(item) {
     costPrice: item.costPrice ?? item.cost_price ?? "",
     supplier: item.supplier || "",
     barcode: item.barcode || "",
-    batches: item.batches || [],
-    expiry: item.expiry || "",
+    batches: (item.batches || []).map((batch) => ({ ...batch, expiry: normalizeExpiryValue(batch.expiry || "") })),
+    expiry: normalizeExpiryValue(item.expiry || ""),
     shelf: item.shelf || item.location || "",
     reorderLevel: item.reorderLevel ?? item.reorder_level ?? "",
     stockLeft: item.stockLeft ?? item.current_stock ?? item.stock ?? null,

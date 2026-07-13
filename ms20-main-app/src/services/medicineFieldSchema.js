@@ -12,7 +12,7 @@ export const MEDICINE_FIELD_DEFINITIONS = Object.freeze({
   supplier: field("supplier", "Supplier", 130),
   barcode: field("barcode", "Barcode", 130),
   batch: field("batch", "Batch", 110),
-  expiry: field("expiry", "Expiry", 120),
+  expiry: field("expiry", "Expiry month (YYYY-MM)", 150),
   shelf: field("shelf", "Shelf", 110),
   reorder_level: field("reorder_level", "Reorder level", 110, "decimal"),
   aliases: field("aliases", "Aliases", 140)
@@ -64,7 +64,7 @@ export function normalizeMedicineReviewRow(row = {}) {
     selling_price: row.selling_price ?? row.sellingPrice ?? "",
     supplier: row.supplier || "",
     batch: row.batch || first(row.batches)?.batch || "",
-    expiry: row.expiry || first(row.batches)?.expiry || "",
+    expiry: normalizeExpiryValue(row.expiry || first(row.batches)?.expiry || ""),
     barcode: row.barcode || "",
     shelf: row.shelf || row.location || "",
     source: row.source || "owner_review"
@@ -84,11 +84,47 @@ export function medicineRecordFromFields(fields = {}, { source = "owner_review",
     supplier: fields.supplier || "",
     barcode: fields.barcode || "",
     batch: fields.batch || "",
-    expiry: fields.expiry || "",
+    expiry: normalizeExpiryValue(fields.expiry || ""),
     shelf: fields.shelf || "",
     aliases: fields.alias ? [fields.alias] : fields.aliases || [],
     source
   };
+}
+
+export function normalizeExpiryValue(value) {
+  const clean = String(value || "").trim();
+  if (!clean) return "";
+  const iso = /^(20\d{2})-(0[1-9]|1[0-2])(?:-(0[1-9]|[12]\d|3[01]))?$/.exec(clean);
+  if (iso) return iso[3] ? `${iso[1]}-${iso[2]}-${iso[3]}` : `${iso[1]}-${iso[2]}`;
+  const named = /^([a-z]{3,9})[\s\-/]+(\d{2}|20\d{2})$/i.exec(clean);
+  if (named) {
+    const month = monthNumber(named[1]);
+    const year = fourDigitYear(named[2]);
+    if (month && year) return `${year}-${month}`;
+  }
+  const numeric = /^(0?[1-9]|1[0-2])[\s\-/]+(\d{2}|20\d{2})$/.exec(clean);
+  if (numeric) return `${fourDigitYear(numeric[2])}-${String(Number(numeric[1])).padStart(2, "0")}`;
+  return clean;
+}
+
+export function expiryEndDate(value) {
+  const normalized = normalizeExpiryValue(value);
+  const monthOnly = /^(20\d{2})-(0[1-9]|1[0-2])$/.exec(normalized);
+  if (monthOnly) return new Date(Date.UTC(Number(monthOnly[1]), Number(monthOnly[2]), 0, 23, 59, 59, 999));
+  const fullDate = /^(20\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.exec(normalized);
+  if (!fullDate) return null;
+  const parsed = new Date(Date.UTC(Number(fullDate[1]), Number(fullDate[2]) - 1, Number(fullDate[3]), 23, 59, 59, 999));
+  return parsed.getUTCFullYear() === Number(fullDate[1]) && parsed.getUTCMonth() === Number(fullDate[2]) - 1 && parsed.getUTCDate() === Number(fullDate[3]) ? parsed : null;
+}
+
+export function expiryDisplayLabel(value) {
+  const normalized = normalizeExpiryValue(value);
+  const date = expiryEndDate(normalized);
+  if (!date) return normalized;
+  if (/^20\d{2}-\d{2}$/.test(normalized)) {
+    return `end of ${date.toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })}`;
+  }
+  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
 function field(key, label, min, inputMode) {
@@ -97,4 +133,16 @@ function field(key, label, min, inputMode) {
 
 function first(values = []) {
   return Array.isArray(values) ? values[0] || "" : "";
+}
+
+function fourDigitYear(value) {
+  const number = Number(value);
+  if (!Number.isInteger(number)) return "";
+  return String(value).length === 2 ? String(2000 + number) : String(number);
+}
+
+function monthNumber(value) {
+  const wanted = String(value || "").slice(0, 3).toLowerCase();
+  const index = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"].indexOf(wanted);
+  return index < 0 ? "" : String(index + 1).padStart(2, "0");
 }
