@@ -1,0 +1,16 @@
+{
+  "test": "Test 3 - clean bulk paste onboarding",
+  "purpose": "Verify local clean-list parsing and owner review before catalog mutation",
+  "source": "MS2.0 Source Medicine Brain",
+  "items": [
+    { "medicine": "Amitriptyline", "form": "tablet", "unit": "tablet", "selling_price": 45 },
+    { "medicine": "Artemether Lumefantrine", "form": "tablet", "unit": "tablet", "selling_price": 180 },
+    { "medicine": "Ciprofloxacin", "form": "eye drops", "unit": "eye drops", "selling_price": 250 },
+    { "medicine": "Loratadine", "form": "syrup", "unit": "syrup", "selling_price": 160 }
+  ],
+  "excluded_current_zuri_catalog": [
+    "Cefixime", "Ceftriaxone", "Salbutamol", "Metformin", "Omeprazole", "Diclofenac",
+    "Hydrocortisone", "Azithromycin", "Zinc", "Acyclovir", "Clotrimazole", "Doxycycline",
+    "Chloramphenicol", "Albendazole", "Amlodipine", "Fluconazole", "Betamethasone"
+  ]
+}

@@ -169,6 +169,9 @@ assert(cefixime.status === "matched", "Source brain did not recognize Cefixime")
 const catalogImport = parseBulkMedicineList("Cefixime tablets 120\nCeftriaxone vial 180\nZinc syrup 70", sourceBrain);
 assert(catalogImport.aiRequired === false, "Bulk import must be zero-token");
 assert(catalogImport.items.length === 3, "Bulk medicine import did not parse three lines");
+const compoundFormImport = parseBulkMedicineList("Ciprofloxacin eye drops 250", sourceBrain);
+assert(compoundFormImport.items[0]?.form === "eye drops", "Supported compound forms must not be incorrectly singularized");
+assert(compoundFormImport.items[0]?.unit === "eye drops", "Supported compound units must not be incorrectly singularized");
 const savedCatalogSummary = buildCatalogSavedSummary(catalogImport.items, catalogImport.unclear);
 assert(savedCatalogSummary.includes("saved"), "Approved catalog summary must confirm saved state");
 assert(!savedCatalogSummary.includes("ready for review"), "Approved catalog summary must not repeat review-state copy");

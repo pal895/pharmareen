@@ -419,3 +419,11 @@ Accepted additions that must remain integrated:
 - Relevant purchase, restock, invoice, and sales stages now include deterministic reviewed discounts; relevant supplier/restock stages include separately recorded purchased and bonus quantities with correct stock and cost treatment.
 - All previous accepted improvements, local-first/no-token constraints, human approval safeguards, one-action guidance, root-cause repair method, and historical records remain intact.
 - Exact current phone state: MS2.0 Operations Chat is open after returning from Downloads. Next single action: tap the `+` button at the lower left to open onboarding actions.
+
+## Test 3 clean Paste list preparation - 2026-07-13
+
+- The owner opened the `+` actions menu successfully.
+- A four-item clean paste fixture was prepared from Source Brain medicines absent from the verified 17-item Zuri Pharmacy catalog: Amitriptyline, Artemether Lumefantrine, Ciprofloxacin, and Loratadine.
+- Fixture parsing is local and zero-token; four rows parsed, with no unclear or duplicate lines.
+- Pre-live verification exposed and fixed a shared normalization defect that incorrectly changed supported compound forms such as `eye drops` to `eye drop`. Architecture verification passes with compound-form regression coverage.
+- Exact current action after deployment: with the actions menu open, tap `Paste list`.

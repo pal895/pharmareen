@@ -274,10 +274,12 @@ function inferUnit(form, sourceMatch) {
 }
 
 function normalizeForm(value) {
-  const clean = normalize(value).replace(/s$/, "");
-  if (clean === "table") return "tablet";
-  if (clean === "cap") return "capsule";
-  return clean;
+  const clean = normalize(value);
+  if (SupportedForms.includes(clean)) return clean;
+  const singular = clean.replace(/s$/, "");
+  if (singular === "table") return "tablet";
+  if (singular === "cap") return "capsule";
+  return SupportedForms.includes(singular) ? singular : clean;
 }
 
 function normalize(value) {

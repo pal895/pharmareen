@@ -16,6 +16,7 @@
 - Keep Scan again available on complete reviews, but tell owners to stop repeated scans when results differ and edit against the source. Once an owner-edited review is complete and total-consistent, treat those rows as stronger than later OCR so a rescan cannot undo verified corrections.
 - Test 2 passed through the intended safety model: local OCR supplied an editable draft, the owner corrected remaining uncertainty against the invoice, approval stayed blocked until completeness and arithmetic passed, and only then did the catalog change. External Android CSV viewer compatibility is separate from export generation; validate file contents in the dedicated export-integrity test.
 - Export lesson: a valid CSV and a professional owner-facing document are different products. Keep CSV machine-readable and test it with spreadsheet software; design Excel, PDF, and Word outputs for their purpose at the scheduled document stage. Prepare and verify Source Brain-backed fixtures before every remaining onboarding test, and keep discounts and bonus quantities deterministic, explicit, reviewed, and separately represented in canonical records.
+- Onboarding fixture lesson: verify fixtures through the same local parser before live use. Form normalization must preserve supported compound forms such as `eye drops`; singularize only when the singular value is itself a supported form, never by removing a trailing `s` indiscriminately.
 
 ## Reusable diagnosis
 
