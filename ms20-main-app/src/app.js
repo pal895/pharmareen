@@ -766,9 +766,7 @@ function bindEvents() {
     input.value = "";
   });
 
-  root.querySelectorAll("[data-action]").forEach((button) => {
-    button.addEventListener("click", () => handleAction(button.dataset));
-  });
+  bindActionElements(root);
 
   root.querySelectorAll("[data-field]").forEach((input) => {
     input.addEventListener("input", () => updateCardField(input.dataset.cardId, input.dataset.field, input.value));
@@ -804,6 +802,14 @@ function bindEvents() {
   });
   root.querySelectorAll("[data-catalog-edit-field]").forEach((input) => {
     input.addEventListener("input", () => updateCatalogEditDraft(input.dataset.cardId, input.dataset.catalogEditField, input.value));
+  });
+}
+
+function bindActionElements(scope) {
+  scope?.querySelectorAll?.("[data-action]").forEach((button) => {
+    if (button.dataset.actionBound === "true") return;
+    button.dataset.actionBound = "true";
+    button.addEventListener("click", () => handleAction(button.dataset));
   });
 }
 
@@ -1942,7 +1948,10 @@ function updateCatalogSearch(cardId, value) {
   const list = root.querySelector(".catalog-workspace-list");
   const count = root.querySelector(".catalog-result-count");
   const items = catalogWorkspaceItems(pharmacyBrain.catalog, value);
-  if (list) list.innerHTML = items.length ? items.map(catalogWorkspaceItemTemplate).join("") : '<p class="catalog-empty">No medicines match this search.</p>';
+  if (list) {
+    list.innerHTML = items.length ? items.map(catalogWorkspaceItemTemplate).join("") : '<p class="catalog-empty">No medicines match this search.</p>';
+    bindActionElements(list);
+  }
   if (count) count.textContent = `Showing ${items.length} of ${pharmacyBrain.catalog.length}`;
 }
 

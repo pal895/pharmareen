@@ -25,6 +25,7 @@ assert(catalogWorkspaceItems([{ id: "zinc", name: "Zinc", forms: ["syrup"], alia
 assert(app.includes('class="show-me-action"') && app.indexOf('class="show-me-action"') < app.indexOf('function chatScreenTemplate'), "SHOW ME must be a top-level action outside Operations Chat");
 assert(app.includes('data-action="open-catalog-medicine"'), "Catalog rows must open a Medicine Action Card");
 assert(app.includes('data-action="approve-catalog-edit"') && app.includes('data-action="cancel-catalog-edit"'), "Medicine edits need approve and discard actions");
+assert(app.includes("function bindActionElements(scope)") && app.includes("bindActionElements(list)"), "Dynamically filtered catalog results must keep their Open & edit actions bound");
 assert(css.includes("grid-template-columns: repeat(2") && css.includes(".catalog-edit-grid") && css.includes("grid-template-columns: 1fr"), "Desktop and mobile catalog editor layouts must be protected");
 
 const draft = createCatalogEditDraft(original[0]);
