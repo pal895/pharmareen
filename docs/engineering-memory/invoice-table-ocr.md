@@ -13,6 +13,7 @@
 - If a geometry row is incomplete or its buying price is not below an observed selling price, run one alternate high-contrast binary coordinate pass. Prefer an arithmetic-valid complete row with a positive selling margin, and use the other pass only to fill nonnumeric blanks such as batch. Do not pay for this pass on already coherent rows.
 - Full-page preprocessing variants can repeat the same digit confusion. For an incomplete batch or an arithmetic-valid but margin-suspicious row, crop only the named cells from the established table geometry, enlarge locally, and use field-specific OCR character sets. Accept numeric replacements only when quantity x buying price equals line total and an observed selling price remains above buying price. This is faster and safer than another whole-page pass.
 - Editable review truth must update immediately after owner corrections and again after reload. Incomplete copy must say values may be missing or incorrect and require checking every field against the invoice; arithmetic consistency enables approval but is not a claim that OCR values match the source.
+- Keep Scan again available on complete reviews, but tell owners to stop repeated scans when results differ and edit against the source. Once an owner-edited review is complete and total-consistent, treat those rows as stronger than later OCR so a rescan cannot undo verified corrections.
 
 ## Reusable diagnosis
 

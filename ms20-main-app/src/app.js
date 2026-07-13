@@ -484,7 +484,7 @@ function catalogImportTableTemplate(card) {
       <p>${invoiceMode && card.fields?.import_incomplete === "true"
         ? "Some details may be missing or incorrect. Check every field against the invoice. Approval appears only when required fields and totals are consistent."
         : invoiceMode
-          ? "Check every field against the invoice. Approve only when all information is correct."
+          ? "Check every field against the invoice. If repeated scans differ, edit the fields to match the invoice, then approve."
           : "Edit each medicine, then approve. Empty medicine names are ignored."}</p>
     </div>
   `;
@@ -564,7 +564,7 @@ function activeActionsTemplate(card) {
       <div class="card-actions">
         ${incompleteInvoice
           ? '<button data-action="capture-invoice">Scan again</button>'
-          : `<button data-action="confirm-card" data-card-id="${card.id}">${invoiceMode ? "Approve medicines" : "Approve catalog"}</button>`}
+          : `${invoiceMode ? '<button data-action="capture-invoice">Scan again</button>' : ""}<button data-action="confirm-card" data-card-id="${card.id}">${invoiceMode ? "Approve medicines" : "Approve catalog"}</button>`}
         ${invoiceMode ? "" : '<button data-action="download-template">Template</button>'}
         <button data-action="read-card" data-card-id="${card.id}">Read</button>
         ${incompleteInvoice ? "" : `<button data-action="correct-card" data-card-id="${card.id}">Correct</button>`}
@@ -1178,6 +1178,11 @@ function mergeRememberedInvoiceReview(rows, result) {
   const numericChoices = [...groups.values()].map((versions) => versions.filter(invoiceRowArithmeticValid).slice(0, 8));
   const exactSet = chooseInvoiceRowsByTotal(numericChoices, targetTotal);
   const chosenByName = new Map((exactSet || []).map((row) => [normalizeMedicineKey(row.name), row]));
+  const ownerReviewedRows = candidates
+    .filter((card) => card.fields?.invoice_owner_edited === "true")
+    .map((card) => catalogRowsForCard(card))
+    .find((candidateRows) => invoiceRowsComplete(candidateRows, targetTotal));
+  ownerReviewedRows?.forEach((row) => chosenByName.set(normalizeMedicineKey(row.name), row));
   const invoiceMonth = invoiceMonthValue(result.invoice_date || rememberedMetadata.invoice_date);
   const batchAssignments = chooseUniqueInvoiceBatches(evidence, [...groups.keys()]);
   const merged = [...groups.entries()].map(([key, versions]) => {
@@ -1199,7 +1204,7 @@ function mergeRememberedInvoiceReview(rows, result) {
     }
     return combined;
   });
-  const completeRememberedOrder = candidates.map((card) => catalogRowsForCard(card))
+  const completeRememberedOrder = ownerReviewedRows || candidates.map((card) => catalogRowsForCard(card))
     .find((candidateRows) => invoiceRowsComplete(candidateRows, targetTotal));
   const currentRowsReconcile = rows.length === groups.size && rows.every(invoiceRowArithmeticValid)
     && (!targetTotal || Math.abs(rows.reduce((sum, row) => sum + Number(row.line_total), 0) - targetTotal) < 0.01);
@@ -1580,6 +1585,7 @@ function updateCatalogImportCell(cardId, rowIndex, field, value) {
   const index = Number(rowIndex);
   if (!Number.isInteger(index) || index < 0 || index >= rows.length) return;
   rows[index][field] = value;
+  if (card.fields?.import_mode === "invoice_ocr") card.fields.invoice_owner_edited = "true";
   persistCatalogRows(card, rows);
   refreshInvoiceImportCompleteness(card, rows);
   rememberInvoiceCard(card);
@@ -1606,8 +1612,8 @@ function refreshInvoiceImportCompleteness(card, rows) {
   const complete = invoiceRowsComplete(rows, card.fields.invoice_total);
   card.fields.import_incomplete = complete ? "false" : "true";
   card.validation = complete
-    ? "Check every field against the invoice. Approve only when all information is correct."
-    : "Some details may be missing or incorrect. Check every field against the invoice before saving.";
+    ? "Check every field against the invoice. If repeated scans differ, edit the fields to match the invoice, then approve."
+    : "Some details may be missing or incorrect. Scan again once if useful; if repeated scans differ, edit every field to match the invoice before saving.";
 }
 
 function addCatalogImportRow(cardId) {
