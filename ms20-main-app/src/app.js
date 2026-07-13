@@ -482,8 +482,10 @@ function catalogImportTableTemplate(card) {
       </div>
       ${invoiceMode && card.fields?.import_incomplete === "true" ? "" : `<button class="secondary-action" type="button" data-action="add-catalog-row" data-card-id="${card.id}">Add medicine row</button>`}
       <p>${invoiceMode && card.fields?.import_incomplete === "true"
-        ? "Some details are missing. Scan again before approving."
-        : "Edit each medicine, then approve. Empty medicine names are ignored."}</p>
+        ? "Some details may be missing or incorrect. Check every field against the invoice. Approval appears only when required fields and totals are consistent."
+        : invoiceMode
+          ? "Check every field against the invoice. Approve only when all information is correct."
+          : "Edit each medicine, then approve. Empty medicine names are ignored."}</p>
     </div>
   `;
 }
@@ -650,6 +652,7 @@ function bindEvents() {
 
   root.querySelectorAll("[data-catalog-field]").forEach((input) => {
     input.addEventListener("input", () => updateCatalogImportCell(input.dataset.cardId, input.dataset.catalogRow, input.dataset.catalogField, input.value));
+    input.addEventListener("change", () => render());
   });
 
   root.querySelector("#photoInput")?.addEventListener("change", (event) => {
@@ -1466,6 +1469,11 @@ function reconcileResumeState() {
   if (catalogHasItems()) {
     removeCardsByType(["CatalogOnboardingCard"]);
   }
+  state.cards.forEach((card) => {
+    if (card.type === "CatalogImportCard" && card.fields?.import_mode === "invoice_ocr") {
+      refreshInvoiceImportCompleteness(card, catalogRowsForCard(card));
+    }
+  });
   state.onboarding.started = state.cards.some((card) => card.type === "OnboardingCard");
   persistFeed();
   persistActiveCards();
@@ -1598,8 +1606,8 @@ function refreshInvoiceImportCompleteness(card, rows) {
   const complete = invoiceRowsComplete(rows, card.fields.invoice_total);
   card.fields.import_incomplete = complete ? "false" : "true";
   card.validation = complete
-    ? "Review the list, edit if needed, then approve."
-    : "This scan is incomplete and cannot be approved. Check the missing fields or scan again.";
+    ? "Check every field against the invoice. Approve only when all information is correct."
+    : "Some details may be missing or incorrect. Check every field against the invoice before saving.";
 }
 
 function addCatalogImportRow(cardId) {

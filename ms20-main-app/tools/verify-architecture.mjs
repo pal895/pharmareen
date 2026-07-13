@@ -220,6 +220,9 @@ assert(appSource.includes("INVOICE_MEMORY_KEY"), "Cancelled invoice reviews must
 assert(appSource.includes('invoiceSummaryTemplate(card)'), "Invoice review must show invoice-level metadata once");
 assert(appSource.includes('This scan is incomplete and cannot be approved.'), "Incomplete invoice review must explain the blocked approval plainly");
 assert(appSource.includes('This scan is incomplete. Scan again before saving anything.'), "Blocked invoice must not tell the owner to approve");
+assert(appSource.includes('Some details may be missing or incorrect. Check every field against the invoice.'), "Invoice review must honestly warn about missing and incorrect OCR values");
+assert(appSource.includes('input.addEventListener("change", () => render())'), "Invoice approval state must rerender after owner edits");
+assert(appSource.includes('refreshInvoiceImportCompleteness(card, catalogRowsForCard(card))'), "Persisted invoice edits must recompute approval state after reload");
 assert(appSource.includes('response.headers.get("content-type")'), "Invoice scan errors must not expose raw JSON parser failures");
 assert(appSource.includes('mergeRememberedInvoiceReview(rows, result)'), "Repeated scans of the same invoice must reuse stronger prior local evidence");
 assert(appSource.includes('invoiceRowsComplete(rows, result.invoice_total)'), "Remembered invoice evidence must pass row arithmetic and total checks before approval");
