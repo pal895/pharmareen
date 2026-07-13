@@ -14,6 +14,7 @@
 - Full-page preprocessing variants can repeat the same digit confusion. For an incomplete batch or an arithmetic-valid but margin-suspicious row, crop only the named cells from the established table geometry, enlarge locally, and use field-specific OCR character sets. Accept numeric replacements only when quantity x buying price equals line total and an observed selling price remains above buying price. This is faster and safer than another whole-page pass.
 - Editable review truth must update immediately after owner corrections and again after reload. Incomplete copy must say values may be missing or incorrect and require checking every field against the invoice; arithmetic consistency enables approval but is not a claim that OCR values match the source.
 - Keep Scan again available on complete reviews, but tell owners to stop repeated scans when results differ and edit against the source. Once an owner-edited review is complete and total-consistent, treat those rows as stronger than later OCR so a rescan cannot undo verified corrections.
+- Test 2 passed through the intended safety model: local OCR supplied an editable draft, the owner corrected remaining uncertainty against the invoice, approval stayed blocked until completeness and arithmetic passed, and only then did the catalog change. External Android CSV viewer compatibility is separate from export generation; validate file contents in the dedicated export-integrity test.
 
 ## Reusable diagnosis
 

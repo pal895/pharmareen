@@ -158,7 +158,7 @@ Pass criteria:
 Numbered live status:
 
 - Test 1 — AfyaLink supplier invoice/photo onboarding: PASSED and preserved.
-- Test 2 — Dawa Bora second supplier invoice consistency: asset preparation complete; live test paused before acquiring the file.
+- Test 2 — Dawa Bora second supplier invoice consistency: PASSED after editable review. Four medicines saved, catalog count reached 17, refresh persistence passed, and CSV download completed. Do not repeat without regression evidence.
 
 Test:
 

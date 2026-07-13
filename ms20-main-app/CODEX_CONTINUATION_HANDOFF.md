@@ -398,3 +398,13 @@ Accepted additions that must remain integrated:
 - The local reader now preserves more landscape resolution, uses sparse-text segmentation only as a zero-row fallback, and assigns values from named table columns by geometry so extra numeric columns cannot become quantity, cost, or line total.
 - Focused invoice OCR tests: 13 passed. Main App architecture verification: passed. OpenAI/API usage: zero.
 - Exact pause: deploy the new commit to Replit, then repeat only the interrupted Test 2 capture. Do not repeat Test 1.
+
+## Test 2 completion update - 2026-07-13
+
+- Dawa Bora landscape invoice live test passed after editable human review.
+- All header fields and four source-order medicines were confirmed against the source.
+- Owner corrected remaining uncertain values before approval; approval stayed blocked until required fields and arithmetic reconciled.
+- Four medicines saved, catalog count increased from 13 to 17, refresh persistence passed, and CSV download completed.
+- The installed Android document reader did not open the CSV; this is an external viewer observation. CSV content integrity remains scheduled for its dedicated test.
+- TEST 2: PASSED. Do not repeat it without concrete regression evidence.
+- Exact pause: Android Downloads screen showing the downloaded catalog CSV. Next single action is to return to MS2.0.
