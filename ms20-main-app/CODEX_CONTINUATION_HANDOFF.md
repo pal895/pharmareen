@@ -408,3 +408,14 @@ Accepted additions that must remain integrated:
 - The installed Android document reader did not open the CSV; this is an external viewer observation. CSV content integrity remains scheduled for its dedicated test.
 - TEST 2: PASSED. Do not repeat it without concrete regression evidence.
 - Exact pause: Android Downloads screen showing the downloaded catalog CSV. Next single action is to return to MS2.0.
+
+## Roadmap improvement integrated - 2026-07-13
+
+- The owner returned from Android Downloads to the MS2.0 Operations Chat. Test 2 remains passed and must not be repeated without regression evidence.
+- Current active sequence is unchanged: continue from the next not-yet-tested onboarding method, preparing its verified Source Brain-backed fixture before asking the owner to supply data.
+- Future export/document stage now requires purpose-designed, professional, readable Excel/PDF/Word outputs where supported, while CSV remains a verified machine-readable format explicitly recommended for spreadsheet apps. This applies across catalog, inventory, onboarding, supplier/purchase, stock, reporting, financial, correction, and reconciliation documents.
+- Every remaining onboarding option must receive a realistic, verified test asset first: existing Zuri medicines excluded when additions are intended, medicines verified in Source Brain, format and arithmetic checked, route confirmed, and repository commit pushed when applicable.
+- Existing operations stages now include comprehensive restocking coverage across commands, cards, invoices, scans, editable review, delivery, offline/sync, conversions, prices, supplier/batch/expiry, duplicates, corrections, persistence, and reports.
+- Relevant purchase, restock, invoice, and sales stages now include deterministic reviewed discounts; relevant supplier/restock stages include separately recorded purchased and bonus quantities with correct stock and cost treatment.
+- All previous accepted improvements, local-first/no-token constraints, human approval safeguards, one-action guidance, root-cause repair method, and historical records remain intact.
+- Exact current phone state: MS2.0 Operations Chat is open after returning from Downloads. Next single action: tap the `+` button at the lower left to open onboarding actions.
