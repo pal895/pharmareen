@@ -219,8 +219,8 @@ const editedCatalog = applyApprovedCatalogEdit(pharmacyBrain.catalog, editDraft.
 assert(editedCatalog.catalog.length === 4 && editedCatalog.updated.sellingPrice === "125", "Approved catalog edit must update without duplicating");
 assert(pharmacyBrain.findMedicine("Ceftriaxone").status === "matched", "Catalog upsert lookup failed for added medicine");
 const spellingMatch = pharmacyBrain.findMedicine("Cefimixe");
-assert(spellingMatch.status === "matched" && spellingMatch.matchType === "spelling_variation", "Unique catalog spelling variation should match locally");
-assert(pharmacyBrain.findMedicine("Meta").status === "not_in_catalog", "Short partial names must not fuzzy-match catalog medicines");
+assert(spellingMatch.status === "matched" && spellingMatch.matchType === "close_spelling", "Unique catalog spelling variation should match through the shared local matcher");
+assert(pharmacyBrain.findMedicine("Metf").matches[0].name === "Metformin", "Safe partial names should resolve through the shared local matcher");
 const spellingSale = parseLocalCommand("Cefimixe 1 cash", pharmacyBrain.catalog);
 assert(spellingSale.fields.medicine === "Cefixime", "Spelling variation sale must use the saved catalog medicine name");
 assert(Number(spellingSale.fields.stockLeft) === 20, "Sale parse must carry saved catalog stock into the local action");

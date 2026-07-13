@@ -86,30 +86,9 @@ export function catalogWorkspaceItems(catalog = [], query = "") {
     const key = normalize(item.name || item.medicine);
     if (key && !unique.has(key)) unique.set(key, item);
   }
-  const wanted = normalize(query);
-  return [...unique.values()]
-    .filter((item) => !wanted || matchesSearch(searchableText(item), wanted))
-    .sort((left, right) => String(left.name || left.medicine).localeCompare(String(right.name || right.medicine)));
-}
-
-function matchesSearch(text, wanted) {
-  if (text.includes(wanted) || text.replace(/\s/g, "").includes(wanted.replace(/\s/g, ""))) return true;
-  if (wanted.length < 5 || wanted.includes(" ")) return false;
-  return text.split(" ").some((word) => word.length >= 5 && editDistanceWithin(word, wanted, Math.max(word.length, wanted.length) >= 8 ? 2 : 1));
-}
-
-function editDistanceWithin(left, right, limit) {
-  if (Math.abs(left.length - right.length) > limit) return false;
-  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
-  for (let row = 1; row <= left.length; row += 1) {
-    const current = [row];
-    for (let column = 1; column <= right.length; column += 1) {
-      const cost = left[row - 1] === right[column - 1] ? 0 : 1;
-      current[column] = Math.min(current[column - 1] + 1, previous[column] + 1, previous[column - 1] + cost);
-    }
-    previous = current;
-  }
-  return previous[right.length] <= limit;
+  const items = [...unique.values()];
+  if (!normalize(query)) return items.sort((left, right) => String(left.name || left.medicine).localeCompare(String(right.name || right.medicine)));
+  return rankMedicineMatches(query, items, { limit: items.length }).map((entry) => entry.medicine);
 }
 
 function searchableText(item) {
@@ -129,5 +108,6 @@ function searchableText(item) {
 }
 
 function normalize(value) {
-  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+  return normalizeMedicineText(value);
 }
+import { rankMedicineMatches, normalizeMedicineText } from "./medicineMatcher.js";

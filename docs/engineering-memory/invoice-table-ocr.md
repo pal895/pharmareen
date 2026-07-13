@@ -70,3 +70,9 @@ OCR review must have an exit from uncertainty. Preserve a canonical card's valid
 ## Catalog access and safe editing
 
 Pharmacy owners must not need to remember chat commands to view their medicines. Keep a permanent `SHOW ME` workspace action outside Operations Chat and load its contents only from the persisted Pharmacy Catalog. Catalog rows open Medicine Action Cards whose edits remain drafts until explicit approval. Discard leaves persisted data untouched; approval updates the existing canonical record, and an identity change that collides with another catalog medicine is blocked rather than silently merged. Browsing, search, review, validation, and ordinary edits stay deterministic, local, and zero-token.
+
+## Centralized medicine recognition and section-based testing
+
+Medicine recognition must be centralized, local-first, confidence-ranked, and tolerant of normal human input. A friction found with one medicine represents a behavior class. Fix the shared recognition engine once, protect it with broad regression tests, and avoid repeating equivalent live tests with many medicines. Catalog search, chat, onboarding/import, sales, restock, stock enquiry, and speech-recognized text must use the same normalizer and ranked resolver; ordinary recognition remains deterministic, offline-capable, and zero-token. High-confidence matches may be surfaced prominently, close alternatives remain an explicit ranked choice, and low-confidence input must not silently change a canonical record.
+
+Permanent test method: test in sections with representative examples; identify and fix the shared root cause; preserve passing behavior; add reusable regression coverage; verify confidence with one or two live examples; close the behavior class; then move to a different test section. Do not repeat the same class without new regression evidence.
