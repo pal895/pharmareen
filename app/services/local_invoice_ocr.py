@@ -34,13 +34,7 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
                 pytesseract.image_to_string(image, config="--psm 4"),
             ]
             primary_text_order = _medicine_order_from_text(ocr_texts[0])
-            word_data = pytesseract.image_to_data(image, config="--psm 6", output_type=pytesseract.Output.DICT)
-            geometry_rows = reconstruct_bounded_invoice_rows(word_data)
-            if not geometry_rows:
-                sparse_data = pytesseract.image_to_data(image, config="--psm 11", output_type=pytesseract.Output.DICT)
-                if reconstruct_bounded_invoice_rows(sparse_data):
-                    word_data = sparse_data
-                    geometry_rows = reconstruct_bounded_invoice_rows(word_data)
+            word_data, geometry_rows = _read_oriented_invoice_words(image, pytesseract)
             geometry_text = "\n".join(geometry_rows)
             if geometry_text:
                 ocr_texts.append(geometry_text)
@@ -114,6 +108,25 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
     if not extraction.get("items"):
         extraction["message"] = "I could not find clear medicine rows. Try a clearer photo."
     return extraction
+
+
+def _read_oriented_invoice_words(image: Image.Image, pytesseract: Any) -> tuple[dict[str, list[Any]], list[str]]:
+    """Retry expensive sparse/rotated OCR only when the normal orientation has no medicine anchors."""
+    attempts = [(image, "--psm 6"), (image, "--psm 11")]
+    attempts.extend((image.transpose(rotation), "--psm 11") for rotation in (
+        Image.Transpose.ROTATE_90,
+        Image.Transpose.ROTATE_270,
+        Image.Transpose.ROTATE_180,
+    ))
+    first_data: dict[str, list[Any]] = {}
+    for attempt_image, config in attempts:
+        data = pytesseract.image_to_data(attempt_image, config=config, output_type=pytesseract.Output.DICT)
+        if not first_data:
+            first_data = data
+        rows = reconstruct_bounded_invoice_rows(data)
+        if rows:
+            return data, rows
+    return first_data, []
 
 
 def reconstruct_invoice_rows_from_word_positions(data: dict[str, list[Any]]) -> list[str]:

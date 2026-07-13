@@ -1056,7 +1056,8 @@ async function captureLightweightCameraFrame() {
     if (status) status.textContent = state.camera.status;
     return;
   }
-  const scale = Math.min(1, 1800 / Math.max(video.videoWidth, video.videoHeight));
+  const readingEdge = video.videoWidth > video.videoHeight ? 2400 : 1800;
+  const scale = Math.min(1, readingEdge / Math.max(video.videoWidth, video.videoHeight));
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
   canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
@@ -1368,7 +1369,8 @@ function invoiceRowsComplete(rows, invoiceTotal) {
 
 async function resizeImageForReading(file) {
   const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
+  const readingEdge = bitmap.width > bitmap.height ? 2400 : 1800;
+  const scale = Math.min(1, readingEdge / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(bitmap.width * scale));
   canvas.height = Math.max(1, Math.round(bitmap.height * scale));

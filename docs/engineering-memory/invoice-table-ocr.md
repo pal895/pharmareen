@@ -6,6 +6,7 @@
 - Preserve strongest-evidence merging, medicine-scoped evidence, total consistency, editable correction, and manual row-order controls as the regression baseline.
 - Test 2 is the required final consistency invoice. Its asset is `ms20-main-app/fixtures/test-2-dawa-bora-invoice.png`, backed by a verified manifest and new Source Brain medicines excluded from Zuri Pharmacy's 13-item catalog.
 - Test 2's first two landscape phone captures found no rows. The reusable cause was layout diversity: strength, pack-size, and selling-price columns make numeric token order unsafe, and a single dense-block OCR segmentation can miss wide sparse tables. Preserve more landscape resolution, retry sparse segmentation only when row anchors are absent, and parse named columns by x-position.
+- A sideways browser camera capture may rotate the visible preview without writing EXIF orientation into its canvas JPEG. If normal and sparse OCR find no medicine anchors, retry the local coordinate pass at 90, 270, then 180 degrees and stop at the first anchored orientation. Keep these extra passes out of the successful fast path.
 
 ## Reusable diagnosis
 

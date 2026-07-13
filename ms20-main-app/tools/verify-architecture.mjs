@@ -211,7 +211,7 @@ assert(appSource.includes('invoiceMode ? "Approve medicines" : "Approve catalog"
 assert(appSource.includes('state.voice.status = "Reading invoice…"'), "Invoice capture must show immediate progress feedback");
 assert(appSource.includes("openLightweightCamera"), "Camera actions must use the memory-safe in-app camera");
 assert(appSource.includes('width: { ideal: 1920, max: 1920 }'), "In-app camera must keep invoice text readable while limiting capture resolution");
-assert(appSource.includes('Math.min(1, 1800 / Math.max(video.videoWidth, video.videoHeight))'), "Invoice capture must preserve enough detail for local OCR");
+assert(appSource.includes('const readingEdge = video.videoWidth > video.videoHeight ? 2400 : 1800'), "Invoice capture must preserve enough landscape detail for local OCR");
 assert(appSource.includes('card.fields.import_incomplete'), "Incomplete local invoice reads must be marked unsafe to approve");
 assert(appSource.includes('const INVOICE_TABLE_COLUMNS'), "Invoice review must use purchase-specific fields");
 assert(appSource.includes('line_total: item.line_total'), "Invoice review must expose line totals for owner cross-checking");

@@ -1,4 +1,4 @@
-from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _fill_unique_source_pair_fields, _invoice_date_from_text, _invoice_number_from_text, _invoice_total_from_text, _medicine_order_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, extract_geometry_table_items, extract_positioned_row_fields, merge_source_brain_invoice_items, reconstruct_bounded_invoice_rows, reconstruct_invoice_rows_from_word_positions
+from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _fill_unique_source_pair_fields, _invoice_date_from_text, _invoice_number_from_text, _invoice_total_from_text, _medicine_order_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, _read_oriented_invoice_words, extract_geometry_table_items, extract_positioned_row_fields, merge_source_brain_invoice_items, reconstruct_bounded_invoice_rows, reconstruct_invoice_rows_from_word_positions
 
 
 def test_multiple_ocr_passes_merge_all_canonical_invoice_rows_and_fields():
@@ -177,3 +177,27 @@ def test_geometry_columns_ignore_strength_pack_size_and_selling_price():
         "quantity": 30, "unit_cost": 35.0, "line_total": 1050.0,
         "batch_number": "ALB-4C7", "expiry_date": "2028-11", "confidence": 0.94,
     }]
+
+
+def test_sideways_canvas_capture_is_rotated_only_after_normal_passes_find_no_rows():
+    from PIL import Image
+
+    empty = {"text": [], "left": [], "top": [], "width": [], "height": []}
+    row = {"text": ["Albendazole"], "left": [10], "top": [10], "width": [80], "height": [20]}
+
+    class FakeTesseract:
+        class Output:
+            DICT = "dict"
+
+        def __init__(self):
+            self.calls = 0
+
+        def image_to_data(self, _image, **_kwargs):
+            self.calls += 1
+            return row if self.calls == 3 else empty
+
+    reader = FakeTesseract()
+    data, rows = _read_oriented_invoice_words(Image.new("L", (100, 200)), reader)
+    assert data is row
+    assert rows == ["Albendazole"]
+    assert reader.calls == 3
