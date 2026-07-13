@@ -1,0 +1,5 @@
+medicine,strength,form,unit,selling_price,cost_price,stock,supplier,barcode,batch,expiry
+Aspirin,75 mg,tablet,tablet,10,6,50,AfyaCare Distributors,,ASP-75A,2028-10
+Atenolol,50 mg,tablet,tablet,20,12,40,AfyaCare Distributors,,ATE-50B,2029-02
+Erythromycin,250 mg,tablet,tablet,35,22,30,AfyaCare Distributors,,ERY-25C,2028-06
+Folic Acid,5 mg,tablet,tablet,8,4,60,AfyaCare Distributors,,FOL-05D,2029-01

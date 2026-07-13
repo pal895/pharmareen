@@ -1,0 +1,14 @@
+{
+  "test": "Test 4 - CSV file onboarding",
+  "purpose": "Verify zero-token CSV parsing, editable review, approval, deduplication, and catalog persistence",
+  "source": "MS2.0 Source Medicine Brain",
+  "supplier": "AfyaCare Distributors",
+  "items": [
+    { "medicine": "Aspirin", "strength": "75 mg", "form": "tablet", "unit": "tablet", "selling_price": 10, "cost_price": 6, "stock": 50, "batch": "ASP-75A", "expiry": "2028-10" },
+    { "medicine": "Atenolol", "strength": "50 mg", "form": "tablet", "unit": "tablet", "selling_price": 20, "cost_price": 12, "stock": 40, "batch": "ATE-50B", "expiry": "2029-02" },
+    { "medicine": "Erythromycin", "strength": "250 mg", "form": "tablet", "unit": "tablet", "selling_price": 35, "cost_price": 22, "stock": 30, "batch": "ERY-25C", "expiry": "2028-06" },
+    { "medicine": "Folic Acid", "strength": "5 mg", "form": "tablet", "unit": "tablet", "selling_price": 8, "cost_price": 4, "stock": 60, "batch": "FOL-05D", "expiry": "2029-01" }
+  ],
+  "verified_absent_from_21_item_catalog": true,
+  "ai_required": false
+}
