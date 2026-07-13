@@ -78,3 +78,6 @@ Medicine recognition must be centralized, local-first, confidence-ranked, and to
 Permanent test method: test in sections with representative examples; identify and fix the shared root cause; preserve passing behavior; add reusable regression coverage; verify confidence with one or two live examples; close the behavior class; then move to a different test section. Do not repeat the same class without new regression evidence.
 
 Dynamic result lists must rebind their interactive actions after replacing HTML. A visually correct result is not complete unless its primary action remains operable after search, filtering, rescanning, or any other partial rerender.
+### Catalog multi-term search intent
+
+Catalog filtering must require every normalized query term to match the same saved medicine. An average fuzzy score can otherwise admit an unrelated medicine because it shares a generic form such as `syrup`. Keep this strict browse-search constraint separate from the general medicine matcher, whose ranked alternatives are still needed for safe sale and restock ambiguity handling.

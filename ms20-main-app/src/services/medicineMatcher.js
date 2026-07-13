@@ -22,12 +22,12 @@ export function normalizeMedicineText(value) {
     .join(" ");
 }
 
-export function rankMedicineMatches(query, medicines = [], { limit = 5 } = {}) {
+export function rankMedicineMatches(query, medicines = [], { limit = 5, requireAllTerms = false } = {}) {
   const wanted = normalizeMedicineText(query);
   if (!wanted) return [];
   return medicines
     .map((medicine) => scoreMedicine(wanted, medicine))
-    .filter((entry) => entry.score >= 0.42)
+    .filter((entry) => entry.score >= 0.42 && (!requireAllTerms || entry.matchesAllTerms))
     .sort((left, right) => right.score - left.score || left.name.localeCompare(right.name))
     .slice(0, limit);
 }
@@ -60,7 +60,7 @@ export function matchMedicine(query, medicines = []) {
 
 function scoreMedicine(wanted, medicine) {
   const labels = medicineLabels(medicine);
-  let best = { score: 0, reason: "nearby" };
+  let best = { score: 0, reason: "nearby", matchesAllTerms: false };
   for (const label of labels) {
     const result = scoreLabel(wanted, label);
     if (result.score > best.score) best = result;
@@ -82,13 +82,13 @@ function medicineLabels(medicine) {
 }
 
 function scoreLabel(wanted, label) {
-  if (wanted === label) return { score: 1, reason: "exact" };
+  if (wanted === label) return { score: 1, reason: "exact", matchesAllTerms: true };
   const compactWanted = wanted.replace(/\s/g, "");
   const compactLabel = label.replace(/\s/g, "");
-  if (compactWanted === compactLabel) return { score: 0.99, reason: "normalized" };
-  if (label.startsWith(wanted) && wanted.length >= 3) return { score: 0.93, reason: "prefix" };
-  if (label.includes(wanted) && wanted.length >= 3) return { score: 0.9, reason: "partial" };
-  if (compactLabel.includes(compactWanted) && compactWanted.length >= 4) return { score: 0.89, reason: "compact_partial" };
+  if (compactWanted === compactLabel) return { score: 0.99, reason: "normalized", matchesAllTerms: true };
+  if (label.startsWith(wanted) && wanted.length >= 3) return { score: 0.93, reason: "prefix", matchesAllTerms: true };
+  if (label.includes(wanted) && wanted.length >= 3) return { score: 0.9, reason: "partial", matchesAllTerms: true };
+  if (compactLabel.includes(compactWanted) && compactWanted.length >= 4) return { score: 0.89, reason: "compact_partial", matchesAllTerms: true };
 
   const wantedTokens = wanted.split(" ");
   const labelTokens = label.split(" ");
@@ -96,10 +96,14 @@ function scoreLabel(wanted, label) {
   const coverage = tokenScores.reduce((sum, value) => sum + value, 0) / tokenScores.length;
   const strongTokens = tokenScores.filter((value) => value >= 0.74).length / tokenScores.length;
   const orderIndependentExact = wantedTokens.every((token) => labelTokens.includes(token));
-  if (orderIndependentExact) return { score: 0.95, reason: "token_order" };
+  if (orderIndependentExact) return { score: 0.95, reason: "token_order", matchesAllTerms: true };
   const lengthBalance = Math.min(compactWanted.length, compactLabel.length) / Math.max(compactWanted.length, compactLabel.length);
   const score = coverage * 0.7 + strongTokens * 0.2 + lengthBalance * 0.1;
-  return { score: Math.min(0.91, score), reason: score >= 0.72 ? "close_spelling" : "nearby" };
+  return {
+    score: Math.min(0.91, score),
+    reason: score >= 0.72 ? "close_spelling" : "nearby",
+    matchesAllTerms: tokenScores.every((value) => value >= 0.74)
+  };
 }
 
 function tokenSimilarity(left, right) {

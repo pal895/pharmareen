@@ -88,7 +88,7 @@ export function catalogWorkspaceItems(catalog = [], query = "") {
   }
   const items = [...unique.values()];
   if (!normalize(query)) return items.sort((left, right) => String(left.name || left.medicine).localeCompare(String(right.name || right.medicine)));
-  return rankMedicineMatches(query, items, { limit: items.length }).map((entry) => entry.medicine);
+  return rankMedicineMatches(query, items, { limit: items.length, requireAllTerms: true }).map((entry) => entry.medicine);
 }
 
 function searchableText(item) {

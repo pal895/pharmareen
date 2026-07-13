@@ -22,6 +22,11 @@ const card = createCatalogWorkspaceCard(original.length);
 assert(card.aiRequired === false, "Catalog workspace must remain zero-token");
 assert(catalogWorkspaceItems(original, "Cefimixe").length === 1, "Catalog search must recognize a safe common misspelling locally");
 assert(catalogWorkspaceItems([{ id: "zinc", name: "Zinc", forms: ["syrup"], aliases: ["Zinc syrup"] }], "zinc sirup").length === 1, "Catalog search must use the shared multi-word medicine matcher");
+const syrupCatalog = [
+  { id: "zinc", name: "Zinc", forms: ["syrup"], aliases: ["Zinc syrup"] },
+  { id: "loratadine", name: "Loratadine", forms: ["syrup"] }
+];
+assert(catalogWorkspaceItems(syrupCatalog, "zinc sirup").map((item) => item.id).join() === "zinc", "Multi-term catalog search must not include medicines matching only a generic form term");
 assert(app.includes('class="show-me-action"') && app.indexOf('class="show-me-action"') < app.indexOf('function chatScreenTemplate'), "SHOW ME must be a top-level action outside Operations Chat");
 assert(app.includes('data-action="open-catalog-medicine"'), "Catalog rows must open a Medicine Action Card");
 assert(app.includes('data-action="approve-catalog-edit"') && app.includes('data-action="cancel-catalog-edit"'), "Medicine edits need approve and discard actions");
