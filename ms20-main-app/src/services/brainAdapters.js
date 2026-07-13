@@ -9,7 +9,8 @@ export class PharmacyBrain {
   }
 
   loadCatalog(items) {
-    this.catalog = items.map((item) => normalizeCatalogItem(item));
+    this.catalog = [];
+    items.forEach((item) => this.upsertCatalogItem(item));
     return this.catalog;
   }
 
@@ -147,6 +148,7 @@ function normalizeCatalogItem(item) {
   return {
     id: item.id || `catalog-${normalize(item.name || item.medicine)}-${Date.now()}`,
     name: item.name || item.medicine || "",
+    strength: item.strength || "",
     aliases: item.aliases || [],
     forms: item.forms || (item.form ? [item.form] : []),
     units: item.units || (item.unit ? [item.unit] : []),
@@ -173,6 +175,7 @@ function mergeCatalogItems(existing, incoming) {
     units: unique([...(existing.units || []), ...(incoming.units || [])]),
     packSizes: unique([...(existing.packSizes || []), ...(incoming.packSizes || [])]),
     batches: [...(existing.batches || []), ...(incoming.batches || [])].filter(Boolean),
+    strength: incoming.strength || existing.strength || "",
     stockLeft: incoming.stockLeft ?? existing.stockLeft
   };
 }

@@ -20,6 +20,7 @@ const requiredFiles = [
   "src/services/catalogOnboarding.js",
   "src/services/notificationCenter.js",
   "src/services/documentGenerator.js",
+  "src/services/catalogWorkspace.js",
   "src/services/liveBackendGateway.js",
   "src/services/backendAdapters.js",
   "src/routes/routeRegistry.js",
@@ -42,6 +43,7 @@ const requiredCards = [
   "VisualScanCard",
   "CatalogOnboardingCard",
   "CatalogImportCard",
+  "CatalogWorkspaceCard",
   "ImportMappingCard",
   "NotificationCard",
   "DocumentExportCard",
@@ -73,6 +75,10 @@ assert(html.includes("MS2.0 Main App"), "HTML title is not branded MS2.0");
 assert(!appSource.includes(oldBrand), "User-facing app source still contains old brand");
 assert(!html.includes(oldBrand), "HTML still contains old brand");
 assert(css.includes("@media (max-width: 720px)"), "Mobile responsive layout missing");
+assert(appSource.includes('data-action="open-catalog"'), "Saved catalog is not directly accessible from the home screen");
+assert(appSource.includes("showCatalogWorkspace();"), "Successful onboarding does not lead into the catalog workspace");
+assert(css.includes(".catalog-workspace-list") && css.includes("grid-template-columns: 1fr"), "Catalog workspace mobile layout protection missing");
+assert(css.includes("repeat(2, minmax(0, 1fr))"), "Catalog workspace desktop layout protection missing");
 assert(appSource.includes("chatHomeTemplate"), "Messaging app home missing");
 assert(appSource.includes("chatScreenTemplate"), "Messaging app conversation screen missing");
 assert(appSource.includes("Notifications"), "Separate Notifications workspace missing");
@@ -150,6 +156,7 @@ const { SourceBrain, PharmacyBrain } = await import(pathToFileURL(path.join(root
 const { createPasteImportCard, parseBulkMedicineList, parseDelimitedInventory, partitionCatalogItems, buildCatalogSavedSummary } = await import(pathToFileURL(path.join(root, "src/services/catalogOnboarding.js")));
 const { buildDeterministicNotifications, mergeNotifications } = await import(pathToFileURL(path.join(root, "src/services/notificationCenter.js")));
 const { buildCatalogCsv, buildBulkPasteTemplate } = await import(pathToFileURL(path.join(root, "src/services/documentGenerator.js")));
+const { createCatalogWorkspaceCard, catalogWorkspaceItems } = await import(pathToFileURL(path.join(root, "src/services/catalogWorkspace.js")));
 
 const sale = parseLocalCommand("panadol2cash");
 assert(sale.kind === "sale", "Demo text command did not create a sale parse");
@@ -198,6 +205,13 @@ pharmacyBrain.upsertCatalogItem({ name: "Cefixime", form: "tablet", selling_pric
 pharmacyBrain.upsertCatalogItem({ name: "Ceftriaxone", form: "vial", selling_price: "180", stock: "12" });
 pharmacyBrain.upsertCatalogItem({ name: "Salbutamol", form: "inhaler", selling_price: "250", stock: "5" });
 assert(pharmacyBrain.catalog.length === 4, "Catalog upsert must append medicines without replacing previous records");
+pharmacyBrain.loadCatalog([...pharmacyBrain.catalog, { name: "Cefixime", strength: "400 mg" }]);
+assert(pharmacyBrain.catalog.length === 4, "Catalog recovery must merge duplicate medicine identities");
+assert(pharmacyBrain.findMedicine("Cefixime").matches[0].strength === "400 mg", "Catalog recovery must preserve medicine strength");
+const workspaceCard = createCatalogWorkspaceCard(pharmacyBrain.catalog.length);
+assert(workspaceCard.fields.item_count === "4" && workspaceCard.aiRequired === false, "Catalog workspace must reference the saved catalog without AI");
+const workspaceItems = catalogWorkspaceItems(pharmacyBrain.catalog, "vial");
+assert(workspaceItems.length === 1 && workspaceItems[0].name === "Ceftriaxone", "Catalog workspace search must filter saved medicines locally");
 assert(pharmacyBrain.findMedicine("Ceftriaxone").status === "matched", "Catalog upsert lookup failed for added medicine");
 const spellingMatch = pharmacyBrain.findMedicine("Cefimixe");
 assert(spellingMatch.status === "matched" && spellingMatch.matchType === "spelling_variation", "Unique catalog spelling variation should match locally");

@@ -18,6 +18,7 @@ import {
 } from "./services/catalogOnboarding.js";
 import { buildDeterministicNotifications, mergeNotifications, notificationToCard } from "./services/notificationCenter.js";
 import { buildCatalogCsv, buildBulkPasteTemplate, buildDocumentCard, downloadTextFile } from "./services/documentGenerator.js";
+import { createCatalogWorkspaceCard, catalogWorkspaceItems } from "./services/catalogWorkspace.js";
 import { cardFieldsFor, createEditableCard, paymentOptions, quantityBumps } from "./cards/editableCards.js";
 import { resolveStockCheck } from "./services/localIntelligence.js";
 import { listRouteSlots, resolveOfflineSlot } from "./routes/routeRegistry.js";
@@ -84,6 +85,7 @@ const DURABLE_CARD_TYPES = new Set([
   "VisualScanCard",
   "CatalogOnboardingCard",
   "CatalogImportCard",
+  "CatalogWorkspaceCard",
   "ImportMappingCard",
   "DocumentExportCard",
   "SyncReviewCard"
@@ -209,6 +211,17 @@ function chatHomeTemplate() {
         </span>
         <span class="row-arrow">Open</span>
       </button>
+      ${pharmacyBrain.catalog.length ? `
+        <button class="conversation-row catalog-row" type="button" data-action="open-catalog" aria-label="Open pharmacy catalog">
+          <span class="assistant-avatar catalog-avatar">${pharmacyBrain.catalog.length}</span>
+          <span class="conversation-copy">
+            <strong>Pharmacy catalog</strong>
+            <small>${pharmacyBrain.catalog.length} medicines</small>
+            <span>Search and review the complete saved catalog.</span>
+          </span>
+          <span class="row-arrow">Open</span>
+        </button>
+      ` : ""}
     </section>
   `;
 }
@@ -411,6 +424,7 @@ function cardTemplate(card) {
 }
 
 function cardBodyTemplate(card, displayed) {
+  if (card.type === "CatalogWorkspaceCard") return catalogWorkspaceTemplate(card);
   if (card.type === "CatalogOnboardingCard") {
     return `
       <div class="catalog-onboarding-prompt">
@@ -430,6 +444,14 @@ function cardBodyTemplate(card, displayed) {
   if (card.type === "CatalogImportCard") {
     return catalogImportTableTemplate(card);
   }
+  if (card.type === "CatalogWorkspaceCard") {
+    return `
+      <div class="card-actions">
+        <button data-action="export-catalog-csv">Export CSV</button>
+        <button data-action="dismiss-card" data-card-id="${card.id}">Close catalog</button>
+      </div>
+    `;
+  }
   if (MEDICINE_DETAIL_CARD_TYPES.has(card.type)) {
     return medicineDetailTemplate(card, displayed);
   }
@@ -437,6 +459,59 @@ function cardBodyTemplate(card, displayed) {
     <div class="field-grid">
       ${displayed.map((field) => fieldTemplate(card, field)).join("")}
     </div>
+  `;
+}
+
+function catalogWorkspaceTemplate(card) {
+  const query = card.fields?.query || "";
+  const items = catalogWorkspaceItems(pharmacyBrain.catalog, query);
+  return `
+    <section class="catalog-workspace" aria-label="Complete pharmacy catalog">
+      <div class="catalog-workspace-summary">
+        <strong>${pharmacyBrain.catalog.length} medicines</strong>
+        <span>Saved in this pharmacy</span>
+      </div>
+      <label class="catalog-search">
+        <span>Search catalog</span>
+        <input type="search" data-catalog-search data-card-id="${card.id}" value="${escapeHtml(query)}" placeholder="Medicine, form, supplier, barcode">
+      </label>
+      <p class="catalog-result-count">Showing ${items.length} of ${pharmacyBrain.catalog.length}</p>
+      <div class="catalog-workspace-list">
+        ${items.length ? items.map(catalogWorkspaceItemTemplate).join("") : '<p class="catalog-empty">No medicines match this search.</p>'}
+      </div>
+    </section>
+  `;
+}
+
+function catalogWorkspaceItemTemplate(item) {
+  const name = item.name || item.medicine || "Medicine";
+  const form = item.form || item.forms?.[0] || "";
+  const unit = item.unit || item.units?.[0] || "";
+  const sellingPrice = item.sellingPrice ?? item.selling_price ?? "";
+  const stock = item.stockLeft ?? item.stock ?? item.current_stock ?? "";
+  const strength = item.strength || "";
+  const details = [
+    ["Buying price", item.costPrice ?? item.cost_price],
+    ["Supplier", item.supplier],
+    ["Barcode", item.barcode],
+    ["Batch", item.batches?.[0]?.batch || item.batch],
+    ["Expiry", item.batches?.[0]?.expiry || item.expiry],
+    ["Shelf", item.shelf || item.location]
+  ].filter(([, value]) => value !== "" && value !== null && value !== undefined);
+  return `
+    <article class="catalog-workspace-item">
+      <div class="catalog-item-main">
+        <div>
+          <strong>${escapeHtml(name)}</strong>
+          <span>${escapeHtml([strength, form, unit].filter(Boolean).join(" · ") || "Details not recorded")}</span>
+        </div>
+        <div class="catalog-item-numbers">
+          <span><small>Selling</small>${sellingPrice === "" ? "—" : escapeHtml(String(sellingPrice))}</span>
+          <span><small>Stock</small>${stock === "" || stock === null ? "—" : escapeHtml(String(stock))}</span>
+        </div>
+      </div>
+      ${details.length ? `<details><summary>More details</summary><dl>${details.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd></div>`).join("")}</dl></details>` : ""}
+    </article>
   `;
 }
 
@@ -693,6 +768,9 @@ function bindEvents() {
     const file = event.target.files?.[0];
     if (file) void handleDocumentFile(file);
   });
+  root.querySelector("[data-catalog-search]")?.addEventListener("input", (event) => {
+    updateCatalogSearch(event.target.dataset.cardId, event.target.value);
+  });
 }
 
 function handleAction(dataset) {
@@ -709,6 +787,13 @@ function handleAction(dataset) {
     state.ui.screen = "chat";
     state.ui.workspace = dataset.workspace || "operations";
     if (state.ui.workspace === "operations") ensureOnboardingStarted();
+    render();
+    return;
+  }
+  if (action === "open-catalog") {
+    state.ui.screen = "chat";
+    state.ui.workspace = "operations";
+    showCatalogWorkspace();
     render();
     return;
   }
@@ -750,6 +835,7 @@ function handleAction(dataset) {
     removeCardsByType(["CatalogOnboardingCard"]);
     addCard(createPasteImportCard());
   }
+  if (action === "open-catalog-card") showCatalogWorkspace();
   if (action === "review-paste-list") reviewPasteList(dataset.cardId);
   if (action === "add-catalog-row") addCatalogImportRow(dataset.cardId);
   if (action === "move-catalog-row") moveCatalogImportRow(dataset.cardId, dataset.rowIndex, dataset.direction);
@@ -1740,6 +1826,25 @@ function approveCatalogImport(card) {
     format: "CSV",
     itemCount: pharmacyBrain.catalog.length
   }));
+  showCatalogWorkspace();
+}
+
+function showCatalogWorkspace() {
+  state.cards = state.cards.filter((card) => card.type !== "CatalogWorkspaceCard");
+  state.cards.unshift(createCatalogWorkspaceCard(pharmacyBrain.catalog.length));
+  persistActiveCards();
+}
+
+function updateCatalogSearch(cardId, value) {
+  const card = state.cards.find((item) => item.id === cardId && item.type === "CatalogWorkspaceCard");
+  if (!card) return;
+  card.fields.query = value;
+  persistActiveCards();
+  const list = root.querySelector(".catalog-workspace-list");
+  const count = root.querySelector(".catalog-result-count");
+  const items = catalogWorkspaceItems(pharmacyBrain.catalog, value);
+  if (list) list.innerHTML = items.length ? items.map(catalogWorkspaceItemTemplate).join("") : '<p class="catalog-empty">No medicines match this search.</p>';
+  if (count) count.textContent = `Showing ${items.length} of ${pharmacyBrain.catalog.length}`;
 }
 
 function saveCatalogFromReviewCard(card) {
@@ -2087,6 +2192,7 @@ function friendlyCardLabel(card) {
     VisualScanCard: "Scan",
     CatalogOnboardingCard: "Onboarding",
     CatalogImportCard: "Catalog",
+    CatalogWorkspaceCard: "Catalog",
     ImportMappingCard: "Import",
     NotificationCard: "Notification",
     DocumentExportCard: "Document",
@@ -2098,6 +2204,7 @@ function friendlyCardLabel(card) {
 function ownerCardNote(card) {
   if (card.type === "CatalogImportCard" && card.fields?.import_incomplete === "true") return "This scan is incomplete. Scan again before saving anything.";
   if (card.type === "CatalogImportCard") return "Review the list, edit if needed, then approve.";
+  if (card.type === "CatalogWorkspaceCard") return "This view uses the complete saved Pharmacy Catalog.";
   if (card.status === "needs_correction") return "Edit anything that looks wrong, then confirm.";
   if (card.type === "SaleCard") return "Complete the sale details, then confirm.";
   if (card.type === "VoiceReviewCard") return "Check the voice result, then confirm.";

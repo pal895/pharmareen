@@ -436,3 +436,13 @@ Accepted additions that must remain integrated:
 - Focused architecture verification covers empty entry, no silent samples, template safety, existing/new partitioning, compound forms, and zero-token behavior; it passes.
 - Prepared Test 3 fixture remains the four verified new Source Brain medicines in `fixtures/test-3-clean-paste-list.txt`.
 - Current phone view is the external viewer opened by the old Template button. After deployment, return to MS2.0 and cancel the stale nine-row card before reopening Paste list.
+
+## Catalog workspace integration - 2026-07-13
+
+- Test 3 clean Paste list saved four verified new medicines and increased Zuri Pharmacy from 17 to 21 medicines. The save and confirmation messages passed.
+- Refresh proved catalog persistence indirectly through retained state, but exposed a shared UX gap: recovery restored chat history without presenting or directly exposing the working catalog.
+- Broad fix: a durable `CatalogWorkspaceCard` renders directly from `PharmacyBrain.catalog`; it never copies or recreates medicine rows. Successful onboarding opens it automatically, and the home screen exposes a dedicated Pharmacy catalog row with the live count.
+- The reusable catalog workspace locally deduplicates and alphabetizes canonical medicines, searches name/strength/form/unit/supplier/barcode/shelf, shows medicine identity, selling price, and stock first, and places optional buying/supplier/barcode/batch/expiry/shelf details behind progressive disclosure.
+- Catalog recovery now merges duplicate medicine identities and preserves strength rather than reproducing duplicate cards or dropping strength on future saves.
+- Focused checks cover persistence loading, duplicate merging, strength preservation, all-item count, local search, zero-token behavior, direct home access, post-save transition, and mobile/desktop responsive layout hooks.
+- Exact pause: refreshed MS2.0 Operations Chat showing the saved messages. Deploy the catalog workspace commit, refresh once, then verify the new catalog experience from the current state.

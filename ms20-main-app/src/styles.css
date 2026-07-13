@@ -595,6 +595,119 @@ input:disabled {
   line-height: 1.35;
 }
 
+.catalog-workspace {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.catalog-workspace-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--surface-soft);
+}
+
+.catalog-workspace-summary span,
+.catalog-result-count,
+.catalog-item-main span {
+  color: var(--muted);
+}
+
+.catalog-search span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.78em;
+  font-weight: 800;
+}
+
+.catalog-search input {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  color: var(--ink);
+  background: #fff;
+}
+
+.catalog-result-count {
+  margin: 0;
+  font-size: 0.82em;
+}
+
+.catalog-workspace-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.catalog-workspace-item {
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  background: #fff;
+}
+
+.catalog-item-main {
+  display: grid;
+  gap: 12px;
+}
+
+.catalog-item-main > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.catalog-item-numbers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.catalog-item-numbers span {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--surface-soft);
+  font-weight: 800;
+}
+
+.catalog-item-numbers small {
+  color: var(--muted);
+  font-size: 0.72em;
+  font-weight: 700;
+}
+
+.catalog-workspace-item details {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.84em;
+}
+
+.catalog-workspace-item dl {
+  display: grid;
+  gap: 6px;
+  margin: 9px 0 0;
+}
+
+.catalog-workspace-item dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.catalog-workspace-item dt,
+.catalog-workspace-item dd {
+  margin: 0;
+}
+
 .field-grid label span,
 .medicine-detail-grid label span {
   display: block;
@@ -941,6 +1054,10 @@ pre {
   .catalog-mobile-rows {
     display: grid;
     gap: 12px;
+  }
+
+  .catalog-workspace-list {
+    grid-template-columns: 1fr;
   }
 
   .catalog-mobile-row {
