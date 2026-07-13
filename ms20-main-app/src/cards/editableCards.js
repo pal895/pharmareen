@@ -1,15 +1,13 @@
+import { MEDICINE_CARD_FIELD_KEYS } from "../services/medicineFieldSchema.js";
+
 export function cardFieldsFor(type) {
   const base = {
     SaleCard: ["medicine", "quantity", "payment", "stockLeft"],
-    InvoiceCard: ["supplier", "medicine", "quantity", "unit", "total", "payment", "batch", "expiry"],
-    RestockCard: ["medicine", "quantity", "unit", "supplier"],
+    ...MEDICINE_CARD_FIELD_KEYS,
     OnboardingCard: ["pharmacy", "owner", "branch", "location", "payments"],
     StockCorrectionCard: ["medicine", "current_stock", "correct_stock", "reason"],
     ReportCard: ["period", "focus", "backend_route"],
     VoiceReviewCard: ["transcript", "medicine", "quantity", "payment"],
-    PhotoReviewCard: ["file", "medicine", "form", "unit", "pack_size", "barcode", "batch", "expiry", "shelf"],
-    MedicineMatchCard: ["message", "medicine", "form", "unit", "selling_price", "quantity", "payment", "stock", "cost_price", "supplier", "batch", "expiry", "alias"],
-    VisualScanCard: ["scan_type", "medicine", "form", "unit", "pack_size", "quantity", "selling_price", "cost_price", "supplier", "barcode", "batch", "expiry", "shelf", "category"],
     CatalogOnboardingCard: ["question", "choices"],
     CatalogImportCard: ["method", "items_text", "notes"],
     ImportMappingCard: ["file", "mapping", "missing_columns", "notes"],

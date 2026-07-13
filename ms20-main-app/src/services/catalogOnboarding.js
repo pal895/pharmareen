@@ -1,6 +1,6 @@
 import { SupportedForms } from "../data/sourceMedicines.js";
 
-const CATALOG_TEXT_HEADER = "medicine | form | unit | selling price | cost price | stock | supplier | barcode | batch | expiry | strength";
+const CATALOG_TEXT_HEADER = "medicine | form | unit | selling price | cost price | stock | supplier | barcode | batch | expiry | strength | pack size | shelf";
 
 export const CatalogOnboardingMethods = [
   {
@@ -119,6 +119,7 @@ export function parseCatalogText(text) {
     return cleanCatalogItem({
       name: parts[0],
       strength: parts[10],
+      pack_size: parts[11],
       form: parts[1],
       unit: parts[2],
       selling_price: parts[3],
@@ -127,7 +128,8 @@ export function parseCatalogText(text) {
       supplier: parts[6],
       barcode: parts[7],
       batch: parts[8],
-      expiry: parts[9]
+      expiry: parts[9],
+      shelf: parts[12]
     });
   }).filter((item) => item.name);
 }
@@ -144,7 +146,9 @@ export function catalogItemsToText(items) {
     item.barcode || "",
     item.batch || "",
     item.expiry || "",
-    item.strength || ""
+    item.strength || "",
+    item.pack_size || first(item.packSizes),
+    item.shelf || item.location || ""
   ].map((value) => String(value ?? "")).join(" | "));
   return [CATALOG_TEXT_HEADER, ...rows].join("\n");
 }
@@ -169,6 +173,7 @@ export function parseDelimitedInventory(text, sourceBrain) {
     items.push(cleanCatalogItem({
       name: sourceMatch?.status === "matched" ? sourceMatch.name : rawName,
       strength: cells[mapping.strength] || "",
+      pack_size: cells[mapping.pack_size] || "",
       form: cells[mapping.form] || first(sourceMatch?.forms),
       unit: cells[mapping.unit] || first(sourceMatch?.units),
       selling_price: cells[mapping.selling_price] || "",
@@ -178,6 +183,7 @@ export function parseDelimitedInventory(text, sourceBrain) {
       barcode: cells[mapping.barcode] || "",
       batch: cells[mapping.batch] || "",
       expiry: cells[mapping.expiry] || "",
+      shelf: cells[mapping.shelf] || "",
       source: sourceMatch?.status === "matched" ? "source_brain_match" : "pharmacy_import"
     }));
   }
@@ -229,6 +235,7 @@ function cleanCatalogItem(item) {
     strength: item.strength || "",
     form: normalizeForm(item.form || ""),
     unit: normalizeForm(item.unit || item.form || ""),
+    pack_size: item.pack_size || "",
     selling_price: item.selling_price || item.sellingPrice || "",
     cost_price: item.cost_price || item.costPrice || "",
     stock: item.stock || item.current_stock || "",
@@ -236,6 +243,7 @@ function cleanCatalogItem(item) {
     barcode: item.barcode || "",
     batch,
     expiry,
+    shelf: item.shelf || "",
     batches: batch || expiry ? [{ batch, expiry, quantity: item.stock || "", supplier: item.supplier || "" }] : [],
     source: item.source || "owner_review"
   };
@@ -252,6 +260,7 @@ function mapHeaders(headers) {
   return {
     name: find("medicine", "drug", "item", "product", "name"),
     strength: find("strength", "dose", "dosage"),
+    pack_size: find("pack size", "pack", "package"),
     form: find("form"),
     unit: find("unit"),
     selling_price: find("sell", "selling", "price", "retail"),
@@ -260,7 +269,8 @@ function mapHeaders(headers) {
     supplier: find("supplier", "vendor"),
     barcode: find("barcode", "code"),
     batch: find("batch", "lot"),
-    expiry: find("expiry", "exp")
+    expiry: find("expiry", "exp"),
+    shelf: find("shelf", "location")
   };
 }
 

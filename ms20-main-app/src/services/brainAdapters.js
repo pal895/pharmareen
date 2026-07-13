@@ -122,6 +122,7 @@ function mergeCatalogItems(existing, incoming) {
     packSizes: unique([...(existing.packSizes || []), ...(incoming.packSizes || [])]),
     batches: [...(existing.batches || []), ...(incoming.batches || [])].filter(Boolean),
     strength: incoming.strength || existing.strength || "",
+    barcode: incoming.barcode || existing.barcode || "",
     stockLeft: incoming.stockLeft ?? existing.stockLeft
   };
 }

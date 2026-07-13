@@ -28,6 +28,15 @@ import {
   reviewCatalogEdit
 } from "./services/catalogWorkspace.js";
 import { cardFieldsFor, createEditableCard, paymentOptions, quantityBumps } from "./cards/editableCards.js";
+import {
+  CATALOG_IMPORT_FIELD_KEYS,
+  MEDICINE_DETAIL_FIELD_ORDER,
+  MEDICINE_FIELD_DEFINITIONS,
+  medicineFieldColumns,
+  medicineFieldLabel,
+  medicineRecordFromFields,
+  normalizeMedicineReviewRow
+} from "./services/medicineFieldSchema.js";
 import { resolveStockCheck } from "./services/localIntelligence.js";
 import { listRouteSlots, resolveOfflineSlot } from "./routes/routeRegistry.js";
 import {
@@ -57,21 +66,9 @@ const ACTIVE_CARD_RESUME_LIMIT = 12;
 const CARD_FONT_SCALE_MIN = 0.85;
 const CARD_FONT_SCALE_MAX = 1.25;
 const CARD_FONT_SCALE_STEP = 0.1;
-const CATALOG_TABLE_COLUMNS = [
-  { key: "name", label: "Medicine", min: 180 },
-  { key: "strength", label: "Strength", min: 110 },
-  { key: "form", label: "Form", min: 110 },
-  { key: "unit", label: "Unit", min: 110 },
-  { key: "stock", label: "Quantity", min: 100, inputMode: "numeric" },
-  { key: "cost_price", label: "Buying price", min: 120, inputMode: "decimal" },
-  { key: "selling_price", label: "Selling price", min: 120, inputMode: "decimal" },
-  { key: "supplier", label: "Supplier", min: 130 },
-  { key: "barcode", label: "Barcode", min: 130 },
-  { key: "batch", label: "Batch", min: 110 },
-  { key: "expiry", label: "Expiry", min: 120 }
-];
+const CATALOG_TABLE_COLUMNS = medicineFieldColumns(CATALOG_IMPORT_FIELD_KEYS);
 const INVOICE_TABLE_COLUMNS = [
-  ...CATALOG_TABLE_COLUMNS.filter((column) => !["supplier", "barcode"].includes(column.key)),
+  ...CATALOG_TABLE_COLUMNS.filter((column) => column.key !== "supplier"),
   { key: "line_total", label: "Line total", min: 120, inputMode: "decimal" }
 ];
 const MEDICINE_DETAIL_CARD_TYPES = new Set([
@@ -100,31 +97,8 @@ const DURABLE_CARD_TYPES = new Set([
   "DocumentExportCard",
   "SyncReviewCard"
 ]);
-const MEDICINE_DETAIL_FIELD_ORDER = [
-  "medicine",
-  "form",
-  "unit",
-  "pack_size",
-  "quantity",
-  "stock",
-  "current_stock",
-  "correct_stock",
-  "cost_price",
-  "selling_price",
-  "supplier",
-  "barcode",
-  "batch",
-  "expiry",
-  "shelf",
-  "category",
-  "reason",
-  "alias",
-  "file",
-  "scan_type",
-  "total",
-  "payment"
-];
 const FIELD_LABELS = {
+  ...Object.fromEntries(Object.entries(MEDICINE_FIELD_DEFINITIONS).map(([key, definition]) => [key, definition.label])),
   medicine: "Medicine",
   form: "Form",
   unit: "Unit",
@@ -1832,19 +1806,7 @@ function confirmCard(cardId) {
     saveCatalogFromReviewCard(card);
   }
   if (card.type === "MedicineMatchCard" && card.fields?.medicine) {
-    saveCatalogItems([{
-      name: card.fields.medicine,
-      form: card.fields.form,
-      unit: card.fields.unit,
-      selling_price: card.fields.selling_price,
-      stock: card.fields.stock,
-      cost_price: card.fields.cost_price,
-      supplier: card.fields.supplier,
-      batch: card.fields.batch,
-      expiry: card.fields.expiry,
-      aliases: card.fields.alias ? [card.fields.alias] : [],
-      source: "sale_time_learning"
-    }]);
+    saveCatalogItems([medicineRecordFromFields(card.fields, { source: "sale_time_learning" })]);
   }
   if (card.type === "OnboardingCard") {
     state.onboarding.completed = true;
@@ -1960,21 +1922,9 @@ function updateCatalogSearch(cardId, value) {
 function saveCatalogFromReviewCard(card) {
   const fields = card.fields || {};
   if (!fields.medicine) return;
-  saveCatalogItems([{
-    name: fields.medicine,
-    form: fields.form,
-    unit: fields.unit,
-    pack_size: fields.pack_size,
-    selling_price: fields.selling_price,
-    cost_price: fields.cost_price,
-    stock: fields.quantity || fields.stock || "",
-    supplier: fields.supplier,
-    barcode: fields.barcode,
-    batch: fields.batch,
-    expiry: fields.expiry,
-    shelf: fields.shelf,
+  saveCatalogItems([medicineRecordFromFields(fields, {
     source: card.type === "InvoiceCard" ? "invoice_review" : "scan_review"
-  }]);
+  })]);
   pharmacyBrain.saveVisualMemory({
     cardId: card.id,
     medicine: fields.medicine,
@@ -2132,7 +2082,10 @@ function applyLocalSaleStock(card) {
 function applyLocalRestockStock(card) {
   const match = pharmacyBrain.findMedicine(card.fields?.medicine);
   if (match.status !== "matched") return;
-  const medicine = match.matches[0];
+  const medicine = pharmacyBrain.upsertCatalogItem(medicineRecordFromFields(card.fields, {
+    source: "restock_review",
+    quantityIsStock: false
+  }));
   const quantity = Number(card.fields?.quantity || 0);
   card.fields.medicine = medicine.name;
   if (!Number.isFinite(quantity) || quantity <= 0) return;
@@ -2478,20 +2431,7 @@ function persistCatalogRows(card, rows) {
 }
 
 function normalizeCatalogRow(row = {}) {
-  return {
-    name: row.name || row.medicine || "",
-    form: row.form || first(row.forms),
-    unit: row.unit || first(row.units) || row.form || "",
-    stock: row.stock ?? row.current_stock ?? row.quantity ?? row.stockLeft ?? "",
-    cost_price: row.cost_price ?? row.costPrice ?? "",
-    line_total: row.line_total ?? row.lineTotal ?? "",
-    selling_price: row.selling_price ?? row.sellingPrice ?? "",
-    supplier: row.supplier || "",
-    batch: row.batch || first(row.batches)?.batch || "",
-    expiry: row.expiry || first(row.batches)?.expiry || "",
-    barcode: row.barcode || "",
-    source: row.source || "owner_review"
-  };
+  return normalizeMedicineReviewRow(row);
 }
 
 function emptyCatalogRow() {
@@ -2506,7 +2446,7 @@ function orderedMedicineFields(fields) {
 }
 
 function fieldLabel(field) {
-  return FIELD_LABELS[field] || field.replaceAll("_", " ");
+  return medicineFieldLabel(field) || FIELD_LABELS[field] || field.replaceAll("_", " ");
 }
 
 function inputModeForField(field) {

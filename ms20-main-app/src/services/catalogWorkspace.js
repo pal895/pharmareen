@@ -12,10 +12,7 @@ export function createCatalogWorkspaceCard(itemCount = 0) {
   };
 }
 
-export const CATALOG_EDIT_FIELDS = [
-  "name", "strength", "form", "unit", "pack_size", "stock", "selling_price",
-  "cost_price", "supplier", "shelf", "barcode", "batch", "expiry", "reorder_level", "aliases"
-];
+export const CATALOG_EDIT_FIELDS = CATALOG_MEDICINE_FIELD_KEYS;
 
 export function catalogItemId(item = {}) {
   return String(item.id || normalize(item.name || item.medicine));
@@ -111,3 +108,4 @@ function normalize(value) {
   return normalizeMedicineText(value);
 }
 import { rankMedicineMatches, normalizeMedicineText } from "./medicineMatcher.js";
+import { CATALOG_MEDICINE_FIELD_KEYS } from "./medicineFieldSchema.js";
