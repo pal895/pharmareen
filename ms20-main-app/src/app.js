@@ -41,6 +41,7 @@ const CATALOG_KEY = "ms20-main-app:pharmacy-catalog";
 const NOTIFICATION_KEY = "ms20-main-app:notifications";
 const FEED_KEY = "ms20-main-app:conversation-feed";
 const ACTIVE_CARDS_KEY = "ms20-main-app:active-cards";
+const INVOICE_MEMORY_KEY = "ms20-main-app:invoice-memory";
 const FEED_RESUME_LIMIT = 40;
 const ACTIVE_CARD_RESUME_LIMIT = 12;
 const CARD_FONT_SCALE_MIN = 0.85;
@@ -58,7 +59,7 @@ const CATALOG_TABLE_COLUMNS = [
   { key: "expiry", label: "Expiry", min: 120 }
 ];
 const INVOICE_TABLE_COLUMNS = [
-  ...CATALOG_TABLE_COLUMNS.filter((column) => !["selling_price", "supplier", "barcode"].includes(column.key)),
+  ...CATALOG_TABLE_COLUMNS.filter((column) => !["supplier", "barcode"].includes(column.key)),
   { key: "line_total", label: "Line total", min: 120, inputMode: "decimal" }
 ];
 const MEDICINE_DETAIL_CARD_TYPES = new Set([
@@ -1074,17 +1075,17 @@ async function captureLightweightCameraFrame() {
   state.camera.status = "";
   render();
   const file = new File([blob], `${scanType}-${Date.now()}.jpg`, { type: "image/jpeg" });
-  if (scanType === "invoice") await readInvoicePhoto(file);
+  if (scanType === "invoice") await readInvoicePhoto(file, true);
   else addPhotoCards(file.name, scanType);
 }
 
-async function readInvoicePhoto(file) {
+async function readInvoicePhoto(file, prepared = false) {
   state.ui.screen = "chat";
   state.ui.workspace = "operations";
   state.voice.status = "Reading invoice…";
   render();
   try {
-    const upload = await resizeImageForReading(file);
+    const upload = prepared ? file : await resizeImageForReading(file);
     const body = new FormData();
     body.append("file", upload, file.name || "invoice.jpg");
     const response = await fetch("/api/ms20/invoice-scan", { method: "POST", body });
@@ -1104,7 +1105,7 @@ async function readInvoicePhoto(file) {
       stock: item.quantity ?? "",
       cost_price: item.unit_cost ?? "",
       line_total: item.line_total ?? "",
-      selling_price: "",
+      selling_price: item.selling_price ?? "",
       supplier: result.supplier_name || "",
       barcode: item.barcode || "",
       batch: item.batch_number || "",
@@ -1143,7 +1144,9 @@ async function readInvoicePhoto(file) {
 }
 
 function mergeRememberedInvoiceReview(rows, result) {
-  const candidates = state.cards.filter((card) => {
+  const knownCards = [...state.cards, ...readInvoiceMemoryCards()]
+    .filter((card, index, cards) => cards.findIndex((candidate) => candidate.id === card.id) === index);
+  const candidates = knownCards.filter((card) => {
     if (card.type !== "CatalogImportCard" || card.fields?.import_mode !== "invoice_ocr") return false;
     const sameNumber = result.invoice_number && card.fields.invoice_number === result.invoice_number;
     const sameSignature = result.supplier_name && result.invoice_date && result.invoice_total
@@ -1177,7 +1180,7 @@ function mergeRememberedInvoiceReview(rows, result) {
   const merged = [...groups.entries()].map(([key, versions]) => {
     const strongest = [...versions].sort((left, right) => invoiceRowEvidenceScore(right) - invoiceRowEvidenceScore(left))[0];
     const combined = { ...(chosenByName.get(key) || strongest) };
-    for (const field of ["form", "unit", "batch", "expiry"]) {
+    for (const field of ["form", "unit", "selling_price", "batch", "expiry"]) {
       const counts = evidence.rows?.[key]?.fields?.[field];
       const consensus = strongestInvoiceEvidenceValue(counts, (value, count) => {
         if (field === "batch") return batchAssignments.get(key) === value;
@@ -1254,7 +1257,7 @@ function addInvoiceObservation(evidence, rows) {
     if (!key) return;
     const target = evidence.rows[key] ||= { fields: {}, positions: {} };
     target.positions[position] = (target.positions[position] || 0) + 1;
-    for (const field of ["form", "unit", "batch", "expiry"]) {
+    for (const field of ["form", "unit", "selling_price", "batch", "expiry"]) {
       const value = String(row[field] || "").trim();
       if (!value) continue;
       const counts = target.fields[field] ||= {};
@@ -1320,7 +1323,7 @@ function invoiceRowArithmeticValid(row) {
 }
 
 function invoiceRowEvidenceScore(row) {
-  return ["name", "form", "unit", "stock", "cost_price", "line_total", "batch", "expiry"]
+  return ["name", "form", "unit", "stock", "cost_price", "selling_price", "line_total", "batch", "expiry"]
     .filter((field) => ![undefined, null, ""].includes(row[field])).length + (invoiceRowArithmeticValid(row) ? 10 : 0);
 }
 
@@ -1544,6 +1547,7 @@ function addCard(card) {
   if (card.type === "CatalogImportCard") removeCardsByType(["CatalogOnboardingCard"]);
   state.cards.unshift(card);
   cloudGateway.saveCardHistory(card);
+  rememberInvoiceCard(card);
   persistActiveCards();
   render();
 }
@@ -1570,6 +1574,7 @@ function updateCatalogImportCell(cardId, rowIndex, field, value) {
   rows[index][field] = value;
   persistCatalogRows(card, rows);
   refreshInvoiceImportCompleteness(card, rows);
+  rememberInvoiceCard(card);
   persistActiveCards();
 }
 
@@ -1583,6 +1588,7 @@ function moveCatalogImportRow(cardId, rowIndex, direction) {
   [rows[from], rows[to]] = [rows[to], rows[from]];
   persistCatalogRows(card, rows);
   refreshInvoiceImportCompleteness(card, rows);
+  rememberInvoiceCard(card);
   persistActiveCards();
   render();
 }
@@ -2124,6 +2130,21 @@ function readActiveCards() {
 function persistActiveCards() {
   const cards = (state.cards || []).filter(isDurableCard).slice(0, ACTIVE_CARD_RESUME_LIMIT);
   safeLocalStorage()?.setItem(ACTIVE_CARDS_KEY, JSON.stringify(cards));
+}
+
+function readInvoiceMemoryCards() {
+  try {
+    const cards = JSON.parse(safeLocalStorage()?.getItem(INVOICE_MEMORY_KEY) || "[]");
+    return Array.isArray(cards) ? cards.filter(isDurableCard).slice(0, 8) : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberInvoiceCard(card) {
+  if (card?.type !== "CatalogImportCard" || card.fields?.import_mode !== "invoice_ocr") return;
+  const cards = [card, ...readInvoiceMemoryCards().filter((item) => item.id !== card.id)].slice(0, 8);
+  safeLocalStorage()?.setItem(INVOICE_MEMORY_KEY, JSON.stringify(cards));
 }
 
 function isDurableCard(card) {

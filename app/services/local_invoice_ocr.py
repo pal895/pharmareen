@@ -30,12 +30,9 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
             image.thumbnail((longest_edge, longest_edge))
             image = ImageOps.autocontrast(image)
             image = ImageEnhance.Contrast(image).enhance(1.5)
-            ocr_texts = [
-                pytesseract.image_to_string(image, config="--psm 4"),
-            ]
-            primary_text_order = _medicine_order_from_text(ocr_texts[0])
             word_data, geometry_rows = _read_oriented_invoice_words(image, pytesseract)
             geometry_text = "\n".join(geometry_rows)
+            ocr_texts = []
             if geometry_text:
                 ocr_texts.append(geometry_text)
             geometry_order = _medicine_order_from_lines(geometry_rows)
@@ -43,6 +40,7 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
             document_geometry_text = "\n".join(reconstruct_document_lines_from_word_positions(word_data))
             if document_geometry_text:
                 ocr_texts.append(document_geometry_text)
+            primary_text_order = _medicine_order_from_text(document_geometry_text)
             visible_text = max(ocr_texts, key=len, default="")
     except Exception:
         return _failed(fingerprint, "I could not read this photo. Try again in good light with the whole page visible.")
@@ -250,6 +248,7 @@ def extract_geometry_table_items(data: dict[str, list[Any]]) -> list[dict[str, A
             "unit": unit,
             "quantity": int(quantity_match.group()),
             "unit_cost": _ocr_money(cost_match.group()),
+            "selling_price": _ocr_money(price_match.group()) if (price_match := re.search(r"\d[\d,.]*", cells.get("price", ""))) else None,
             "line_total": _ocr_money(total_match.group()),
             "batch_number": batch_match.group() if batch_match else "",
             "expiry_date": f"{expiry_match.group(1)}-{expiry_match.group(2)}" if expiry_match else "",
@@ -263,7 +262,13 @@ def _merge_geometry_items(items: list[dict[str, Any]], geometry_items: list[dict
     order = [str(item.get("medicine_name")) for item in geometry_items]
     for item in geometry_items:
         name = str(item.get("medicine_name"))
-        by_name[name] = _merge_item_candidates([by_name[name], item]) if name in by_name else item
+        if name in by_name:
+            descriptive = _merge_item_candidates([by_name[name], item])
+            for field in ("quantity", "unit_cost", "selling_price", "line_total"):
+                descriptive[field] = item.get(field)
+            by_name[name] = descriptive
+        else:
+            by_name[name] = item
     return sorted(by_name.values(), key=lambda item: order.index(str(item.get("medicine_name"))) if str(item.get("medicine_name")) in order else len(order))
 
 
@@ -695,10 +700,11 @@ def _supplier_name_from_text(text: str) -> str:
     candidates = []
     for line in text.splitlines():
         clean = " ".join(line.split()).strip(" :-")
-        if re.search(r"\b(?:medical|pharma\w*)\s+suppl\w*\b", clean, flags=re.I):
+        if re.search(r"\b(?:medical\s+suppl\w*|pharma\w*(?:\s+suppl\w*)?|wholesale|wholesaler)\b", clean, flags=re.I):
             clean = re.sub(r"^supplier\s*[:\-]?\s*", "", clean, flags=re.I)
+            clean = re.sub(r"\s+supplier\s+invoice.*$", "", clean, flags=re.I)
             candidates.append(clean)
-    return _best_ocr_metadata_value(candidates)
+    return max(candidates, key=lambda value: (bool(re.search(r"\b(?:ltd|limited|plc|inc)\b", value, flags=re.I)), value.isupper(), len(value)), default="")
 
 
 def _row_has_required_invoice_fields(item: dict[str, Any]) -> bool:

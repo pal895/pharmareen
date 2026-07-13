@@ -1,4 +1,4 @@
-from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _fill_unique_source_pair_fields, _invoice_date_from_text, _invoice_number_from_text, _invoice_total_from_text, _medicine_order_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, _read_oriented_invoice_words, extract_geometry_table_items, extract_positioned_row_fields, merge_source_brain_invoice_items, reconstruct_bounded_invoice_rows, reconstruct_invoice_rows_from_word_positions
+from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _fill_unique_source_pair_fields, _invoice_date_from_text, _invoice_number_from_text, _invoice_total_from_text, _medicine_order_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, _read_oriented_invoice_words, _supplier_name_from_text, extract_geometry_table_items, extract_positioned_row_fields, merge_source_brain_invoice_items, reconstruct_bounded_invoice_rows, reconstruct_invoice_rows_from_word_positions
 
 
 def test_multiple_ocr_passes_merge_all_canonical_invoice_rows_and_fields():
@@ -174,7 +174,7 @@ def test_geometry_columns_ignore_strength_pack_size_and_selling_price():
     }
     assert extract_geometry_table_items(data) == [{
         "medicine_name": "Albendazole", "form": "chewable tablet", "unit": "tablet",
-        "quantity": 30, "unit_cost": 35.0, "line_total": 1050.0,
+        "quantity": 30, "unit_cost": 35.0, "selling_price": 50.0, "line_total": 1050.0,
         "batch_number": "ALB-4C7", "expiry_date": "2028-11", "confidence": 0.94,
     }]
 
@@ -201,3 +201,8 @@ def test_sideways_canvas_capture_is_rotated_only_after_normal_passes_find_no_row
     assert data is row
     assert rows == ["Albendazole"]
     assert reader.calls == 3
+
+
+def test_wholesale_company_header_is_recognized_as_supplier_not_subtitle():
+    text = "DAWA BORA WHOLESALE LTD\nLicensed pharmaceutical wholesaler | Nairobi, Kenya\nSUPPLIER INVOICE"
+    assert _supplier_name_from_text(text) == "DAWA BORA WHOLESALE LTD"

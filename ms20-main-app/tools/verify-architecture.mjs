@@ -215,6 +215,8 @@ assert(appSource.includes('const readingEdge = video.videoWidth > video.videoHei
 assert(appSource.includes('card.fields.import_incomplete'), "Incomplete local invoice reads must be marked unsafe to approve");
 assert(appSource.includes('const INVOICE_TABLE_COLUMNS'), "Invoice review must use purchase-specific fields");
 assert(appSource.includes('line_total: item.line_total'), "Invoice review must expose line totals for owner cross-checking");
+assert(appSource.includes('selling_price: item.selling_price'), "Optional invoice selling prices must reach the editable review");
+assert(appSource.includes("INVOICE_MEMORY_KEY"), "Cancelled invoice reviews must retain reusable local evidence");
 assert(appSource.includes('invoiceSummaryTemplate(card)'), "Invoice review must show invoice-level metadata once");
 assert(appSource.includes('This scan is incomplete and cannot be approved.'), "Incomplete invoice review must explain the blocked approval plainly");
 assert(appSource.includes('This scan is incomplete. Scan again before saving anything.'), "Blocked invoice must not tell the owner to approve");

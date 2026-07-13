@@ -7,6 +7,9 @@
 - Test 2 is the required final consistency invoice. Its asset is `ms20-main-app/fixtures/test-2-dawa-bora-invoice.png`, backed by a verified manifest and new Source Brain medicines excluded from Zuri Pharmacy's 13-item catalog.
 - Test 2's first two landscape phone captures found no rows. The reusable cause was layout diversity: strength, pack-size, and selling-price columns make numeric token order unsafe, and a single dense-block OCR segmentation can miss wide sparse tables. Preserve more landscape resolution, retry sparse segmentation only when row anchors are absent, and parse named columns by x-position.
 - A sideways browser camera capture may rotate the visible preview without writing EXIF orientation into its canvas JPEG. If normal and sparse OCR find no medicine anchors, retry the local coordinate pass at 90, 270, then 180 degrees and stop at the first anchored orientation. Keep these extra passes out of the successful fast path.
+- Named geometry is authoritative for quantity, buying price, optional selling price, and line total. Do not let arithmetic select a different role combination merely because extra numeric columns form another valid equation. Missing geometry stays missing and blocks approval.
+- Canceling a review card is a UI action, not permission to forget strong recognition evidence. Retain a small local invoice-memory ledger so a weaker rescan cannot replace a stronger earlier read. Optional selling price should be reviewed and saved when present but must not become an approval requirement when absent.
+- Derive header, row, and order text from the selected coordinate pass instead of running a redundant whole-page text OCR pass. Camera frames already prepared at the capture limit should be uploaded directly without a second canvas decode/re-encode.
 
 ## Reusable diagnosis
 
