@@ -147,9 +147,9 @@ const { CloudMemoryGateway } = await import(pathToFileURL(path.join(root, "src/s
 const { runVisualPipeline } = await import(pathToFileURL(path.join(root, "src/services/visualPipeline.js")));
 const { BackendAdapterRegistry } = await import(pathToFileURL(path.join(root, "src/services/backendAdapters.js")));
 const { SourceBrain, PharmacyBrain } = await import(pathToFileURL(path.join(root, "src/services/brainAdapters.js")));
-const { parseBulkMedicineList, parseDelimitedInventory, buildCatalogSavedSummary } = await import(pathToFileURL(path.join(root, "src/services/catalogOnboarding.js")));
+const { createPasteImportCard, parseBulkMedicineList, parseDelimitedInventory, partitionCatalogItems, buildCatalogSavedSummary } = await import(pathToFileURL(path.join(root, "src/services/catalogOnboarding.js")));
 const { buildDeterministicNotifications, mergeNotifications } = await import(pathToFileURL(path.join(root, "src/services/notificationCenter.js")));
-const { buildCatalogCsv } = await import(pathToFileURL(path.join(root, "src/services/documentGenerator.js")));
+const { buildCatalogCsv, buildBulkPasteTemplate } = await import(pathToFileURL(path.join(root, "src/services/documentGenerator.js")));
 
 const sale = parseLocalCommand("panadol2cash");
 assert(sale.kind === "sale", "Demo text command did not create a sale parse");
@@ -172,6 +172,17 @@ assert(catalogImport.items.length === 3, "Bulk medicine import did not parse thr
 const compoundFormImport = parseBulkMedicineList("Ciprofloxacin eye drops 250", sourceBrain);
 assert(compoundFormImport.items[0]?.form === "eye drops", "Supported compound forms must not be incorrectly singularized");
 assert(compoundFormImport.items[0]?.unit === "eye drops", "Supported compound units must not be incorrectly singularized");
+const emptyPasteCard = createPasteImportCard();
+assert(emptyPasteCard.fields.entry_mode === "paste_input", "Paste onboarding must open an input step before review");
+assert(emptyPasteCard.fields.items_text === "", "Paste onboarding must not silently insert sample medicines");
+const bulkTemplate = buildBulkPasteTemplate();
+assert(!/Cefixime|Ceftriaxone|Salbutamol|Metformin/i.test(bulkTemplate), "Bulk template must not contain pharmacy medicine data");
+const partitionedPaste = partitionCatalogItems(
+  parseBulkMedicineList("Cefixime tablet 120\nLoratadine syrup 160", sourceBrain).items,
+  [{ name: "Cefixime" }]
+);
+assert(partitionedPaste.existing.length === 1 && partitionedPaste.existing[0].name === "Cefixime", "Paste review must identify medicines already in the pharmacy catalog");
+assert(partitionedPaste.newItems.length === 1 && partitionedPaste.newItems[0].name === "Loratadine", "Paste review must retain genuinely new medicines");
 const savedCatalogSummary = buildCatalogSavedSummary(catalogImport.items, catalogImport.unclear);
 assert(savedCatalogSummary.includes("saved"), "Approved catalog summary must confirm saved state");
 assert(!savedCatalogSummary.includes("ready for review"), "Approved catalog summary must not repeat review-state copy");

@@ -36,15 +36,10 @@ export function buildCatalogCsv(items = []) {
 
 export function buildBulkPasteTemplate() {
   return [
-    "Cefixime tablets 120",
-    "Ceftriaxone vial 180",
-    "Salbutamol inhaler 250",
-    "Metformin tablets 15",
-    "Omeprazole capsules 20",
-    "Diclofenac gel 180",
-    "Hydrocortisone cream 180",
-    "Azithromycin suspension 350",
-    "Zinc syrup 70"
+    "MS2.0 BULK PASTE TEMPLATE",
+    "Enter one medicine per line.",
+    "Format: medicine name form selling price",
+    "Remove these instructions before pasting your medicine lines."
   ].join("\n");
 }
 

@@ -12,6 +12,7 @@ import {
   parseCatalogText,
   parseDelimitedInventory,
   catalogItemsToText,
+  partitionCatalogItems,
   buildImportSummary,
   buildCatalogSavedSummary
 } from "./services/catalogOnboarding.js";
@@ -418,6 +419,14 @@ function cardBodyTemplate(card, displayed) {
       </div>
     `;
   }
+  if (card.type === "CatalogImportCard" && card.fields?.entry_mode === "paste_input") {
+    return `
+      <div class="catalog-paste-input">
+        ${fieldTemplate(card, "items_text")}
+        <p>Paste one medicine per line. Nothing is saved until you review and approve the parsed rows.</p>
+      </div>
+    `;
+  }
   if (card.type === "CatalogImportCard") {
     return catalogImportTableTemplate(card);
   }
@@ -558,6 +567,15 @@ function activeActionsTemplate(card) {
     `;
   }
   if (card.type === "CatalogImportCard") {
+    if (card.fields?.entry_mode === "paste_input") {
+      return `
+        <div class="card-actions">
+          <button data-action="review-paste-list" data-card-id="${card.id}">Review list</button>
+          <button data-action="download-template">Template</button>
+          <button data-action="reject-card" data-card-id="${card.id}">Cancel</button>
+        </div>
+      `;
+    }
     const invoiceMode = card.fields?.import_mode === "invoice_ocr";
     const incompleteInvoice = invoiceMode && card.fields?.import_incomplete === "true";
     return `
@@ -732,6 +750,7 @@ function handleAction(dataset) {
     removeCardsByType(["CatalogOnboardingCard"]);
     addCard(createPasteImportCard());
   }
+  if (action === "review-paste-list") reviewPasteList(dataset.cardId);
   if (action === "add-catalog-row") addCatalogImportRow(dataset.cardId);
   if (action === "move-catalog-row") moveCatalogImportRow(dataset.cardId, dataset.rowIndex, dataset.direction);
   if (action === "start-catalog-file") {
@@ -1622,6 +1641,37 @@ function addCatalogImportRow(cardId) {
   const rows = catalogRowsForCard(card);
   rows.push(emptyCatalogRow());
   persistCatalogRows(card, rows);
+  persistActiveCards();
+  render();
+}
+
+function reviewPasteList(cardId) {
+  const card = state.cards.find((item) => item.id === cardId);
+  if (!card || card.type !== "CatalogImportCard") return;
+  const text = String(card.fields?.items_text || "").trim();
+  if (!text) {
+    card.validation = "Paste at least one medicine line before review.";
+    persistActiveCards();
+    render();
+    return;
+  }
+  const parsed = parseBulkMedicineList(text, sourceBrain);
+  const { existing, newItems } = partitionCatalogItems(parsed.items, pharmacyBrain.catalog);
+  if (newItems.length === 0) {
+    card.validation = `No new medicines found. Already in this pharmacy: ${existing.map((item) => item.name).join(", ")}.`;
+    persistActiveCards();
+    render();
+    return;
+  }
+  card.fields.entry_mode = "review";
+  card.fields.catalog_rows = JSON.stringify(newItems);
+  card.fields.items_text = catalogItemsToText(newItems);
+  card.fields.existing_medicines_ignored = existing.map((item) => item.name).join(", ");
+  card.validation = [
+    `${newItems.length} new medicine(s) ready for review.`,
+    existing.length ? `${existing.length} existing medicine(s) were not added again: ${existing.map((item) => item.name).join(", ")}.` : "No existing catalog medicines were repeated.",
+    parsed.unclear.length ? `${parsed.unclear.length} line(s) need correction.` : "Check every field, then approve."
+  ].join(" ");
   persistActiveCards();
   render();
 }

@@ -427,3 +427,12 @@ Accepted additions that must remain integrated:
 - Fixture parsing is local and zero-token; four rows parsed, with no unclear or duplicate lines.
 - Pre-live verification exposed and fixed a shared normalization defect that incorrectly changed supported compound forms such as `eye drops` to `eye drop`. Architecture verification passes with compound-form regression coverage.
 - Exact current action after deployment: with the actions menu open, tap `Paste list`.
+
+## Test 3 paste-entry friction - 2026-07-13
+
+- Live evidence showed that `Paste list` skipped owner input and silently loaded the old nine-line example list, whose medicines were already in Zuri Pharmacy. The downloaded Template repeated the same catalog medicines. Nothing from this card should be approved.
+- Root cause: `createPasteImportCard()` substituted `sampleMedicineList()` whenever no seed text was supplied, and the UI rendered that substitution directly as an approval table instead of providing a paste-input stage.
+- Broad fix: Paste list now opens an empty textarea, requires `Review list` before row review, partitions already-cataloged medicines from genuinely new medicines, blocks an all-existing list, and sends only new rows to approval. The template now contains format instructions only, never pharmacy medicine data.
+- Focused architecture verification covers empty entry, no silent samples, template safety, existing/new partitioning, compound forms, and zero-token behavior; it passes.
+- Prepared Test 3 fixture remains the four verified new Source Brain medicines in `fixtures/test-3-clean-paste-list.txt`.
+- Current phone view is the external viewer opened by the old Template button. After deployment, return to MS2.0 and cancel the stale nine-row card before reopening Paste list.

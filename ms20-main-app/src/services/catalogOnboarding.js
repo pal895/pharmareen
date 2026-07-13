@@ -48,17 +48,19 @@ export function createCatalogChoiceCard() {
 }
 
 export function createPasteImportCard(seedText = "") {
+  const preparedText = seedText.trim();
   return {
     id: `card-catalog-paste-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     type: "CatalogImportCard",
     title: "Review medicine list",
     source: "Bulk paste",
-    confidence: seedText.trim() ? 0.82 : 0.65,
+    confidence: preparedText ? 0.82 : 0.65,
     status: "needs_correction",
     aiRequired: false,
     fields: {
       method: "bulk paste",
-      items_text: seedText.trim() || sampleMedicineList(),
+      entry_mode: preparedText ? "review" : "paste_input",
+      items_text: preparedText,
       notes: "One medicine per line. Price can be the last number."
     },
     validation: "MS2.0 parses this locally, then saves approved medicines to this pharmacy."
@@ -95,6 +97,14 @@ export function parseBulkMedicineList(text, sourceBrain) {
     duplicates: items.filter((item) => item.duplicate),
     aiRequired: false
   };
+}
+
+export function partitionCatalogItems(items = [], catalog = []) {
+  const existingNames = new Set(catalog.map((item) => normalize(item.name || item.medicine)));
+  return items.reduce((result, item) => {
+    result[existingNames.has(normalize(item.name || item.medicine)) ? "existing" : "newItems"].push(item);
+    return result;
+  }, { newItems: [], existing: [] });
 }
 
 export function parseCatalogText(text) {
@@ -186,20 +196,6 @@ export function buildCatalogSavedSummary(items, unclear = []) {
     unclear.length ? `${unclear.length} line(s) still need attention.` : "No unclear lines found.",
     "Catalog is ready for daily sales."
   ].join(" ");
-}
-
-export function sampleMedicineList() {
-  return [
-    "Cefixime tablets 120",
-    "Ceftriaxone vial 180",
-    "Salbutamol inhaler 250",
-    "Metformin tablets 15",
-    "Omeprazole capsules 20",
-    "Diclofenac gel 180",
-    "Hydrocortisone cream 180",
-    "Azithromycin suspension 350",
-    "Zinc syrup 70"
-  ].join("\n");
 }
 
 function parseMedicineLine(line, sourceBrain) {
