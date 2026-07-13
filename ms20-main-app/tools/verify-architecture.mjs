@@ -194,9 +194,10 @@ const savedCatalogSummary = buildCatalogSavedSummary(catalogImport.items, catalo
 assert(savedCatalogSummary.includes("saved"), "Approved catalog summary must confirm saved state");
 assert(!savedCatalogSummary.includes("ready for review"), "Approved catalog summary must not repeat review-state copy");
 
-const delimited = parseDelimitedInventory("medicine,form,selling price,stock,batch,expiry\nMetformin,tablets,15,20,B1,2026-12-31", sourceBrain);
+const delimited = parseDelimitedInventory("medicine,strength,form,selling price,stock,batch,expiry\nMetformin,500 mg,tablets,15,20,B1,2026-12-31", sourceBrain);
 assert(delimited.items.length === 1, "CSV inventory import did not parse one row");
 assert(delimited.aiRequired === false, "CSV inventory import must be zero-token");
+assert(delimited.items[0].strength === "500 mg", "CSV inventory import must preserve medicine strength for owner review and approval");
 
 const pharmacyBrain = new PharmacyBrain({ pharmacyId: "verify" });
 pharmacyBrain.loadCatalog(delimited.items);

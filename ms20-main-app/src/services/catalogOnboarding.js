@@ -1,6 +1,6 @@
 import { SupportedForms } from "../data/sourceMedicines.js";
 
-const CATALOG_TEXT_HEADER = "medicine | form | unit | selling price | cost price | stock | supplier | barcode | batch | expiry";
+const CATALOG_TEXT_HEADER = "medicine | form | unit | selling price | cost price | stock | supplier | barcode | batch | expiry | strength";
 
 export const CatalogOnboardingMethods = [
   {
@@ -118,6 +118,7 @@ export function parseCatalogText(text) {
     const parts = row.split("|").map((part) => part.trim());
     return cleanCatalogItem({
       name: parts[0],
+      strength: parts[10],
       form: parts[1],
       unit: parts[2],
       selling_price: parts[3],
@@ -142,7 +143,8 @@ export function catalogItemsToText(items) {
     item.supplier || "",
     item.barcode || "",
     item.batch || "",
-    item.expiry || ""
+    item.expiry || "",
+    item.strength || ""
   ].map((value) => String(value ?? "")).join(" | "));
   return [CATALOG_TEXT_HEADER, ...rows].join("\n");
 }
@@ -166,6 +168,7 @@ export function parseDelimitedInventory(text, sourceBrain) {
     const sourceMatch = sourceBrain?.lookupMedicine(rawName);
     items.push(cleanCatalogItem({
       name: sourceMatch?.status === "matched" ? sourceMatch.name : rawName,
+      strength: cells[mapping.strength] || "",
       form: cells[mapping.form] || first(sourceMatch?.forms),
       unit: cells[mapping.unit] || first(sourceMatch?.units),
       selling_price: cells[mapping.selling_price] || "",
@@ -248,6 +251,7 @@ function mapHeaders(headers) {
   const find = (...needles) => headers.findIndex((header) => needles.some((needle) => header.includes(needle)));
   return {
     name: find("medicine", "drug", "item", "product", "name"),
+    strength: find("strength", "dose", "dosage"),
     form: find("form"),
     unit: find("unit"),
     selling_price: find("sell", "selling", "price", "retail"),

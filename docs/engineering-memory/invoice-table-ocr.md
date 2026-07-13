@@ -81,3 +81,5 @@ Dynamic result lists must rebind their interactive actions after replacing HTML.
 ### Catalog multi-term search intent
 
 Catalog filtering must require every normalized query term to match the same saved medicine. An average fuzzy score can otherwise admit an unrelated medicine because it shares a generic form such as `syrup`. Keep this strict browse-search constraint separate from the general medicine matcher, whose ranked alternatives are still needed for safe sale and restock ambiguity handling.
+
+Delimited onboarding must preserve every supported identity field across all transformation boundaries: header mapping, normalized row objects, intermediate serialization, editable review, approval, and persistence. A field parsed from the source is not protected if an intermediate row format or shared review-column definition omits it. Extend persisted positional formats compatibly so active older review cards remain readable.

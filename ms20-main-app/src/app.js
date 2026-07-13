@@ -59,12 +59,14 @@ const CARD_FONT_SCALE_MAX = 1.25;
 const CARD_FONT_SCALE_STEP = 0.1;
 const CATALOG_TABLE_COLUMNS = [
   { key: "name", label: "Medicine", min: 180 },
+  { key: "strength", label: "Strength", min: 110 },
   { key: "form", label: "Form", min: 110 },
   { key: "unit", label: "Unit", min: 110 },
   { key: "stock", label: "Quantity", min: 100, inputMode: "numeric" },
   { key: "cost_price", label: "Buying price", min: 120, inputMode: "decimal" },
   { key: "selling_price", label: "Selling price", min: 120, inputMode: "decimal" },
   { key: "supplier", label: "Supplier", min: 130 },
+  { key: "barcode", label: "Barcode", min: 130 },
   { key: "batch", label: "Batch", min: 110 },
   { key: "expiry", label: "Expiry", min: 120 }
 ];
