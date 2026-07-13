@@ -1,4 +1,4 @@
-from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _fill_unique_source_pair_fields, _invoice_date_from_text, _invoice_number_from_text, _invoice_total_from_text, _medicine_order_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, _read_oriented_invoice_words, _supplier_name_from_text, _merge_geometry_passes, extract_geometry_table_items, extract_positioned_row_fields, merge_source_brain_invoice_items, reconstruct_bounded_invoice_rows, reconstruct_invoice_rows_from_word_positions
+from app.services.local_invoice_ocr import _apply_targeted_cell_readings, _best_ocr_metadata_value, _coherent_row_numbers, _fill_unique_source_pair_fields, _invoice_date_from_text, _invoice_number_from_text, _invoice_total_from_text, _medicine_order_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, _read_oriented_invoice_words, _supplier_name_from_text, _merge_geometry_passes, extract_geometry_table_items, extract_positioned_row_fields, merge_source_brain_invoice_items, reconstruct_bounded_invoice_rows, reconstruct_invoice_rows_from_word_positions
 
 
 def test_multiple_ocr_passes_merge_all_canonical_invoice_rows_and_fields():
@@ -221,3 +221,26 @@ def test_refined_geometry_prefers_complete_positive_margin_row_and_fills_batch()
         "batch_number": "BET-01Q", "expiry_date": "2027-12", "confidence": 0.94,
     }]
     assert _merge_geometry_passes(primary, refined)[0] == refined[0]
+
+
+def test_targeted_cell_ocr_repairs_ambiguous_numeric_roles_and_missing_batch():
+    wrong = {
+        "medicine_name": "Example", "quantity": 12, "unit_cost": 180.0,
+        "selling_price": 180.0, "line_total": 2160.0, "batch_number": "",
+    }
+    fixed = _apply_targeted_cell_readings(wrong, {
+        "quantity": "18", "unit_cost": "120.00", "selling_price": "180.00",
+        "line_total": "2,160.00", "batch_number": "BET-01Q",
+    })
+    assert fixed["quantity"] == 18
+    assert fixed["unit_cost"] == 120.0
+    assert fixed["selling_price"] == 180.0
+    assert fixed["line_total"] == 2160.0
+    assert fixed["batch_number"] == "BET-01Q"
+
+
+def test_targeted_cell_ocr_rejects_non_reconciling_numeric_replacement():
+    trusted = {"quantity": 30, "unit_cost": 35.0, "selling_price": 50.0, "line_total": 1050.0}
+    assert _apply_targeted_cell_readings(trusted, {
+        "quantity": "80", "unit_cost": "35", "selling_price": "50", "line_total": "1050",
+    }) == trusted

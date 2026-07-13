@@ -66,9 +66,7 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
     table_items = merge_source_brain_invoice_items(ocr_texts)
     geometry_items = extract_geometry_table_items(word_data)
     if _geometry_needs_refinement(geometry_items):
-        threshold = ImageOps.autocontrast(oriented_image).point(lambda value: 255 if value > 175 else 0)
-        refined_data = pytesseract.image_to_data(threshold, config="--psm 6", output_type=pytesseract.Output.DICT)
-        geometry_items = _merge_geometry_passes(geometry_items, extract_geometry_table_items(refined_data))
+        geometry_items = _refine_ambiguous_invoice_cells(oriented_image, word_data, geometry_items, pytesseract)
     table_items = _merge_geometry_items(table_items, geometry_items)
     _fill_unique_source_pair_fields(table_items)
     for item in table_items:
@@ -287,6 +285,112 @@ def _geometry_needs_refinement(items: list[dict[str, Any]]) -> bool:
         if selling not in (None, "") and float(item.get("unit_cost") or 0) >= float(selling):
             return True
     return False
+
+
+def _refine_ambiguous_invoice_cells(
+    image: Image.Image,
+    data: dict[str, list[Any]],
+    items: list[dict[str, Any]],
+    pytesseract: Any,
+) -> list[dict[str, Any]]:
+    boxes = _invoice_cell_boxes(data, image.size)
+    refined: list[dict[str, Any]] = []
+    for item in items:
+        candidate = dict(item)
+        row_boxes = boxes.get(str(item.get("medicine_name")), {})
+        readings: dict[str, str] = {}
+        if not item.get("batch_number") and row_boxes.get("batch"):
+            readings["batch_number"] = _read_invoice_cell(image, row_boxes["batch"], pytesseract, "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-")
+        selling = item.get("selling_price")
+        suspicious_numbers = selling not in (None, "") and float(item.get("unit_cost") or 0) >= float(selling)
+        if suspicious_numbers:
+            for field in ("quantity", "unit_cost", "selling_price", "line_total"):
+                if row_boxes.get(field):
+                    readings[field] = _read_invoice_cell(image, row_boxes[field], pytesseract, "0123456789.,")
+        candidate = _apply_targeted_cell_readings(candidate, readings)
+        refined.append(candidate)
+    return refined
+
+
+def _read_invoice_cell(image: Image.Image, box: tuple[int, int, int, int], pytesseract: Any, whitelist: str) -> str:
+    left, top, right, bottom = box
+    crop = image.crop((left + 2, top + 2, right - 2, bottom - 2))
+    crop = crop.resize((max(1, crop.width * 3), max(1, crop.height * 3)), Image.Resampling.LANCZOS)
+    crop = ImageEnhance.Sharpness(ImageOps.autocontrast(crop)).enhance(2.0)
+    return "".join(pytesseract.image_to_string(
+        crop,
+        config=f"--psm 7 -c tessedit_char_whitelist={whitelist}",
+    ).split())
+
+
+def _apply_targeted_cell_readings(item: dict[str, Any], readings: dict[str, str]) -> dict[str, Any]:
+    result = dict(item)
+    batch = readings.get("batch_number", "").upper()
+    if re.fullmatch(r"(?=[A-Z0-9-]*[A-Z])(?=[A-Z0-9-]*\d)[A-Z0-9]+(?:-[A-Z0-9]+)+", batch):
+        result["batch_number"] = batch
+    try:
+        quantity = int(float(re.sub(r"[^0-9.]", "", readings.get("quantity", ""))))
+        unit_cost = _ocr_money(re.sub(r"[^0-9.,]", "", readings.get("unit_cost", "")))
+        selling_price = _ocr_money(re.sub(r"[^0-9.,]", "", readings.get("selling_price", "")))
+        line_total = _ocr_money(re.sub(r"[^0-9.,]", "", readings.get("line_total", "")))
+    except (ValueError, TypeError):
+        return result
+    if quantity > 0 and unit_cost >= 0 and selling_price > unit_cost and line_total > 0 \
+            and abs(quantity * unit_cost - line_total) < 0.01:
+        result.update({
+            "quantity": quantity,
+            "unit_cost": unit_cost,
+            "selling_price": selling_price,
+            "line_total": line_total,
+        })
+    return result
+
+
+def _invoice_cell_boxes(data: dict[str, list[Any]], image_size: tuple[int, int]) -> dict[str, dict[str, tuple[int, int, int, int]]]:
+    tokens: list[dict[str, Any]] = []
+    for index, raw_text in enumerate(data.get("text") or []):
+        text = " ".join(str(raw_text or "").split())
+        if not text:
+            continue
+        try:
+            left = int((data.get("left") or [])[index])
+            top = int((data.get("top") or [])[index])
+            width = int((data.get("width") or [])[index])
+            height = int((data.get("height") or [])[index])
+        except (ValueError, TypeError, IndexError):
+            continue
+        tokens.append({"text": text, "center_x": left + width / 2, "center_y": top + height / 2})
+    anchors = _unique_medicine_anchors(tokens, load_source_brain_medicines())
+    if not anchors:
+        return {}
+    header = [token for token in tokens if token["center_y"] < anchors[0][0]]
+
+    def x_for(*labels: str) -> float:
+        matches = [token["center_x"] for token in header if token["text"].lower() in labels]
+        return max(matches, default=0)
+
+    columns = [
+        ("medicine", min((token["center_x"] for token in header if token["text"].lower().startswith("medicine")), default=0)),
+        ("form", x_for("form")), ("unit", x_for("unit")), ("pack", x_for("pack", "size")),
+        ("quantity", x_for("qty", "quantity")), ("unit_cost", x_for("cost")),
+        ("selling_price", x_for("price")), ("line_total", x_for("total")),
+        ("batch", x_for("batch")), ("expiry", x_for("expiry", "expires")),
+    ]
+    columns = [(name, x) for name, x in columns if x > 0]
+    columns.sort(key=lambda entry: entry[1])
+    if not all(any(name == required for name, _ in columns) for required in ("quantity", "unit_cost", "line_total", "batch")):
+        return {}
+    x_edges = [0] + [int((columns[index][1] + columns[index + 1][1]) / 2) for index in range(len(columns) - 1)] + [image_size[0]]
+    typical_gap = min((anchors[index + 1][0] - anchors[index][0] for index in range(len(anchors) - 1)), default=80)
+    result: dict[str, dict[str, tuple[int, int, int, int]]] = {}
+    for row_index, (center_y, name) in enumerate(anchors):
+        top = int((anchors[row_index - 1][0] + center_y) / 2) if row_index else max(0, int(center_y - typical_gap / 2))
+        bottom = int((center_y + anchors[row_index + 1][0]) / 2) if row_index + 1 < len(anchors) else min(image_size[1], int(center_y + typical_gap / 2))
+        result[name] = {
+            field: (x_edges[index], top, x_edges[index + 1], bottom)
+            for index, (field, _x) in enumerate(columns)
+        }
+    return result
 
 
 def _merge_geometry_passes(primary: list[dict[str, Any]], refined: list[dict[str, Any]]) -> list[dict[str, Any]]:
