@@ -30,7 +30,7 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
             image.thumbnail((longest_edge, longest_edge))
             image = ImageOps.autocontrast(image)
             image = ImageEnhance.Contrast(image).enhance(1.5)
-            word_data, geometry_rows = _read_oriented_invoice_words(image, pytesseract)
+            word_data, geometry_rows, oriented_image = _read_oriented_invoice_words(image, pytesseract)
             geometry_text = "\n".join(geometry_rows)
             ocr_texts = []
             if geometry_text:
@@ -64,7 +64,12 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
     if not re.search(r"\d", str(extraction.get("invoice_number") or "")):
         extraction["invoice_number"] = ""
     table_items = merge_source_brain_invoice_items(ocr_texts)
-    table_items = _merge_geometry_items(table_items, extract_geometry_table_items(word_data))
+    geometry_items = extract_geometry_table_items(word_data)
+    if _geometry_needs_refinement(geometry_items):
+        threshold = ImageOps.autocontrast(oriented_image).point(lambda value: 255 if value > 175 else 0)
+        refined_data = pytesseract.image_to_data(threshold, config="--psm 6", output_type=pytesseract.Output.DICT)
+        geometry_items = _merge_geometry_passes(geometry_items, extract_geometry_table_items(refined_data))
+    table_items = _merge_geometry_items(table_items, geometry_items)
     _fill_unique_source_pair_fields(table_items)
     for item in table_items:
         for field, value in positioned_fields.get(str(item.get("medicine_name")), {}).items():
@@ -108,7 +113,7 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
     return extraction
 
 
-def _read_oriented_invoice_words(image: Image.Image, pytesseract: Any) -> tuple[dict[str, list[Any]], list[str]]:
+def _read_oriented_invoice_words(image: Image.Image, pytesseract: Any) -> tuple[dict[str, list[Any]], list[str], Image.Image]:
     """Retry expensive sparse/rotated OCR only when the normal orientation has no medicine anchors."""
     attempts = [(image, "--psm 6"), (image, "--psm 11")]
     attempts.extend((image.transpose(rotation), "--psm 11") for rotation in (
@@ -123,8 +128,8 @@ def _read_oriented_invoice_words(image: Image.Image, pytesseract: Any) -> tuple[
             first_data = data
         rows = reconstruct_bounded_invoice_rows(data)
         if rows:
-            return data, rows
-    return first_data, []
+            return data, rows, attempt_image
+    return first_data, [], image
 
 
 def reconstruct_invoice_rows_from_word_positions(data: dict[str, list[Any]]) -> list[str]:
@@ -270,6 +275,51 @@ def _merge_geometry_items(items: list[dict[str, Any]], geometry_items: list[dict
         else:
             by_name[name] = item
     return sorted(by_name.values(), key=lambda item: order.index(str(item.get("medicine_name"))) if str(item.get("medicine_name")) in order else len(order))
+
+
+def _geometry_needs_refinement(items: list[dict[str, Any]]) -> bool:
+    if not items:
+        return False
+    for item in items:
+        if not _row_has_required_invoice_fields(item):
+            return True
+        selling = item.get("selling_price")
+        if selling not in (None, "") and float(item.get("unit_cost") or 0) >= float(selling):
+            return True
+    return False
+
+
+def _merge_geometry_passes(primary: list[dict[str, Any]], refined: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    refined_by_name = {str(item.get("medicine_name")): item for item in refined}
+    result: list[dict[str, Any]] = []
+    for original in primary:
+        alternative = refined_by_name.pop(str(original.get("medicine_name")), None)
+        if not alternative:
+            result.append(original)
+            continue
+        ranked = sorted([original, alternative], key=_geometry_item_score, reverse=True)
+        chosen = dict(ranked[0])
+        for field in ("form", "unit", "selling_price", "batch_number", "expiry_date"):
+            if chosen.get(field) in (None, "", 0):
+                chosen[field] = ranked[1].get(field)
+        result.append(chosen)
+    result.extend(refined_by_name.values())
+    return result
+
+
+def _geometry_item_score(item: dict[str, Any]) -> tuple[int, int, int]:
+    complete = sum(item.get(field) not in (None, "", 0) for field in (
+        "form", "unit", "quantity", "unit_cost", "line_total", "batch_number", "expiry_date"
+    ))
+    arithmetic = int(
+        item.get("quantity") not in (None, "", 0)
+        and item.get("unit_cost") not in (None, "")
+        and item.get("line_total") not in (None, "", 0)
+        and abs(float(item["quantity"]) * float(item["unit_cost"]) - float(item["line_total"])) < 0.01
+    )
+    selling = item.get("selling_price")
+    positive_margin = int(selling not in (None, "") and float(selling) > float(item.get("unit_cost") or 0))
+    return arithmetic, positive_margin, complete
 
 
 def reconstruct_bounded_invoice_rows(data: dict[str, list[Any]]) -> list[str]:

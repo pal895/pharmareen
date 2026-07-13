@@ -10,6 +10,7 @@
 - Named geometry is authoritative for quantity, buying price, optional selling price, and line total. Do not let arithmetic select a different role combination merely because extra numeric columns form another valid equation. Missing geometry stays missing and blocks approval.
 - Canceling a review card is a UI action, not permission to forget strong recognition evidence. Retain a small local invoice-memory ledger so a weaker rescan cannot replace a stronger earlier read. Optional selling price should be reviewed and saved when present but must not become an approval requirement when absent.
 - Derive header, row, and order text from the selected coordinate pass instead of running a redundant whole-page text OCR pass. Camera frames already prepared at the capture limit should be uploaded directly without a second canvas decode/re-encode.
+- If a geometry row is incomplete or its buying price is not below an observed selling price, run one alternate high-contrast binary coordinate pass. Prefer an arithmetic-valid complete row with a positive selling margin, and use the other pass only to fill nonnumeric blanks such as batch. Do not pay for this pass on already coherent rows.
 
 ## Reusable diagnosis
 
