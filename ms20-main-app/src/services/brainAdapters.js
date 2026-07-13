@@ -161,6 +161,7 @@ function normalizeCatalogItem(item) {
     batches: item.batches || [],
     expiry: item.expiry || "",
     shelf: item.shelf || item.location || "",
+    reorderLevel: item.reorderLevel ?? item.reorder_level ?? "",
     stockLeft: item.stockLeft ?? item.current_stock ?? item.stock ?? null,
     source: item.source || "pharmacy_catalog"
   };

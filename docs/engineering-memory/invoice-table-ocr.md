@@ -66,3 +66,7 @@ Independent batch voting is insufficient when a displaced batch has accumulated 
 Do not use isolated Tesseract token coordinates as the final order source on phone captures: coordinate groups can be unstable and rotate an otherwise correct table. Prefer medicine occurrence order from the primary whole-page OCR pass when it recognizes every extracted medicine. Use bounded medicine geometry only when the primary ordered text is incomplete. Ordering logic must never rewrite row values.
 
 OCR review must have an exit from uncertainty. Preserve a canonical card's valid nonblank value when a new scan is blank, expose mobile row up/down controls, and recompute the completeness/approval gate immediately after every field edit or row move. Once the owner corrects a complete canonical review, preserve that verified order on matching rescans instead of allowing a weaker new scan to reorder it.
+
+## Catalog access and safe editing
+
+Pharmacy owners must not need to remember chat commands to view their medicines. Keep a permanent `SHOW ME` workspace action outside Operations Chat and load its contents only from the persisted Pharmacy Catalog. Catalog rows open Medicine Action Cards whose edits remain drafts until explicit approval. Discard leaves persisted data untouched; approval updates the existing canonical record, and an identity change that collides with another catalog medicine is blocked rather than silently merged. Browsing, search, review, validation, and ordinary edits stay deterministic, local, and zero-token.

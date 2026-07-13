@@ -446,3 +446,11 @@ Accepted additions that must remain integrated:
 - Catalog recovery now merges duplicate medicine identities and preserves strength rather than reproducing duplicate cards or dropping strength on future saves.
 - Focused checks cover persistence loading, duplicate merging, strength preservation, all-item count, local search, zero-token behavior, direct home access, post-save transition, and mobile/desktop responsive layout hooks.
 - Exact pause: refreshed MS2.0 Operations Chat showing the saved messages. Deploy the catalog workspace commit, refresh once, then verify the new catalog experience from the current state.
+
+## SHOW ME and editable catalog cards - 2026-07-13
+
+- Before the unpulled catalog workspace was deployed, it was extended with a permanent `SHOW ME` action on the top-level home screen, outside Operations Chat.
+- `SHOW ME` opens the same persisted Pharmacy Catalog workspace. Selecting a saved medicine opens a local Medicine Action Card with common fields first and packaging/supplier/traceability fields behind progressive disclosure.
+- Edits are drafts: the stored record is unchanged until `Approve & save`; `Discard` cancels them. Approval replaces the existing record by stable identity, persists locally/cloud-side, and does not create a duplicate. Renaming to an already-existing catalog identity is blocked with a clear message rather than silently merged.
+- Focused verification protects top-level access, persisted catalog use, editable selection, approved and cancelled edits, refresh serialization, duplicate/collision safety, responsive layout, and zero-token operation.
+- Current sequence remains Test 3 onboarding completion. Deploy both unpulled catalog commits together, then begin the combined live pass from the refreshed MS2.0 home screen.

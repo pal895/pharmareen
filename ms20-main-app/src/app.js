@@ -18,7 +18,15 @@ import {
 } from "./services/catalogOnboarding.js";
 import { buildDeterministicNotifications, mergeNotifications, notificationToCard } from "./services/notificationCenter.js";
 import { buildCatalogCsv, buildBulkPasteTemplate, buildDocumentCard, downloadTextFile } from "./services/documentGenerator.js";
-import { createCatalogWorkspaceCard, catalogWorkspaceItems } from "./services/catalogWorkspace.js";
+import {
+  CATALOG_EDIT_FIELDS,
+  applyApprovedCatalogEdit,
+  catalogItemId,
+  createCatalogEditDraft,
+  createCatalogWorkspaceCard,
+  catalogWorkspaceItems,
+  reviewCatalogEdit
+} from "./services/catalogWorkspace.js";
 import { cardFieldsFor, createEditableCard, paymentOptions, quantityBumps } from "./cards/editableCards.js";
 import { resolveStockCheck } from "./services/localIntelligence.js";
 import { listRouteSlots, resolveOfflineSlot } from "./routes/routeRegistry.js";
@@ -211,17 +219,15 @@ function chatHomeTemplate() {
         </span>
         <span class="row-arrow">Open</span>
       </button>
-      ${pharmacyBrain.catalog.length ? `
-        <button class="conversation-row catalog-row" type="button" data-action="open-catalog" aria-label="Open pharmacy catalog">
-          <span class="assistant-avatar catalog-avatar">${pharmacyBrain.catalog.length}</span>
+      <button class="show-me-action" type="button" data-action="open-catalog" aria-label="Show my complete pharmacy catalog">
+          <span class="show-me-icon" aria-hidden="true">&#128065;</span>
           <span class="conversation-copy">
-            <strong>Pharmacy catalog</strong>
-            <small>${pharmacyBrain.catalog.length} medicines</small>
-            <span>Search and review the complete saved catalog.</span>
+            <strong>SHOW ME</strong>
+            <small>${pharmacyBrain.catalog.length} saved medicine${pharmacyBrain.catalog.length === 1 ? "" : "s"}</small>
+            <span>Open, search, and safely edit your Pharmacy Catalog.</span>
           </span>
           <span class="row-arrow">Open</span>
-        </button>
-      ` : ""}
+      </button>
     </section>
   `;
 }
@@ -476,9 +482,9 @@ function catalogWorkspaceTemplate(card) {
         <input type="search" data-catalog-search data-card-id="${card.id}" value="${escapeHtml(query)}" placeholder="Medicine, form, supplier, barcode">
       </label>
       <p class="catalog-result-count">Showing ${items.length} of ${pharmacyBrain.catalog.length}</p>
-      <div class="catalog-workspace-list">
-        ${items.length ? items.map(catalogWorkspaceItemTemplate).join("") : '<p class="catalog-empty">No medicines match this search.</p>'}
-      </div>
+      ${card.fields?.selected_id ? catalogMedicineEditorTemplate(card) : `<div class="catalog-workspace-list">
+        ${items.length ? items.map(catalogWorkspaceItemTemplate).join("") : `<p class="catalog-empty">${pharmacyBrain.catalog.length ? "No medicines match this search." : "No medicines have been saved in this pharmacy yet."}</p>`}
+      </div>`}
     </section>
   `;
 }
@@ -511,7 +517,31 @@ function catalogWorkspaceItemTemplate(item) {
         </div>
       </div>
       ${details.length ? `<details><summary>More details</summary><dl>${details.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd></div>`).join("")}</dl></details>` : ""}
+      <button class="catalog-open-medicine" type="button" data-action="open-catalog-medicine" data-medicine-id="${escapeHtml(catalogItemId(item))}">Open &amp; edit</button>
     </article>
+  `;
+}
+
+function catalogMedicineEditorTemplate(card) {
+  const draft = catalogEditDraft(card);
+  const review = reviewCatalogEdit(pharmacyBrain.catalog, card.fields.selected_id, draft);
+  const advanced = new Set(["pack_size", "supplier", "shelf", "barcode", "batch", "expiry", "reorder_level", "aliases"]);
+  const fields = (showAdvanced) => CATALOG_EDIT_FIELDS.filter((field) => advanced.has(field) === showAdvanced).map((field) => `
+    <label><span>${escapeHtml(fieldLabel(field))}</span><input data-catalog-edit-field="${field}" data-card-id="${card.id}" value="${escapeHtml(String(draft[field] ?? ""))}" ${["stock", "selling_price", "cost_price", "reorder_level"].includes(field) ? 'inputmode="decimal"' : ""}></label>
+  `).join("");
+  return `
+    <section class="catalog-medicine-editor" aria-label="Edit ${escapeHtml(draft.name || "medicine")}">
+      <button class="catalog-back" type="button" data-action="cancel-catalog-edit" data-card-id="${card.id}">&larr; Back to catalog</button>
+      <div class="catalog-editor-heading"><div><small>Medicine Action Card</small><h3>${escapeHtml(draft.name || "Medicine")}</h3></div><span>Unsaved draft</span></div>
+      <p>Check the changes below. The saved medicine stays unchanged until you approve.</p>
+      <div class="catalog-edit-grid">${fields(false)}</div>
+      <details class="catalog-advanced-fields"><summary>Packaging, supplier and other details</summary><div class="catalog-edit-grid">${fields(true)}</div></details>
+      ${review.error ? `<p class="catalog-edit-warning" role="alert">${escapeHtml(review.error)}</p>` : review.changes?.length ? `<p class="catalog-change-summary">Review: ${review.changes.length} field${review.changes.length === 1 ? "" : "s"} changed — ${review.changes.map(fieldLabel).join(", ")}.</p>` : '<p class="catalog-change-summary">No changes yet.</p>'}
+      <div class="catalog-edit-actions">
+        <button type="button" data-action="approve-catalog-edit" data-card-id="${card.id}" ${review.valid && review.changes?.length ? "" : "disabled"}>Approve &amp; save</button>
+        <button type="button" data-action="cancel-catalog-edit" data-card-id="${card.id}">Discard</button>
+      </div>
+    </section>
   `;
 }
 
@@ -630,6 +660,7 @@ function catalogImportMobileRowTemplate(cardId, row, index, columns = CATALOG_TA
 }
 
 function activeActionsTemplate(card) {
+  if (card.type === "CatalogWorkspaceCard") return "";
   if (card.type === "CatalogOnboardingCard") {
     return `
       <div class="card-actions onboarding-actions">
@@ -771,6 +802,9 @@ function bindEvents() {
   root.querySelector("[data-catalog-search]")?.addEventListener("input", (event) => {
     updateCatalogSearch(event.target.dataset.cardId, event.target.value);
   });
+  root.querySelectorAll("[data-catalog-edit-field]").forEach((input) => {
+    input.addEventListener("input", () => updateCatalogEditDraft(input.dataset.cardId, input.dataset.catalogEditField, input.value));
+  });
 }
 
 function handleAction(dataset) {
@@ -797,6 +831,9 @@ function handleAction(dataset) {
     render();
     return;
   }
+  if (action === "open-catalog-medicine") openCatalogMedicine(dataset.medicineId);
+  if (action === "cancel-catalog-edit") cancelCatalogEdit(dataset.cardId);
+  if (action === "approve-catalog-edit") approveCatalogEdit(dataset.cardId);
   if (action === "back-home") {
     state.ui.screen = "home";
     render();
@@ -1833,6 +1870,68 @@ function showCatalogWorkspace() {
   state.cards = state.cards.filter((card) => card.type !== "CatalogWorkspaceCard");
   state.cards.unshift(createCatalogWorkspaceCard(pharmacyBrain.catalog.length));
   persistActiveCards();
+}
+
+function catalogEditDraft(card) {
+  try {
+    return JSON.parse(card.fields?.edit_draft || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function openCatalogMedicine(medicineId) {
+  const card = state.cards.find((item) => item.type === "CatalogWorkspaceCard");
+  const medicine = pharmacyBrain.catalog.find((item) => catalogItemId(item) === String(medicineId));
+  if (!card || !medicine) return;
+  card.fields.selected_id = catalogItemId(medicine);
+  card.fields.edit_draft = JSON.stringify(createCatalogEditDraft(medicine));
+  persistActiveCards();
+  render();
+}
+
+function updateCatalogEditDraft(cardId, field, value) {
+  const card = state.cards.find((item) => item.id === cardId && item.type === "CatalogWorkspaceCard");
+  if (!card || !CATALOG_EDIT_FIELDS.includes(field)) return;
+  const draft = catalogEditDraft(card);
+  draft[field] = value;
+  card.fields.edit_draft = JSON.stringify(draft);
+  persistActiveCards();
+  const warning = root.querySelector(".catalog-edit-warning, .catalog-change-summary");
+  const review = reviewCatalogEdit(pharmacyBrain.catalog, card.fields.selected_id, draft);
+  if (warning) {
+    warning.className = review.error ? "catalog-edit-warning" : "catalog-change-summary";
+    warning.textContent = review.error || (review.changes.length ? `Review: ${review.changes.length} field${review.changes.length === 1 ? "" : "s"} changed — ${review.changes.map(fieldLabel).join(", ")}.` : "No changes yet.");
+  }
+  const approve = root.querySelector('[data-action="approve-catalog-edit"]');
+  if (approve) approve.disabled = !review.valid || !review.changes?.length;
+}
+
+function cancelCatalogEdit(cardId) {
+  const card = state.cards.find((item) => item.id === cardId && item.type === "CatalogWorkspaceCard");
+  if (!card) return;
+  card.fields.selected_id = "";
+  card.fields.edit_draft = "";
+  persistActiveCards();
+  render();
+}
+
+function approveCatalogEdit(cardId) {
+  const card = state.cards.find((item) => item.id === cardId && item.type === "CatalogWorkspaceCard");
+  if (!card) return;
+  const result = applyApprovedCatalogEdit(pharmacyBrain.catalog, card.fields.selected_id, catalogEditDraft(card));
+  if (!result.valid || !result.changes?.length) return;
+  pharmacyBrain.loadCatalog(result.catalog);
+  state.catalog.items = pharmacyBrain.catalog;
+  safeLocalStorage()?.setItem(CATALOG_KEY, JSON.stringify(state.catalog.items));
+  void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);
+  addFeed("system", `${result.updated.name} updated in the Pharmacy Catalog.`);
+  card.fields.selected_id = "";
+  card.fields.edit_draft = "";
+  card.fields.item_count = String(pharmacyBrain.catalog.length);
+  persistActiveCards();
+  refreshNotifications();
+  render();
 }
 
 function updateCatalogSearch(cardId, value) {

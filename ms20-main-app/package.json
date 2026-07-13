@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "check": "node --check src/app.js",
+    "verify:catalog": "node tools/verify-catalog-workspace.mjs",
     "verify": "node tools/verify-architecture.mjs",
     "serve": "node tools/serve.mjs"
   }

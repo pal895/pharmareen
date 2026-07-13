@@ -156,7 +156,7 @@ const { SourceBrain, PharmacyBrain } = await import(pathToFileURL(path.join(root
 const { createPasteImportCard, parseBulkMedicineList, parseDelimitedInventory, partitionCatalogItems, buildCatalogSavedSummary } = await import(pathToFileURL(path.join(root, "src/services/catalogOnboarding.js")));
 const { buildDeterministicNotifications, mergeNotifications } = await import(pathToFileURL(path.join(root, "src/services/notificationCenter.js")));
 const { buildCatalogCsv, buildBulkPasteTemplate } = await import(pathToFileURL(path.join(root, "src/services/documentGenerator.js")));
-const { createCatalogWorkspaceCard, catalogWorkspaceItems } = await import(pathToFileURL(path.join(root, "src/services/catalogWorkspace.js")));
+const { createCatalogWorkspaceCard, catalogWorkspaceItems, createCatalogEditDraft, reviewCatalogEdit, applyApprovedCatalogEdit } = await import(pathToFileURL(path.join(root, "src/services/catalogWorkspace.js")));
 
 const sale = parseLocalCommand("panadol2cash");
 assert(sale.kind === "sale", "Demo text command did not create a sale parse");
@@ -212,6 +212,11 @@ const workspaceCard = createCatalogWorkspaceCard(pharmacyBrain.catalog.length);
 assert(workspaceCard.fields.item_count === "4" && workspaceCard.aiRequired === false, "Catalog workspace must reference the saved catalog without AI");
 const workspaceItems = catalogWorkspaceItems(pharmacyBrain.catalog, "vial");
 assert(workspaceItems.length === 1 && workspaceItems[0].name === "Ceftriaxone", "Catalog workspace search must filter saved medicines locally");
+const editDraft = createCatalogEditDraft(pharmacyBrain.catalog.find((item) => item.name === "Cefixime"));
+editDraft.selling_price = "125";
+assert(reviewCatalogEdit(pharmacyBrain.catalog, editDraft.id, editDraft).valid, "Catalog medicine edit must enter deterministic review");
+const editedCatalog = applyApprovedCatalogEdit(pharmacyBrain.catalog, editDraft.id, editDraft);
+assert(editedCatalog.catalog.length === 4 && editedCatalog.updated.sellingPrice === "125", "Approved catalog edit must update without duplicating");
 assert(pharmacyBrain.findMedicine("Ceftriaxone").status === "matched", "Catalog upsert lookup failed for added medicine");
 const spellingMatch = pharmacyBrain.findMedicine("Cefimixe");
 assert(spellingMatch.status === "matched" && spellingMatch.matchType === "spelling_variation", "Unique catalog spelling variation should match locally");
