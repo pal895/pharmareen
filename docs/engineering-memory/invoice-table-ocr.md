@@ -5,6 +5,7 @@
 - The AfyaLink first supplier-invoice onboarding test passed end to end: four medicines, no unclear lines, approval, catalog save, export confirmation, and final Saved message.
 - Preserve strongest-evidence merging, medicine-scoped evidence, total consistency, editable correction, and manual row-order controls as the regression baseline.
 - Test 2 is the required final consistency invoice. Its asset is `ms20-main-app/fixtures/test-2-dawa-bora-invoice.png`, backed by a verified manifest and new Source Brain medicines excluded from Zuri Pharmacy's 13-item catalog.
+- Test 2's first two landscape phone captures found no rows. The reusable cause was layout diversity: strength, pack-size, and selling-price columns make numeric token order unsafe, and a single dense-block OCR segmentation can miss wide sparse tables. Preserve more landscape resolution, retry sparse segmentation only when row anchors are absent, and parse named columns by x-position.
 
 ## Reusable diagnosis
 

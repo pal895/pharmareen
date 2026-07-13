@@ -1,4 +1,4 @@
-from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _fill_unique_source_pair_fields, _invoice_date_from_text, _invoice_number_from_text, _invoice_total_from_text, _medicine_order_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, extract_positioned_row_fields, merge_source_brain_invoice_items, reconstruct_bounded_invoice_rows, reconstruct_invoice_rows_from_word_positions
+from app.services.local_invoice_ocr import _best_ocr_metadata_value, _coherent_row_numbers, _fill_unique_source_pair_fields, _invoice_date_from_text, _invoice_number_from_text, _invoice_total_from_text, _medicine_order_from_text, _normalize_batch_digits_by_invoice_pattern, _ocr_money, extract_geometry_table_items, extract_positioned_row_fields, merge_source_brain_invoice_items, reconstruct_bounded_invoice_rows, reconstruct_invoice_rows_from_word_positions
 
 
 def test_multiple_ocr_passes_merge_all_canonical_invoice_rows_and_fields():
@@ -158,3 +158,22 @@ def test_compact_expiry_and_header_invoice_number_are_recovered():
 def test_primary_text_preserves_document_medicine_order():
     text = "Acyclovir cream\nClotrimazole pessary\nDoxycycline capsule\nChloramphenicol eye drops"
     assert _medicine_order_from_text(text) == ["Acyclovir", "Clotrimazole", "Doxycycline", "Chloramphenicol"]
+
+
+def test_geometry_columns_ignore_strength_pack_size_and_selling_price():
+    headers = ["Medicine", "Form", "Unit", "Pack", "Qty", "cost", "price", "total", "Batch", "Expiry"]
+    row = ["Albendazole", "chewable", "tablet", "tablet", "1 tablet", "30", "35.00", "50.00", "1,050.00", "ALB-4C7", "2028-11"]
+    texts = headers + row
+    left = [10, 250, 370, 480, 600, 700, 810, 920, 1050, 1160] + [10, 250, 315, 370, 480, 600, 700, 810, 920, 1050, 1160]
+    data = {
+        "text": texts,
+        "left": left,
+        "top": [50] * len(headers) + [100] * len(row),
+        "width": [60] * len(texts),
+        "height": [20] * len(texts),
+    }
+    assert extract_geometry_table_items(data) == [{
+        "medicine_name": "Albendazole", "form": "chewable tablet", "unit": "tablet",
+        "quantity": 30, "unit_cost": 35.0, "line_total": 1050.0,
+        "batch_number": "ALB-4C7", "expiry_date": "2028-11", "confidence": 0.94,
+    }]

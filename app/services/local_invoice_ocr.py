@@ -26,7 +26,8 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
     try:
         with Image.open(io.BytesIO(image_bytes)) as source:
             image = ImageOps.exif_transpose(source).convert("L")
-            image.thumbnail((1800, 1800))
+            longest_edge = 2400 if image.width > image.height else 1800
+            image.thumbnail((longest_edge, longest_edge))
             image = ImageOps.autocontrast(image)
             image = ImageEnhance.Contrast(image).enhance(1.5)
             ocr_texts = [
@@ -35,6 +36,11 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
             primary_text_order = _medicine_order_from_text(ocr_texts[0])
             word_data = pytesseract.image_to_data(image, config="--psm 6", output_type=pytesseract.Output.DICT)
             geometry_rows = reconstruct_bounded_invoice_rows(word_data)
+            if not geometry_rows:
+                sparse_data = pytesseract.image_to_data(image, config="--psm 11", output_type=pytesseract.Output.DICT)
+                if reconstruct_bounded_invoice_rows(sparse_data):
+                    word_data = sparse_data
+                    geometry_rows = reconstruct_bounded_invoice_rows(word_data)
             geometry_text = "\n".join(geometry_rows)
             if geometry_text:
                 ocr_texts.append(geometry_text)
@@ -66,6 +72,7 @@ def scan_invoice_locally(image_bytes: bytes) -> dict[str, Any]:
     if not re.search(r"\d", str(extraction.get("invoice_number") or "")):
         extraction["invoice_number"] = ""
     table_items = merge_source_brain_invoice_items(ocr_texts)
+    table_items = _merge_geometry_items(table_items, extract_geometry_table_items(word_data))
     _fill_unique_source_pair_fields(table_items)
     for item in table_items:
         for field, value in positioned_fields.get(str(item.get("medicine_name")), {}).items():
@@ -151,6 +158,100 @@ def reconstruct_invoice_rows_from_word_positions(data: dict[str, list[Any]]) -> 
             rows.append((anchor["center_y"], line))
             used_y.append(anchor["center_y"])
     return [line for _, line in sorted(rows)]
+
+
+def extract_geometry_table_items(data: dict[str, list[Any]]) -> list[dict[str, Any]]:
+    """Read variable-layout invoice cells from named column positions, not numeric token order."""
+    medicines = load_source_brain_medicines()
+    tokens: list[dict[str, Any]] = []
+    for index, raw_text in enumerate(data.get("text") or []):
+        text = " ".join(str(raw_text or "").split())
+        if not text:
+            continue
+        try:
+            left = int((data.get("left") or [])[index])
+            top = int((data.get("top") or [])[index])
+            width = int((data.get("width") or [])[index])
+            height = int((data.get("height") or [])[index])
+        except (ValueError, TypeError, IndexError):
+            continue
+        tokens.append({"text": text, "left": left, "center_x": left + width / 2, "center_y": top + height / 2})
+    anchors = _unique_medicine_anchors(tokens, medicines)
+    if not anchors:
+        return []
+    header_tokens = [token for token in tokens if token["center_y"] < anchors[0][0]]
+
+    def rightmost(label: str) -> dict[str, Any] | None:
+        matches = [token for token in header_tokens if token["text"].lower() == label]
+        return max(matches, key=lambda token: token["center_x"], default=None)
+
+    qty = rightmost("qty") or rightmost("quantity")
+    cost = rightmost("cost")
+    total = rightmost("total")
+    batch = rightmost("batch")
+    expiry = rightmost("expiry") or rightmost("expires")
+    required = [qty, cost, total, batch, expiry]
+    if any(token is None for token in required):
+        return []
+    positions = {name: token["center_x"] for name, token in zip(("qty", "cost", "total", "batch", "expiry"), required)}
+    if positions != dict(sorted(positions.items(), key=lambda item: item[1])):
+        return []
+    form_headers = [token for token in header_tokens if token["text"].lower() == "form" and token["center_x"] < positions["qty"]]
+    unit_headers = [token for token in header_tokens if token["text"].lower() == "unit" and token["center_x"] < positions["qty"]]
+    form_x = max((token["center_x"] for token in form_headers), default=0)
+    unit_x = max((token["center_x"] for token in unit_headers), default=0)
+    pack = rightmost("pack") or rightmost("size")
+    price = rightmost("price")
+    column_centers = [("form", form_x), ("unit", unit_x), ("pack", pack["center_x"] if pack else 0),
+                      ("qty", positions["qty"]), ("cost", positions["cost"]),
+                      ("price", price["center_x"] if price else 0), ("total", positions["total"]),
+                      ("batch", positions["batch"]), ("expiry", positions["expiry"])]
+    column_centers = [(name, x) for name, x in column_centers if x > 0]
+    column_centers.sort(key=lambda item: item[1])
+    boundaries = [(column_centers[i][1] + column_centers[i + 1][1]) / 2 for i in range(len(column_centers) - 1)]
+    typical_gap = min((anchors[i + 1][0] - anchors[i][0] for i in range(len(anchors) - 1)), default=80)
+    medicine_map = {medicine["name"]: medicine for medicine in medicines}
+    rows: list[dict[str, Any]] = []
+    for index, (center_y, name) in enumerate(anchors):
+        lower = (anchors[index - 1][0] + center_y) / 2 if index else center_y - typical_gap / 2
+        upper = (center_y + anchors[index + 1][0]) / 2 if index + 1 < len(anchors) else center_y + typical_gap / 2
+        row_tokens = [token for token in tokens if lower <= token["center_y"] < upper]
+        cells: dict[str, str] = {}
+        for column_index, (column_name, _x) in enumerate(column_centers):
+            cell_left = boundaries[column_index - 1] if column_index else float("-inf")
+            cell_right = boundaries[column_index] if column_index < len(boundaries) else float("inf")
+            cells[column_name] = " ".join(token["text"] for token in sorted(row_tokens, key=lambda token: token["left"]) if cell_left <= token["center_x"] < cell_right)
+        medicine = medicine_map[name]
+        form = _best_known_value(f"{cells.get('form', '')} {cells.get('unit', '')}", medicine["forms"])
+        unit = _best_known_value(cells.get("unit", ""), medicine["units"])
+        quantity_match = re.search(r"\d+", cells.get("qty", ""))
+        cost_match = re.search(r"\d[\d,.]*", cells.get("cost", ""))
+        total_match = re.search(r"\d[\d,.]*", cells.get("total", ""))
+        batch_match = re.search(r"(?=[A-Z0-9-]*[A-Z])(?=[A-Z0-9-]*\d)[A-Z0-9]+(?:-[A-Z0-9]+)+", cells.get("batch", ""), flags=re.I)
+        expiry_match = re.search(r"(20\d{2})\D*(0[1-9]|1[0-2])", cells.get("expiry", ""))
+        if not (quantity_match and cost_match and total_match):
+            continue
+        rows.append({
+            "medicine_name": name,
+            "form": form,
+            "unit": unit,
+            "quantity": int(quantity_match.group()),
+            "unit_cost": _ocr_money(cost_match.group()),
+            "line_total": _ocr_money(total_match.group()),
+            "batch_number": batch_match.group() if batch_match else "",
+            "expiry_date": f"{expiry_match.group(1)}-{expiry_match.group(2)}" if expiry_match else "",
+            "confidence": 0.94,
+        })
+    return rows
+
+
+def _merge_geometry_items(items: list[dict[str, Any]], geometry_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    by_name = {str(item.get("medicine_name")): item for item in items}
+    order = [str(item.get("medicine_name")) for item in geometry_items]
+    for item in geometry_items:
+        name = str(item.get("medicine_name"))
+        by_name[name] = _merge_item_candidates([by_name[name], item]) if name in by_name else item
+    return sorted(by_name.values(), key=lambda item: order.index(str(item.get("medicine_name"))) if str(item.get("medicine_name")) in order else len(order))
 
 
 def reconstruct_bounded_invoice_rows(data: dict[str, list[Any]]) -> list[str]:
@@ -534,7 +635,7 @@ def _ocr_money(token: str) -> float:
 
 
 def _best_known_value(line: str, values: list[str]) -> str:
-    exact = next((value for value in values if _contains_name(line, value)), "")
+    exact = next((value for value in sorted(values, key=len, reverse=True) if _contains_name(line, value)), "")
     if exact:
         return exact
     singular_line = re.sub(r"\bdrops\b", "drop", line.lower())

@@ -390,3 +390,11 @@ Accepted additions that must remain integrated:
 - Test safe unit/pack conversions, no negative stock, no double deduction, durable card state, offline queue, reconnect/sync, and duplicate submission protection.
 - Test representative phone, tablet, and desktop layouts without claiming untested universal device support.
 - Fix each friction in the shared reusable component, run focused related regression checks, and return to the interrupted live action.
+
+## Test 2 live continuation update - 2026-07-13
+
+- The first two phone captures of the Dawa Bora landscape fixture returned no clear medicine rows.
+- The verified shared friction was layout diversity: the invoice includes strength, pack-size, and selling-price columns, and dense OCR segmentation found no stable medicine-row anchors.
+- The local reader now preserves more landscape resolution, uses sparse-text segmentation only as a zero-row fallback, and assigns values from named table columns by geometry so extra numeric columns cannot become quantity, cost, or line total.
+- Focused invoice OCR tests: 13 passed. Main App architecture verification: passed. OpenAI/API usage: zero.
+- Exact pause: deploy the new commit to Replit, then repeat only the interrupted Test 2 capture. Do not repeat Test 1.

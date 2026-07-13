@@ -1,6 +1,6 @@
 export const SourceMedicineList = [
   medicine("Acyclovir", ["acyclovir"], ["tablet", "cream", "suspension"], ["tablet", "tube", "bottle"]),
-  medicine("Albendazole", ["alben", "abendazole"], ["tablet", "suspension"], ["tablet", "bottle"]),
+  medicine("Albendazole", ["alben", "abendazole"], ["tablet", "suspension", "chewable tablet"], ["tablet", "bottle", "tablet"]),
   medicine("Amitriptyline", ["amitrip"], ["tablet"], ["tablet", "strip"]),
   medicine("Amlodipine", ["amlod"], ["tablet"], ["tablet", "strip"]),
   medicine("Artemether Lumefantrine", ["al", "lumartem", "coartem", "artemether"], ["tablet", "suspension"], ["tablet", "strip", "bottle"]),
