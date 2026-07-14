@@ -29,7 +29,6 @@ const root = {
 globalThis.localStorage = localStorage;
 Object.defineProperty(globalThis, "navigator", { value: { onLine: true, userAgent: "node-render-regression" }, configurable: true });
 globalThis.Node = { TEXT_NODE: 3 };
-globalThis.CSS = { escape: (value) => value };
 globalThis.document = {
   querySelector: (selector) => selector === "#app" ? root : null,
   querySelectorAll: () => []
@@ -44,10 +43,7 @@ globalThis.window = {
 
 await import("../src/app.js");
 root.onclick({ target: { closest: () => ({ dataset: { action: "open-chat", workspace: "operations" } }) } });
-if (!root.innerHTML.includes("Review medicine list") || !root.innerHTML.includes("Paste one medicine per line")) {
-  throw new Error("A resumed Paste List card must render in the Operations workspace");
+if (!root.innerHTML.includes("How can I help today?") || root.innerHTML.includes("Review medicine list")) {
+  throw new Error("Resume must discard repeated empty Paste List drafts and render Operations normally");
 }
-if (root.innerHTML.split("Review medicine list").length - 1 !== 1) {
-  throw new Error("Repeated empty Paste List taps must resume as one safe draft");
-}
-console.log("Pending Paste List render reproduction passed.");
+console.log("Pending Paste List recovery reproduction passed.");

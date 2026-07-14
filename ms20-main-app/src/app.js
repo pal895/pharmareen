@@ -225,7 +225,7 @@ function chatScreenTemplate() {
       <section class="chat-body" id="chatBody" aria-label="Messages">
         <div class="message-list">
           ${chatMessageTemplates()}
-          ${isNotifications ? "" : state.cards.map(cardTemplate).join("")}
+          ${isNotifications ? "" : state.cards.map(safeCardTemplate).join("")}
         </div>
       </section>
       ${isNotifications ? notificationsFooterTemplate() : composerTemplate()}
@@ -242,7 +242,7 @@ function chatMessageTemplates() {
       time: "Now"
     };
     const cards = activeNotificationCards();
-    return [intro].map(feedItemTemplate).join("") + cards.map(cardTemplate).join("");
+    return [intro].map(feedItemTemplate).join("") + cards.map(safeCardTemplate).join("");
   }
   const intro = {
     id: "intro",
@@ -407,6 +407,24 @@ function cardTemplate(card) {
       </div>
     </article>
   `;
+}
+
+function safeCardTemplate(card) {
+  try {
+    return cardTemplate(card);
+  } catch (error) {
+    console.error("MS2.0 isolated an unreadable review card", card?.id, error);
+    return `
+      <article class="card-message needs_correction" data-card-id="${escapeHtml(card?.id || "unreadable-card")}">
+        <div class="card-top">
+          <span class="card-heading"><span class="card-type">Review</span><strong>Draft could not be displayed</strong></span>
+          ${cardCloseButtonTemplate(card || { id: "", type: "ReviewCard" }, "top")}
+        </div>
+        <p class="card-note">Your saved Pharmacy Catalog is unchanged. Close this unreadable draft and reopen the workflow.</p>
+        <div class="card-bottom-close">${cardCloseButtonTemplate(card || { id: "", type: "ReviewCard" }, "bottom")}</div>
+      </article>
+    `;
+  }
 }
 
 function cardCloseButtonTemplate(card, placement) {
@@ -1643,15 +1661,12 @@ function reconcileResumeState() {
 }
 
 function consolidateEmptyPasteDrafts() {
-  let kept = false;
   state.cards = state.cards.filter((card) => {
     const emptyPasteDraft = card.type === "CatalogImportCard"
       && card.fields?.entry_mode === "paste_input"
       && !String(card.fields?.items_text || "").trim();
     if (!emptyPasteDraft) return true;
-    if (kept) return false;
-    kept = true;
-    return true;
+    return false;
   });
 }
 
@@ -1738,7 +1753,9 @@ function addCard(card) {
 }
 
 function focusCard(cardId) {
-  root.querySelector(`[data-card-id="${CSS.escape(String(cardId))}"]`)?.scrollIntoView({ block: "start", behavior: "smooth" });
+  const card = Array.from(root.querySelectorAll("[data-card-id]"))
+    .find((element) => element.dataset.cardId === String(cardId));
+  card?.scrollIntoView({ block: "start", behavior: "smooth" });
 }
 
 function addFeed(type, text) {

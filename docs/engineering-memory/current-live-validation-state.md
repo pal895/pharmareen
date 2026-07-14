@@ -20,6 +20,7 @@
 - Confirm shared row movement appears in a safe CSV or bulk-paste review and moves one intact row. Do not approve prepared existing data or create duplicates during this check.
 - Live evidence after `6476f7c` verified false expiry alerts were removed and the synchronized bottom catalog search appeared. File and Paste List quick actions then exposed a shared interaction-lifecycle failure before a review could open.
 - Live evidence after `60b2014` showed four import-approval alerts: repeated Paste List taps created empty drafts but did not navigate to the new card, making Operations appear hung while Notifications remained available. Empty repeated drafts now consolidate safely and every opened card is focused immediately.
+- Live evidence after `b011b6b` showed the retained blank draft still blocked Operations after its notification was dismissed. Resume now discards every truly empty Paste input draft and isolates any unreadable non-empty card so operational workspaces cannot be locked by one draft.
 
 ## Shared-root conclusions and drift
 
