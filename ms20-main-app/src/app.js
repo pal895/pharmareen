@@ -40,6 +40,7 @@ import {
 } from "./services/medicineFieldSchema.js";
 import { resolveStockCheck } from "./services/localIntelligence.js";
 import { catalogReviewCapabilities, reorderedCatalogRows } from "./services/catalogReviewPolicy.js";
+import { medicineReviewBlocker } from "./services/medicineReviewReadiness.js";
 import { listRouteSlots, resolveOfflineSlot } from "./routes/routeRegistry.js";
 import {
   TokenPolicy,
@@ -769,9 +770,10 @@ function activeActionsTemplate(card) {
       </div>
     `;
   }
+  const confirmationBlocker = medicineReviewBlocker(card);
   return `
     <div class="card-actions">
-      <button data-action="confirm-card" data-card-id="${card.id}">Confirm</button>
+      <button data-action="confirm-card" data-card-id="${card.id}" ${confirmationBlocker ? `disabled title="${escapeHtml(confirmationBlocker)}"` : ""}>Confirm</button>
       <button data-action="correct-card" data-card-id="${card.id}">Correct</button>
       <button data-action="reject-card" data-card-id="${card.id}">Cancel</button>
     </div>
@@ -1985,6 +1987,13 @@ function reviewPasteList(cardId) {
 function confirmCard(cardId) {
   const card = state.cards.find((item) => item.id === cardId);
   if (!card) return;
+  const confirmationBlocker = medicineReviewBlocker(card);
+  if (confirmationBlocker) {
+    card.validation = confirmationBlocker;
+    persistActiveCards();
+    render();
+    return;
+  }
   if (card.type === "CatalogOnboardingCard") {
     removeCard(cardId);
     addCard(createPasteImportCard());
@@ -2481,6 +2490,8 @@ function ownerCardNote(card) {
   }
   if (card.type === "CatalogImportCard") return "Review the list, edit if needed, then approve.";
   if (card.type === "CatalogWorkspaceCard") return "This view uses the complete saved Pharmacy Catalog.";
+  const confirmationBlocker = medicineReviewBlocker(card);
+  if (confirmationBlocker) return confirmationBlocker;
   if (card.status === "needs_correction") return "Edit anything that looks wrong, then confirm.";
   if (card.type === "SaleCard") return "Complete the sale details, then confirm.";
   if (card.type === "VoiceReviewCard") return "Check the voice result, then confirm.";

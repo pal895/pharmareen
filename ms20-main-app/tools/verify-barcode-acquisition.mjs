@@ -12,6 +12,8 @@ expect(source.includes('"BarcodeDetector" in globalThis'), "Barcode decoding mus
 expect(source.includes('pharmacyBrain.catalog.find'), "Decoded barcodes must match only against the saved Pharmacy Catalog");
 expect(source.includes('const review = recognized ? normalizeMedicineReviewRow(recognized) : {}'), "Fixture and saved-catalog barcode matches must share canonical review normalization");
 expect(source.includes('quantity: review.stock ?? ""'), "Repeated barcode review must preserve saved current stock");
+expect(source.includes("const confirmationBlocker = medicineReviewBlocker(card)"), "Incomplete barcode reviews must share the medicine confirmation gate");
+expect(source.includes('disabled title="${escapeHtml(confirmationBlocker)}"'), "Incomplete barcode review must visibly disable confirmation");
 expect(source.includes('enter the barcode manually; nothing has been saved'), "Unreadable barcodes must retain an honest unsaved fallback");
 expect(!source.includes("Barcode scanner placeholder"), "Placeholder barcode cards must not remain reachable");
 
