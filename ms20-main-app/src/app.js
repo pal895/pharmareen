@@ -4,6 +4,7 @@ import { OfflineQueue } from "./services/offlineQueue.js";
 import { SyncAdapter } from "./services/syncAdapter.js";
 import { BackendAdapterRegistry } from "./services/backendAdapters.js";
 import { PharmacyBrain, SourceBrain, AIFallbackAdapter } from "./services/brainAdapters.js";
+import { findBarcodeTestFixture } from "./data/barcodeTestFixtures.js";
 import { runVisualPipeline, buildPhotoReviewCard } from "./services/visualPipeline.js";
 import {
   createCatalogChoiceCard,
@@ -1336,29 +1337,36 @@ async function readBarcodeCapture(file) {
   const existing = barcode
     ? pharmacyBrain.catalog.find((item) => String(item.barcode || "").trim() === barcode)
     : null;
+  const fixture = existing ? null : findBarcodeTestFixture(barcode);
+  const sourceCandidate = fixture ? sourceBrain.lookupMedicine(fixture.name) : null;
+  const recognized = existing || (sourceCandidate?.status === "matched" ? fixture : null);
   addCard(createEditableCard({
     type: "VisualScanCard",
     title: barcode ? "Check barcode" : "Barcode needs review",
     source: "Local barcode scanner",
     fields: {
       scan_type: "barcode",
-      medicine: existing?.name || "",
-      strength: existing?.strength || "",
-      form: existing?.form || "",
-      unit: existing?.unit || "",
+      medicine: recognized?.name || "",
+      strength: recognized?.strength || "",
+      form: recognized?.form || recognized?.forms?.[0] || "",
+      unit: recognized?.unit || recognized?.units?.[0] || "",
       barcode,
-      quantity: "",
-      selling_price: existing?.selling_price || "",
-      cost_price: existing?.cost_price || "",
-      supplier: existing?.supplier || "",
-      batch: existing?.batch || "",
-      expiry: existing?.expiry || "",
-      shelf: existing?.shelf || ""
+      quantity: fixture?.stock || "",
+      selling_price: recognized?.selling_price || recognized?.sellingPrice || "",
+      cost_price: recognized?.cost_price || recognized?.costPrice || "",
+      supplier: recognized?.supplier || "",
+      batch: recognized?.batch || "",
+      expiry: recognized?.expiry || "",
+      shelf: recognized?.shelf || ""
     },
     confidence: barcode ? 0.96 : 0.3,
-    status: existing ? "ready" : "needs_correction",
+    status: recognized ? "ready" : "needs_correction",
     validation: barcode
-      ? existing ? "Matched locally to a saved Pharmacy Catalog medicine. Check before confirming." : "Barcode read locally. Add the medicine details before confirming."
+      ? existing
+        ? "Matched locally to a saved Pharmacy Catalog medicine. Check before confirming."
+        : fixture && recognized
+          ? "Matched locally to a controlled Source Brain test fixture. Nothing is saved until approval."
+          : "Barcode read locally. Add the medicine details before confirming."
       : "No barcode was read. Retake the scan or enter the barcode manually; nothing has been saved."
   }));
 }

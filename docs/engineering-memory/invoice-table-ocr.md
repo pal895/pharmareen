@@ -110,3 +110,5 @@ Expiry is canonical medicine data, not free-form display text. Normalize support
 - A barcode action must acquire evidence before creating a review card. Never route an acquisition control directly to an empty placeholder review.
 - Barcode capture reuses the shared camera lifecycle, decodes locally when the browser supports `BarcodeDetector`, and matches only against the saved Pharmacy Catalog.
 - If decoding is unavailable or unclear, keep the draft unsaved and offer honest manual barcode entry; do not invent a code or use an AI/API fallback.
+- Before every onboarding test that depends on external material, Codex prepares and verifies a realistic controlled fixture first. This includes invoices/photos, CSV, Excel, paste lists, manual and sale-time learning prompts, barcodes, shelf photos, and future external-input workflows; the owner should not be asked to manufacture technical test data.
+- Controlled barcode mappings remain isolated fixture data, must resolve through Source Brain, must avoid the known Pharmacy Catalog, and never promote a medicine until the owner approves the shared review card.
