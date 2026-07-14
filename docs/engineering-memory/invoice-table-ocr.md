@@ -92,6 +92,7 @@ Capability migrations must replace every renderer reference atomically. Parser t
 Successful duplicate prevention still requires visible owner feedback. Show partition outcomes in the main shared card note rather than only in collapsed diagnostics: this includes an intentional no-op when every proposed medicine exists and a mixed review where existing medicines are excluded while new rows proceed. A safe result that is visually silent looks like a broken control or unexplained data loss. Keep raw import controls owner-facing and phone-readable: use canonical labels such as `Medicine list` and let long text inputs fill the card width.
 
 A single-medicine review must prioritize action over form length. Use progressive disclosure ordered from rush-hour actions, to stock and medicine details, to traceability and secondary details. Keep every canonical field available, but put medicine, selling price, one sale-quantity state, payment, and the primary actions in the first phone view. Distinguish sale quantity from current stock in the schema and labels; never render two controls with the same `Quantity` meaning. Implement this once in the shared single-medicine detail renderer, while multi-row CSV, Paste List, and invoice tables retain their own review layout.
+Progressive panels must also translate internal field keys into owner-facing language and avoid desktop resize affordances that appear as visual debris on phones.
 
 ### Catalog multi-term search intent
 

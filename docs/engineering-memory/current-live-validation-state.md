@@ -26,6 +26,7 @@
 - Live evidence after `e4da9fa` verified the four-row CSV review renders and shared row movement preserves complete rows. A clean Paste List containing four already-saved medicines correctly created no duplicates, but its result was hidden in collapsed diagnostics; the shared CatalogImport note now exposes safe no-op review outcomes and the paste editor uses an owner-facing, full-width medicine-list field.
 - Live evidence after `0eaa499` verified all-existing feedback and the improved paste editor. A mixed Paste List then correctly excluded saved Amitriptyline and reviewed only new Quinine Sulfate; the shared visible feedback now also explains this mixed partition instead of leaving the omitted existing row unexplained.
 - Live evidence after `904c501` closed the mixed draft without saving, then the unknown-medicine sale command `Quinine Sulfate 1 cash` correctly opened a Medicine Match / sale-time learning review. Its shared renderer exposed every field as one long phone form and labeled both sale quantity and current stock as `Quantity`; shared single-medicine reviews now use three-slide progressive disclosure and distinct canonical labels. The Quinine draft remains unapproved.
+- Live evidence after `d6027d6` verified all three compact panels and their navigation. The remaining raw `message` label and mobile textarea resize artifact are normalized at the shared field/style boundary; the Quinine draft remains unapproved.
 
 ## Shared-root conclusions and drift
 

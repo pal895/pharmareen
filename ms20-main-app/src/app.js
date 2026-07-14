@@ -130,6 +130,7 @@ const FIELD_LABELS = {
   scan_type: "Scan type",
   total: "Total",
   payment: "Payment",
+  message: "Note",
   transcript: "Transcript",
   backend_route: "Backend route",
   items_text: "Medicine list"

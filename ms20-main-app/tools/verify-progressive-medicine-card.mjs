@@ -62,6 +62,7 @@ expect(html.includes("Quinine sulfate") && html.includes('data-field="selling_pr
 expect((html.match(/data-field="quantity"/g) || []).length === 1, "Medicine review must expose one quantity state only");
 expect(html.includes("Current stock") && html.includes('data-field="strength"') && html.includes('data-field="form"'), "Slide 2 must contain stock and core medicine details");
 expect(html.includes('data-field="supplier"') && html.includes('data-field="barcode"') && html.includes('data-field="batch"'), "Slide 3 must retain traceability details");
+expect(html.includes(">Note</span>") && !html.includes(">message</span>"), "Secondary fields must use owner-facing labels");
 expect(html.includes('data-action="confirm-card"') && html.includes('data-action="correct-card"') && html.includes('data-action="reject-card"'), "Fast action must retain Confirm, Correct, and Cancel");
 expect(JSON.parse(storage.get("ms20-main-app:pharmacy-catalog")).length === 0, "Rendering and slide navigation must not save a medicine");
 expect(card.aiRequired === false, "Progressive medicine review must remain zero-token");

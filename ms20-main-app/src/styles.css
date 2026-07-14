@@ -1009,7 +1009,7 @@ input:disabled {
 
 .medicine-slide-fields textarea {
   min-height: 76px;
-  resize: vertical;
+  resize: none;
 }
 
 .medicine-strength-summary {
