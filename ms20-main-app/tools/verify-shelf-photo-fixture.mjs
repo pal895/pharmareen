@@ -9,6 +9,7 @@ const png = fs.readFileSync(new URL("../fixtures/shelf-photo-b2.png", import.met
 const cameraManifest = JSON.parse(fs.readFileSync(new URL("../fixtures/shelf-photo-c3-camera.json", import.meta.url), "utf8"));
 const cameraPng = fs.readFileSync(new URL("../fixtures/shelf-photo-c3-camera.png", import.meta.url));
 const app = fs.readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+const styles = fs.readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
 const fixture = findShelfTestFixture({ fileName: manifest.fileName });
 const contentHash = crypto.createHash("sha256").update(png).digest("hex");
 const cameraFixture = findShelfTestFixture({ fileName: cameraManifest.fileName });
@@ -28,6 +29,9 @@ assert(cameraContentHash === cameraManifest.sha256 && cameraFixture.sha256 === c
 assert(cameraFixture.items.length === 2 && cameraFixture.items.every((item) => sourceBrain.lookupMedicine(item.name).status === "matched"), "Every camera shelf proposal must resolve through Source Brain");
 assert(cameraFixture.items.every((item) => !confirmedCatalog.includes(item.name)), "Camera shelf fixture must not overlap the confirmed 29-item live catalog");
 assert(cameraFixture.items.every((item) => item.shelf === "C3" && item.stock && item.cost_price && item.selling_price && item.batch && item.expiry), "Camera fixture must retain complete review fields");
+assert(findShelfTestFixture({ perceptualHashes: ["fff0f9f9f9f8b000", "b88080bcfefefcfe"], aspectRatio: 0.566 }) === cameraFixture, "Sideways camera captures must normalize orientation before fixture matching");
+assert(findShelfTestFixture({ perceptualHashes: ["00fe70fcfefefef8", "004e5e5f7f7f7f5f"], aspectRatio: 0.566 }) === cameraFixture, "Upright portrait camera captures must tolerate screen framing and perspective");
+assert(findShelfTestFixture({ perceptualHashes: ["ffffffffffffffff"], aspectRatio: 0.566 }) === null, "Unrelated portrait captures must remain unmatched");
 assert(png.length > 100000 && png.subarray(1, 4).toString() === "PNG", "Realistic shelf PNG fixture is missing");
 assert(fixture.items.length === 2 && fixture.items.every((item) => sourceBrain.lookupMedicine(item.name).status === "matched"), "Every shelf proposal must resolve through Source Brain");
 assert(fixture.items.every((item) => !knownCatalogBeforeB2.includes(item.name)), "Shelf fixture must not overlap the known 27-item live catalog");
@@ -44,6 +48,9 @@ assert(app.includes("await addPhotoCards(file, scanType)"), "Camera and gallery 
 assert(app.includes('state.pendingScanType = "shelf_photo"'), "Catalog shelf scan must retain its scan identity through file acquisition");
 assert(app.includes('crypto.subtle.digest("SHA-256"'), "Shelf fixture recognition must survive photo-picker filename changes");
 assert(app.includes("createImageBitmap(fileOrName)"), "Shelf fixture recognition must survive photo-library re-encoding");
+assert(app.includes("const orientations = [luminance]"), "Shelf camera normalization must evaluate every right-angle orientation");
+assert(app.includes("perceptualHashes"), "Shelf camera matching must receive normalized orientation candidates");
+assert(styles.includes("place-self: center") && styles.includes("max-height: min(420px"), "Shelf acquisition choice must remain compact on narrow phones");
 assert(app.includes('addPhotoCards(file || "camera-photo.jpg"'), "Photo-library acquisition must retain file content for fixture verification");
 assert(app.includes('createPasteImportCard(catalogItemsToText(recognizedItems))'), "Recognized shelf medicines must converge into the shared multi-row catalog review");
 assert(app.includes("sourceBrain.lookupMedicine(item.name).status === \"matched\""), "Controlled shelf proposals must be Source Brain-gated");

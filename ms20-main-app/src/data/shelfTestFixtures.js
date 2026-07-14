@@ -18,7 +18,7 @@ const ShelfTestFixtures = Object.freeze([
     sha256: "c169056a58bcb7f7a98bbb28e12acd92693454bcb5f05f0a74482b918a11e782",
     perceptualHash: "00000cffffffff00",
     aspectRatio: 1.7768,
-    visualTolerance: 18,
+    visualTolerance: 24,
     items: Object.freeze([
       Object.freeze({ name: "Metronidazole", strength: "400 mg", form: "tablet", unit: "tablet", stock: "36", selling_price: "20", cost_price: "11", supplier: "Afya Wholesale Ltd", batch: "MET-400C", expiry: "2029-03", shelf: "C3", source: "controlled_shelf_fixture" }),
       Object.freeze({ name: "Ibuprofen", strength: "200 mg", form: "tablet", unit: "tablet", stock: "28", selling_price: "18", cost_price: "9", supplier: "Afya Wholesale Ltd", batch: "IBU-200C", expiry: "2028-12", shelf: "C3", source: "controlled_shelf_fixture" })
@@ -30,7 +30,9 @@ export function findShelfTestFixture(identity = {}) {
   const input = typeof identity === "string" ? { fileName: identity } : identity;
   const name = String(input?.fileName || "").trim().toLowerCase();
   const sha256 = String(input?.sha256 || "").trim().toLowerCase();
-  const perceptualHash = String(input?.perceptualHash || "").trim().toLowerCase();
+  const perceptualHashes = (Array.isArray(input?.perceptualHashes) ? input.perceptualHashes : [input?.perceptualHash])
+    .map((hash) => String(hash || "").trim().toLowerCase())
+    .filter(Boolean);
   const aspectRatio = Number(input?.aspectRatio || 0);
   const hammingDistance = (left, right) => {
     if (!left || !right || left.length !== right.length) return Infinity;
@@ -47,9 +49,12 @@ export function findShelfTestFixture(identity = {}) {
   return ShelfTestFixtures.find((fixture) =>
     (name && fixture.fileName.toLowerCase() === name)
     || (sha256 && fixture.sha256 === sha256)
-    || (perceptualHash
-      && Math.abs(aspectRatio - fixture.aspectRatio) <= 0.08
-      && hammingDistance(perceptualHash, fixture.perceptualHash) <= (fixture.visualTolerance || 12))
+    || (perceptualHashes.length
+      && Math.min(
+        Math.abs(aspectRatio - fixture.aspectRatio),
+        Math.abs((1 / Math.max(aspectRatio, 0.0001)) - fixture.aspectRatio)
+      ) <= 0.15
+      && perceptualHashes.some((hash) => hammingDistance(hash, fixture.perceptualHash) <= (fixture.visualTolerance || 12)))
   ) || null;
 }
 

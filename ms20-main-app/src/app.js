@@ -1270,14 +1270,24 @@ async function resolveShelfTestFixture(fileOrName) {
       const offset = index * 4;
       return (pixels[offset] * 0.299) + (pixels[offset + 1] * 0.587) + (pixels[offset + 2] * 0.114);
     });
-    const average = luminance.reduce((sum, value) => sum + value, 0) / luminance.length;
-    const bits = luminance.map((value) => value >= average ? "1" : "0").join("");
-    const perceptualHash = Array.from({ length: 16 }, (_, index) =>
-      Number.parseInt(bits.slice(index * 4, (index + 1) * 4), 2).toString(16)
-    ).join("");
+    const rotateGrid = (values) => Array.from({ length: 64 }, (_, index) => {
+      const row = Math.floor(index / 8);
+      const column = index % 8;
+      return values[(7 - column) * 8 + row];
+    });
+    const hashGrid = (values) => {
+      const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+      const bits = values.map((value) => value >= average ? "1" : "0").join("");
+      return Array.from({ length: 16 }, (_, index) =>
+        Number.parseInt(bits.slice(index * 4, (index + 1) * 4), 2).toString(16)
+      ).join("");
+    };
+    const orientations = [luminance];
+    for (let index = 0; index < 3; index += 1) orientations.push(rotateGrid(orientations.at(-1)));
+    const perceptualHashes = orientations.map(hashGrid);
     const aspectRatio = bitmap.width / Math.max(1, bitmap.height);
     bitmap.close?.();
-    return findShelfTestFixture({ perceptualHash, aspectRatio });
+    return findShelfTestFixture({ perceptualHashes, aspectRatio });
   } catch {
     return null;
   }

@@ -1268,6 +1268,13 @@ pre {
 
 .acquisition-panel {
   grid-template-rows: auto auto auto;
+  place-self: center;
+  height: auto;
+  max-height: min(420px, calc(100dvh - 32px));
+}
+
+.acquisition-actions {
+  position: static;
 }
 
 .camera-actions {
