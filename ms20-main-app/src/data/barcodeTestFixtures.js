@@ -14,6 +14,21 @@ export const BarcodeTestFixtures = Object.freeze([
     batch: "LOS-50T",
     expiry: "2029-06",
     source: "controlled_barcode_fixture"
+  }),
+  Object.freeze({
+    fixtureId: "barcode-loperamide-2mg",
+    barcode: "6161109876553",
+    name: "Loperamide",
+    strength: "2 mg",
+    form: "capsule",
+    unit: "capsule",
+    selling_price: "15",
+    cost_price: "8",
+    stock: "30",
+    supplier: "MedSource Kenya Ltd",
+    batch: "LOP-2C",
+    expiry: "2028-12",
+    source: "controlled_barcode_fixture"
   })
 ]);
 

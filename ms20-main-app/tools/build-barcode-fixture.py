@@ -1,9 +1,11 @@
 from pathlib import Path
 import json
+import sys
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
-manifest = json.loads((ROOT / "fixtures" / "barcode-losartan-50mg.json").read_text(encoding="utf-8"))
+manifest_path = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "fixtures" / "barcode-losartan-50mg.json"
+manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 value = manifest["barcode"]
 L = ["0001101", "0011001", "0010011", "0111101", "0100011", "0110001", "0101111", "0111011", "0110111", "0001011"]
 G = ["0100111", "0110011", "0011011", "0100001", "0011101", "0111001", "0000101", "0010001", "0001001", "0010111"]
@@ -28,5 +30,5 @@ for index, bit in enumerate(bits):
         draw.rectangle((start_x + index * module, top, start_x + (index + 1) * module - 1, top + bar_height + (35 if guard else 0)), fill="black")
 draw.text((500, 590), value, fill="black", font=bold)
 draw.text((70, 650), "Expected: unsaved editable review; do not approve during recognition test.", fill="black", font=regular)
-draw.text((70, 700), "Fixture data: stock 40 - buy 15 - sell 25 - batch LOS-50T - expiry 2029-06", fill="black", font=regular)
-image.save(ROOT / "fixtures" / "barcode-losartan-50mg.png", optimize=True)
+draw.text((70, 700), f'Fixture data: stock {manifest["stock"]} - buy {manifest["cost_price"]} - sell {manifest["selling_price"]} - batch {manifest["batch"]} - expiry {manifest["expiry"]}', fill="black", font=regular)
+image.save(manifest_path.with_suffix(".png"), optimize=True)

@@ -1,0 +1,16 @@
+{
+  "fixtureId": "barcode-loperamide-2mg",
+  "format": "EAN-13",
+  "barcode": "6161109876553",
+  "medicine": "Loperamide",
+  "strength": "2 mg",
+  "form": "capsule",
+  "unit": "capsule",
+  "selling_price": "15",
+  "cost_price": "8",
+  "stock": "30",
+  "supplier": "MedSource Kenya Ltd",
+  "batch": "LOP-2C",
+  "expiry": "2028-12",
+  "expected": "One unsaved editable review; no catalog write before approval."
+}
