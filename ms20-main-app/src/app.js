@@ -62,6 +62,7 @@ const NOTIFICATION_KEY = "ms20-main-app:notifications";
 const FEED_KEY = "ms20-main-app:conversation-feed";
 const ACTIVE_CARDS_KEY = "ms20-main-app:active-cards";
 const INVOICE_MEMORY_KEY = "ms20-main-app:invoice-memory";
+const QUARANTINED_CARDS_KEY = "ms20-main-app:quarantined-cards";
 const FEED_RESUME_LIMIT = 40;
 const ACTIVE_CARD_RESUME_LIMIT = 12;
 const CARD_FONT_SCALE_MIN = 0.85;
@@ -429,7 +430,7 @@ function safeCardTemplate(card) {
 
 function cardCloseButtonTemplate(card, placement) {
   const label = `Close ${friendlyCardLabel(card)} card`;
-  return `<button class="card-close-button ${placement === "bottom" ? "card-close-button-bottom" : ""}" type="button" data-action="dismiss-card" data-card-id="${card.id}" aria-label="${escapeHtml(label)}">${placement === "bottom" ? "× Close card" : "x"}</button>`;
+  return `<button class="card-close-button ${placement === "bottom" ? "card-close-button-bottom" : ""}" type="button" data-action="dismiss-card" data-card-id="${card.id}" aria-label="${escapeHtml(label)}">x</button>`;
 }
 
 function cardBodyTemplate(card, displayed) {
@@ -1655,9 +1656,32 @@ function reconcileResumeState() {
     }
   });
   consolidateEmptyPasteDrafts();
+  quarantineUnreadableActiveCards();
   state.onboarding.started = state.cards.some((card) => card.type === "OnboardingCard");
   persistFeed();
   persistActiveCards();
+}
+
+function quarantineUnreadableActiveCards() {
+  const quarantined = [];
+  state.cards = state.cards.filter((card) => {
+    try {
+      cardTemplate(card);
+      return true;
+    } catch (error) {
+      quarantined.push({ card, reason: error?.name || "RenderError", quarantined_at: new Date().toISOString() });
+      return false;
+    }
+  });
+  if (!quarantined.length) return;
+  const storage = safeLocalStorage();
+  let previous = [];
+  try {
+    previous = JSON.parse(storage?.getItem(QUARANTINED_CARDS_KEY) || "[]");
+  } catch {
+    previous = [];
+  }
+  storage?.setItem(QUARANTINED_CARDS_KEY, JSON.stringify([...quarantined, ...(Array.isArray(previous) ? previous : [])].slice(0, ACTIVE_CARD_RESUME_LIMIT)));
 }
 
 function consolidateEmptyPasteDrafts() {
