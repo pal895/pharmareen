@@ -288,7 +288,7 @@ function composerTemplate() {
           <button type="button" data-action="upload-photo">Photo library</button>
           <button type="button" data-action="upload-document">File</button>
           <button type="button" data-action="capture-invoice">Invoice</button>
-          <button type="button" data-action="demo-barcode">Scan barcode</button>
+          <button type="button" data-action="scan-barcode">Scan barcode</button>
           <button type="button" data-action="start-catalog-paste">Paste list</button>
           <button type="button" data-action="demo-stock-correction">Stock fix</button>
           <button type="button" data-action="demo-report">Report</button>
@@ -316,8 +316,8 @@ function cameraOverlayTemplate() {
   return `
     <section class="camera-overlay" aria-label="MS2.0 camera">
       <div class="camera-panel">
-        <h2>${state.camera.scanType === "invoice" ? "Photograph invoice" : "Photograph medicine"}</h2>
-        <p>Keep the whole item clear inside the frame.</p>
+        <h2>${state.camera.scanType === "invoice" ? "Photograph invoice" : state.camera.scanType === "barcode" ? "Scan barcode" : "Photograph medicine"}</h2>
+        <p>${state.camera.scanType === "barcode" ? "Keep one barcode clear inside the frame, then tap Capture." : "Keep the whole item clear inside the frame."}</p>
         <video id="ms20CameraPreview" autoplay muted playsinline></video>
         <p class="camera-status" aria-live="polite">${escapeHtml(state.camera.status)}</p>
         <div class="camera-actions">
@@ -920,7 +920,9 @@ function handleAction(dataset) {
     root.querySelector("#photoInput")?.click();
   }
   if (action === "upload-document") root.querySelector("#documentInput")?.click();
-  if (action === "demo-barcode") addBarcodeCard();
+  if (action === "scan-barcode") {
+    void openLightweightCamera("barcode");
+  }
   if (action === "capture-invoice") {
     void openLightweightCamera("invoice");
   }
@@ -1314,7 +1316,51 @@ async function captureLightweightCameraFrame() {
   render();
   const file = new File([blob], `${scanType}-${Date.now()}.jpg`, { type: "image/jpeg" });
   if (scanType === "invoice") await readInvoicePhoto(file, true);
+  else if (scanType === "barcode") await readBarcodeCapture(file);
   else addPhotoCards(file.name, scanType);
+}
+
+async function readBarcodeCapture(file) {
+  let barcode = "";
+  if ("BarcodeDetector" in globalThis) {
+    try {
+      const detector = new globalThis.BarcodeDetector();
+      const bitmap = await createImageBitmap(file);
+      const results = await detector.detect(bitmap);
+      bitmap.close();
+      barcode = String(results[0]?.rawValue || "").trim();
+    } catch (_error) {
+      barcode = "";
+    }
+  }
+  const existing = barcode
+    ? pharmacyBrain.catalog.find((item) => String(item.barcode || "").trim() === barcode)
+    : null;
+  addCard(createEditableCard({
+    type: "VisualScanCard",
+    title: barcode ? "Check barcode" : "Barcode needs review",
+    source: "Local barcode scanner",
+    fields: {
+      scan_type: "barcode",
+      medicine: existing?.name || "",
+      strength: existing?.strength || "",
+      form: existing?.form || "",
+      unit: existing?.unit || "",
+      barcode,
+      quantity: "",
+      selling_price: existing?.selling_price || "",
+      cost_price: existing?.cost_price || "",
+      supplier: existing?.supplier || "",
+      batch: existing?.batch || "",
+      expiry: existing?.expiry || "",
+      shelf: existing?.shelf || ""
+    },
+    confidence: barcode ? 0.96 : 0.3,
+    status: existing ? "ready" : "needs_correction",
+    validation: barcode
+      ? existing ? "Matched locally to a saved Pharmacy Catalog medicine. Check before confirming." : "Barcode read locally. Add the medicine details before confirming."
+      : "No barcode was read. Retake the scan or enter the barcode manually; nothing has been saved."
+  }));
 }
 
 async function readInvoicePhoto(file, prepared = false) {
@@ -1628,17 +1674,6 @@ async function resizeImageForReading(file) {
     "image/jpeg",
     0.92
   ));
-}
-
-function addBarcodeCard() {
-  addCard(createEditableCard({
-    type: "VisualScanCard",
-    title: "Check scan",
-    source: "Barcode scanner placeholder",
-    fields: { scan_type: "barcode", medicine: "", form: "", unit: "", pack_size: "", category: "" },
-    confidence: 0.62,
-    validation: "Barcode scans stay zero-token for known catalog items."
-  }));
 }
 
 function addOnboardingCard() {
@@ -2440,6 +2475,7 @@ function ownerCardNote(card) {
   if (card.type === "SaleCard") return "Complete the sale details, then confirm.";
   if (card.type === "VoiceReviewCard") return "Check the voice result, then confirm.";
   if (card.type === "InvoiceCard") return "Check the invoice before saving.";
+  if (card.type === "VisualScanCard" && card.fields?.scan_type === "barcode") return card.validation || "Check the barcode details before saving.";
   if (card.type === "PhotoReviewCard" || card.type === "VisualScanCard") return "Check the photo details before saving.";
   if (card.type === "CatalogOnboardingCard") return "Choose the easiest way to add medicines.";
   if (card.type === "ImportMappingCard") return "Map the columns once, then MS2.0 can reuse the pattern.";
