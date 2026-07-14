@@ -1,0 +1,16 @@
+{
+  "fixtureId": "barcode-unregistered",
+  "format": "EAN-13",
+  "barcode": "6161109876560",
+  "medicine": "Unregistered barcode",
+  "strength": "",
+  "form": "",
+  "unit": "",
+  "selling_price": "",
+  "cost_price": "",
+  "stock": "",
+  "supplier": "",
+  "batch": "",
+  "expiry": "",
+  "expected": "One unsaved needs-review card containing only the decoded barcode; no invented medicine and no catalog write."
+}
