@@ -847,7 +847,7 @@ function bindEvents() {
 
   root.querySelector("#photoInput")?.addEventListener("change", (event) => {
     const file = event.target.files?.[0];
-    addPhotoCards(file?.name || "camera-photo.jpg", state.pendingScanType || "medicine_photo");
+    void addPhotoCards(file || "camera-photo.jpg", state.pendingScanType || "medicine_photo");
     state.pendingScanType = "medicine_photo";
   });
 
@@ -856,7 +856,7 @@ function bindEvents() {
     if (file && state.pendingScanType === "invoice") {
       void readInvoicePhoto(file);
     } else {
-      addPhotoCards(file?.name || "camera-photo.jpg", state.pendingScanType || "medicine_photo");
+      void addPhotoCards(file || "camera-photo.jpg", state.pendingScanType || "medicine_photo");
     }
     state.pendingScanType = "medicine_photo";
   });
@@ -1201,10 +1201,24 @@ function commandHasExplicitPayment(text) {
   return /(?:^|[\s\d-])(cash|mpesa|m-pesa|credit|mixed)$/i.test(String(text || "").trim());
 }
 
-function addPhotoCards(fileName, scanType) {
+async function resolveShelfTestFixture(fileOrName) {
+  const fileName = typeof fileOrName === "string" ? fileOrName : fileOrName?.name;
+  const filenameMatch = findShelfTestFixture({ fileName });
+  if (filenameMatch || typeof fileOrName?.arrayBuffer !== "function" || !globalThis.crypto?.subtle) return filenameMatch;
+  try {
+    const digest = await globalThis.crypto.subtle.digest("SHA-256", await fileOrName.arrayBuffer());
+    const sha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return findShelfTestFixture({ sha256 });
+  } catch {
+    return null;
+  }
+}
+
+async function addPhotoCards(fileOrName, scanType) {
   state.ui.screen = "chat";
   state.ui.workspace = "operations";
-  const shelfFixture = scanType === "shelf_photo" ? findShelfTestFixture(fileName) : null;
+  const fileName = typeof fileOrName === "string" ? fileOrName : fileOrName?.name || "camera-photo.jpg";
+  const shelfFixture = scanType === "shelf_photo" ? await resolveShelfTestFixture(fileOrName) : null;
   if (shelfFixture) {
     const recognizedItems = shelfFixture.items.filter((item) => sourceBrain.lookupMedicine(item.name).status === "matched");
     if (recognizedItems.length === shelfFixture.items.length) {
@@ -1338,7 +1352,7 @@ async function captureLightweightCameraFrame() {
   const file = new File([blob], `${scanType}-${Date.now()}.jpg`, { type: "image/jpeg" });
   if (scanType === "invoice") await readInvoicePhoto(file, true);
   else if (scanType === "barcode") await readBarcodeCapture(file);
-  else addPhotoCards(file.name, scanType);
+  else await addPhotoCards(file, scanType);
 }
 
 async function readBarcodeCapture(file) {
@@ -2187,7 +2201,7 @@ async function handleDocumentFile(file) {
   state.ui.screen = "chat";
   state.ui.workspace = "operations";
   if (file.type.startsWith("image/") || lower.endsWith(".pdf")) {
-    addPhotoCards(name, "invoice");
+    void addPhotoCards(file, "invoice");
     return;
   }
   if (lower.endsWith(".xls") || lower.endsWith(".xlsx")) {

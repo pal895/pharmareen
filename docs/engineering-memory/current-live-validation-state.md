@@ -33,6 +33,7 @@
 - Live evidence after `0d7ce83` verified Loperamide recognition, approval, refresh persistence, and repeat-scan consistency across all trusted fields; cancellation left the catalog duplicate-safe at 27 medicines. The next prepared barcode fixture is valid EAN-13 `6161109876560` with intentionally no registry mapping, for verifying an honest unsaved unknown-barcode fallback without invented medicine data.
 - Live evidence after `0ba0aaa` verified the unregistered EAN-13 decoded locally with only its barcode populated and no invented medicine data. The shared card still displayed generic confirmation guidance and an active Confirm button while medicine identity was blank. All progressive medicine reviews now inherit one identity-readiness gate in visible guidance, button state, and the confirmation action boundary.
 - Live evidence after `0874b68` verified the unregistered barcode's clear missing-match message, disabled Confirm action, safe cancellation, and unchanged 27-item catalog. Barcode coverage is complete. The next prepared fixture is a realistic controlled B2 shelf photo containing Prednisolone and Septrin; its isolated filename mapping is Source Brain-gated and converges into the shared two-row catalog review without saving before approval.
+- Live evidence after `53cea3a` verified the Shelf photo acquisition route and its safe unmatched fallback: the Android photo picker changed the selected fixture's filename, so the filename-only controlled-fixture boundary produced a blank, disabled review and saved nothing. Controlled shelf fixtures now carry a verified SHA-256 identity and photo-library/camera acquisition retains the actual File for content hashing; filename remains a fast path, unknown content still follows the safe normal review pipeline, and Source Brain/readiness gates remain mandatory.
 
 ## Shared-root conclusions and drift
 
@@ -64,4 +65,4 @@ Whenever an editable-medicine behavior is reusable, implement it once in the sha
 
 ## Next action
 
-After the shared batch-persistence fix is pushed, pull/restart Replit once and rescan the already-saved Losartan barcode. Verify duplicate handling opens the existing medicine safely and does not create a 27th catalog record. Do not advance to another onboarding method from that test.
+Pull/restart Replit once and select the same controlled B2 image through `+` -> `Shelf photo`. Do not approve it. Verify one unsaved two-row review appears for Prednisolone and Septrin with the prepared stock, price, supplier, batch, expiry, and shelf values, while the saved catalog remains at 27 medicines.
