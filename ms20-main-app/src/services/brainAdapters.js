@@ -126,11 +126,31 @@ function mergeCatalogItems(existing, incoming) {
     forms: unique([...(existing.forms || []), ...(incoming.forms || [])]),
     units: unique([...(existing.units || []), ...(incoming.units || [])]),
     packSizes: unique([...(existing.packSizes || []), ...(incoming.packSizes || [])]),
-    batches: [...(existing.batches || []), ...(incoming.batches || [])].filter(Boolean),
+    batches: uniqueBatches([...(existing.batches || []), ...(incoming.batches || [])]),
     strength: incoming.strength || existing.strength || "",
+    category: incoming.category || existing.category || "",
+    sellingPrice: preferMeaningful(incoming.sellingPrice, existing.sellingPrice),
+    costPrice: preferMeaningful(incoming.costPrice, existing.costPrice),
+    supplier: incoming.supplier || existing.supplier || "",
     barcode: incoming.barcode || existing.barcode || "",
-    stockLeft: incoming.stockLeft ?? existing.stockLeft
+    expiry: incoming.expiry || existing.expiry || "",
+    shelf: incoming.shelf || existing.shelf || "",
+    reorderLevel: preferMeaningful(incoming.reorderLevel, existing.reorderLevel),
+    stockLeft: preferMeaningful(incoming.stockLeft, existing.stockLeft)
   };
+}
+
+function preferMeaningful(incoming, existing) {
+  return incoming === null || incoming === undefined || incoming === "" ? existing : incoming;
+}
+
+function uniqueBatches(batches = []) {
+  const uniqueRecords = new Map();
+  for (const batch of batches.filter(Boolean)) {
+    const key = `${String(batch.batch || "").trim()}|${normalizeExpiryValue(batch.expiry || "")}`;
+    if (key !== "|" && !uniqueRecords.has(key)) uniqueRecords.set(key, batch);
+  }
+  return [...uniqueRecords.values()];
 }
 
 function unique(values) {

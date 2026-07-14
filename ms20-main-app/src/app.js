@@ -1340,24 +1340,26 @@ async function readBarcodeCapture(file) {
   const fixture = existing ? null : findBarcodeTestFixture(barcode);
   const sourceCandidate = fixture ? sourceBrain.lookupMedicine(fixture.name) : null;
   const recognized = existing || (sourceCandidate?.status === "matched" ? fixture : null);
+  const review = recognized ? normalizeMedicineReviewRow(recognized) : {};
   addCard(createEditableCard({
     type: "VisualScanCard",
     title: barcode ? "Check barcode" : "Barcode needs review",
     source: "Local barcode scanner",
     fields: {
       scan_type: "barcode",
-      medicine: recognized?.name || "",
-      strength: recognized?.strength || "",
-      form: recognized?.form || recognized?.forms?.[0] || "",
-      unit: recognized?.unit || recognized?.units?.[0] || "",
+      medicine: review.name || "",
+      strength: review.strength || "",
+      form: review.form || "",
+      unit: review.unit || "",
+      pack_size: review.pack_size || "",
       barcode,
-      quantity: fixture?.stock || "",
-      selling_price: recognized?.selling_price || recognized?.sellingPrice || "",
-      cost_price: recognized?.cost_price || recognized?.costPrice || "",
-      supplier: recognized?.supplier || "",
-      batch: recognized?.batch || "",
-      expiry: recognized?.expiry || "",
-      shelf: recognized?.shelf || ""
+      quantity: review.stock ?? "",
+      selling_price: review.selling_price ?? "",
+      cost_price: review.cost_price ?? "",
+      supplier: review.supplier || "",
+      batch: review.batch || "",
+      expiry: review.expiry || "",
+      shelf: review.shelf || ""
     },
     confidence: barcode ? 0.96 : 0.3,
     status: recognized ? "ready" : "needs_correction",

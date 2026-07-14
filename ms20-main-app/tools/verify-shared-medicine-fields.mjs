@@ -54,6 +54,13 @@ const barcodeRecord = medicineRecordFromFields({
 }, { source: "scan_review" });
 brain.upsertCatalogItem(barcodeRecord);
 assert(brain.catalog.at(-1).batches[0]?.batch === "LOS-50T", "Shared review approval must promote a top-level batch into canonical catalog batches");
+const savedLosartanReview = normalizeMedicineReviewRow(brain.catalog.at(-1));
+assert(savedLosartanReview.stock === "40" && savedLosartanReview.cost_price === "15", "Saved catalog stock and buying price must return to shared reviews through canonical aliases");
+assert(savedLosartanReview.form === "tablet" && savedLosartanReview.unit === "tablet" && savedLosartanReview.batch === "LOS-50T", "Saved packaging and batch must return to shared reviews through canonical arrays");
+brain.upsertCatalogItem(medicineRecordFromFields({ medicine: "Losartan", barcode: "6161109876546", quantity: "" }, { source: "scan_review" }));
+assert(brain.catalog.length === 3, "Repeated barcode approval must not duplicate an existing catalog medicine");
+assert(brain.catalog.at(-1).stockLeft === "40" && brain.catalog.at(-1).costPrice === "15" && brain.catalog.at(-1).supplier === "Dawa Bora Wholesale Ltd", "Sparse repeat approval must not erase saved stock or commercial fields");
+assert(brain.catalog.at(-1).batches[0]?.batch === "LOS-50T" && brain.catalog.at(-1).batches.length === 1, "Sparse repeat approval must preserve and deduplicate saved traceability");
 const refreshed = new PharmacyBrain({ pharmacyId: "shared-field-refresh" });
 refreshed.loadCatalog(JSON.parse(JSON.stringify(brain.catalog)));
 assert(refreshed.catalog[0].strength === "100 mg" && refreshed.catalog[0].barcode === "6161100000098", "Strength and barcode must persist through refresh serialization");

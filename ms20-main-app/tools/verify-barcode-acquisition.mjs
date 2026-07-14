@@ -10,6 +10,8 @@ expect(source.includes('openLightweightCamera("barcode")'), "Barcode action must
 expect(source.includes('await readBarcodeCapture(file)'), "Captured barcode frames must enter local decoding");
 expect(source.includes('"BarcodeDetector" in globalThis'), "Barcode decoding must remain local and zero-token");
 expect(source.includes('pharmacyBrain.catalog.find'), "Decoded barcodes must match only against the saved Pharmacy Catalog");
+expect(source.includes('const review = recognized ? normalizeMedicineReviewRow(recognized) : {}'), "Fixture and saved-catalog barcode matches must share canonical review normalization");
+expect(source.includes('quantity: review.stock ?? ""'), "Repeated barcode review must preserve saved current stock");
 expect(source.includes('enter the barcode manually; nothing has been saved'), "Unreadable barcodes must retain an honest unsaved fallback");
 expect(!source.includes("Barcode scanner placeholder"), "Placeholder barcode cards must not remain reachable");
 
