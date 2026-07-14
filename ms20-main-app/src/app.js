@@ -323,7 +323,7 @@ function cameraOverlayTemplate() {
     <section class="camera-overlay" aria-label="MS2.0 camera">
       <div class="camera-panel">
         <h2>${state.camera.scanType === "invoice" ? "Photograph invoice" : state.camera.scanType === "barcode" ? "Scan barcode" : state.camera.scanType === "shelf_photo" ? "Photograph shelf" : "Photograph medicine"}</h2>
-        <p>${state.camera.scanType === "barcode" ? "Keep one barcode clear inside the frame, then tap Capture." : state.camera.scanType === "shelf_photo" ? "Include full packages and the shelf label. Keep labels visible, hold steady, and avoid glare." : "Keep the whole item clear inside the frame."}</p>
+        <p>${state.camera.scanType === "barcode" ? "Keep one barcode clear inside the frame, then tap Capture." : state.camera.scanType === "shelf_photo" ? "Show the whole medicine packs and the shelf label. Keep the words clear. Hold the phone still. Keep bright light off the packs or screen." : "Keep the whole item clear inside the frame."}</p>
         ${state.camera.capturedUrl
           ? `<img class="camera-captured-preview" src="${escapeHtml(state.camera.capturedUrl)}" alt="Captured shelf preview">`
           : `<video id="ms20CameraPreview" autoplay muted playsinline></video>`}
@@ -1293,11 +1293,13 @@ async function resolveShelfTestFixture(fileOrName) {
   }
 }
 
-async function addPhotoCards(fileOrName, scanType) {
+async function addPhotoCards(fileOrName, scanType, knownShelfFixture) {
   state.ui.screen = "chat";
   state.ui.workspace = "operations";
   const fileName = typeof fileOrName === "string" ? fileOrName : fileOrName?.name || "camera-photo.jpg";
-  const shelfFixture = scanType === "shelf_photo" ? await resolveShelfTestFixture(fileOrName) : null;
+  const shelfFixture = scanType === "shelf_photo"
+    ? (knownShelfFixture === undefined ? await resolveShelfTestFixture(fileOrName) : knownShelfFixture)
+    : null;
   if (shelfFixture) {
     const recognizedItems = shelfFixture.items.filter((item) => sourceBrain.lookupMedicine(item.name).status === "matched");
     if (recognizedItems.length === shelfFixture.items.length) {
@@ -1306,17 +1308,23 @@ async function addPhotoCards(fileOrName, scanType) {
       card.source = fileName;
       card.fields.method = "shelf photo";
       card.fields.scan_type = "shelf_photo";
-      card.fields.review_feedback = `${recognizedItems.length} medicines recognized locally from controlled shelf fixture. Nothing is saved until approval.`;
+      card.fields.review_feedback = "Controlled test match. Read from this photo: medicine names, strengths, form, and shelf. Filled from the prepared test record, not read from the photo: stock, buying and selling prices, supplier, batch, and expiry. Barcode was left blank. Check every value. Nothing is saved until approval.";
       card.validation = card.fields.review_feedback;
       addCard(card);
       refreshNotifications();
-      return;
+      return true;
     }
+  }
+  if (scanType === "shelf_photo") {
+    addFeed("assistant", "I could not read this shelf photo clearly. Take it again. Move closer, show the medicine names and shelf label, hold the phone still, and keep bright light off the packs or screen. Nothing has been saved.");
+    render();
+    return false;
   }
   const result = runVisualPipeline({ fileName, scanType });
   const visualCard = buildPhotoReviewCard(result);
   addCard(visualCard);
   refreshNotifications();
+  return true;
 }
 
 async function openLightweightCamera(scanType = "medicine_photo") {
@@ -1352,7 +1360,7 @@ async function openLightweightCamera(scanType = "medicine_photo") {
       await video.play();
     }
     const status = root.querySelector(".camera-status");
-    if (status) status.textContent = "Ready — avoid reflections, hold still, then tap Capture.";
+    if (status) status.textContent = "Ready — hold the phone still, keep bright light off the packs or screen, then tap Capture.";
     const actions = root.querySelector(".camera-actions");
     if (actions && state.camera.lightAvailable && !actions.querySelector('[data-action="toggle-camera-light"]')) {
       const lightButton = document.createElement("button");
@@ -1396,7 +1404,13 @@ async function useCameraPhoto() {
   if (!file) return;
   state.camera.status = "Processing photo locallyâ€¦";
   render();
-  await addPhotoCards(file, scanType);
+  const shelfFixture = scanType === "shelf_photo" ? await resolveShelfTestFixture(file) : undefined;
+  if (scanType === "shelf_photo" && !shelfFixture) {
+    state.camera.status = "I could not read this shelf clearly. Tap Retake. Move closer, show both medicine names and the shelf label, hold the phone still, and keep bright light off the packs or screen. Nothing has been saved.";
+    render();
+    return;
+  }
+  await addPhotoCards(file, scanType, shelfFixture);
   clearCapturedCameraPhoto();
   state.camera.open = false;
   state.camera.status = "";
@@ -1419,7 +1433,7 @@ async function toggleCameraLight() {
   } catch {
     state.camera.lightAvailable = false;
     root.querySelector('[data-action="toggle-camera-light"]')?.remove();
-    state.camera.status = "Camera light is not available on this phone. Use room light and avoid reflections.";
+    state.camera.status = "The camera light does not work on this phone. Use room light and keep bright light off the packs or screen.";
     const status = root.querySelector(".camera-status");
     if (status) status.textContent = state.camera.status;
   }

@@ -70,6 +70,12 @@ Do not repeat the two passed invoice fixtures, clean paste fixture, filtered cat
 
 Whenever an editable-medicine behavior is reusable, implement it once in the shared editable-card or editable-list capability and make every applicable workflow inherit it. Preserve one canonical implementation and focused regression protection. Permit an exception only when a context-specific safety or workflow reason is documented and tested; never duplicate shared behavior screen by screen.
 
+## Shelf-photo trust and first-response rule
+
+Live C3 evidence verified successful recognition in both sideways and upright phone use, but one sideways first attempt opened an empty review before a repeat produced the correct two-row result. A shelf photo must now produce one of only two honest responses: a recognized review, or a clear Retake instruction that leaves the preview open. It must never open an empty approval form.
+
+Controlled fixture reviews must disclose field sources. The C3 image visibly supports medicine names, strengths, tablet form, and shelf C3. Stock, prices, supplier, batch, and expiry come from the prepared controlled-test record and are not read from the photo; barcode remains blank. Real unknown photos must not receive prepared fixture values. Camera guidance must use simple words suitable for a 12-year-old, such as “keep bright light off the packs or screen,” rather than “glare” or “reflections.”
+
 ## Next action
 
-Pull/restart once, then repeat only the C3 direct-camera capture in the phone orientation that is most comfortable. Acquisition is already passed; verify that `Use photo` now opens the unsaved two-row Metronidazole/Ibuprofen review with the prepared fields. Do not approve during this checkpoint.
+Pull/restart once, then repeat C3 direct-camera capture once. Verify either: (a) a clear photo opens the unsaved two-row review with the visible provenance message, or (b) an unclear photo stays in preview with a simple Retake instruction and no empty card. Do not approve during this checkpoint.

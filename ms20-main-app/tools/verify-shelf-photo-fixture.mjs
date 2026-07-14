@@ -44,7 +44,7 @@ assert(app.includes('data-action="choose-shelf-photo">Choose from phone</button>
 assert(app.includes('openLightweightCamera("shelf_photo")'), "Take photo must use the shared rear-camera lifecycle");
 assert(app.includes('data-action="retake-camera-photo">Retake</button>'), "Captured shelf photos must support retake before processing");
 assert(app.includes('data-action="use-camera-photo">Use photo</button>'), "Captured shelf photos must require explicit use before processing");
-assert(app.includes("await addPhotoCards(file, scanType)"), "Camera and gallery files must converge into the shared photo pipeline");
+assert(app.includes("await addPhotoCards(file, scanType, shelfFixture)"), "Camera and gallery files must converge into the shared photo pipeline");
 assert(app.includes('state.pendingScanType = "shelf_photo"'), "Catalog shelf scan must retain its scan identity through file acquisition");
 assert(app.includes('crypto.subtle.digest("SHA-256"'), "Shelf fixture recognition must survive photo-picker filename changes");
 assert(app.includes("createImageBitmap(fileOrName)"), "Shelf fixture recognition must survive photo-library re-encoding");
@@ -54,5 +54,10 @@ assert(styles.includes("place-self: center") && styles.includes("max-height: min
 assert(app.includes('addPhotoCards(file || "camera-photo.jpg"'), "Photo-library acquisition must retain file content for fixture verification");
 assert(app.includes('createPasteImportCard(catalogItemsToText(recognizedItems))'), "Recognized shelf medicines must converge into the shared multi-row catalog review");
 assert(app.includes("sourceBrain.lookupMedicine(item.name).status === \"matched\""), "Controlled shelf proposals must be Source Brain-gated");
+assert(app.includes("Filled from the prepared test record, not read from the photo"), "Controlled shelf reviews must disclose the source of prepared fields");
+assert(app.includes("Barcode was left blank"), "Controlled shelf reviews must never imply that an unseen barcode was read");
+assert(app.includes('if (scanType === "shelf_photo" && !shelfFixture)'), "An unclear camera shelf photo must stay in the retake flow");
+assert(app.includes('I could not read this shelf photo clearly.'), "An unmatched gallery shelf photo must not open an empty approval form");
+assert(!app.includes("avoid glare") && !app.includes("avoid reflections"), "Shelf camera guidance must use simple words instead of glare or reflections");
 
 console.log("Shelf photo verification passed: B2 gallery persistence baseline, C3 camera isolation, acquisition choice, retake/use lifecycle, shared pipeline, complete fields, and zero catalog writes before approval.");
