@@ -127,32 +127,41 @@ function mergeCatalogItems(existing, incoming) {
     units: unique([...(existing.units || []), ...(incoming.units || [])]),
     packSizes: unique([...(existing.packSizes || []), ...(incoming.packSizes || [])]),
     batches: uniqueBatches([...(existing.batches || []), ...(incoming.batches || [])]),
-    strength: incoming.strength || existing.strength || "",
-    category: incoming.category || existing.category || "",
+    strength: preferMeaningful(incoming.strength, existing.strength) || "",
+    category: preferMeaningful(incoming.category, existing.category) || "",
     sellingPrice: preferMeaningful(incoming.sellingPrice, existing.sellingPrice),
     costPrice: preferMeaningful(incoming.costPrice, existing.costPrice),
-    supplier: incoming.supplier || existing.supplier || "",
-    barcode: incoming.barcode || existing.barcode || "",
-    expiry: incoming.expiry || existing.expiry || "",
-    shelf: incoming.shelf || existing.shelf || "",
+    supplier: preferMeaningful(incoming.supplier, existing.supplier) || "",
+    barcode: preferMeaningful(incoming.barcode, existing.barcode) || "",
+    expiry: preferMeaningful(incoming.expiry, existing.expiry) || "",
+    shelf: preferMeaningful(incoming.shelf, existing.shelf) || "",
     reorderLevel: preferMeaningful(incoming.reorderLevel, existing.reorderLevel),
     stockLeft: preferMeaningful(incoming.stockLeft, existing.stockLeft)
   };
 }
 
 function preferMeaningful(incoming, existing) {
-  return incoming === null || incoming === undefined || incoming === "" ? existing : incoming;
+  return isMeaningful(incoming) ? incoming : existing;
 }
 
 function uniqueBatches(batches = []) {
   const uniqueRecords = new Map();
   for (const batch of batches.filter(Boolean)) {
-    const key = `${String(batch.batch || "").trim()}|${normalizeExpiryValue(batch.expiry || "")}`;
+    const batchValue = isMeaningful(batch.batch) ? String(batch.batch).trim() : "";
+    const expiryValue = isMeaningful(batch.expiry) ? normalizeExpiryValue(batch.expiry) : "";
+    const key = `${batchValue}|${expiryValue}`;
     if (key !== "|" && !uniqueRecords.has(key)) uniqueRecords.set(key, batch);
   }
   return [...uniqueRecords.values()];
 }
 
 function unique(values) {
-  return [...new Set(values.filter(Boolean))];
+  return [...new Set(values.filter(isMeaningful))];
+}
+
+function isMeaningful(value) {
+  if (value === null || value === undefined) return false;
+  if (typeof value !== "string") return true;
+  const normalized = value.trim().toLowerCase();
+  return normalized !== "" && !new Set(["-", "—", "unknown", "n/a", "na", "not available", "unreadable"]).has(normalized);
 }

@@ -32,6 +32,8 @@
 
 ## Shared-root conclusions and drift
 
+- Permanent trusted-result rule: every approved result is a baseline. Later workflows and UX improvements must preserve its meaningful canonical facts unless the owner explicitly changes them. Empty, absent, placeholder, or failed-extraction values never erase trusted catalog data. Apply the checklist and fast `npm run verify:consistency` gate documented in `trusted-result-consistency.md` before every relevant commit.
+
 - Medicine identity fields and persistence converge through the canonical medicine field schema; strength and barcode are not CSV-only.
 - Reviewed batch and expiry values must converge into canonical `batches[]` during Pharmacy Brain normalization even when the originating shared card supplies flat fields.
 - Every saved-catalog record reopened in a review must pass through canonical field normalization; never manually read only one storage shape. Sparse approvals must not erase durable pharmacy values, while explicit catalog edits remain the owner-controlled way to clear or replace them.
