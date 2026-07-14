@@ -887,6 +887,31 @@ input:disabled {
   line-height: 1.35;
 }
 
+.catalog-paste-input label span {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.8em;
+  font-weight: 700;
+}
+
+.catalog-paste-input textarea {
+  width: 100%;
+  min-height: 180px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px 14px;
+  color: var(--ink);
+  background: #fff;
+  outline: none;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.catalog-paste-input textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(24, 95, 85, 0.12);
+}
+
 .field-grid input:focus,
 .field-grid textarea:focus,
 .medicine-detail-grid input:focus,

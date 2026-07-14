@@ -23,6 +23,7 @@
 - Live evidence after `b011b6b` showed the retained blank draft still blocked Operations after its notification was dismissed. Resume now discards every truly empty Paste input draft and isolates any unreadable non-empty card so operational workspaces cannot be locked by one draft.
 - Live evidence after `481835d` verified MS2.0 Assistant and SHOW ME open again. Two valid import reviews reached isolation cards because of a renderer defect, and the bottom close label wrapped poorly; unreadable raw drafts now move to bounded local quarantine on resume and every shared bottom close control displays only `x`.
 - Live evidence after `91a8d7e` verified the File picker opens, but selecting the Test 4 CSV produced an isolation card. Exact reproduction found a stale `incompleteInvoice` action-template reference left behind by the capability migration; completed CSV/Paste reviews now consume `correctionAllowed` from the shared policy and have full render regression coverage.
+- Live evidence after `e4da9fa` verified the four-row CSV review renders and shared row movement preserves complete rows. A clean Paste List containing four already-saved medicines correctly created no duplicates, but its result was hidden in collapsed diagnostics; the shared CatalogImport note now exposes safe no-op review outcomes and the paste editor uses an owner-facing, full-width medicine-list field.
 
 ## Shared-root conclusions and drift
 

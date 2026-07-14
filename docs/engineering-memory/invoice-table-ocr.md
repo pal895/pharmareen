@@ -88,6 +88,9 @@ An empty input card is not durable pharmacy data. If the app resumes with abando
 When resume detects an unreadable non-empty card, move its raw payload to bounded local quarantine before removing it from the active render path. This preserves evidence for diagnosis without forcing the owner to repeatedly close broken cards. Shared bottom navigation controls should remain visually compact on phones: show only `x`, retain the descriptive close action in `aria-label`, and inherit the same safe dismissal behavior as the top control.
 
 Capability migrations must replace every renderer reference atomically. Parser tests alone cannot protect an import workflow: exercise a complete realistic card through body rendering and action rendering, because a stale workflow-local variable can leave parsing correct while making the review card unreadable. CSV, bulk paste, and invoice reviews must all render their actions from the same CatalogImport capability policy.
+
+Successful duplicate prevention still requires visible owner feedback. When a review action intentionally keeps an input card open because every proposed medicine already exists, show that outcome in the main shared card note rather than only in collapsed diagnostics. A safe no-op that is visually silent looks like a broken control and invites repeated taps. Keep raw import controls owner-facing and phone-readable: use canonical labels such as `Medicine list` and let long text inputs fill the card width.
+
 ### Catalog multi-term search intent
 
 Catalog filtering must require every normalized query term to match the same saved medicine. An average fuzzy score can otherwise admit an unrelated medicine because it shares a generic form such as `syrup`. Keep this strict browse-search constraint separate from the general medicine matcher, whose ranked alternatives are still needed for safe sale and restock ambiguity handling.

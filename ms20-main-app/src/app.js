@@ -130,7 +130,8 @@ const FIELD_LABELS = {
   total: "Total",
   payment: "Payment",
   transcript: "Transcript",
-  backend_route: "Backend route"
+  backend_route: "Backend route",
+  items_text: "Medicine list"
 };
 let activeRecognition = null;
 
@@ -1792,6 +1793,10 @@ function updateCardField(cardId, field, value) {
   const card = state.cards.find((item) => item.id === cardId);
   if (!card) return;
   card.fields[field] = value;
+  if (card.type === "CatalogImportCard" && card.fields?.entry_mode === "paste_input" && field === "items_text") {
+    delete card.fields.review_feedback;
+    card.validation = "Paste one medicine per line, then review the proposed rows before saving.";
+  }
   persistActiveCards();
 }
 
@@ -1846,6 +1851,7 @@ function reviewPasteList(cardId) {
   const text = String(card.fields?.items_text || "").trim();
   if (!text) {
     card.validation = "Paste at least one medicine line before review.";
+    card.fields.review_feedback = card.validation;
     persistActiveCards();
     render();
     return;
@@ -1854,11 +1860,13 @@ function reviewPasteList(cardId) {
   const { existing, newItems } = partitionCatalogItems(parsed.items, pharmacyBrain.catalog);
   if (newItems.length === 0) {
     card.validation = `No new medicines found. Already in this pharmacy: ${existing.map((item) => item.name).join(", ")}.`;
+    card.fields.review_feedback = card.validation;
     persistActiveCards();
     render();
     return;
   }
   card.fields.entry_mode = "review";
+  delete card.fields.review_feedback;
   card.fields.catalog_rows = JSON.stringify(newItems);
   card.fields.items_text = catalogItemsToText(newItems);
   card.fields.existing_medicines_ignored = existing.map((item) => item.name).join(", ");
@@ -2358,6 +2366,12 @@ function friendlyCardLabel(card) {
 
 function ownerCardNote(card) {
   if (card.type === "CatalogImportCard" && card.fields?.import_incomplete === "true") return "This scan is incomplete. Scan again before saving anything.";
+  if (card.type === "CatalogImportCard" && card.fields?.entry_mode === "paste_input") {
+    const feedback = String(card.fields?.review_feedback || "").trim();
+    if (feedback) return feedback;
+    const retainedFeedback = String(card.validation || "").trim();
+    if (/^(No new medicines found|Paste at least one medicine line)/.test(retainedFeedback)) return retainedFeedback;
+  }
   if (card.type === "CatalogImportCard") return "Review the list, edit if needed, then approve.";
   if (card.type === "CatalogWorkspaceCard") return "This view uses the complete saved Pharmacy Catalog.";
   if (card.status === "needs_correction") return "Edit anything that looks wrong, then confirm.";
