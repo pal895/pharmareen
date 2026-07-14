@@ -274,7 +274,7 @@ assert(appSource.includes('chooseUniqueInvoiceBatches(evidence, [...groups.keys(
 assert(appSource.includes('const currentRowsReconcile = rows.length === groups.size'), "A complete total-reconciled scan must restore photographed source order");
 assert(appSource.includes('moveCatalogImportRow(dataset.cardId, dataset.rowIndex, dataset.direction)'), "Invoice review must let the owner correct row order without rescanning");
 assert(appSource.includes('refreshInvoiceImportCompleteness(card, rows)'), "Invoice edits must immediately recalculate the approval safety gate");
-assert(css.includes('.invoice-row-order-controls'), "Mobile invoice rows must expose compact order controls");
+assert(css.includes('.review-row-order-controls'), "Shared multi-row medicine reviews must expose compact order controls");
 assert(appSource.includes('invoiceExpiryNotBefore(value, invoiceMonth)'), "Incoming invoice evidence must reject expiry dates older than the invoice");
 assert(appSource.includes('This scan is missing invoice details.'), "Incomplete invoice approval must be blocked at the action boundary");
 assert(appSource.includes("closeCameraStream()"), "In-app camera must release memory after capture or cancel");

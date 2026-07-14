@@ -38,6 +38,7 @@ import {
   normalizeMedicineReviewRow
 } from "./services/medicineFieldSchema.js";
 import { resolveStockCheck } from "./services/localIntelligence.js";
+import { catalogReviewCapabilities, reorderedCatalogRows } from "./services/catalogReviewPolicy.js";
 import { listRouteSlots, resolveOfflineSlot } from "./routes/routeRegistry.js";
 import {
   TokenPolicy,
@@ -556,9 +557,11 @@ function medicineDetailTemplate(card, displayed) {
 function catalogImportTableTemplate(card) {
   const rows = catalogRowsForCard(card);
   const invoiceMode = card.fields?.import_mode === "invoice_ocr";
+  const capabilities = catalogReviewCapabilities(card);
   const columns = invoiceMode ? INVOICE_TABLE_COLUMNS : CATALOG_TABLE_COLUMNS;
   const columnTemplate = columns
     .map((column) => `${column.min}px`)
+    .concat(capabilities.reorderable ? ["104px"] : [])
     .join(" ");
   return `
     <div class="catalog-import-editor">
@@ -568,17 +571,18 @@ function catalogImportTableTemplate(card) {
           <thead>
             <tr>
               ${columns.map((column) => `<th scope="col">${escapeHtml(column.label)}</th>`).join("")}
+              ${capabilities.reorderable ? '<th scope="col">Order</th>' : ""}
             </tr>
           </thead>
           <tbody>
-            ${rows.map((row, index) => catalogImportRowTemplate(card.id, row, index, columns)).join("")}
+            ${rows.map((row, index) => catalogImportRowTemplate(card.id, row, index, rows.length, columns, capabilities)).join("")}
           </tbody>
         </table>
       </div>
       <div class="catalog-mobile-rows" aria-label="Medicine catalog mobile review">
-        ${rows.map((row, index) => catalogImportMobileRowTemplate(card.id, row, index, columns, invoiceMode)).join("")}
+        ${rows.map((row, index) => catalogImportMobileRowTemplate(card.id, row, index, rows.length, columns, capabilities)).join("")}
       </div>
-      ${invoiceMode && card.fields?.import_incomplete === "true" ? "" : `<button class="secondary-action" type="button" data-action="add-catalog-row" data-card-id="${card.id}">Add medicine row</button>`}
+      ${capabilities.addRowAllowed ? `<button class="secondary-action" type="button" data-action="add-catalog-row" data-card-id="${card.id}">Add medicine row</button>` : ""}
       <p>${invoiceMode && card.fields?.import_incomplete === "true"
         ? "Some details may be missing or incorrect. Check every field against the invoice. Approval appears only when required fields and totals are consistent."
         : invoiceMode
@@ -597,7 +601,7 @@ function invoiceSummaryTemplate(card) {
   `;
 }
 
-function catalogImportRowTemplate(cardId, row, index, columns = CATALOG_TABLE_COLUMNS) {
+function catalogImportRowTemplate(cardId, row, index, rowCount, columns = CATALOG_TABLE_COLUMNS, capabilities = {}) {
   return `
     <tr>
       ${columns.map((column) => `
@@ -610,21 +614,27 @@ function catalogImportRowTemplate(cardId, row, index, columns = CATALOG_TABLE_CO
             value="${escapeHtml(String(row[column.key] ?? ""))}">
         </td>
       `).join("")}
+      ${capabilities.reorderable ? `<td data-label="Order">${catalogRowOrderControls(cardId, row, index, rowCount)}</td>` : ""}
     </tr>
   `;
 }
 
-function catalogImportMobileRowTemplate(cardId, row, index, columns = CATALOG_TABLE_COLUMNS, invoiceMode = false) {
+function catalogRowOrderControls(cardId, row, index, rowCount) {
+  const title = row.name || `Medicine ${index + 1}`;
+  return `<span class="review-row-order-controls">
+    <button type="button" data-action="move-catalog-row" data-card-id="${cardId}" data-row-index="${index}" data-direction="-1" ${index === 0 ? "disabled" : ""} aria-label="Move ${escapeHtml(title)} up">↑</button>
+    <button type="button" data-action="move-catalog-row" data-card-id="${cardId}" data-row-index="${index}" data-direction="1" ${index === rowCount - 1 ? "disabled" : ""} aria-label="Move ${escapeHtml(title)} down">↓</button>
+  </span>`;
+}
+
+function catalogImportMobileRowTemplate(cardId, row, index, rowCount, columns = CATALOG_TABLE_COLUMNS, capabilities = {}) {
   const title = row.name || `Medicine ${index + 1}`;
   return `
     <section class="catalog-mobile-row" aria-label="${escapeHtml(title)}">
       <div class="catalog-mobile-row-title">
         <strong>${escapeHtml(title)}</strong>
         <span>Row ${index + 1}</span>
-        ${invoiceMode ? `<span class="invoice-row-order-controls">
-          <button type="button" data-action="move-catalog-row" data-card-id="${cardId}" data-row-index="${index}" data-direction="-1" aria-label="Move ${escapeHtml(title)} up">↑</button>
-          <button type="button" data-action="move-catalog-row" data-card-id="${cardId}" data-row-index="${index}" data-direction="1" aria-label="Move ${escapeHtml(title)} down">↓</button>
-        </span>` : ""}
+        ${capabilities.reorderable ? catalogRowOrderControls(cardId, row, index, rowCount) : ""}
       </div>
       <div class="catalog-mobile-fields">
         ${columns.map((column) => `
@@ -667,10 +677,10 @@ function activeActionsTemplate(card) {
       `;
     }
     const invoiceMode = card.fields?.import_mode === "invoice_ocr";
-    const incompleteInvoice = invoiceMode && card.fields?.import_incomplete === "true";
+    const capabilities = catalogReviewCapabilities(card);
     return `
       <div class="card-actions">
-        ${incompleteInvoice
+        ${!capabilities.approvalAllowed
           ? '<button data-action="capture-invoice">Scan again</button>'
           : `${invoiceMode ? '<button data-action="capture-invoice">Scan again</button>' : ""}<button data-action="confirm-card" data-card-id="${card.id}">${invoiceMode ? "Approve medicines" : "Approve catalog"}</button>`}
         ${invoiceMode ? "" : '<button data-action="download-template">Template</button>'}
@@ -1727,11 +1737,8 @@ function updateCatalogImportCell(cardId, rowIndex, field, value) {
 function moveCatalogImportRow(cardId, rowIndex, direction) {
   const card = state.cards.find((item) => item.id === cardId);
   if (!card || card.type !== "CatalogImportCard") return;
-  const rows = catalogRowsForCard(card);
-  const from = Number(rowIndex);
-  const to = from + Number(direction);
-  if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < 0 || from >= rows.length || to >= rows.length) return;
-  [rows[from], rows[to]] = [rows[to], rows[from]];
+  if (!catalogReviewCapabilities(card).reorderable) return;
+  const rows = reorderedCatalogRows(catalogRowsForCard(card), rowIndex, direction);
   persistCatalogRows(card, rows);
   refreshInvoiceImportCompleteness(card, rows);
   rememberInvoiceCard(card);
