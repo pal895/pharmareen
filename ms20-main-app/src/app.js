@@ -2369,6 +2369,8 @@ function ownerCardNote(card) {
   if (card.type === "CatalogImportCard") {
     const feedback = String(card.fields?.review_feedback || "").trim();
     if (feedback) return feedback;
+    const retainedFeedback = String(card.validation || "").trim();
+    if (/^\d+ new medicine\(s\) ready for review\./.test(retainedFeedback)) return retainedFeedback;
   }
   if (card.type === "CatalogImportCard" && card.fields?.entry_mode === "paste_input") {
     const retainedFeedback = String(card.validation || "").trim();
