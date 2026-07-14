@@ -142,7 +142,8 @@ let activeRecognition = null;
 
 state.ui = { screen: "home", workspace: "operations" };
 state.voice = { listening: false, status: "" };
-state.camera = { open: false, scanType: "medicine_photo", stream: null, status: "", lightAvailable: false, lightOn: false };
+state.camera = { open: false, scanType: "medicine_photo", stream: null, status: "", lightAvailable: false, lightOn: false, capturedFile: null, capturedUrl: "" };
+state.shelfAcquisitionOpen = false;
 state.pendingScanType = "medicine_photo";
 state.cardFontScale = readCardFontScale();
 hydrateResumeState();
@@ -165,6 +166,7 @@ function render() {
   root.innerHTML = `
     <main class="chat-app" style="--card-font-scale: ${state.cardFontScale};">
       ${state.ui.screen === "chat" ? chatScreenTemplate() : chatHomeTemplate()}
+      ${shelfAcquisitionTemplate()}
       ${cameraOverlayTemplate()}
     </main>
   `;
@@ -289,7 +291,7 @@ function composerTemplate() {
         <div class="attach-sheet">
           <button type="button" data-action="take-photo">Camera</button>
           <button type="button" data-action="upload-photo">Photo library</button>
-          <button type="button" data-action="upload-photo" data-scan-type="shelf_photo">Shelf photo</button>
+          <button type="button" data-action="choose-shelf-photo-method">Shelf photo</button>
           <button type="button" data-action="upload-document">File</button>
           <button type="button" data-action="capture-invoice">Invoice</button>
           <button type="button" data-action="scan-barcode">Scan barcode</button>
@@ -320,18 +322,37 @@ function cameraOverlayTemplate() {
   return `
     <section class="camera-overlay" aria-label="MS2.0 camera">
       <div class="camera-panel">
-        <h2>${state.camera.scanType === "invoice" ? "Photograph invoice" : state.camera.scanType === "barcode" ? "Scan barcode" : "Photograph medicine"}</h2>
-        <p>${state.camera.scanType === "barcode" ? "Keep one barcode clear inside the frame, then tap Capture." : "Keep the whole item clear inside the frame."}</p>
-        <video id="ms20CameraPreview" autoplay muted playsinline></video>
+        <h2>${state.camera.scanType === "invoice" ? "Photograph invoice" : state.camera.scanType === "barcode" ? "Scan barcode" : state.camera.scanType === "shelf_photo" ? "Photograph shelf" : "Photograph medicine"}</h2>
+        <p>${state.camera.scanType === "barcode" ? "Keep one barcode clear inside the frame, then tap Capture." : state.camera.scanType === "shelf_photo" ? "Include full packages and the shelf label. Keep labels visible, hold steady, and avoid glare." : "Keep the whole item clear inside the frame."}</p>
+        ${state.camera.capturedUrl
+          ? `<img class="camera-captured-preview" src="${escapeHtml(state.camera.capturedUrl)}" alt="Captured shelf preview">`
+          : `<video id="ms20CameraPreview" autoplay muted playsinline></video>`}
         <p class="camera-status" aria-live="polite">${escapeHtml(state.camera.status)}</p>
         <div class="camera-actions">
           <button type="button" data-action="close-camera">Cancel</button>
-          ${state.camera.lightAvailable ? `<button type="button" data-action="toggle-camera-light">${state.camera.lightOn ? "Light off" : "Light on"}</button>` : ""}
-          <button class="primary-action" type="button" data-action="capture-camera-frame">Capture</button>
+          ${state.camera.capturedUrl
+            ? `<button type="button" data-action="retake-camera-photo">Retake</button><button class="primary-action" type="button" data-action="use-camera-photo">Use photo</button>`
+            : `${state.camera.lightAvailable ? `<button type="button" data-action="toggle-camera-light">${state.camera.lightOn ? "Light off" : "Light on"}</button>` : ""}<button class="primary-action" type="button" data-action="capture-camera-frame">Capture</button>`}
         </div>
       </div>
     </section>
   `;
+}
+
+function shelfAcquisitionTemplate() {
+  if (!state.shelfAcquisitionOpen) return "";
+  return `
+    <section class="camera-overlay" aria-label="Choose shelf photo source">
+      <div class="camera-panel acquisition-panel">
+        <h2>Add shelf photo</h2>
+        <p>Take a new shelf photo now, or choose one already saved on this phone.</p>
+        <div class="camera-actions acquisition-actions">
+          <button type="button" data-action="cancel-shelf-photo">Cancel</button>
+          <button type="button" data-action="choose-shelf-photo">Choose from phone</button>
+          <button class="primary-action" type="button" data-action="take-shelf-photo">Take photo</button>
+        </div>
+      </div>
+    </section>`;
 }
 
 function notificationsFooterTemplate() {
@@ -924,6 +945,28 @@ function handleAction(dataset) {
     state.pendingScanType = dataset.scanType || "medicine_photo";
     root.querySelector("#photoInput")?.click();
   }
+  if (action === "choose-shelf-photo-method") {
+    state.shelfAcquisitionOpen = true;
+    render();
+    return;
+  }
+  if (action === "cancel-shelf-photo") {
+    state.shelfAcquisitionOpen = false;
+    render();
+    return;
+  }
+  if (action === "choose-shelf-photo") {
+    state.shelfAcquisitionOpen = false;
+    state.pendingScanType = "shelf_photo";
+    render();
+    root.querySelector("#photoInput")?.click();
+    return;
+  }
+  if (action === "take-shelf-photo") {
+    state.shelfAcquisitionOpen = false;
+    void openLightweightCamera("shelf_photo");
+    return;
+  }
   if (action === "upload-document") root.querySelector("#documentInput")?.click();
   if (action === "scan-barcode") {
     void openLightweightCamera("barcode");
@@ -934,6 +977,8 @@ function handleAction(dataset) {
   if (action === "close-camera") closeLightweightCamera();
   if (action === "toggle-camera-light") void toggleCameraLight();
   if (action === "capture-camera-frame") void captureLightweightCameraFrame();
+  if (action === "retake-camera-photo") void retakeCameraPhoto();
+  if (action === "use-camera-photo") void useCameraPhoto();
   if (action === "demo-onboarding") addOnboardingCard();
   if (action === "start-catalog-invoice") {
     removeCardsByType(["CatalogOnboardingCard"]);
@@ -1266,6 +1311,7 @@ async function addPhotoCards(fileOrName, scanType) {
 
 async function openLightweightCamera(scanType = "medicine_photo") {
   closeCameraStream();
+  clearCapturedCameraPhoto();
   state.camera.open = true;
   state.camera.scanType = scanType;
   state.camera.status = "Opening camera…";
@@ -1314,10 +1360,36 @@ async function openLightweightCamera(scanType = "medicine_photo") {
 
 function closeLightweightCamera() {
   closeCameraStream();
+  clearCapturedCameraPhoto();
   state.camera.open = false;
   state.camera.status = "";
   state.camera.lightAvailable = false;
   state.camera.lightOn = false;
+  render();
+}
+
+function clearCapturedCameraPhoto() {
+  if (state.camera.capturedUrl) URL.revokeObjectURL(state.camera.capturedUrl);
+  state.camera.capturedFile = null;
+  state.camera.capturedUrl = "";
+}
+
+async function retakeCameraPhoto() {
+  const scanType = state.camera.scanType;
+  clearCapturedCameraPhoto();
+  await openLightweightCamera(scanType);
+}
+
+async function useCameraPhoto() {
+  const file = state.camera.capturedFile;
+  const scanType = state.camera.scanType;
+  if (!file) return;
+  state.camera.status = "Processing photo locallyâ€¦";
+  render();
+  await addPhotoCards(file, scanType);
+  clearCapturedCameraPhoto();
+  state.camera.open = false;
+  state.camera.status = "";
   render();
 }
 
@@ -1370,13 +1442,20 @@ async function captureLightweightCameraFrame() {
     0.92
   ));
   closeCameraStream();
-  state.camera.open = false;
-  state.camera.status = "";
-  render();
   const file = new File([blob], `${scanType}-${Date.now()}.jpg`, { type: "image/jpeg" });
-  if (scanType === "invoice") await readInvoicePhoto(file, true);
-  else if (scanType === "barcode") await readBarcodeCapture(file);
-  else await addPhotoCards(file, scanType);
+  if (scanType !== "shelf_photo") {
+    state.camera.open = false;
+    state.camera.status = "";
+    render();
+    if (scanType === "invoice") await readInvoicePhoto(file, true);
+    else if (scanType === "barcode") await readBarcodeCapture(file);
+    else await addPhotoCards(file, scanType);
+    return;
+  }
+  state.camera.capturedFile = file;
+  state.camera.capturedUrl = URL.createObjectURL(file);
+  state.camera.status = "Check the photo. Retake it, or use it to continue. Nothing has been saved.";
+  render();
 }
 
 async function readBarcodeCapture(file) {

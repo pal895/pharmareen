@@ -6,26 +6,41 @@ import { catalogItemsToText, parseCatalogText } from "../src/services/catalogOnb
 
 const manifest = JSON.parse(fs.readFileSync(new URL("../fixtures/shelf-photo-b2.json", import.meta.url), "utf8"));
 const png = fs.readFileSync(new URL("../fixtures/shelf-photo-b2.png", import.meta.url));
+const cameraManifest = JSON.parse(fs.readFileSync(new URL("../fixtures/shelf-photo-c3-camera.json", import.meta.url), "utf8"));
+const cameraPng = fs.readFileSync(new URL("../fixtures/shelf-photo-c3-camera.png", import.meta.url));
 const app = fs.readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
 const fixture = findShelfTestFixture({ fileName: manifest.fileName });
 const contentHash = crypto.createHash("sha256").update(png).digest("hex");
+const cameraFixture = findShelfTestFixture({ fileName: cameraManifest.fileName });
+const cameraContentHash = crypto.createHash("sha256").update(cameraPng).digest("hex");
 const sourceBrain = new SourceBrain();
-const knownCatalog = ["Cefixime", "Ceftriaxone", "Salbutamol", "Metformin", "Omeprazole", "Diclofenac", "Hydrocortisone", "Azithromycin", "Zinc", "Acyclovir", "Clotrimazole", "Doxycycline", "Chloramphenicol", "Albendazole", "Amlodipine", "Fluconazole", "Betamethasone", "Amitriptyline", "Artemether Lumefantrine", "Ciprofloxacin", "Loratadine", "Aspirin", "Atenolol", "Erythromycin", "Folic Acid", "Losartan", "Loperamide"];
+const knownCatalogBeforeB2 = ["Cefixime", "Ceftriaxone", "Salbutamol", "Metformin", "Omeprazole", "Diclofenac", "Hydrocortisone", "Azithromycin", "Zinc", "Acyclovir", "Clotrimazole", "Doxycycline", "Chloramphenicol", "Albendazole", "Amlodipine", "Fluconazole", "Betamethasone", "Amitriptyline", "Artemether Lumefantrine", "Ciprofloxacin", "Loratadine", "Aspirin", "Atenolol", "Erythromycin", "Folic Acid", "Losartan", "Loperamide"];
+const confirmedCatalog = [...knownCatalogBeforeB2, "Prednisolone", "Septrin"];
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 
-assert(fixture && ShelfTestFixtures.length === 1, "Shelf fixture lookup must remain isolated");
+assert(fixture && cameraFixture && ShelfTestFixtures.length === 2, "Shelf fixture lookup must remain isolated to the two controlled stages");
 assert(contentHash === manifest.sha256 && fixture.sha256 === contentHash, "Shelf fixture content hash must match its manifest and registry");
 assert(findShelfTestFixture({ fileName: "renamed-by-android.png", sha256: contentHash }) === fixture, "Renamed photo-picker uploads must resolve by content hash");
 assert(fixture.perceptualHash === manifest.perceptualHash && fixture.aspectRatio === manifest.aspectRatio, "Shelf visual fingerprint must match its manifest");
 assert(findShelfTestFixture({ fileName: "reencoded-by-photos.jpg", perceptualHash: "0004043efebdff01", aspectRatio: 1.78 }) === fixture, "Re-encoded photo-library uploads must tolerate bounded visual changes");
 assert(findShelfTestFixture({ perceptualHash: "ffffffffffffffff", aspectRatio: 1.78 }) === null, "Unrelated images must not resolve as controlled fixtures");
+assert(cameraContentHash === cameraManifest.sha256 && cameraFixture.sha256 === cameraContentHash, "Camera fixture content hash must match its manifest and registry");
+assert(cameraFixture.items.length === 2 && cameraFixture.items.every((item) => sourceBrain.lookupMedicine(item.name).status === "matched"), "Every camera shelf proposal must resolve through Source Brain");
+assert(cameraFixture.items.every((item) => !confirmedCatalog.includes(item.name)), "Camera shelf fixture must not overlap the confirmed 29-item live catalog");
+assert(cameraFixture.items.every((item) => item.shelf === "C3" && item.stock && item.cost_price && item.selling_price && item.batch && item.expiry), "Camera fixture must retain complete review fields");
 assert(png.length > 100000 && png.subarray(1, 4).toString() === "PNG", "Realistic shelf PNG fixture is missing");
 assert(fixture.items.length === 2 && fixture.items.every((item) => sourceBrain.lookupMedicine(item.name).status === "matched"), "Every shelf proposal must resolve through Source Brain");
-assert(fixture.items.every((item) => !knownCatalog.includes(item.name)), "Shelf fixture must not overlap the known 27-item live catalog");
+assert(fixture.items.every((item) => !knownCatalogBeforeB2.includes(item.name)), "Shelf fixture must not overlap the known 27-item live catalog");
 assert(fixture.items.every((item) => item.shelf === "B2" && item.stock && item.cost_price && item.selling_price && item.batch && item.expiry), "Shelf fixture must retain complete review fields");
 const roundTrip = parseCatalogText(catalogItemsToText(fixture.items));
 assert(roundTrip.length === 2 && roundTrip.every((item) => item.shelf === "B2"), "Shelf rows must survive shared editable-list serialization");
-assert(app.includes('data-scan-type="shelf_photo">Shelf photo</button>'), "Shelf fixture must have a dedicated owner-facing photo-library action");
+assert(app.includes('data-action="choose-shelf-photo-method">Shelf photo</button>'), "Shelf photo must open an acquisition choice");
+assert(app.includes('data-action="take-shelf-photo">Take photo</button>'), "Shelf photo must offer direct camera capture");
+assert(app.includes('data-action="choose-shelf-photo">Choose from phone</button>'), "Shelf photo must preserve phone-library selection");
+assert(app.includes('openLightweightCamera("shelf_photo")'), "Take photo must use the shared rear-camera lifecycle");
+assert(app.includes('data-action="retake-camera-photo">Retake</button>'), "Captured shelf photos must support retake before processing");
+assert(app.includes('data-action="use-camera-photo">Use photo</button>'), "Captured shelf photos must require explicit use before processing");
+assert(app.includes("await addPhotoCards(file, scanType)"), "Camera and gallery files must converge into the shared photo pipeline");
 assert(app.includes('state.pendingScanType = "shelf_photo"'), "Catalog shelf scan must retain its scan identity through file acquisition");
 assert(app.includes('crypto.subtle.digest("SHA-256"'), "Shelf fixture recognition must survive photo-picker filename changes");
 assert(app.includes("createImageBitmap(fileOrName)"), "Shelf fixture recognition must survive photo-library re-encoding");
@@ -33,4 +48,4 @@ assert(app.includes('addPhotoCards(file || "camera-photo.jpg"'), "Photo-library 
 assert(app.includes('createPasteImportCard(catalogItemsToText(recognizedItems))'), "Recognized shelf medicines must converge into the shared multi-row catalog review");
 assert(app.includes("sourceBrain.lookupMedicine(item.name).status === \"matched\""), "Controlled shelf proposals must be Source Brain-gated");
 
-console.log("Shelf photo fixture verification passed: realistic PNG, filename/exact/visual identity, negative isolation, two Source Brain medicines, complete fields, and shared review round trip.");
+console.log("Shelf photo verification passed: B2 gallery persistence baseline, C3 camera isolation, acquisition choice, retake/use lifecycle, shared pipeline, complete fields, and zero catalog writes before approval.");

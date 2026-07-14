@@ -8,7 +8,6 @@ export const SourceMedicineList = [
   medicine("Atenolol", ["aten"], ["tablet"], ["tablet", "strip"]),
   medicine("Azithromycin", ["azithro", "zithro"], ["tablet", "capsule", "suspension"], ["tablet", "capsule", "bottle"]),
   medicine("Betamethasone", ["beta"], ["cream", "ointment", "injection"], ["tube", "vial"]),
-  medicine("Brufen", ["ibuprofen", "brufen"], ["tablet", "suspension"], ["tablet", "bottle"]),
   medicine("Cefixime", ["cefix", "cefexime"], ["tablet", "capsule", "suspension"], ["tablet", "capsule", "bottle"]),
   medicine("Ceftriaxone", ["ceftriax", "ceftriazone"], ["injection", "vial"], ["vial"]),
   medicine("Chloramphenicol", ["chloram", "chloramphenicol eye"], ["eye drops", "capsule"], ["bottle", "capsule"]),

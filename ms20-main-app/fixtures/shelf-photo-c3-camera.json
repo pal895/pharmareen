@@ -1,0 +1,15 @@
+{
+  "fixtureId": "shelf-photo-c3-camera",
+  "fileName": "shelf-photo-c3-camera.png",
+  "sha256": "c169056a58bcb7f7a98bbb28e12acd92693454bcb5f05f0a74482b918a11e782",
+  "perceptualHash": "00000cffffffff00",
+  "aspectRatio": 1.7768,
+  "scanType": "shelf_photo",
+  "shelf": "C3",
+  "expectedCatalogCountBeforeApproval": 29,
+  "items": [
+    { "name": "Metronidazole", "strength": "400 mg", "form": "tablet", "unit": "tablet", "stock": "36", "selling_price": "20", "cost_price": "11", "supplier": "Afya Wholesale Ltd", "batch": "MET-400C", "expiry": "2029-03", "shelf": "C3" },
+    { "name": "Ibuprofen", "strength": "200 mg", "form": "tablet", "unit": "tablet", "stock": "28", "selling_price": "18", "cost_price": "9", "supplier": "Afya Wholesale Ltd", "batch": "IBU-200C", "expiry": "2028-12", "shelf": "C3" }
+  ],
+  "expected": "Direct camera capture pauses for Retake or Use photo, then opens one unsaved two-row shared shelf review."
+}
