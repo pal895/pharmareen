@@ -89,7 +89,7 @@ When resume detects an unreadable non-empty card, move its raw payload to bounde
 
 Capability migrations must replace every renderer reference atomically. Parser tests alone cannot protect an import workflow: exercise a complete realistic card through body rendering and action rendering, because a stale workflow-local variable can leave parsing correct while making the review card unreadable. CSV, bulk paste, and invoice reviews must all render their actions from the same CatalogImport capability policy.
 
-Successful duplicate prevention still requires visible owner feedback. When a review action intentionally keeps an input card open because every proposed medicine already exists, show that outcome in the main shared card note rather than only in collapsed diagnostics. A safe no-op that is visually silent looks like a broken control and invites repeated taps. Keep raw import controls owner-facing and phone-readable: use canonical labels such as `Medicine list` and let long text inputs fill the card width.
+Successful duplicate prevention still requires visible owner feedback. Show partition outcomes in the main shared card note rather than only in collapsed diagnostics: this includes an intentional no-op when every proposed medicine exists and a mixed review where existing medicines are excluded while new rows proceed. A safe result that is visually silent looks like a broken control or unexplained data loss. Keep raw import controls owner-facing and phone-readable: use canonical labels such as `Medicine list` and let long text inputs fill the card width.
 
 ### Catalog multi-term search intent
 

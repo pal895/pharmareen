@@ -1866,7 +1866,6 @@ function reviewPasteList(cardId) {
     return;
   }
   card.fields.entry_mode = "review";
-  delete card.fields.review_feedback;
   card.fields.catalog_rows = JSON.stringify(newItems);
   card.fields.items_text = catalogItemsToText(newItems);
   card.fields.existing_medicines_ignored = existing.map((item) => item.name).join(", ");
@@ -1875,6 +1874,7 @@ function reviewPasteList(cardId) {
     existing.length ? `${existing.length} existing medicine(s) were not added again: ${existing.map((item) => item.name).join(", ")}.` : "No existing catalog medicines were repeated.",
     parsed.unclear.length ? `${parsed.unclear.length} line(s) need correction.` : "Check every field, then approve."
   ].join(" ");
+  card.fields.review_feedback = card.validation;
   persistActiveCards();
   render();
 }
@@ -2366,9 +2366,11 @@ function friendlyCardLabel(card) {
 
 function ownerCardNote(card) {
   if (card.type === "CatalogImportCard" && card.fields?.import_incomplete === "true") return "This scan is incomplete. Scan again before saving anything.";
-  if (card.type === "CatalogImportCard" && card.fields?.entry_mode === "paste_input") {
+  if (card.type === "CatalogImportCard") {
     const feedback = String(card.fields?.review_feedback || "").trim();
     if (feedback) return feedback;
+  }
+  if (card.type === "CatalogImportCard" && card.fields?.entry_mode === "paste_input") {
     const retainedFeedback = String(card.validation || "").trim();
     if (/^(No new medicines found|Paste at least one medicine line)/.test(retainedFeedback)) return retainedFeedback;
   }
