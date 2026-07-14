@@ -27,10 +27,12 @@
 - Live evidence after `0eaa499` verified all-existing feedback and the improved paste editor. A mixed Paste List then correctly excluded saved Amitriptyline and reviewed only new Quinine Sulfate; the shared visible feedback now also explains this mixed partition instead of leaving the omitted existing row unexplained.
 - Live evidence after `904c501` closed the mixed draft without saving, then the unknown-medicine sale command `Quinine Sulfate 1 cash` correctly opened a Medicine Match / sale-time learning review. Its shared renderer exposed every field as one long phone form and labeled both sale quantity and current stock as `Quantity`; shared single-medicine reviews now use three-slide progressive disclosure and distinct canonical labels. The Quinine draft remains unapproved.
 - Live evidence after `d6027d6` verified all three compact panels and their navigation. The remaining raw `message` label and mobile textarea resize artifact are normalized at the shared field/style boundary; the Quinine draft remains unapproved.
+- Live evidence after `3de02cb` verified local EAN-13 capture of the controlled Losartan fixture, Source Brain-gated recognition, a complete unsaved review, explicit approval, catalog growth from 25 to 26, and persistence after refresh. The saved record retained name, strength, form, unit, stock, prices, supplier, barcode, and expiry, but lost `LOS-50T`: shared review records exposed top-level `batch`/`expiry` while Pharmacy Brain normalization only retained a prebuilt `batches[]` array. Canonical normalization now promotes those reviewed traceability fields into `batches[]` for barcode, photo, manual, and other shared review approvals.
 
 ## Shared-root conclusions and drift
 
 - Medicine identity fields and persistence converge through the canonical medicine field schema; strength and barcode are not CSV-only.
+- Reviewed batch and expiry values must converge into canonical `batches[]` during Pharmacy Brain normalization even when the originating shared card supplies flat fields.
 - Multi-row review movement was generic in persistence but its UI was incorrectly gated by invoice mode. The shared CatalogImport review policy now owns reorder, add-row, editing, approval, and correction capabilities.
 - All `data-action` controls now delegate through one stable application-root lifecycle. Every card inherits the same safe close action at both the top and bottom so long editable cards do not require a full upward scroll.
 - Safe invoice, CSV, bulk-paste, and future compatible multi-row CatalogImport reviews inherit ordering. Incomplete invoices intentionally hide ordering and add-row controls until safe; single-medicine cards exclude ordering.
@@ -54,4 +56,4 @@ Whenever an editable-medicine behavior is reusable, implement it once in the sha
 
 ## Next action
 
-After this shared-row commit is pushed, pull/restart Replit once and perform only the combined paused-stage validation described above. Do not advance to Excel onboarding from that test.
+After the shared batch-persistence fix is pushed, pull/restart Replit once and rescan the already-saved Losartan barcode. Verify duplicate handling opens the existing medicine safely and does not create a 27th catalog record. Do not advance to another onboarding method from that test.

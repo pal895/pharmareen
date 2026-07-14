@@ -39,9 +39,25 @@ const restockRecord = medicineRecordFromFields(
 brain.upsertCatalogItem(restockRecord);
 assert(brain.catalog.length === 2 && brain.catalog[0].strength === "100 mg" && brain.catalog[0].barcode === "6161100000098", "Restock review must reuse canonical medicine persistence without duplication");
 assert(brain.catalog[0].stockLeft === "50", "Restock metadata review must not confuse delivered quantity with replacement stock");
+const barcodeRecord = medicineRecordFromFields({
+  medicine: "Losartan",
+  strength: "50 mg",
+  form: "tablet",
+  unit: "tablet",
+  stock: "40",
+  selling_price: "25",
+  cost_price: "15",
+  supplier: "Dawa Bora Wholesale Ltd",
+  barcode: "6161109876546",
+  batch: "LOS-50T",
+  expiry: "2029-06"
+}, { source: "scan_review" });
+brain.upsertCatalogItem(barcodeRecord);
+assert(brain.catalog.at(-1).batches[0]?.batch === "LOS-50T", "Shared review approval must promote a top-level batch into canonical catalog batches");
 const refreshed = new PharmacyBrain({ pharmacyId: "shared-field-refresh" });
 refreshed.loadCatalog(JSON.parse(JSON.stringify(brain.catalog)));
 assert(refreshed.catalog[0].strength === "100 mg" && refreshed.catalog[0].barcode === "6161100000098", "Strength and barcode must persist through refresh serialization");
+assert(refreshed.catalog.at(-1).batches[0]?.batch === "LOS-50T" && refreshed.catalog.at(-1).batches[0]?.expiry === "2029-06", "Barcode batch and expiry must persist together through refresh serialization");
 refreshed.upsertCatalogItem({ name: "Expiry Check", batches: [{ batch: "E1", expiry: "Oct-28" }] });
 assert(refreshed.catalog.at(-1).batches[0].expiry === "2028-10", "Persisted catalog loading must migrate display-style expiry text to canonical YYYY-MM");
 const futureExpiry = buildDeterministicNotifications({ catalog: [refreshed.catalog.at(-1)], now: new Date("2026-07-14T00:00:00Z") });

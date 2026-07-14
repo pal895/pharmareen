@@ -91,6 +91,11 @@ function sameMedicine(left, right) {
 }
 
 function normalizeCatalogItem(item) {
+  const batches = Array.isArray(item.batches) && item.batches.length
+    ? item.batches
+    : item.batch || item.expiry
+      ? [{ batch: item.batch || "", expiry: item.expiry || "" }]
+      : [];
   return {
     id: item.id || `catalog-${normalize(item.name || item.medicine)}-${Date.now()}`,
     name: item.name || item.medicine || "",
@@ -104,7 +109,7 @@ function normalizeCatalogItem(item) {
     costPrice: item.costPrice ?? item.cost_price ?? "",
     supplier: item.supplier || "",
     barcode: item.barcode || "",
-    batches: (item.batches || []).map((batch) => ({ ...batch, expiry: normalizeExpiryValue(batch.expiry || "") })),
+    batches: batches.map((batch) => ({ ...batch, expiry: normalizeExpiryValue(batch.expiry || "") })),
     expiry: normalizeExpiryValue(item.expiry || ""),
     shelf: item.shelf || item.location || "",
     reorderLevel: item.reorderLevel ?? item.reorder_level ?? "",
