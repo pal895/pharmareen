@@ -5,6 +5,7 @@ import { SyncAdapter } from "./services/syncAdapter.js";
 import { BackendAdapterRegistry } from "./services/backendAdapters.js";
 import { PharmacyBrain, SourceBrain, AIFallbackAdapter } from "./services/brainAdapters.js";
 import { findBarcodeTestFixture } from "./data/barcodeTestFixtures.js";
+import { findShelfTestFixture } from "./data/shelfTestFixtures.js";
 import { runVisualPipeline, buildPhotoReviewCard } from "./services/visualPipeline.js";
 import {
   createCatalogChoiceCard,
@@ -288,6 +289,7 @@ function composerTemplate() {
         <div class="attach-sheet">
           <button type="button" data-action="take-photo">Camera</button>
           <button type="button" data-action="upload-photo">Photo library</button>
+          <button type="button" data-action="upload-photo" data-scan-type="shelf_photo">Shelf photo</button>
           <button type="button" data-action="upload-document">File</button>
           <button type="button" data-action="capture-invoice">Invoice</button>
           <button type="button" data-action="scan-barcode">Scan barcode</button>
@@ -940,7 +942,7 @@ function handleAction(dataset) {
   }
   if (action === "start-catalog-scan") {
     removeCardsByType(["CatalogOnboardingCard"]);
-    state.pendingScanType = "medicine_photo";
+    state.pendingScanType = "shelf_photo";
     root.querySelector("#cameraInput")?.click();
   }
   if (action === "start-catalog-paste") {
@@ -1202,6 +1204,22 @@ function commandHasExplicitPayment(text) {
 function addPhotoCards(fileName, scanType) {
   state.ui.screen = "chat";
   state.ui.workspace = "operations";
+  const shelfFixture = scanType === "shelf_photo" ? findShelfTestFixture(fileName) : null;
+  if (shelfFixture) {
+    const recognizedItems = shelfFixture.items.filter((item) => sourceBrain.lookupMedicine(item.name).status === "matched");
+    if (recognizedItems.length === shelfFixture.items.length) {
+      const card = createPasteImportCard(catalogItemsToText(recognizedItems));
+      card.title = "Review shelf medicines";
+      card.source = fileName;
+      card.fields.method = "shelf photo";
+      card.fields.scan_type = "shelf_photo";
+      card.fields.review_feedback = `${recognizedItems.length} medicines recognized locally from controlled shelf fixture. Nothing is saved until approval.`;
+      card.validation = card.fields.review_feedback;
+      addCard(card);
+      refreshNotifications();
+      return;
+    }
+  }
   const result = runVisualPipeline({ fileName, scanType });
   const visualCard = buildPhotoReviewCard(result);
   addCard(visualCard);

@@ -1,0 +1,12 @@
+{
+  "fixtureId": "shelf-photo-b2",
+  "fileName": "shelf-photo-b2.png",
+  "scanType": "shelf_photo",
+  "shelf": "B2",
+  "expectedCatalogCountBeforeApproval": 27,
+  "items": [
+    { "name": "Prednisolone", "strength": "5 mg", "form": "tablet", "unit": "tablet", "stock": "24", "selling_price": "12", "cost_price": "7", "supplier": "MedSource Kenya Ltd", "batch": "PRE-5T", "expiry": "2028-11", "shelf": "B2" },
+    { "name": "Septrin", "strength": "", "form": "suspension", "unit": "bottle", "stock": "12", "selling_price": "180", "cost_price": "120", "supplier": "MedSource Kenya Ltd", "batch": "SEP-100S", "expiry": "2028-09", "shelf": "B2" }
+  ],
+  "expected": "One unsaved two-row shelf review; no catalog write before explicit approval."
+}
