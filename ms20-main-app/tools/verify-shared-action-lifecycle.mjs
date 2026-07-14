@@ -13,6 +13,7 @@ assert(app.includes('data-action="start-catalog-paste"') && app.includes('if (ac
 assert(app.includes("consolidateEmptyPasteDrafts()") && app.includes("focusCard(existing.id)") && app.includes("focusCard(card.id)"), "Repeated blank Paste List actions must reuse one draft, focus it, and discard it safely if still empty on resume");
 assert(app.includes("function safeCardTemplate(card)") && app.includes("state.cards.map(safeCardTemplate)"), "One unreadable operational draft must never lock the whole workspace");
 assert(app.includes("function quarantineUnreadableActiveCards()") && app.includes("QUARANTINED_CARDS_KEY"), "Unreadable non-empty drafts must leave the active render path without losing their raw data");
+assert(!app.includes("incompleteInvoice") && app.includes("capabilities.correctionAllowed"), "Catalog review actions must consume the shared capability policy without stale workflow-local variables");
 assert(!app.includes("CSS.escape"), "Card focus must not depend on an optional browser CSS escaping API");
 assert(!app.includes("bindActionElements(list)"), "Dynamic catalog lists must rely on the same root action lifecycle instead of local rebinding");
 assert(app.includes('cardCloseButtonTemplate(card, "top")') && app.includes('cardCloseButtonTemplate(card, "bottom")'), "Every rendered card must inherit top and bottom close controls from one renderer");

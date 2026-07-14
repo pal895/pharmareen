@@ -21,7 +21,8 @@
 - Live evidence after `6476f7c` verified false expiry alerts were removed and the synchronized bottom catalog search appeared. File and Paste List quick actions then exposed a shared interaction-lifecycle failure before a review could open.
 - Live evidence after `60b2014` showed four import-approval alerts: repeated Paste List taps created empty drafts but did not navigate to the new card, making Operations appear hung while Notifications remained available. Empty repeated drafts now consolidate safely and every opened card is focused immediately.
 - Live evidence after `b011b6b` showed the retained blank draft still blocked Operations after its notification was dismissed. Resume now discards every truly empty Paste input draft and isolates any unreadable non-empty card so operational workspaces cannot be locked by one draft.
-- Live evidence after `481835d` verified MS2.0 Assistant and SHOW ME open again. Two corrupt legacy import drafts reached isolation cards, and the bottom close label wrapped poorly; corrupt raw drafts now move to bounded local quarantine on resume and every shared bottom close control displays only `x`.
+- Live evidence after `481835d` verified MS2.0 Assistant and SHOW ME open again. Two valid import reviews reached isolation cards because of a renderer defect, and the bottom close label wrapped poorly; unreadable raw drafts now move to bounded local quarantine on resume and every shared bottom close control displays only `x`.
+- Live evidence after `91a8d7e` verified the File picker opens, but selecting the Test 4 CSV produced an isolation card. Exact reproduction found a stale `incompleteInvoice` action-template reference left behind by the capability migration; completed CSV/Paste reviews now consume `correctionAllowed` from the shared policy and have full render regression coverage.
 
 ## Shared-root conclusions and drift
 

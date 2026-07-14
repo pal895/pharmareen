@@ -712,7 +712,7 @@ function activeActionsTemplate(card) {
           : `${invoiceMode ? '<button data-action="capture-invoice">Scan again</button>' : ""}<button data-action="confirm-card" data-card-id="${card.id}">${invoiceMode ? "Approve medicines" : "Approve catalog"}</button>`}
         ${invoiceMode ? "" : '<button data-action="download-template">Template</button>'}
         <button data-action="read-card" data-card-id="${card.id}">Read</button>
-        ${incompleteInvoice ? "" : `<button data-action="correct-card" data-card-id="${card.id}">Correct</button>`}
+        ${capabilities.correctionAllowed ? `<button data-action="correct-card" data-card-id="${card.id}">Correct</button>` : ""}
         <button data-action="reject-card" data-card-id="${card.id}">Cancel</button>
       </div>
     `;
@@ -1669,7 +1669,7 @@ function quarantineUnreadableActiveCards() {
       cardTemplate(card);
       return true;
     } catch (error) {
-      quarantined.push({ card, reason: error?.name || "RenderError", quarantined_at: new Date().toISOString() });
+      quarantined.push({ card, reason: `${error?.name || "RenderError"}: ${String(error?.message || "Unreadable card").slice(0, 180)}`, quarantined_at: new Date().toISOString() });
       return false;
     }
   });
