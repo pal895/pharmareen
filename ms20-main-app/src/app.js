@@ -81,6 +81,7 @@ const MEDICINE_DETAIL_CARD_TYPES = new Set([
   "MedicineMatchCard",
   "VisualScanCard"
 ]);
+const PROGRESSIVE_MEDICINE_CARD_TYPES = new Set(MEDICINE_DETAIL_CARD_TYPES);
 const DURABLE_CARD_TYPES = new Set([
   "SaleCard",
   "InvoiceCard",
@@ -379,6 +380,7 @@ function adminMenuTemplate() {
 function cardTemplate(card) {
   const fields = cardFieldsFor(card.type);
   const displayed = fields.length ? fields : Object.keys(card.fields || {});
+  const progressiveMedicine = PROGRESSIVE_MEDICINE_CARD_TYPES.has(card.type);
   return `
     <article class="card-message ${card.status}" data-card-id="${card.id}">
       <div class="card-top">
@@ -392,10 +394,10 @@ function cardTemplate(card) {
         </span>
       </div>
       ${cardBodyTemplate(card, displayed)}
-      ${(card.type === "SaleCard" || card.type === "VoiceReviewCard") ? paymentToolbar(card) : ""}
-      ${(card.type === "SaleCard" || card.type === "RestockCard") ? quantityToolbar(card) : ""}
+      ${!progressiveMedicine && (card.type === "SaleCard" || card.type === "VoiceReviewCard") ? paymentToolbar(card) : ""}
+      ${!progressiveMedicine && (card.type === "SaleCard" || card.type === "RestockCard") ? quantityToolbar(card) : ""}
       <p class="card-note">${escapeHtml(ownerCardNote(card))}</p>
-      ${activeActionsTemplate(card)}
+      ${progressiveMedicine ? "" : activeActionsTemplate(card)}
       <details class="card-technical">
         <summary>Details</summary>
         ${card.source ? `<p>From: ${escapeHtml(card.source)}</p>` : ""}
@@ -575,10 +577,38 @@ function fieldTemplate(card, field) {
 
 function medicineDetailTemplate(card, displayed) {
   const ordered = orderedMedicineFields(displayed);
+  const fieldSet = new Set(ordered);
+  const slideOneFields = ["medicine", "selling_price", "quantity"].filter((field) => fieldSet.has(field));
+  const slideTwoFields = ["stock", "current_stock", "strength", "form", "unit", "cost_price", "expiry", "pack_size", "reorder_level"].filter((field) => fieldSet.has(field));
+  const used = new Set([...slideOneFields, ...slideTwoFields, "payment"]);
+  const slideThreeFields = ["supplier", "barcode", "batch", "alias", "aliases", "message", "shelf", "category", "reason", "file", "scan_type", "total", "correct_stock"].filter((field) => fieldSet.has(field) && !used.has(field));
+  const remaining = ordered.filter((field) => !used.has(field) && !slideThreeFields.includes(field));
+  slideThreeFields.push(...remaining);
+  const strength = String(card.fields?.strength || "").trim();
   return `
-    <div class="medicine-detail-grid">
-      ${ordered.map((field) => fieldTemplate(card, field)).join("")}
-    </div>
+    <section class="medicine-review-workspace" data-medicine-workspace="${card.id}">
+      <div class="medicine-slide-nav" aria-label="Medicine review sections">
+        <button type="button" class="selected" data-action="show-medicine-slide" data-card-id="${card.id}" data-slide="0">Fast action</button>
+        <button type="button" data-action="show-medicine-slide" data-card-id="${card.id}" data-slide="1">Stock &amp; details</button>
+        <button type="button" data-action="show-medicine-slide" data-card-id="${card.id}" data-slide="2">Traceability</button>
+      </div>
+      <div class="medicine-slide-status"><span data-medicine-slide-indicator="${card.id}">1 of 3</span><span>Swipe or use the section buttons</span></div>
+      <div class="medicine-slide-track" data-medicine-carousel="${card.id}">
+        <section class="medicine-slide medicine-slide-fast" aria-label="Fast action">
+          ${strength ? `<p class="medicine-strength-summary">${escapeHtml(strength)}</p>` : ""}
+          <div class="medicine-slide-fields">${slideOneFields.map((field) => fieldTemplate(card, field)).join("")}</div>
+          ${fieldSet.has("quantity") ? quantityToolbar(card) : ""}
+          ${fieldSet.has("payment") ? paymentToolbar(card) : ""}
+          ${activeActionsTemplate(card)}
+        </section>
+        <section class="medicine-slide" aria-label="Stock and medicine details">
+          <div class="medicine-slide-fields medicine-slide-fields-compact">${slideTwoFields.length ? slideTwoFields.map((field) => fieldTemplate(card, field)).join("") : '<p class="medicine-empty-slide">No stock details supplied yet.</p>'}</div>
+        </section>
+        <section class="medicine-slide" aria-label="Traceability and secondary details">
+          <div class="medicine-slide-fields medicine-slide-fields-compact">${slideThreeFields.length ? slideThreeFields.map((field) => fieldTemplate(card, field)).join("") : '<p class="medicine-empty-slide">No traceability details supplied yet.</p>'}</div>
+        </section>
+      </div>
+    </section>
   `;
 }
 
@@ -789,6 +819,16 @@ function bindEvents() {
   });
 
   bindActionElements(root);
+  root.querySelectorAll("[data-medicine-carousel]").forEach((track) => {
+    let frame = 0;
+    track.addEventListener("scroll", () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const index = Math.max(0, Math.min(2, Math.round(track.scrollLeft / Math.max(1, track.clientWidth))));
+        updateMedicineSlideNavigation(track.dataset.medicineCarousel, index);
+      });
+    }, { passive: true });
+  });
 
   root.querySelectorAll("[data-field]").forEach((input) => {
     input.addEventListener("input", () => updateCardField(input.dataset.cardId, input.dataset.field, input.value));
@@ -938,6 +978,23 @@ function handleAction(dataset) {
   if (action === "dismiss-card") dismissCard(dataset.cardId);
   if (action === "set-payment") setPayment(dataset.cardId, dataset.payment);
   if (action === "bump-quantity") bumpQuantity(dataset.cardId, Number(dataset.amount));
+  if (action === "show-medicine-slide") showMedicineSlide(dataset.cardId, Number(dataset.slide));
+}
+
+function showMedicineSlide(cardId, slide) {
+  const track = root.querySelector(`[data-medicine-carousel="${cardId}"]`);
+  if (!track) return;
+  const index = Math.max(0, Math.min(2, Number.isFinite(slide) ? slide : 0));
+  track.scrollTo({ left: track.clientWidth * index, behavior: "smooth" });
+  updateMedicineSlideNavigation(cardId, index);
+}
+
+function updateMedicineSlideNavigation(cardId, index) {
+  const workspace = root.querySelector(`[data-medicine-workspace="${cardId}"]`);
+  if (!workspace) return;
+  workspace.querySelectorAll("[data-slide]").forEach((button) => button.classList.toggle("selected", Number(button.dataset.slide) === index));
+  const indicator = workspace.querySelector(`[data-medicine-slide-indicator="${cardId}"]`);
+  if (indicator) indicator.textContent = `${index + 1} of 3`;
 }
 
 function handleCommand(text) {

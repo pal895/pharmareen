@@ -6,7 +6,7 @@ export const MEDICINE_FIELD_DEFINITIONS = Object.freeze({
   unit: field("unit", "Unit", 110),
   pack_size: field("pack_size", "Pack size", 120),
   quantity: field("quantity", "Quantity", 100, "numeric"),
-  stock: field("stock", "Quantity", 100, "numeric"),
+  stock: field("stock", "Current stock", 100, "numeric"),
   cost_price: field("cost_price", "Buying price", 120, "decimal"),
   selling_price: field("selling_price", "Selling price", 120, "decimal"),
   supplier: field("supplier", "Supplier", 130),
