@@ -808,13 +808,12 @@ function bindEvents() {
 }
 
 function bindActionElements(scope) {
-  if (!scope || scope.dataset.actionDelegationBound === "true") return;
-  scope.dataset.actionDelegationBound = "true";
-  scope.addEventListener("click", (event) => {
+  if (!scope) return;
+  scope.onclick = (event) => {
     const actionElement = event.target.closest?.("[data-action]");
     if (!actionElement || !scope.contains(actionElement)) return;
     handleAction(actionElement.dataset);
-  });
+  };
 }
 
 function handleAction(dataset) {
@@ -880,7 +879,13 @@ function handleAction(dataset) {
   }
   if (action === "start-catalog-paste") {
     removeCardsByType(["CatalogOnboardingCard"]);
-    addCard(createPasteImportCard());
+    const existing = state.cards.find((card) => card.type === "CatalogImportCard" && card.fields?.entry_mode === "paste_input" && !String(card.fields?.items_text || "").trim());
+    if (existing) {
+      render();
+      focusCard(existing.id);
+    } else {
+      addCard(createPasteImportCard());
+    }
   }
   if (action === "open-catalog-card") showCatalogWorkspace();
   if (action === "review-paste-list") reviewPasteList(dataset.cardId);
@@ -1631,9 +1636,23 @@ function reconcileResumeState() {
       refreshInvoiceImportCompleteness(card, catalogRowsForCard(card));
     }
   });
+  consolidateEmptyPasteDrafts();
   state.onboarding.started = state.cards.some((card) => card.type === "OnboardingCard");
   persistFeed();
   persistActiveCards();
+}
+
+function consolidateEmptyPasteDrafts() {
+  let kept = false;
+  state.cards = state.cards.filter((card) => {
+    const emptyPasteDraft = card.type === "CatalogImportCard"
+      && card.fields?.entry_mode === "paste_input"
+      && !String(card.fields?.items_text || "").trim();
+    if (!emptyPasteDraft) return true;
+    if (kept) return false;
+    kept = true;
+    return true;
+  });
 }
 
 function resetOnboarding() {
@@ -1715,6 +1734,11 @@ function addCard(card) {
   rememberInvoiceCard(card);
   persistActiveCards();
   render();
+  focusCard(card.id);
+}
+
+function focusCard(cardId) {
+  root.querySelector(`[data-card-id="${CSS.escape(String(cardId))}"]`)?.scrollIntoView({ block: "start", behavior: "smooth" });
 }
 
 function addFeed(type, text) {

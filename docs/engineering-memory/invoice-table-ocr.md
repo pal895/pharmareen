@@ -80,6 +80,8 @@ Permanent test method: test in sections with representative examples; identify a
 Dynamic result lists must rebind their interactive actions after replacing HTML. A visually correct result is not complete unless its primary action remains operable after search, filtering, rescanning, or any other partial rerender.
 
 Interactive actions belong at the stable rendering lifecycle boundary. Prefer one delegated `data-action` listener on the application root so composer sheets, filtered lists, refreshed reviews, and future dynamic controls inherit behavior without screen-specific rebinding. Long cards must also inherit the same safe close action at both their top and bottom; navigation improvements are shared card behavior, not per-workflow decoration.
+
+Creating a review is not enough if the owner cannot see it. After opening or creating a card, focus that exact card rather than scrolling to an unrelated end of a long conversation. Idempotently reuse an existing blank draft for the same workflow and consolidate empty duplicates on resume; repeated taps caused by uncertain feedback must never multiply pending work or make the app appear hung.
 ### Catalog multi-term search intent
 
 Catalog filtering must require every normalized query term to match the same saved medicine. An average fuzzy score can otherwise admit an unrelated medicine because it shares a generic form such as `syrup`. Keep this strict browse-search constraint separate from the general medicine matcher, whose ranked alternatives are still needed for safe sale and restock ambiguity handling.

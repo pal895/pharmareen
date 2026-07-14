@@ -7,9 +7,10 @@ const app = fs.readFileSync(path.join(root, "src/app.js"), "utf8");
 const css = fs.readFileSync(path.join(root, "src/styles.css"), "utf8");
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 
-assert(app.includes('scope.addEventListener("click"') && app.includes('event.target.closest?.("[data-action]")'), "Actions must delegate through a stable rendered root");
+assert(app.includes("scope.onclick = (event)") && app.includes('event.target.closest?.("[data-action]")'), "Every render must replace the root with one current delegated action handler");
 assert(app.includes('data-action="upload-document"') && app.includes('if (action === "upload-document")'), "File quick action must reach the shared document input path");
 assert(app.includes('data-action="start-catalog-paste"') && app.includes('if (action === "start-catalog-paste")'), "Paste List quick action must reach the shared catalog review path");
+assert(app.includes("consolidateEmptyPasteDrafts()") && app.includes("focusCard(existing.id)") && app.includes("focusCard(card.id)"), "Repeated blank Paste List actions must reuse one draft and focus the opened card");
 assert(!app.includes("bindActionElements(list)"), "Dynamic catalog lists must rely on the same root action lifecycle instead of local rebinding");
 assert(app.includes('cardCloseButtonTemplate(card, "top")') && app.includes('cardCloseButtonTemplate(card, "bottom")'), "Every rendered card must inherit top and bottom close controls from one renderer");
 assert(app.includes('data-action="dismiss-card"') && css.includes(".card-bottom-close") && css.includes(".card-close-button-bottom"), "Bottom close controls must use the canonical safe dismissal action and responsive styling");
