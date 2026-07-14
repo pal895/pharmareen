@@ -30,7 +30,7 @@ assert(catalogWorkspaceItems(syrupCatalog, "zinc sirup").map((item) => item.id).
 assert(app.includes('class="show-me-action"') && app.indexOf('class="show-me-action"') < app.indexOf('function chatScreenTemplate'), "SHOW ME must be a top-level action outside Operations Chat");
 assert(app.includes('data-action="open-catalog-medicine"'), "Catalog rows must open a Medicine Action Card");
 assert(app.includes('data-action="approve-catalog-edit"') && app.includes('data-action="cancel-catalog-edit"'), "Medicine edits need approve and discard actions");
-assert(app.includes("function bindActionElements(scope)") && app.includes("bindActionElements(list)"), "Dynamically filtered catalog results must keep their Open & edit actions bound");
+assert(app.includes("function bindActionElements(scope)") && app.includes('event.target.closest?.("[data-action]")'), "All current and dynamically rendered actions must inherit stable delegated interaction");
 assert(app.includes('catalogSearchTemplate(card, query, "top")') && app.includes('catalogSearchTemplate(card, query, "bottom")'), "Long catalog lists must expose the same search component above and below the results");
 assert(app.includes('querySelectorAll("[data-catalog-search]")'), "Top and bottom catalog search controls must stay synchronized and interactive");
 assert(css.includes("grid-template-columns: repeat(2") && css.includes(".catalog-edit-grid") && css.includes("grid-template-columns: 1fr"), "Desktop and mobile catalog editor layouts must be protected");

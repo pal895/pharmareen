@@ -18,11 +18,13 @@
 - Deploy and live-confirm canonical month expiry handling removes the four false alerts produced from values such as `Oct-28`.
 - Confirm the synchronized bottom catalog search added at `937cc3f`.
 - Confirm shared row movement appears in a safe CSV or bulk-paste review and moves one intact row. Do not approve prepared existing data or create duplicates during this check.
+- Live evidence after `6476f7c` verified false expiry alerts were removed and the synchronized bottom catalog search appeared. File and Paste List quick actions then exposed a shared interaction-lifecycle failure before a review could open.
 
 ## Shared-root conclusions and drift
 
 - Medicine identity fields and persistence converge through the canonical medicine field schema; strength and barcode are not CSV-only.
 - Multi-row review movement was generic in persistence but its UI was incorrectly gated by invoice mode. The shared CatalogImport review policy now owns reorder, add-row, editing, approval, and correction capabilities.
+- All `data-action` controls now delegate through one stable application-root lifecycle. Every card inherits the same safe close action at both the top and bottom so long editable cards do not require a full upward scroll.
 - Safe invoice, CSV, bulk-paste, and future compatible multi-row CatalogImport reviews inherit ordering. Incomplete invoices intentionally hide ordering and add-row controls until safe; single-medicine cards exclude ordering.
 - Context parsers may differ, but supported fields must converge before editable review. Excel parsing and genuine barcode decoding remain future stages, not part of this fix.
 

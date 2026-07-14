@@ -386,7 +386,7 @@ function cardTemplate(card) {
         </span>
         <span class="card-top-actions">
           ${cardFontControlsTemplate()}
-          <button class="card-close-button" type="button" data-action="dismiss-card" data-card-id="${card.id}" aria-label="Close ${escapeHtml(friendlyCardLabel(card))} card">x</button>
+          ${cardCloseButtonTemplate(card, "top")}
         </span>
       </div>
       ${cardBodyTemplate(card, displayed)}
@@ -402,8 +402,16 @@ function cardTemplate(card) {
         ${card.integration ? `<p>${escapeHtml(card.integration.summary)}</p>` : ""}
         ${card.validation ? `<p>${escapeHtml(card.validation)}</p>` : ""}
       </details>
+      <div class="card-bottom-close">
+        ${cardCloseButtonTemplate(card, "bottom")}
+      </div>
     </article>
   `;
+}
+
+function cardCloseButtonTemplate(card, placement) {
+  const label = `Close ${friendlyCardLabel(card)} card`;
+  return `<button class="card-close-button ${placement === "bottom" ? "card-close-button-bottom" : ""}" type="button" data-action="dismiss-card" data-card-id="${card.id}" aria-label="${escapeHtml(label)}">${placement === "bottom" ? "× Close card" : "x"}</button>`;
 }
 
 function cardBodyTemplate(card, displayed) {
@@ -800,10 +808,12 @@ function bindEvents() {
 }
 
 function bindActionElements(scope) {
-  scope?.querySelectorAll?.("[data-action]").forEach((button) => {
-    if (button.dataset.actionBound === "true") return;
-    button.dataset.actionBound = "true";
-    button.addEventListener("click", () => handleAction(button.dataset));
+  if (!scope || scope.dataset.actionDelegationBound === "true") return;
+  scope.dataset.actionDelegationBound = "true";
+  scope.addEventListener("click", (event) => {
+    const actionElement = event.target.closest?.("[data-action]");
+    if (!actionElement || !scope.contains(actionElement)) return;
+    handleAction(actionElement.dataset);
   });
 }
 
@@ -1929,7 +1939,6 @@ function updateCatalogSearch(cardId, value, sourceInput) {
   const items = catalogWorkspaceItems(pharmacyBrain.catalog, value);
   if (list) {
     list.innerHTML = items.length ? items.map(catalogWorkspaceItemTemplate).join("") : '<p class="catalog-empty">No medicines match this search.</p>';
-    bindActionElements(list);
   }
   root.querySelectorAll("[data-catalog-search]").forEach((input) => {
     if (input !== sourceInput) input.value = value;

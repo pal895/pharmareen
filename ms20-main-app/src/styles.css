@@ -345,6 +345,19 @@ input:disabled {
   gap: 7px;
 }
 
+.card-bottom-close {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.card-close-button-bottom {
+  width: auto;
+  min-width: 132px;
+  padding-inline: 16px;
+}
+
 .card-heading {
   display: grid;
   min-width: 0;
