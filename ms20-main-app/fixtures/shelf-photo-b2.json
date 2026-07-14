@@ -2,6 +2,8 @@
   "fixtureId": "shelf-photo-b2",
   "fileName": "shelf-photo-b2.png",
   "sha256": "b85b153d614a27be5f584b2718cc9e3ec1b3adba574a24cb9c36c9cb0b22fd53",
+  "perceptualHash": "0004043efebdff00",
+  "aspectRatio": 1.7768,
   "scanType": "shelf_photo",
   "shelf": "B2",
   "expectedCatalogCountBeforeApproval": 27,

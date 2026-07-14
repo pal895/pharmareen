@@ -1204,11 +1204,35 @@ function commandHasExplicitPayment(text) {
 async function resolveShelfTestFixture(fileOrName) {
   const fileName = typeof fileOrName === "string" ? fileOrName : fileOrName?.name;
   const filenameMatch = findShelfTestFixture({ fileName });
-  if (filenameMatch || typeof fileOrName?.arrayBuffer !== "function" || !globalThis.crypto?.subtle) return filenameMatch;
-  try {
+  if (filenameMatch || typeof fileOrName?.arrayBuffer !== "function") return filenameMatch;
+  if (globalThis.crypto?.subtle) try {
     const digest = await globalThis.crypto.subtle.digest("SHA-256", await fileOrName.arrayBuffer());
     const sha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-    return findShelfTestFixture({ sha256 });
+    const contentMatch = findShelfTestFixture({ sha256 });
+    if (contentMatch) return contentMatch;
+  } catch {
+    // A visual fingerprint below remains available when byte hashing is unavailable.
+  }
+  try {
+    const bitmap = await createImageBitmap(fileOrName);
+    const canvas = document.createElement("canvas");
+    canvas.width = 8;
+    canvas.height = 8;
+    const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+    context.drawImage(bitmap, 0, 0, 8, 8);
+    const pixels = context.getImageData(0, 0, 8, 8).data;
+    const luminance = Array.from({ length: 64 }, (_, index) => {
+      const offset = index * 4;
+      return (pixels[offset] * 0.299) + (pixels[offset + 1] * 0.587) + (pixels[offset + 2] * 0.114);
+    });
+    const average = luminance.reduce((sum, value) => sum + value, 0) / luminance.length;
+    const bits = luminance.map((value) => value >= average ? "1" : "0").join("");
+    const perceptualHash = Array.from({ length: 16 }, (_, index) =>
+      Number.parseInt(bits.slice(index * 4, (index + 1) * 4), 2).toString(16)
+    ).join("");
+    const aspectRatio = bitmap.width / Math.max(1, bitmap.height);
+    bitmap.close?.();
+    return findShelfTestFixture({ perceptualHash, aspectRatio });
   } catch {
     return null;
   }
