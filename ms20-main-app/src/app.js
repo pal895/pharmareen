@@ -15,7 +15,7 @@ import {
   parseCatalogText,
   parseDelimitedInventory,
   catalogItemsToText,
-  partitionCatalogItems,
+  prepareCatalogImport,
   buildImportSummary,
   buildCatalogSavedSummary
 } from "./services/catalogOnboarding.js";
@@ -493,6 +493,9 @@ function cardBodyTemplate(card, displayed) {
       </div>
     `;
   }
+  if (card.type === "CatalogImportCard" && card.fields?.entry_mode === "no_changes") {
+    return `<div class="catalog-import-no-changes"><p>${escapeHtml(card.fields?.review_feedback || card.validation || "No new medicines found. Nothing was saved.")}</p></div>`;
+  }
   if (card.type === "CatalogImportCard") {
     return catalogImportTableTemplate(card);
   }
@@ -770,6 +773,15 @@ function activeActionsTemplate(card) {
           <button data-action="review-paste-list" data-card-id="${card.id}">Review list</button>
           <button data-action="download-template">Template</button>
           <button data-action="reject-card" data-card-id="${card.id}">Cancel</button>
+        </div>
+      `;
+    }
+    if (card.fields?.entry_mode === "no_changes") {
+      return `
+        <div class="card-actions">
+          <button data-action="open-catalog-card">Open catalog</button>
+          <button data-action="read-card" data-card-id="${card.id}">Read</button>
+          <button data-action="reject-card" data-card-id="${card.id}">Close</button>
         </div>
       `;
     }
@@ -2215,7 +2227,7 @@ function reviewPasteList(cardId) {
     return;
   }
   const parsed = parseBulkMedicineList(text, sourceBrain);
-  const { existing, newItems } = partitionCatalogItems(parsed.items, pharmacyBrain.catalog);
+  const { existing, newItems } = prepareCatalogImport(parsed.items, pharmacyBrain.catalog);
   if (newItems.length === 0) {
     card.validation = `No new medicines found. Already in this pharmacy: ${existing.map((item) => item.name).join(", ")}.`;
     card.fields.review_feedback = card.validation;
@@ -2435,7 +2447,7 @@ async function handleDocumentFile(file) {
     try {
       const text = await readXlsxInventory(file);
       const parsed = parseDelimitedInventory(text, sourceBrain);
-      addCard(createFileImportReviewCard(parsed, name, "Excel"));
+      addCard(createFileImportReviewCard(parsed, name, "Excel", pharmacyBrain.catalog));
     } catch (error) {
       addFeed("system", `I could not read this Excel file. ${error?.message || "Save it as XLSX or CSV, then try again."} Nothing was saved.`);
     }
@@ -2448,22 +2460,40 @@ async function handleDocumentFile(file) {
   const text = await file.text();
   if (lower.endsWith(".csv") || lower.endsWith(".tsv") || text.includes(",")) {
     const parsed = parseDelimitedInventory(text, sourceBrain);
-    addCard(createFileImportReviewCard(parsed, name, lower.endsWith(".tsv") ? "TSV" : "CSV"));
+    addCard(createFileImportReviewCard(parsed, name, lower.endsWith(".tsv") ? "TSV" : "CSV", pharmacyBrain.catalog));
     return;
   }
   addCard(createPasteImportCard(text));
 }
 
-function createFileImportReviewCard(parsed, fileName, fileType) {
-  const itemCount = parsed.items.length;
+function createFileImportReviewCard(parsed, fileName, fileType, catalog = []) {
+  const prepared = prepareCatalogImport(parsed.items, catalog);
+  const itemCount = prepared.newItems.length;
   const unclearCount = parsed.unclear.length;
   const unclearNote = unclearCount
     ? ` ${unclearCount} row(s) could not be read and were not added.`
     : "";
-  return createPasteImportCard(catalogItemsToText(parsed.items), {
+  if (!prepared.hasNewItems) {
+    const existingList = prepared.existingNames.join(", ") || "the medicines in this file";
+    const feedback = `No new medicines found in ${fileType} file ${fileName}. Already in this pharmacy: ${existingList}. Nothing was saved.`;
+    const card = createPasteImportCard("", {
+      source: fileName,
+      method: `${fileType.toLowerCase()} file`,
+      reviewFeedback: feedback
+    });
+    card.fields.entry_mode = "no_changes";
+    card.fields.existing_medicines_ignored = prepared.existingNames.join(", ");
+    card.validation = feedback;
+    card.status = "ready";
+    return card;
+  }
+  const existingNote = prepared.existingNames.length
+    ? ` ${prepared.existingNames.length} existing medicine(s) were not added again: ${prepared.existingNames.join(", ")}.`
+    : "";
+  return createPasteImportCard(catalogItemsToText(prepared.newItems), {
     source: fileName,
     method: `${fileType.toLowerCase()} file`,
-    reviewFeedback: `Read ${itemCount} medicine(s) from ${fileType} file ${fileName}.${unclearNote} Check every value. Nothing is saved until approval.`
+    reviewFeedback: `Read ${itemCount} new medicine(s) from ${fileType} file ${fileName}.${existingNote}${unclearNote} Check every value. Nothing is saved until approval.`
   });
 }
 

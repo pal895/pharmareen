@@ -112,6 +112,16 @@ export function partitionCatalogItems(items = [], catalog = []) {
   }, { newItems: [], existing: [] });
 }
 
+export function prepareCatalogImport(items = [], catalog = []) {
+  const { existing, newItems } = partitionCatalogItems(items, catalog);
+  return {
+    existing,
+    newItems,
+    existingNames: existing.map((item) => item.name || item.medicine).filter(Boolean),
+    hasNewItems: newItems.length > 0
+  };
+}
+
 export function parseCatalogText(text) {
   const rows = String(text || "")
     .split(/\r?\n/)
