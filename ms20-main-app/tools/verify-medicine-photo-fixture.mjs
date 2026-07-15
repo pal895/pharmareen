@@ -17,7 +17,10 @@ assert(contentHash === manifest.sha256 && fixture.sha256 === contentHash, "Medic
 assert(png.length > 100000 && png.subarray(1, 4).toString() === "PNG", "Realistic medicine-photo PNG fixture is missing");
 assert(findMedicinePhotoTestFixture({ fileName: "renamed-by-phone.jpg", sha256: contentHash }) === fixture, "Renamed medicine photos must resolve by content hash");
 assert(findMedicinePhotoTestFixture({ perceptualHash: "ffffdfcfe18181df", aspectRatio: 0.6667 }) === fixture, "Harmless medicine-photo re-encoding must tolerate bounded visual changes");
+assert(findMedicinePhotoTestFixture({ perceptualHashes: ["0000fcffffe0b8fc"], aspectRatio: 0.565 }) === fixture, "Verified upright camera framing must resolve inside the isolated content gate");
+assert(findMedicinePhotoTestFixture({ perceptualHashes: ["0000fefedefe0000"], aspectRatio: 0.565 }) === fixture, "Verified sideways camera framing must resolve inside the isolated content gate");
 assert(findMedicinePhotoTestFixture({ perceptualHash: "0000000000000000", aspectRatio: 0.6667 }) === null, "Unrelated medicine photos must remain unmatched");
+assert(findMedicinePhotoTestFixture({ perceptualHash: "0000fcffffe0b8fc", aspectRatio: 1.2 }) === null, "A matching-looking hash with the wrong shape must remain unmatched");
 assert(sourceBrain.lookupMedicine(fixture.item.name).status === "matched", "Controlled medicine-photo proposal must pass Source Brain");
 assert(sourceMedicines.includes('medicine("Amoxicillin"'), "Amoxicillin must be reusable Source Brain knowledge, not pharmacy-owned data");
 assert(fixture.item.name === "Amoxicillin" && fixture.item.strength === "500 mg" && fixture.item.form === "capsule", "Photo-supported medicine identity fields are incorrect");

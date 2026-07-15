@@ -1,3 +1,5 @@
+import { matchesControlledImageFixture } from "./controlledImageIdentity.js";
+
 // Controlled live-test records only. Production shelf recognition remains adapter-owned.
 const ShelfTestFixtures = Object.freeze([
   Object.freeze({
@@ -28,34 +30,7 @@ const ShelfTestFixtures = Object.freeze([
 
 export function findShelfTestFixture(identity = {}) {
   const input = typeof identity === "string" ? { fileName: identity } : identity;
-  const name = String(input?.fileName || "").trim().toLowerCase();
-  const sha256 = String(input?.sha256 || "").trim().toLowerCase();
-  const perceptualHashes = (Array.isArray(input?.perceptualHashes) ? input.perceptualHashes : [input?.perceptualHash])
-    .map((hash) => String(hash || "").trim().toLowerCase())
-    .filter(Boolean);
-  const aspectRatio = Number(input?.aspectRatio || 0);
-  const hammingDistance = (left, right) => {
-    if (!left || !right || left.length !== right.length) return Infinity;
-    let distance = 0;
-    for (let index = 0; index < left.length; index += 1) {
-      let value = Number.parseInt(left[index], 16) ^ Number.parseInt(right[index], 16);
-      while (value) {
-        distance += value & 1;
-        value >>>= 1;
-      }
-    }
-    return distance;
-  };
-  return ShelfTestFixtures.find((fixture) =>
-    (name && fixture.fileName.toLowerCase() === name)
-    || (sha256 && fixture.sha256 === sha256)
-    || (perceptualHashes.length
-      && Math.min(
-        Math.abs(aspectRatio - fixture.aspectRatio),
-        Math.abs((1 / Math.max(aspectRatio, 0.0001)) - fixture.aspectRatio)
-      ) <= 0.15
-      && perceptualHashes.some((hash) => hammingDistance(hash, fixture.perceptualHash) <= (fixture.visualTolerance || 12)))
-  ) || null;
+  return ShelfTestFixtures.find((fixture) => matchesControlledImageFixture(fixture, input)) || null;
 }
 
 export { ShelfTestFixtures };

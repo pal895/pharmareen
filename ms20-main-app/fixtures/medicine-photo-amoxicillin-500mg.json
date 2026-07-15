@@ -3,6 +3,13 @@
   "fileName": "medicine-photo-amoxicillin-500mg.png",
   "sha256": "5bbf45481b34879f17ba66dc4fe147f8c215c9f4c1e120546b92a37866e8c2af",
   "perceptualHash": "ffffcfcff1c181ff",
+  "perceptualHashes": [
+    "ffffcfcff1c181ff",
+    "0000fcffffe0b8fc",
+    "0000fcffffe0b03c",
+    "0000fefedefe0000",
+    "0000feffdffe0000"
+  ],
   "aspectRatio": 0.6667,
   "scanType": "medicine_photo",
   "expectedCatalogCountBeforeApproval": 31,
