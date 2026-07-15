@@ -70,6 +70,10 @@ Do not repeat the two passed invoice fixtures, clean paste fixture, filtered cat
 
 Whenever an editable-medicine behavior is reusable, implement it once in the shared editable-card or editable-list capability and make every applicable workflow inherit it. Preserve one canonical implementation and focused regression protection. Permit an exception only when a context-specific safety or workflow reason is documented and tested; never duplicate shared behavior screen by screen.
 
+## Permanent honesty and simple-language rule
+
+The product-wide standard in `honesty-and-simple-language.md` is mandatory for all current and future MS2.0 work. Every important value must retain an honest source; uncertainty must be visible; unsupported facts must remain empty; and all owner-facing text must use short, everyday English understandable by a 12-year-old. Apply the rule through shared capabilities and implementation review, not as isolated screen fixes.
+
 ## Shelf-photo trust and first-response rule
 
 Live C3 evidence verified successful recognition in both sideways and upright phone use, but one sideways first attempt opened an empty review before a repeat produced the correct two-row result. A shelf photo must now produce one of only two honest responses: a recognized review, or a clear Retake instruction that leaves the preview open. It must never open an empty approval form.
