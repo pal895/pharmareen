@@ -1,4 +1,6 @@
 export const SourceMedicineList = [
+  medicine("Cetirizine", ["cetir", "cetirizine"], ["tablet", "syrup"], ["tablet", "bottle"]),
+  medicine("Co-amoxiclav", ["co amoxiclav", "amoxiclav", "augmentin"], ["tablet", "suspension"], ["tablet", "bottle"]),
   medicine("Acyclovir", ["acyclovir"], ["tablet", "cream", "suspension"], ["tablet", "tube", "bottle"]),
   medicine("Albendazole", ["alben", "abendazole"], ["tablet", "suspension", "chewable tablet"], ["tablet", "bottle", "tablet"]),
   medicine("Amitriptyline", ["amitrip"], ["tablet"], ["tablet", "strip"]),
@@ -27,6 +29,7 @@ export const SourceMedicineList = [
   medicine("Metformin", ["met"], ["tablet"], ["tablet", "strip"]),
   medicine("Metronidazole", ["metro"], ["tablet", "suspension", "injection"], ["tablet", "bottle", "vial"]),
   medicine("Omeprazole", ["omep", "ome"], ["capsule", "tablet"], ["capsule", "tablet"]),
+  medicine("Paracetamol", ["paracetamol", "panadol", "pcm"], ["tablet", "syrup", "suppository"], ["tablet", "bottle", "suppository"]),
   medicine("Prednisolone", ["pred"], ["tablet", "syrup", "eye drops"], ["tablet", "bottle"]),
   medicine("Salbutamol", ["salbu", "ventolin"], ["inhaler", "syrup", "nebulule", "tablet"], ["inhaler", "bottle", "nebulule"]),
   medicine("Septrin", ["cotrimoxazole", "co-trimoxazole"], ["tablet", "suspension"], ["tablet", "bottle"]),

@@ -41,7 +41,8 @@ Supported in the Main App presentation/adapters layer:
 - Invoice/photo: review-first InvoiceCard. Real OCR/PDF extraction remains adapter-ready, not falsely complete.
 - Medicine/shelf/drawer/stockroom scan: VisualScanCard and PhotoReviewCard with barcode, batch, expiry, supplier, shelf, and price fields.
 - Bulk paste: deterministic parsing into CatalogImportCard.
-- CSV/text/POS export: deterministic parsing and mapping into CatalogImportCard. Binary Excel mapping is reserved for the adapter path.
+- CSV/text/POS export: deterministic parsing and mapping into CatalogImportCard.
+- Modern XLSX: local first-worksheet extraction converges into the same deterministic catalog mapping and editable review. Older binary XLS remains an honest save-as-XLSX-or-CSV fallback.
 - Add while selling: MedicineMatchCard saves a missing medicine locally, records the sale, and allows repeat sales without re-entering the price.
 
 ## Token Control
@@ -91,7 +92,7 @@ Current document support:
 Reserved adapter path:
 
 - PDF export
-- Excel binary import/export
+- Legacy XLS import and purpose-designed Excel export
 - purchase orders
 - goods received notes
 - supplier reports

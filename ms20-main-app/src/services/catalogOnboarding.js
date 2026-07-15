@@ -22,7 +22,7 @@ export const CatalogOnboardingMethods = [
   {
     id: "file",
     label: "Upload CSV or old POS export",
-    ownerText: "Upload CSV/text now; Excel mapping is reserved for the file adapter."
+    ownerText: "Upload CSV, XLSX, or text from your old system."
   },
   {
     id: "sell",

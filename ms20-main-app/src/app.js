@@ -43,6 +43,7 @@ import {
 import { resolveStockCheck } from "./services/localIntelligence.js";
 import { catalogReviewCapabilities, reorderedCatalogRows } from "./services/catalogReviewPolicy.js";
 import { medicineReviewBlocker } from "./services/medicineReviewReadiness.js";
+import { readXlsxInventory } from "./services/excelInventory.js";
 import { listRouteSlots, resolveOfflineSlot } from "./routes/routeRegistry.js";
 import {
   TokenPolicy,
@@ -2402,21 +2403,18 @@ async function handleDocumentFile(file) {
     void addPhotoCards(file, "invoice");
     return;
   }
-  if (lower.endsWith(".xls") || lower.endsWith(".xlsx")) {
-    addCard(createEditableCard({
-      type: "ImportMappingCard",
-      title: "Map Excel import",
-      source: name,
-      fields: {
-        file: name,
-        mapping: "Export this file as CSV for the current zero-token import path.",
-        missing_columns: "Excel binary parsing adapter is reserved.",
-        notes: "CSV/text import is supported now. Excel mapping will use the same catalog review card after adapter wiring."
-      },
-      confidence: 0.62,
-      status: "needs_correction",
-      validation: "No AI or backend call was used."
-    }));
+  if (lower.endsWith(".xlsx")) {
+    try {
+      const text = await readXlsxInventory(file);
+      const parsed = parseDelimitedInventory(text, sourceBrain);
+      addCard(createPasteImportCard(catalogItemsToText(parsed.items)));
+    } catch (error) {
+      addFeed("system", `I could not read this Excel file. ${error?.message || "Save it as XLSX or CSV, then try again."} Nothing was saved.`);
+    }
+    return;
+  }
+  if (lower.endsWith(".xls")) {
+    addFeed("system", "I could not read this older Excel file. Save it as XLSX or CSV, then try again. Nothing was saved.");
     return;
   }
   const text = await file.text();

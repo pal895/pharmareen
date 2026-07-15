@@ -1,0 +1,14 @@
+{
+  "test": "Test 5 - XLSX file onboarding",
+  "purpose": "Verify local XLSX extraction through the shared catalog review and approval path",
+  "source": "MS2.0 Source Medicine Brain",
+  "expectedCatalogCountBeforeApproval": 32,
+  "expectedCatalogCountAfterApproval": 35,
+  "items": [
+    { "medicine": "Cetirizine", "strength": "10 mg", "form": "tablet", "unit": "tablet", "selling_price": 15, "cost_price": 8, "stock": 45, "supplier": "EastCare Pharma", "barcode": "", "batch": "CET-10A", "expiry": "2029-04", "pack_size": "30 tablets", "shelf": "D1" },
+    { "medicine": "Co-amoxiclav", "strength": "625 mg", "form": "tablet", "unit": "tablet", "selling_price": 85, "cost_price": 60, "stock": 24, "supplier": "EastCare Pharma", "barcode": "", "batch": "COA-625B", "expiry": "2028-11", "pack_size": "14 tablets", "shelf": "D2" },
+    { "medicine": "Paracetamol", "strength": "500 mg", "form": "tablet", "unit": "tablet", "selling_price": 10, "cost_price": 5, "stock": 100, "supplier": "EastCare Pharma", "barcode": "", "batch": "PAR-500C", "expiry": "2029-06", "pack_size": "100 tablets", "shelf": "D3" }
+  ],
+  "expected": "One unsaved three-row catalog review; nothing enters the Pharmacy Catalog before approval.",
+  "ai_required": false
+}
