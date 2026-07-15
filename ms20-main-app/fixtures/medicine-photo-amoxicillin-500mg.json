@@ -1,0 +1,25 @@
+{
+  "fixtureId": "medicine-photo-amoxicillin-500mg",
+  "fileName": "medicine-photo-amoxicillin-500mg.png",
+  "sha256": "5bbf45481b34879f17ba66dc4fe147f8c215c9f4c1e120546b92a37866e8c2af",
+  "perceptualHash": "ffffcfcff1c181ff",
+  "aspectRatio": 0.6667,
+  "scanType": "medicine_photo",
+  "expectedCatalogCountBeforeApproval": 31,
+  "item": {
+    "name": "Amoxicillin",
+    "strength": "500 mg",
+    "form": "capsule",
+    "unit": "capsule",
+    "pack_size": "20 capsules",
+    "stock": "",
+    "selling_price": "",
+    "cost_price": "",
+    "supplier": "",
+    "barcode": "6161109876577",
+    "batch": "AMX-500K",
+    "expiry": "2029-08",
+    "shelf": ""
+  },
+  "expected": "One unsaved medicine-photo review with only photo-supported fields populated."
+}

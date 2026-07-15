@@ -6,6 +6,7 @@ import { BackendAdapterRegistry } from "./services/backendAdapters.js";
 import { PharmacyBrain, SourceBrain, AIFallbackAdapter } from "./services/brainAdapters.js";
 import { findBarcodeTestFixture } from "./data/barcodeTestFixtures.js";
 import { findShelfTestFixture } from "./data/shelfTestFixtures.js";
+import { findMedicinePhotoTestFixture } from "./data/medicinePhotoTestFixtures.js";
 import { runVisualPipeline, buildPhotoReviewCard } from "./services/visualPipeline.js";
 import {
   createCatalogChoiceCard,
@@ -325,7 +326,7 @@ function cameraOverlayTemplate() {
         <h2>${state.camera.scanType === "invoice" ? "Photograph invoice" : state.camera.scanType === "barcode" ? "Scan barcode" : state.camera.scanType === "shelf_photo" ? "Photograph shelf" : "Photograph medicine"}</h2>
         <p>${state.camera.scanType === "barcode" ? "Keep one barcode clear inside the frame, then tap Capture." : state.camera.scanType === "shelf_photo" ? "Show the whole medicine packs and shelf label. Keep the words clear. Hold the phone still. Keep bright light off the packs or screen." : "Keep the whole item clear inside the frame."}</p>
         ${state.camera.capturedUrl
-          ? `<img class="camera-captured-preview" src="${escapeHtml(state.camera.capturedUrl)}" alt="Captured shelf preview">`
+          ? `<img class="camera-captured-preview" src="${escapeHtml(state.camera.capturedUrl)}" alt="Captured photo preview">`
           : `<video id="ms20CameraPreview" autoplay muted playsinline></video>`}
         <p class="camera-status" aria-live="polite">${escapeHtml(state.camera.status)}</p>
         <div class="camera-actions">
@@ -408,7 +409,8 @@ function cardTemplate(card) {
   const displayed = fields.length ? fields : Object.keys(card.fields || {});
   const progressiveMedicine = PROGRESSIVE_MEDICINE_CARD_TYPES.has(card.type);
   const note = ownerCardNote(card);
-  const noteBeforeBody = card.type === "CatalogImportCard" && Boolean(String(card.fields?.review_feedback || "").trim());
+  const noteBeforeBody = ["CatalogImportCard", "VisualScanCard", "PhotoReviewCard"].includes(card.type)
+    && Boolean(String(card.fields?.review_feedback || "").trim());
   return `
     <article class="card-message ${card.status}" data-card-id="${card.id}">
       <div class="card-top">
@@ -1249,14 +1251,14 @@ function commandHasExplicitPayment(text) {
   return /(?:^|[\s\d-])(cash|mpesa|m-pesa|credit|mixed)$/i.test(String(text || "").trim());
 }
 
-async function resolveShelfTestFixture(fileOrName) {
+async function resolveVisualTestFixture(fileOrName, findFixture) {
   const fileName = typeof fileOrName === "string" ? fileOrName : fileOrName?.name;
-  const filenameMatch = findShelfTestFixture({ fileName });
+  const filenameMatch = findFixture({ fileName });
   if (filenameMatch || typeof fileOrName?.arrayBuffer !== "function") return filenameMatch;
   if (globalThis.crypto?.subtle) try {
     const digest = await globalThis.crypto.subtle.digest("SHA-256", await fileOrName.arrayBuffer());
     const sha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-    const contentMatch = findShelfTestFixture({ sha256 });
+    const contentMatch = findFixture({ sha256 });
     if (contentMatch) return contentMatch;
   } catch {
     // A visual fingerprint below remains available when byte hashing is unavailable.
@@ -1300,18 +1302,21 @@ async function resolveShelfTestFixture(fileOrName) {
     });
     const aspectRatio = bitmap.width / Math.max(1, bitmap.height);
     bitmap.close?.();
-    return findShelfTestFixture({ perceptualHashes, aspectRatio });
+    return findFixture({ perceptualHashes, aspectRatio });
   } catch {
     return null;
   }
 }
 
-async function addPhotoCards(fileOrName, scanType, knownShelfFixture) {
+const resolveShelfTestFixture = (fileOrName) => resolveVisualTestFixture(fileOrName, findShelfTestFixture);
+const resolveMedicinePhotoTestFixture = (fileOrName) => resolveVisualTestFixture(fileOrName, findMedicinePhotoTestFixture);
+
+async function addPhotoCards(fileOrName, scanType, knownFixture) {
   state.ui.screen = "chat";
   state.ui.workspace = "operations";
   const fileName = typeof fileOrName === "string" ? fileOrName : fileOrName?.name || "camera-photo.jpg";
   const shelfFixture = scanType === "shelf_photo"
-    ? (knownShelfFixture === undefined ? await resolveShelfTestFixture(fileOrName) : knownShelfFixture)
+    ? (knownFixture === undefined ? await resolveShelfTestFixture(fileOrName) : knownFixture)
     : null;
   if (shelfFixture) {
     const recognizedItems = shelfFixture.items.filter((item) => sourceBrain.lookupMedicine(item.name).status === "matched");
@@ -1330,6 +1335,48 @@ async function addPhotoCards(fileOrName, scanType, knownShelfFixture) {
   }
   if (scanType === "shelf_photo") {
     addFeed("assistant", "I could not read this shelf photo clearly. Take it again. Move closer, show the medicine names and shelf label, hold the phone still, and keep bright light off the packs or screen. Nothing has been saved.");
+    render();
+    return false;
+  }
+  const medicineFixture = scanType === "medicine_photo"
+    ? (knownFixture === undefined ? await resolveMedicinePhotoTestFixture(fileOrName) : knownFixture)
+    : null;
+  if (medicineFixture) {
+    const sourceMatch = sourceBrain.lookupMedicine(medicineFixture.item.name);
+    if (sourceMatch.status === "matched") {
+      const review = normalizeMedicineReviewRow(medicineFixture.item);
+      addCard(createEditableCard({
+        type: "VisualScanCard",
+        title: "Review medicine photo",
+        source: fileName,
+        fields: {
+          scan_type: "medicine_photo",
+          medicine: review.name,
+          strength: review.strength,
+          form: review.form,
+          unit: review.unit,
+          pack_size: review.pack_size,
+          quantity: "",
+          selling_price: "",
+          cost_price: "",
+          supplier: "",
+          barcode: review.barcode,
+          batch: review.batch,
+          expiry: review.expiry,
+          shelf: "",
+          category: "",
+          review_feedback: "Controlled test match. Seen in this photo: medicine name, strength, capsule form, pack size, barcode, batch, and expiry. Stock, prices, supplier, and shelf were not seen and were left blank. Check every value. Nothing is saved until approval."
+        },
+        confidence: 0.96,
+        status: "ready",
+        validation: "Controlled medicine-photo fixture matched locally through Source Brain."
+      }));
+      refreshNotifications();
+      return true;
+    }
+  }
+  if (scanType === "medicine_photo") {
+    addFeed("assistant", "I could not read this medicine photo clearly. Take it again. Show the whole medicine pack, keep the words clear, and hold the phone still. Nothing has been saved.");
     render();
     return false;
   }
@@ -1420,14 +1467,20 @@ async function useCameraPhoto() {
   if (!file) return;
   state.camera.status = "Processing photo locallyâ€¦";
   render();
-  const shelfFixture = scanType === "shelf_photo" ? await resolveShelfTestFixture(file) : undefined;
-  if (scanType === "shelf_photo" && !shelfFixture) {
+  const visualFixture = scanType === "shelf_photo"
+    ? await resolveShelfTestFixture(file)
+    : scanType === "medicine_photo"
+      ? await resolveMedicinePhotoTestFixture(file)
+      : undefined;
+  if ((scanType === "shelf_photo" || scanType === "medicine_photo") && !visualFixture) {
     state.camera.retryRequired = true;
-    state.camera.status = "I could not read this shelf clearly. Tap Retake. If the phone was sideways, try holding it upright. Move closer, show both medicine names and the shelf label, and hold the phone still. Nothing has been saved.";
+    state.camera.status = scanType === "shelf_photo"
+      ? "I could not read this shelf clearly. Tap Retake. If the phone was sideways, try holding it upright. Move closer, show both medicine names and the shelf label, and hold the phone still. Nothing has been saved."
+      : "I could not read this medicine clearly. Tap Retake. Move closer, show the whole pack, keep the words clear, and hold the phone still. Nothing has been saved.";
     render();
     return;
   }
-  await addPhotoCards(file, scanType, shelfFixture);
+  await addPhotoCards(file, scanType, visualFixture);
   clearCapturedCameraPhoto();
   state.camera.open = false;
   state.camera.status = "";
@@ -1484,7 +1537,7 @@ async function captureLightweightCameraFrame() {
   ));
   closeCameraStream();
   const file = new File([blob], `${scanType}-${Date.now()}.jpg`, { type: "image/jpeg" });
-  if (scanType !== "shelf_photo") {
+  if (scanType !== "shelf_photo" && scanType !== "medicine_photo") {
     state.camera.open = false;
     state.camera.status = "";
     render();
@@ -2654,6 +2707,9 @@ function friendlyCardLabel(card) {
 }
 
 function ownerCardNote(card) {
+  if ((card.type === "VisualScanCard" || card.type === "PhotoReviewCard") && card.fields?.review_feedback) {
+    return String(card.fields.review_feedback).trim();
+  }
   if (card.type === "CatalogImportCard" && card.fields?.import_incomplete === "true") return "This scan is incomplete. Scan again before saving anything.";
   if (card.type === "CatalogImportCard") {
     const feedback = String(card.fields?.review_feedback || "").trim();

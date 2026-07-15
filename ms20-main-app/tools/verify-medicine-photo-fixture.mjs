@@ -1,0 +1,37 @@
+import fs from "node:fs";
+import crypto from "node:crypto";
+import { SourceBrain } from "../src/services/brainAdapters.js";
+import { findMedicinePhotoTestFixture, MedicinePhotoTestFixtures } from "../src/data/medicinePhotoTestFixtures.js";
+
+const manifest = JSON.parse(fs.readFileSync(new URL("../fixtures/medicine-photo-amoxicillin-500mg.json", import.meta.url), "utf8"));
+const png = fs.readFileSync(new URL("../fixtures/medicine-photo-amoxicillin-500mg.png", import.meta.url));
+const app = fs.readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+const sourceMedicines = fs.readFileSync(new URL("../src/data/sourceMedicines.js", import.meta.url), "utf8");
+const fixture = findMedicinePhotoTestFixture({ fileName: manifest.fileName });
+const contentHash = crypto.createHash("sha256").update(png).digest("hex");
+const sourceBrain = new SourceBrain();
+const assert = (condition, message) => { if (!condition) throw new Error(message); };
+
+assert(fixture && MedicinePhotoTestFixtures.length === 1, "Medicine-photo fixture must remain isolated to its controlled stage");
+assert(contentHash === manifest.sha256 && fixture.sha256 === contentHash, "Medicine-photo content hash must match its manifest and registry");
+assert(png.length > 100000 && png.subarray(1, 4).toString() === "PNG", "Realistic medicine-photo PNG fixture is missing");
+assert(findMedicinePhotoTestFixture({ fileName: "renamed-by-phone.jpg", sha256: contentHash }) === fixture, "Renamed medicine photos must resolve by content hash");
+assert(findMedicinePhotoTestFixture({ perceptualHash: "ffffdfcfe18181df", aspectRatio: 0.6667 }) === fixture, "Harmless medicine-photo re-encoding must tolerate bounded visual changes");
+assert(findMedicinePhotoTestFixture({ perceptualHash: "0000000000000000", aspectRatio: 0.6667 }) === null, "Unrelated medicine photos must remain unmatched");
+assert(sourceBrain.lookupMedicine(fixture.item.name).status === "matched", "Controlled medicine-photo proposal must pass Source Brain");
+assert(sourceMedicines.includes('medicine("Amoxicillin"'), "Amoxicillin must be reusable Source Brain knowledge, not pharmacy-owned data");
+assert(fixture.item.name === "Amoxicillin" && fixture.item.strength === "500 mg" && fixture.item.form === "capsule", "Photo-supported medicine identity fields are incorrect");
+assert(fixture.item.pack_size === "20 capsules" && fixture.item.barcode === "6161109876577" && fixture.item.batch === "AMX-500K" && fixture.item.expiry === "2029-08", "Photo-supported pack and traceability fields are incomplete");
+assert(!fixture.item.stock && !fixture.item.cost_price && !fixture.item.selling_price && !fixture.item.supplier && !fixture.item.shelf, "Unsupported pharmacy fields must stay empty");
+assert(app.includes("resolveVisualTestFixture(fileOrName, findFixture)"), "Shelf and medicine fixtures must share local image identity handling");
+assert(app.includes("resolveMedicinePhotoTestFixture"), "Medicine-photo acquisition must use local controlled recognition");
+assert(app.includes('type: "VisualScanCard"') && app.includes('title: "Review medicine photo"'), "Recognized medicine photos must use the shared single-medicine review");
+assert(app.includes("Seen in this photo: medicine name, strength, capsule form, pack size, barcode, batch, and expiry"), "Medicine-photo review must disclose photo-supported fields");
+assert(app.includes("Stock, prices, supplier, and shelf were not seen and were left blank"), "Medicine-photo review must disclose unsupported fields");
+assert(app.includes('scanType !== "shelf_photo" && scanType !== "medicine_photo"'), "Medicine camera capture must pause for Retake or Use photo");
+assert(app.includes("I could not read this medicine clearly. Tap Retake."), "Unclear direct medicine photos must remain in the Retake flow");
+assert(app.includes("I could not read this medicine photo clearly. Take it again."), "Unclear gallery medicine photos must not open an empty review");
+assert(app.includes("ownerCardNote(card)") && app.includes("card.fields?.review_feedback"), "Medicine-photo provenance must be visible outside technical details");
+assert(app.includes('["CatalogImportCard", "VisualScanCard", "PhotoReviewCard"].includes(card.type)') && app.includes("card-note-before-review"), "Medicine-photo provenance must appear before the review fields");
+
+console.log("Medicine-photo verification passed: realistic isolated fixture, Source Brain gate, honest fields, shared recognition, preview lifecycle, safe Retake, and zero catalog writes before approval.");
