@@ -74,6 +74,10 @@ Whenever an editable-medicine behavior is reusable, implement it once in the sha
 
 The Git repository is the authoritative shared source for important development and validation assets. Whenever appropriate, commit fixtures, Excel and CSV samples, PDF and Word templates, export examples, onboarding samples, testing assets, downloadable reports, and other generated documents needed to reproduce or review a workflow. Do not leave an important downloadable asset only in a Codex workspace, temporary folder, local download directory, or unshared runtime path. Runtime-owned secrets, private pharmacy data, caches, and disposable generated output remain excluded. This rule does not change the active live checkpoint or turn a committed fixture into proof of an in-app production download.
 
+## Permanent live-test execution rule
+
+Every live-test response must be self-contained and include the exact executable command, exact fixture or route, ordered owner actions, approval boundary, expected result, preserved catalog baseline, and requested next evidence. Use the stable response structure and pre-send completeness check in `live-test-execution-discipline.md`. Focused cycles begin with this current state, the latest relevant diff, and directly affected shared components; they use focused tests plus only necessary protected regressions. Repository-wide rediscovery, repeated architecture analysis, unrelated broad suites, implementation loops, and regeneration of known context are prohibited. Local-first, deterministic-first, zero-token-first, and all existing API-token preservation rules remain mandatory. This process rule does not advance or replace the active checkpoint.
+
 ## Permanent honesty and simple-language rule
 
 The product-wide standard in `honesty-and-simple-language.md` is mandatory for all current and future MS2.0 work. Every important value must retain an honest source; uncertainty must be visible; unsupported facts must remain empty; and all owner-facing text must use short, everyday English understandable by a 12-year-old. Apply the rule through shared capabilities and implementation review, not as isolated screen fixes.
