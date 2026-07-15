@@ -1070,6 +1070,12 @@ function handleCommand(text) {
     render();
     return;
   }
+  if (isCatalogNavigationIntent(trimmed)) {
+    addFeed("owner", trimmed);
+    showCatalogWorkspace();
+    render();
+    return;
+  }
   if (looksLikeMedicineList(trimmed)) {
     addFeed("owner", "Pasted medicine list");
     addCard(createPasteImportCard(trimmed.replace(/^list\s*:/i, "").trim()));
@@ -1100,6 +1106,11 @@ function handleCommand(text) {
   }
 }
 
+function isCatalogNavigationIntent(text) {
+  const normalized = String(text || "").trim().toLowerCase().replace(/\s+/g, " ");
+  return ["show me", "show catalog", "show my catalog", "open catalog", "pharmacy catalog"].includes(normalized);
+}
+
 function stockCheckReply(medicine) {
   const rawStock = medicine?.stockLeft;
   const unit = medicine?.units?.[0] || "item";
@@ -1117,6 +1128,12 @@ function handleVoiceTranscript(text) {
   state.ui.workspace = "operations";
   if (!state.onboarding.completed) {
     ensureOnboardingStarted();
+    render();
+    return;
+  }
+  if (isCatalogNavigationIntent(text)) {
+    addFeed("owner", String(text || "").trim());
+    showCatalogWorkspace();
     render();
     return;
   }

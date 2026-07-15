@@ -28,6 +28,9 @@ const syrupCatalog = [
 ];
 assert(catalogWorkspaceItems(syrupCatalog, "zinc sirup").map((item) => item.id).join() === "zinc", "Multi-term catalog search must not include medicines matching only a generic form term");
 assert(app.includes('class="show-me-action"') && app.indexOf('class="show-me-action"') < app.indexOf('function chatScreenTemplate'), "SHOW ME must be a top-level action outside Operations Chat");
+assert(app.includes("function isCatalogNavigationIntent(text)"), "Typed and voice catalog navigation must use one shared intent guard");
+assert(app.includes('["show me", "show catalog", "show my catalog", "open catalog", "pharmacy catalog"]'), "Natural catalog navigation phrases must be recognized locally and case-insensitively");
+assert(app.indexOf("if (isCatalogNavigationIntent(trimmed))") < app.indexOf("if (looksLikeMedicineList(trimmed))"), "Catalog navigation must be handled before medicine/list parsing");
 assert(app.includes('data-action="open-catalog-medicine"'), "Catalog rows must open a Medicine Action Card");
 assert(app.includes('data-action="approve-catalog-edit"') && app.includes('data-action="cancel-catalog-edit"'), "Medicine edits need approve and discard actions");
 assert(app.includes("function bindActionElements(scope)") && app.includes("scope.onclick = (event)") && app.includes('event.target.closest?.("[data-action]")'), "Every render must install one current delegated action handler");
