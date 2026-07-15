@@ -323,7 +323,7 @@ function cameraOverlayTemplate() {
     <section class="camera-overlay" aria-label="MS2.0 camera">
       <div class="camera-panel">
         <h2>${state.camera.scanType === "invoice" ? "Photograph invoice" : state.camera.scanType === "barcode" ? "Scan barcode" : state.camera.scanType === "shelf_photo" ? "Photograph shelf" : "Photograph medicine"}</h2>
-        <p>${state.camera.scanType === "barcode" ? "Keep one barcode clear inside the frame, then tap Capture." : state.camera.scanType === "shelf_photo" ? "Hold your phone upright, not sideways. Show the whole medicine packs and the shelf label. Keep the words clear. Hold the phone still. Keep bright light off the packs or screen." : "Keep the whole item clear inside the frame."}</p>
+        <p>${state.camera.scanType === "barcode" ? "Keep one barcode clear inside the frame, then tap Capture." : state.camera.scanType === "shelf_photo" ? "Show the whole medicine packs and shelf label. Keep the words clear. Hold the phone still. Keep bright light off the packs or screen." : "Keep the whole item clear inside the frame."}</p>
         ${state.camera.capturedUrl
           ? `<img class="camera-captured-preview" src="${escapeHtml(state.camera.capturedUrl)}" alt="Captured shelf preview">`
           : `<video id="ms20CameraPreview" autoplay muted playsinline></video>`}
@@ -1374,7 +1374,7 @@ async function openLightweightCamera(scanType = "medicine_photo") {
     }
     const status = root.querySelector(".camera-status");
     if (status) status.textContent = scanType === "shelf_photo"
-      ? "Ready — keep the phone upright and still, then tap Capture."
+      ? "Ready — hold the phone still, then tap Capture."
       : "Ready — hold the phone still, keep bright light off the item, then tap Capture.";
     const actions = root.querySelector(".camera-actions");
     if (actions && state.camera.lightAvailable && !actions.querySelector('[data-action="toggle-camera-light"]')) {
@@ -1423,7 +1423,7 @@ async function useCameraPhoto() {
   const shelfFixture = scanType === "shelf_photo" ? await resolveShelfTestFixture(file) : undefined;
   if (scanType === "shelf_photo" && !shelfFixture) {
     state.camera.retryRequired = true;
-    state.camera.status = "I could not read this shelf clearly. Tap Retake. Hold your phone upright, move closer, show both medicine names and the shelf label, and hold the phone still. Nothing has been saved.";
+    state.camera.status = "I could not read this shelf clearly. Tap Retake. If the phone was sideways, try holding it upright. Move closer, show both medicine names and the shelf label, and hold the phone still. Nothing has been saved.";
     render();
     return;
   }

@@ -62,6 +62,8 @@ assert(app.includes("Barcode was left blank"), "Controlled shelf reviews must ne
 assert(app.includes('if (scanType === "shelf_photo" && !shelfFixture)'), "An unclear camera shelf photo must stay in the retake flow");
 assert(app.includes('I could not read this shelf photo clearly.'), "An unmatched gallery shelf photo must not open an empty approval form");
 assert(!app.includes("avoid glare") && !app.includes("avoid reflections"), "Shelf camera guidance must use simple words instead of glare or reflections");
-assert(app.includes("Hold your phone upright, not sideways."), "Shelf camera guidance must recommend the most reliable phone position");
+assert(app.includes("If the phone was sideways, try holding it upright."), "Upright guidance must be an alternative only after a failed shelf read");
+assert(!app.includes("Hold your phone upright, not sideways."), "The first shelf attempt must allow either phone position");
+assert(styles.includes(".camera-panel:not(.acquisition-panel)") && styles.includes("height: calc(100dvh - 32px)"), "The camera must keep a stable full-height viewing area");
 
 console.log("Shelf photo verification passed: B2 gallery persistence baseline, C3 camera isolation, acquisition choice, retake/use lifecycle, shared pipeline, complete fields, and zero catalog writes before approval.");

@@ -1251,6 +1251,10 @@ pre {
   background: var(--surface);
 }
 
+.camera-panel:not(.acquisition-panel) {
+  height: calc(100dvh - 32px);
+}
+
 .camera-panel h2,
 .camera-panel p {
   margin: 0;
@@ -1305,6 +1309,10 @@ pre {
     max-height: calc(100dvh - 16px);
     gap: 8px;
     padding: 12px;
+  }
+
+  .camera-panel:not(.acquisition-panel) {
+    height: calc(100dvh - 16px);
   }
 
   .camera-panel video {
