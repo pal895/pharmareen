@@ -237,12 +237,22 @@ input:disabled {
   position: relative;
   z-index: 10;
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
   gap: 10px;
   align-items: center;
   padding: 14px;
   border-bottom: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.96);
+}
+
+.header-catalog-action svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .icon-button,

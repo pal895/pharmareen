@@ -231,6 +231,13 @@ function chatScreenTemplate() {
           <strong>${isNotifications ? "Notifications" : "MS2.0"}</strong>
           <small>${state.sync.online ? "Online" : "Offline"} / ${isNotifications ? `${unreadNotifications()} unread` : onboardingStatusText()}</small>
         </span>
+        ${isNotifications ? "" : `
+          <button class="icon-button header-catalog-action" type="button" data-action="open-catalog" aria-label="Open Pharmacy Catalog" title="Open Pharmacy Catalog">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M5 4.5h12a2 2 0 0 1 2 2v12H7a2 2 0 0 1-2-2v-12Zm2 0v12h12M9.5 8h6M9.5 11.5h6" />
+            </svg>
+          </button>
+        `}
         ${adminMenuTemplate()}
       </header>
       <section class="chat-body" id="chatBody" aria-label="Messages">
@@ -927,9 +934,7 @@ function handleAction(dataset) {
     return;
   }
   if (action === "open-catalog") {
-    state.ui.screen = "chat";
-    state.ui.workspace = "operations";
-    showCatalogWorkspace();
+    navigateToCatalogWorkspace();
     render();
     return;
   }
@@ -1006,7 +1011,7 @@ function handleAction(dataset) {
       addCard(createPasteImportCard());
     }
   }
-  if (action === "open-catalog-card") showCatalogWorkspace();
+  if (action === "open-catalog-card") navigateToCatalogWorkspace();
   if (action === "review-paste-list") reviewPasteList(dataset.cardId);
   if (action === "add-catalog-row") addCatalogImportRow(dataset.cardId);
   if (action === "move-catalog-row") moveCatalogImportRow(dataset.cardId, dataset.rowIndex, dataset.direction);
@@ -1072,7 +1077,7 @@ function handleCommand(text) {
   }
   if (isCatalogNavigationIntent(trimmed)) {
     addFeed("owner", trimmed);
-    showCatalogWorkspace();
+    navigateToCatalogWorkspace();
     render();
     return;
   }
@@ -1133,7 +1138,7 @@ function handleVoiceTranscript(text) {
   }
   if (isCatalogNavigationIntent(text)) {
     addFeed("owner", String(text || "").trim());
-    showCatalogWorkspace();
+    navigateToCatalogWorkspace();
     render();
     return;
   }
@@ -2298,6 +2303,12 @@ function showCatalogWorkspace() {
   state.cards = state.cards.filter((card) => card.type !== "CatalogWorkspaceCard");
   state.cards.unshift(createCatalogWorkspaceCard(pharmacyBrain.catalog.length));
   persistActiveCards();
+}
+
+function navigateToCatalogWorkspace() {
+  state.ui.screen = "chat";
+  state.ui.workspace = "operations";
+  showCatalogWorkspace();
 }
 
 function catalogEditDraft(card) {
