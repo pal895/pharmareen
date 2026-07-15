@@ -61,7 +61,7 @@
 3. Cover remaining non-clean paste variants, then manual creation and sale-time learning.
 4. Validate barcode/shelf/photo onboarding, then broader Medicine Action Card cases.
 5. Run Mic Test 2 before broader sales and restocking coverage.
-6. Validate reports/export integrity, then the full Notifications stage once catalog dates are trustworthy.
+6. Validate the in-app Export Hub and reports/export integrity, then the full Notifications stage once catalog dates are trustworthy. The owner must generate and download real supported Excel, PDF, Word, CSV, and future document formats from MS2.0 itself; Codex workspace fixture creation is not production proof.
 7. Continue to Digital Operations Assistant and Operational Intelligence.
 
 Do not repeat the two passed invoice fixtures, clean paste fixture, filtered catalog action, strict Zinc search, basic Cefixime sale, or basic Cefixime restock unless new regression evidence appears.
@@ -69,6 +69,10 @@ Do not repeat the two passed invoice fixtures, clean paste fixture, filtered cat
 ## Permanent reusable-behavior rule
 
 Whenever an editable-medicine behavior is reusable, implement it once in the shared editable-card or editable-list capability and make every applicable workflow inherit it. Preserve one canonical implementation and focused regression protection. Permit an exception only when a context-specific safety or workflow reason is documented and tested; never duplicate shared behavior screen by screen.
+
+## Permanent repository asset rule
+
+The Git repository is the authoritative shared source for important development and validation assets. Whenever appropriate, commit fixtures, Excel and CSV samples, PDF and Word templates, export examples, onboarding samples, testing assets, downloadable reports, and other generated documents needed to reproduce or review a workflow. Do not leave an important downloadable asset only in a Codex workspace, temporary folder, local download directory, or unshared runtime path. Runtime-owned secrets, private pharmacy data, caches, and disposable generated output remain excluded. This rule does not change the active live checkpoint or turn a committed fixture into proof of an in-app production download.
 
 ## Permanent honesty and simple-language rule
 
