@@ -84,6 +84,8 @@ Live evidence after `f33d434` verified the safe first-response rule. A sideways 
 
 Shelf camera guidance now recommends holding the phone upright while sideways capture remains supported. Controlled matching evaluates the full image and two small symmetric crops through all four right-angle orientations, reducing the effect of camera borders and framing without weakening the isolated registry, aspect-ratio boundary, Source Brain gate, review gate, or approval boundary. A failed read now offers Retake only. Important multi-row review feedback, including shelf-photo provenance, appears before the editable rows so the owner sees the source before reviewing values.
 
+Live evidence after `cf3aab3` closed the C3 sideways recognition and review-readiness checkpoint. Replit pulled and started successfully, the shelf camera showed the upright-phone advice, and one sideways capture opened the correct unsaved two-row Metronidazole and Ibuprofen review. The controlled-test source message appeared before the rows; medicine names, strengths, tablet form, and shelf C3 were correctly identified as photo evidence; prepared stock, prices, supplier, batch, and expiry were disclosed separately; and both barcodes remained blank. No new friction was visible and no approval occurred.
+
 ## Next action
 
-Pull/restart once, then repeat one sideways C3 direct-camera capture. Verify the upright-phone advice is visible and that the improved bounded matching either opens the correct unsaved two-row review or leaves the preview with a Retake-only response. If a review opens, verify the source message appears before the medicine rows. Do not approve during this checkpoint.
+Approve the open C3 review exactly once. Verify the Pharmacy Catalog grows from 29 to 31, then refresh once and confirm Metronidazole and Ibuprofen remain saved with the reviewed values. Do not repeat the shelf scan during this checkpoint.
