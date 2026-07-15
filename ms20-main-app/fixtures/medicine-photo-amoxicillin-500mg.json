@@ -8,7 +8,9 @@
     "0000fcffffe0b8fc",
     "0000fcffffe0b03c",
     "0000fefedefe0000",
-    "0000feffdffe0000"
+    "0000feffdffe0000",
+    "00ffffffdffe0000",
+    "00ffffdfdffc0000"
   ],
   "aspectRatio": 0.6667,
   "scanType": "medicine_photo",

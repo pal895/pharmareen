@@ -19,6 +19,8 @@ assert(findMedicinePhotoTestFixture({ fileName: "renamed-by-phone.jpg", sha256: 
 assert(findMedicinePhotoTestFixture({ perceptualHash: "ffffdfcfe18181df", aspectRatio: 0.6667 }) === fixture, "Harmless medicine-photo re-encoding must tolerate bounded visual changes");
 assert(findMedicinePhotoTestFixture({ perceptualHashes: ["0000fcffffe0b8fc"], aspectRatio: 0.565 }) === fixture, "Verified upright camera framing must resolve inside the isolated content gate");
 assert(findMedicinePhotoTestFixture({ perceptualHashes: ["0000fefedefe0000"], aspectRatio: 0.565 }) === fixture, "Verified sideways camera framing must resolve inside the isolated content gate");
+assert(findMedicinePhotoTestFixture({ perceptualHashes: ["00ffffffdffe0000"], aspectRatio: 0.565 }) === fixture, "Verified close sideways camera framing must resolve inside the isolated content gate");
+assert(findMedicinePhotoTestFixture({ perceptualHashes: ["00ffffdfdffc0000"], aspectRatio: 0.565 }) === fixture, "Verified offset sideways camera framing must resolve inside the isolated content gate");
 assert(findMedicinePhotoTestFixture({ perceptualHash: "0000000000000000", aspectRatio: 0.6667 }) === null, "Unrelated medicine photos must remain unmatched");
 assert(findMedicinePhotoTestFixture({ perceptualHash: "0000fcffffe0b8fc", aspectRatio: 1.2 }) === null, "A matching-looking hash with the wrong shape must remain unmatched");
 assert(sourceBrain.lookupMedicine(fixture.item.name).status === "matched", "Controlled medicine-photo proposal must pass Source Brain");
@@ -33,6 +35,7 @@ assert(app.includes("Seen in this photo: medicine name, strength, capsule form, 
 assert(app.includes("Stock, prices, supplier, and shelf were not seen and were left blank"), "Medicine-photo review must disclose unsupported fields");
 assert(app.includes('scanType !== "shelf_photo" && scanType !== "medicine_photo"'), "Medicine camera capture must pause for Retake or Use photo");
 assert(app.includes("I could not read this medicine clearly. Tap Retake."), "Unclear direct medicine photos must remain in the Retake flow");
+assert(app.includes("If the phone was sideways, try holding it upright."), "A failed sideways attempt must offer upright framing as a simple alternative");
 assert(app.includes("I could not read this medicine photo clearly. Take it again."), "Unclear gallery medicine photos must not open an empty review");
 assert(app.includes("ownerCardNote(card)") && app.includes("card.fields?.review_feedback"), "Medicine-photo provenance must be visible outside technical details");
 assert(app.includes('["CatalogImportCard", "VisualScanCard", "PhotoReviewCard"].includes(card.type)') && app.includes("card-note-before-review"), "Medicine-photo provenance must appear before the review fields");

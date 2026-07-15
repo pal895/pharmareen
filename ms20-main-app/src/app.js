@@ -1476,7 +1476,7 @@ async function useCameraPhoto() {
     state.camera.retryRequired = true;
     state.camera.status = scanType === "shelf_photo"
       ? "I could not read this shelf clearly. Tap Retake. If the phone was sideways, try holding it upright. Move closer, show both medicine names and the shelf label, and hold the phone still. Nothing has been saved."
-      : "I could not read this medicine clearly. Tap Retake. Move closer, show the whole pack, keep the words clear, and hold the phone still. Nothing has been saved.";
+      : "I could not read this medicine clearly. Tap Retake. If the phone was sideways, try holding it upright. Move closer, show the whole pack, keep the words clear, and hold the phone still. Nothing has been saved.";
     render();
     return;
   }

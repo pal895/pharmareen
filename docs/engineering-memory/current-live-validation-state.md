@@ -102,4 +102,8 @@ Initial live medicine-photo evidence after `f0c6fa8` verified the full camera an
 
 ## Next action
 
-Pull/restart once, then use the main `Camera` action to photograph the prepared Amoxicillin fixture once in either upright or sideways framing. Tap `Use photo`. Verify one unsaved Amoxicillin review opens with visible honest provenance and only the supported fields populated. Do not approve. The Pharmacy Catalog must remain at 31.
+Live evidence after `3478fc5` verified the complete upright medicine-photo path. One clear Amoxicillin capture opened an honest unsaved review: name, strength, capsule form, pack size, barcode, batch, and expiry came from the photo; stock, prices, supplier, and shelf remained blank. No approval occurred and the Pharmacy Catalog remained 31. The same sequence isolated a remaining orientation regression: two clear sideways captures failed safely, but their retry message omitted the agreed upright alternative. These captures used newer close and offset camera compositions that were outside the bounded verified reference list.
+
+The controlled medicine registry now includes those two verified sideways compositions without increasing the visual tolerance or weakening the aspect-ratio, Source Brain, review, or approval gates. Initial guidance remains orientation-neutral because sideways is supported. Only after a failed read does the retry message say: `If the phone was sideways, try holding it upright.`
+
+Pull/restart once, then use the main `Camera` action to photograph the prepared Amoxicillin fixture once sideways. Tap `Use photo`. Verify one unsaved Amoxicillin review opens with visible honest provenance and only the supported fields populated. Do not approve. If recognition still fails, verify the preview offers Retake only and includes the upright alternative. The Pharmacy Catalog must remain at 31.
