@@ -473,6 +473,10 @@ input:disabled {
   margin-top: 14px;
 }
 
+.card-note-before-review {
+  margin-bottom: 12px;
+}
+
 .invoice-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

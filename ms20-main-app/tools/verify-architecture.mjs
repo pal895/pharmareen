@@ -279,7 +279,7 @@ assert(appSource.includes('invoiceExpiryNotBefore(value, invoiceMonth)'), "Incom
 assert(appSource.includes('This scan is missing invoice details.'), "Incomplete invoice approval must be blocked at the action boundary");
 assert(appSource.includes("closeCameraStream()"), "In-app camera must release memory after capture or cancel");
 assert(css.includes(".camera-overlay"), "Memory-safe camera preview UI missing");
-assert(appSource.includes('status.textContent = "Ready — hold the phone still, keep bright light off the packs or screen, then tap Capture."'), "Camera preview must clearly say when capture is ready in simple English");
+assert(appSource.includes('"Ready — keep the phone upright and still, then tap Capture."') && appSource.includes('"Ready — hold the phone still, keep bright light off the item, then tap Capture."'), "Camera preview must clearly say when each capture type is ready in simple English");
 assert(appSource.includes('data-action="toggle-camera-light"'), "Camera light must be an optional owner control");
 assert(!appSource.includes('capabilities.torch) advanced.push({ torch: true })'), "Camera light must never turn on automatically");
 assert(appSource.includes('track.getSettings?.().torch'), "Camera light must verify that the phone actually applied the torch setting");

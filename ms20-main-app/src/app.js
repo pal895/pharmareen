@@ -142,7 +142,7 @@ let activeRecognition = null;
 
 state.ui = { screen: "home", workspace: "operations" };
 state.voice = { listening: false, status: "" };
-state.camera = { open: false, scanType: "medicine_photo", stream: null, status: "", lightAvailable: false, lightOn: false, capturedFile: null, capturedUrl: "" };
+state.camera = { open: false, scanType: "medicine_photo", stream: null, status: "", lightAvailable: false, lightOn: false, capturedFile: null, capturedUrl: "", retryRequired: false };
 state.shelfAcquisitionOpen = false;
 state.pendingScanType = "medicine_photo";
 state.cardFontScale = readCardFontScale();
@@ -323,7 +323,7 @@ function cameraOverlayTemplate() {
     <section class="camera-overlay" aria-label="MS2.0 camera">
       <div class="camera-panel">
         <h2>${state.camera.scanType === "invoice" ? "Photograph invoice" : state.camera.scanType === "barcode" ? "Scan barcode" : state.camera.scanType === "shelf_photo" ? "Photograph shelf" : "Photograph medicine"}</h2>
-        <p>${state.camera.scanType === "barcode" ? "Keep one barcode clear inside the frame, then tap Capture." : state.camera.scanType === "shelf_photo" ? "Show the whole medicine packs and the shelf label. Keep the words clear. Hold the phone still. Keep bright light off the packs or screen." : "Keep the whole item clear inside the frame."}</p>
+        <p>${state.camera.scanType === "barcode" ? "Keep one barcode clear inside the frame, then tap Capture." : state.camera.scanType === "shelf_photo" ? "Hold your phone upright, not sideways. Show the whole medicine packs and the shelf label. Keep the words clear. Hold the phone still. Keep bright light off the packs or screen." : "Keep the whole item clear inside the frame."}</p>
         ${state.camera.capturedUrl
           ? `<img class="camera-captured-preview" src="${escapeHtml(state.camera.capturedUrl)}" alt="Captured shelf preview">`
           : `<video id="ms20CameraPreview" autoplay muted playsinline></video>`}
@@ -331,7 +331,7 @@ function cameraOverlayTemplate() {
         <div class="camera-actions">
           <button type="button" data-action="close-camera">Cancel</button>
           ${state.camera.capturedUrl
-            ? `<button type="button" data-action="retake-camera-photo">Retake</button><button class="primary-action" type="button" data-action="use-camera-photo">Use photo</button>`
+            ? `<button type="button" data-action="retake-camera-photo">Retake</button>${state.camera.retryRequired ? "" : '<button class="primary-action" type="button" data-action="use-camera-photo">Use photo</button>'}`
             : `${state.camera.lightAvailable ? `<button type="button" data-action="toggle-camera-light">${state.camera.lightOn ? "Light off" : "Light on"}</button>` : ""}<button class="primary-action" type="button" data-action="capture-camera-frame">Capture</button>`}
         </div>
       </div>
@@ -407,6 +407,8 @@ function cardTemplate(card) {
   const fields = cardFieldsFor(card.type);
   const displayed = fields.length ? fields : Object.keys(card.fields || {});
   const progressiveMedicine = PROGRESSIVE_MEDICINE_CARD_TYPES.has(card.type);
+  const note = ownerCardNote(card);
+  const noteBeforeBody = card.type === "CatalogImportCard" && Boolean(String(card.fields?.review_feedback || "").trim());
   return `
     <article class="card-message ${card.status}" data-card-id="${card.id}">
       <div class="card-top">
@@ -419,10 +421,11 @@ function cardTemplate(card) {
           ${cardCloseButtonTemplate(card, "top")}
         </span>
       </div>
+      ${noteBeforeBody ? `<p class="card-note card-note-before-review">${escapeHtml(note)}</p>` : ""}
       ${cardBodyTemplate(card, displayed)}
       ${!progressiveMedicine && (card.type === "SaleCard" || card.type === "VoiceReviewCard") ? paymentToolbar(card) : ""}
       ${!progressiveMedicine && (card.type === "SaleCard" || card.type === "RestockCard") ? quantityToolbar(card) : ""}
-      <p class="card-note">${escapeHtml(ownerCardNote(card))}</p>
+      ${noteBeforeBody ? "" : `<p class="card-note">${escapeHtml(note)}</p>`}
       ${progressiveMedicine ? "" : activeActionsTemplate(card)}
       <details class="card-technical">
         <summary>Details</summary>
@@ -1264,11 +1267,19 @@ async function resolveShelfTestFixture(fileOrName) {
     canvas.width = 8;
     canvas.height = 8;
     const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
-    context.drawImage(bitmap, 0, 0, 8, 8);
-    const pixels = context.getImageData(0, 0, 8, 8).data;
-    const luminance = Array.from({ length: 64 }, (_, index) => {
-      const offset = index * 4;
-      return (pixels[offset] * 0.299) + (pixels[offset + 1] * 0.587) + (pixels[offset + 2] * 0.114);
+    const cropInsets = [0, 0.06, 0.12];
+    const luminanceCandidates = cropInsets.map((inset) => {
+      const sourceX = Math.round(bitmap.width * inset);
+      const sourceY = Math.round(bitmap.height * inset);
+      const sourceWidth = Math.max(1, bitmap.width - (sourceX * 2));
+      const sourceHeight = Math.max(1, bitmap.height - (sourceY * 2));
+      context.clearRect(0, 0, 8, 8);
+      context.drawImage(bitmap, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, 8, 8);
+      const pixels = context.getImageData(0, 0, 8, 8).data;
+      return Array.from({ length: 64 }, (_, index) => {
+        const offset = index * 4;
+        return (pixels[offset] * 0.299) + (pixels[offset + 1] * 0.587) + (pixels[offset + 2] * 0.114);
+      });
     });
     const rotateGrid = (values) => Array.from({ length: 64 }, (_, index) => {
       const row = Math.floor(index / 8);
@@ -1282,9 +1293,11 @@ async function resolveShelfTestFixture(fileOrName) {
         Number.parseInt(bits.slice(index * 4, (index + 1) * 4), 2).toString(16)
       ).join("");
     };
-    const orientations = [luminance];
-    for (let index = 0; index < 3; index += 1) orientations.push(rotateGrid(orientations.at(-1)));
-    const perceptualHashes = orientations.map(hashGrid);
+    const perceptualHashes = luminanceCandidates.flatMap((luminance) => {
+      const orientations = [luminance];
+      for (let index = 0; index < 3; index += 1) orientations.push(rotateGrid(orientations.at(-1)));
+      return orientations.map(hashGrid);
+    });
     const aspectRatio = bitmap.width / Math.max(1, bitmap.height);
     bitmap.close?.();
     return findShelfTestFixture({ perceptualHashes, aspectRatio });
@@ -1360,7 +1373,9 @@ async function openLightweightCamera(scanType = "medicine_photo") {
       await video.play();
     }
     const status = root.querySelector(".camera-status");
-    if (status) status.textContent = "Ready — hold the phone still, keep bright light off the packs or screen, then tap Capture.";
+    if (status) status.textContent = scanType === "shelf_photo"
+      ? "Ready — keep the phone upright and still, then tap Capture."
+      : "Ready — hold the phone still, keep bright light off the item, then tap Capture.";
     const actions = root.querySelector(".camera-actions");
     if (actions && state.camera.lightAvailable && !actions.querySelector('[data-action="toggle-camera-light"]')) {
       const lightButton = document.createElement("button");
@@ -1390,6 +1405,7 @@ function clearCapturedCameraPhoto() {
   if (state.camera.capturedUrl) URL.revokeObjectURL(state.camera.capturedUrl);
   state.camera.capturedFile = null;
   state.camera.capturedUrl = "";
+  state.camera.retryRequired = false;
 }
 
 async function retakeCameraPhoto() {
@@ -1406,7 +1422,8 @@ async function useCameraPhoto() {
   render();
   const shelfFixture = scanType === "shelf_photo" ? await resolveShelfTestFixture(file) : undefined;
   if (scanType === "shelf_photo" && !shelfFixture) {
-    state.camera.status = "I could not read this shelf clearly. Tap Retake. Move closer, show both medicine names and the shelf label, hold the phone still, and keep bright light off the packs or screen. Nothing has been saved.";
+    state.camera.retryRequired = true;
+    state.camera.status = "I could not read this shelf clearly. Tap Retake. Hold your phone upright, move closer, show both medicine names and the shelf label, and hold the phone still. Nothing has been saved.";
     render();
     return;
   }
@@ -1478,6 +1495,7 @@ async function captureLightweightCameraFrame() {
   }
   state.camera.capturedFile = file;
   state.camera.capturedUrl = URL.createObjectURL(file);
+  state.camera.retryRequired = false;
   state.camera.status = "Check the photo. Retake it, or use it to continue. Nothing has been saved.";
   render();
 }
