@@ -2407,7 +2407,7 @@ async function handleDocumentFile(file) {
     try {
       const text = await readXlsxInventory(file);
       const parsed = parseDelimitedInventory(text, sourceBrain);
-      addCard(createPasteImportCard(catalogItemsToText(parsed.items)));
+      addCard(createFileImportReviewCard(parsed, name, "Excel"));
     } catch (error) {
       addFeed("system", `I could not read this Excel file. ${error?.message || "Save it as XLSX or CSV, then try again."} Nothing was saved.`);
     }
@@ -2420,10 +2420,23 @@ async function handleDocumentFile(file) {
   const text = await file.text();
   if (lower.endsWith(".csv") || lower.endsWith(".tsv") || text.includes(",")) {
     const parsed = parseDelimitedInventory(text, sourceBrain);
-    addCard(createPasteImportCard(catalogItemsToText(parsed.items)));
+    addCard(createFileImportReviewCard(parsed, name, lower.endsWith(".tsv") ? "TSV" : "CSV"));
     return;
   }
   addCard(createPasteImportCard(text));
+}
+
+function createFileImportReviewCard(parsed, fileName, fileType) {
+  const itemCount = parsed.items.length;
+  const unclearCount = parsed.unclear.length;
+  const unclearNote = unclearCount
+    ? ` ${unclearCount} row(s) could not be read and were not added.`
+    : "";
+  return createPasteImportCard(catalogItemsToText(parsed.items), {
+    source: fileName,
+    method: `${fileType.toLowerCase()} file`,
+    reviewFeedback: `Read ${itemCount} medicine(s) from ${fileType} file ${fileName}.${unclearNote} Check every value. Nothing is saved until approval.`
+  });
 }
 
 function addMissingMedicineCard() {

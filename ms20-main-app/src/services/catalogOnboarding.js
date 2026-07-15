@@ -48,21 +48,25 @@ export function createCatalogChoiceCard() {
   };
 }
 
-export function createPasteImportCard(seedText = "") {
+export function createPasteImportCard(seedText = "", options = {}) {
   const preparedText = seedText.trim();
+  const source = String(options.source || "Bulk paste").trim();
+  const method = String(options.method || "bulk paste").trim();
+  const reviewFeedback = String(options.reviewFeedback || "").trim();
   return {
     id: `card-catalog-paste-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     type: "CatalogImportCard",
     title: "Review medicine list",
-    source: "Bulk paste",
+    source,
     confidence: preparedText ? 0.82 : 0.65,
     status: "needs_correction",
     aiRequired: false,
     fields: {
-      method: "bulk paste",
+      method,
       entry_mode: preparedText ? "review" : "paste_input",
       items_text: preparedText,
-      notes: "One medicine per line. Price can be the last number."
+      notes: "One medicine per line. Price can be the last number.",
+      ...(reviewFeedback ? { review_feedback: reviewFeedback } : {})
     },
     validation: "MS2.0 parses this locally, then saves approved medicines to this pharmacy."
   };
