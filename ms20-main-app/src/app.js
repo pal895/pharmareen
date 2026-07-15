@@ -1023,7 +1023,10 @@ function handleAction(dataset) {
       addCard(createPasteImportCard());
     }
   }
-  if (action === "open-catalog-card") navigateToCatalogWorkspace();
+  if (action === "open-catalog-card") {
+    navigateToCatalogWorkspace();
+    render();
+  }
   if (action === "review-paste-list") reviewPasteList(dataset.cardId);
   if (action === "add-catalog-row") addCatalogImportRow(dataset.cardId);
   if (action === "move-catalog-row") moveCatalogImportRow(dataset.cardId, dataset.rowIndex, dataset.direction);

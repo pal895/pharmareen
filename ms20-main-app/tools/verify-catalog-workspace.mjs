@@ -31,6 +31,7 @@ assert(app.includes('class="show-me-action"') && app.indexOf('class="show-me-act
 assert(app.includes('class="icon-button header-catalog-action"') && app.includes('aria-label="Open Pharmacy Catalog"'), "The chat header must expose one compact accessible catalog action");
 assert(app.includes("function navigateToCatalogWorkspace()"), "All catalog entry points must share one navigation controller");
 assert((app.match(/navigateToCatalogWorkspace\(\)/g) || []).length >= 5, "Header, home, typed, voice, and card catalog entry points must use the shared controller");
+assert(/if \(action === "open-catalog-card"\) \{\s*navigateToCatalogWorkspace\(\);\s*render\(\);\s*\}/.test(app), "Duplicate-result Open catalog must render the shared catalog route immediately");
 assert((app.match(/showCatalogWorkspace\(\)/g) || []).length === 3, "Catalog workspace mutation must remain behind the shared controller except the post-save refresh");
 assert(app.includes("function isCatalogNavigationIntent(text)"), "Typed and voice catalog navigation must use one shared intent guard");
 assert(app.includes('["show me", "show catalog", "show my catalog", "open catalog", "pharmacy catalog"]'), "Natural catalog navigation phrases must be recognized locally and case-insensitively");
