@@ -5,9 +5,9 @@
 - Authoritative repository root: the current `pharmareen` checkout at `C:\Users\Pal\Documents\New project\.pharmareen_github_merge`.
 - Active branch and remote: `main` tracking `origin/main` at `https://github.com/pal895/pharmareen`.
 - Historical or duplicate checkouts, including `pharmareen (1)`, are non-authoritative and must not be modified. Stop before implementation if the repository root, branch, remote, or current checkpoint cannot be proven.
-- Latest focused fix: `114e66d` (`Fix duplicate-result catalog navigation`), pushed to `origin/main`.
+- Latest completed checkpoint: `5caac52` (`Close Zinc voice sale no mutation check`), pushed to `origin/main`.
 - Catalog baseline: 35 medicines.
-- Current stage: Mic Test 2. Voice catalog navigation passed; the shared voice-restock recovery and review fix awaits one focused live retest.
+- Current stage: Mic Test 2 is complete. Broader daily-sales validation is next, beginning with the simulator-first Transaction Completion Engine foundation and one controlled Fast Record sale.
 - Test 5 XLSX onboarding is complete and protected. Do not repeat it without new regression evidence.
 - Accepted testing-path improvement: typed input is a permanent supported interaction lane, equivalent intents across typed, microphone, camera, photo, shelf photo, invoice, file, barcode, Paste List, and other supported sources must converge on the same shared domain behavior, and every active feature/entry point must receive efficient source-specific live coverage. This does not replace or advance Mic Test 2.
 
@@ -20,6 +20,7 @@
 - Test 5 XLSX approval and persistence are live-approved: the catalog grew exactly from 32 to 35, and Cetirizine, Co-Amoxiclav, and Paracetamol each persisted once with all reviewed values intact and no pending edit on reopen.
 - The repeat Test 5 XLSX no-new-medicines result is live-approved end to end: `Open catalog` rendered the complete persisted 35-item catalog immediately, and closing returned to the unchanged chat without creating a message, draft, approval, sale, new medicine, or catalog mutation.
 - Mic Test 2 voice navigation is live-approved on mobile: recognized `show me` opened the complete 35-item catalog, repeated safely, closed back to chat, and used zero OpenAI API tokens and requests.
+- Mic Test 2 voice restock, generic-only safety, startup readiness, spoken-number parsing, normal-pronunciation sale review, bad-pronunciation sale review, cancellation and no-mutation behavior are live-approved.
 
 ## Current unresolved validation
 
@@ -214,3 +215,9 @@ Resume Mic Test 2 with the easier saved catalog name `Zinc`. After `Speak` appea
 Live evidence after `4c419d0` passed the spoken-sale interpretation and review boundary. Replit pulled and restarted with backend health OK. Android/Chrome returned the exact transcript `zinc one cash`; the shared local parser converted `one` to quantity 1, the catalog matcher resolved canonical Zinc, Cash was selected, and one editable `Check voice result` card appeared with Confirm, Correct, and Cancel. No automatic sale acknowledgement or mutation is visible in the supplied evidence. Do not repeat the pronunciation or parsing test. Close or Cancel this draft, then provide only the smallest remaining proof that no sale was recorded and Zinc stock stayed unchanged.
 
 Follow-up catalog evidence closed the cancellation/no-mutation boundary. Opening saved Zinc after the voice review showed blank current stock, selling price 70, syrup form and unit, and alias `Zinc syrup`. The Medicine Action Card reported `No changes yet` and kept `Approve & save` disabled. Therefore the unconfirmed spoken sale changed neither stock nor the saved catalog record. The `Zinc one cash` Mic Test checkpoint is complete and must not be repeated without regression evidence.
+
+Bad-pronunciation follow-up evidence completed the final Mic Test 2 boundary. Spoken `suffix may one cash` remained visible as the exact transcript, resolved canonical Cefixime, converted `one` to quantity 1, selected Cash, and stopped at review. After cancellation, saved Cefixime still showed stock 25, selling price 120, tablet form/unit, `No changes yet`, and disabled `Approve & save`. No sale or catalog mutation occurred. There is no remaining Mic Test 2 friction.
+
+The accepted next architecture is the Transaction Completion Engine documented in `transaction-completion-engine.md`. Payment is now one adapter-driven part of shared transaction completion. The local foundation covers Fast Record, Request & Verify state, simulator outcomes, non-blocking pending queue state, global transaction IDs, daily sale numbering, idempotency, duplicate callbacks, and linked undo/reversal records. Real providers are explicitly deferred until simulator-backed owner flows pass.
+
+The next live checkpoint is the first TCE-backed Fast Record sale. Type `Cefixime 1 cash` once. Expect an immediate receipt headed `Sale 1`, canonical Cefixime x1, Cash, and stock left 24. This action intentionally records a real local test sale and reduces Cefixime stock from the protected baseline 25 to 24. Do not repeat or undo until the result is analyzed.

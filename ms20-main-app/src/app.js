@@ -43,6 +43,8 @@ import {
 import { resolveStockCheck } from "./services/localIntelligence.js";
 import { catalogReviewCapabilities, reorderedCatalogRows } from "./services/catalogReviewPolicy.js";
 import { medicineReviewBlocker } from "./services/medicineReviewReadiness.js";
+import { CashPaymentAdapter, ManualPaymentAdapter, SimulatorPaymentAdapter } from "./services/paymentAdapters.js";
+import { TransactionCompletionEngine } from "./services/transactionCompletionEngine.js";
 import { readXlsxInventory } from "./services/excelInventory.js";
 import { listRouteSlots, resolveOfflineSlot } from "./routes/routeRegistry.js";
 import {
@@ -57,6 +59,13 @@ const cloudGateway = new CloudMemoryGateway();
 const queue = new OfflineQueue();
 const syncAdapter = new SyncAdapter({ queue, cloudGateway });
 const backendAdapters = new BackendAdapterRegistry();
+const transactionEngine = new TransactionCompletionEngine({
+  adapters: {
+    cash: new CashPaymentAdapter(),
+    manual: new ManualPaymentAdapter(),
+    simulator: new SimulatorPaymentAdapter()
+  }
+});
 const pharmacyBrain = new PharmacyBrain({ pharmacyId: state.pharmacy.id });
 const sourceBrain = new SourceBrain();
 const aiFallback = new AIFallbackAdapter();
@@ -2592,16 +2601,35 @@ function readCardAloud(cardId) {
 function recordCard(card) {
   const backend = backendAdapters.prepareBackendAction(card, state.liveBackend);
   card.integration = backend;
+  const saleCard = card.type === "SaleCard" || card.type === "VoiceReviewCard" || card.type === "MedicineMatchCard";
+  const transactionResult = saleCard
+    ? transactionEngine.start({
+      id: `transaction-${card.id}`,
+      kind: "sale",
+      amount: saleTransactionAmount(card),
+      paymentMethod: String(card.fields?.payment || "cash").replace("-", "").toLowerCase(),
+      mode: "fast_record",
+      adapter: String(card.fields?.payment || "cash").replace("-", "").toLowerCase() === "cash" ? "cash" : "manual",
+      reference: card.id,
+      metadata: { medicine: card.fields?.medicine || "", quantity: Number(card.fields?.quantity || 0) }
+    })
+    : null;
+  if (transactionResult?.transaction?.status === "completed") {
+    card.fields.sale_number = transactionResult.transaction.saleNumber;
+    card.fields.transaction_id = transactionResult.transaction.permanentId;
+    card.fields.transaction_amount = transactionResult.transaction.amount;
+  }
   const action = {
     id: `action-${card.id}`,
     type: card.type,
     fields: card.fields,
     backend,
+    transaction: transactionResult?.transaction || null,
     localFirst: true,
     aiUsed: false
   };
   const result = syncAdapter.queueAction(action);
-  if (result.added && (card.type === "SaleCard" || card.type === "VoiceReviewCard" || card.type === "MedicineMatchCard")) {
+  if (result.added && saleCard && transactionResult?.transaction?.status === "completed") {
     applyLocalSaleStock(card);
     updateTodayTotals(card);
   }
@@ -2609,6 +2637,15 @@ function recordCard(card) {
     applyLocalRestockStock(card);
   }
   addFeed("system", result.duplicate ? "Already saved." : savedReplyFor(card));
+}
+
+function saleTransactionAmount(card) {
+  const quantity = Number(card.fields?.quantity || 0);
+  const enteredPrice = Number(card.fields?.selling_price);
+  if (Number.isFinite(enteredPrice) && enteredPrice > 0) return quantity * enteredPrice;
+  const match = pharmacyBrain.findMedicine(card.fields?.medicine);
+  const savedPrice = Number(match.matches?.[0]?.sellingPrice ?? match.matches?.[0]?.selling_price);
+  return Number.isFinite(savedPrice) && savedPrice > 0 ? quantity * savedPrice : 0;
 }
 
 function applyLocalSaleStock(card) {
@@ -2869,7 +2906,10 @@ function savedReplyFor(card) {
     const medicine = card.fields?.medicine || "Sale";
     const quantity = card.fields?.quantity || "1";
     const payment = paymentLabel(String(card.fields?.payment || "cash").toLowerCase());
-    const lines = [`✅ ${medicine} x${quantity} recorded • ${payment}`];
+    const lines = [
+      card.fields?.sale_number ? `Sale ${card.fields.sale_number}` : "",
+      `✅ ${medicine} x${quantity} recorded • ${payment}`
+    ].filter(Boolean);
     const stockLine = stockReplyLine(card);
     if (stockLine) lines.push(stockLine);
     return lines.join("\n");

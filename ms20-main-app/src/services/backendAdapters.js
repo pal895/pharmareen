@@ -4,10 +4,15 @@ import { LiveBackendGateway } from "./liveBackendGateway.js";
 export class BackendAdapterRegistry {
   constructor({ liveBackendGateway = new LiveBackendGateway() } = {}) {
     this.liveBackendGateway = liveBackendGateway;
+    const transactionCompletionAdapter = liveSlot(
+      "transactionCompletionAdapter",
+      "Shared transaction completion, payment adapters, queue, numbering, refunds, reversals, and undo"
+    );
     this.adapters = {
       commandParserAdapter: new CommandParserAdapter(),
       medicineBrainAdapter: liveSlot("medicineBrainAdapter", "Pharmacy catalog, aliases, forms, units, and source brain"),
-      saleEngineAdapter: liveSlot("saleEngineAdapter", "Sales, payment modes, stock safety, undo/correction ledger"),
+      transactionCompletionAdapter,
+      saleEngineAdapter: transactionCompletionAdapter,
       stockEngineAdapter: liveSlot("stockEngineAdapter", "Stock checks, restock, low-stock/no-stock behavior"),
       reportEngineAdapter: liveSlot("reportEngineAdapter", "Corrected reports with cash, M-Pesa, credit, and mixed totals"),
       invoiceEngineAdapter: liveSlot("invoiceEngineAdapter", "Invoice/photo review foundation without AI by default"),

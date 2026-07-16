@@ -226,6 +226,20 @@ The Main App now has one reusable catalog spelling resolver used by parsing and 
 
 The resolver now includes a bounded phrase-level phonetic skeleton for accent- and recognizer-shaped catalog text. It runs locally after exact/normalized comparisons, never creates a medicine, preserves strength ambiguity, and retains the generic-form identity block. The command parser also converts common spoken English/Kiswahili number words into editable sale/restock quantities. Medicine Match confirmation shares a readiness gate requiring medicine, positive quantity, supported payment, and positive selling price.
 
+## Transaction Completion Engine
+
+MS2.0 uses one Transaction Completion Engine rather than a standalone Payment Engine. Sales, subscriptions, supplier/restock payments, refunds, reversals, credits, and future settlement workflows share this completion boundary.
+
+- Completion modes: Always Fast Record, Always Request & Verify, or Always Ask.
+- Providers are isolated behind Payment Adapters.
+- Simulator-first development is mandatory before official M-PESA/card adapters.
+- Pending requests enter a non-blocking Payment Queue.
+- Global transaction IDs coexist with owner-facing daily `Sale N` numbering.
+- Undo creates linked reconciliation/reversal history and never deletes a sale.
+- Operational Confidence may preselect or suggest but never silently execute a financial action.
+
+The local foundation is implemented and documented in `docs/engineering-memory/transaction-completion-engine.md`. Existing confirmed sales use Fast Record through the TCE. Owner-facing Setup selection, Request & Verify queue screens, full reconciliation hooks, subscription UI and official providers remain staged future work.
+
 Implemented and live-verified:
 
 - Unique spelling variation resolution (`Cefimixe` → `Cefixime`).
