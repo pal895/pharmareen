@@ -78,18 +78,34 @@ export function parseLocalCommand(input, catalog = []) {
   }
 
   if (text.includes("restock")) {
-    const enteredMedicine = raw.replace(/restock/gi, "").trim();
+    const restockText = raw.replace(/restock/gi, "").trim();
+    const quantityMatch = /^(.*?)(?:\s+(\d+(?:\.\d+)?))?$/.exec(restockText);
+    const enteredMedicine = String(quantityMatch?.[1] || restockText).trim();
+    const enteredQuantity = quantityMatch?.[2] || "";
     const medicineMatch = matchMedicineName(enteredMedicine, catalog);
+    const known = normalizeMedicineReviewRow(medicineMatch.matches?.[0] || {});
     return {
       kind: "restock",
       cardType: "RestockCard",
       aiRequired: false,
       confidence: medicineMatch.status === "matched" ? 0.94 : 0.72,
       fields: {
-        medicine: medicineMatch.matches[0]?.name || enteredMedicine,
-        quantity: "1",
-        unit: medicineMatch.matches[0]?.units?.[0] || "pack",
-        supplier: medicineMatch.matches[0]?.supplier || ""
+        medicine: medicineMatch.matches?.[0]?.name || enteredMedicine,
+        quantity: enteredQuantity,
+        bonus_quantity: "",
+        unit: known.unit || "",
+        pack_size: known.pack_size || "",
+        strength: known.strength || "",
+        form: known.form || "",
+        cost_price: known.cost_price ?? "",
+        selling_price: known.selling_price ?? "",
+        supplier: known.supplier || "",
+        batch: known.batch || "",
+        expiry: known.expiry || "",
+        barcode: known.barcode || "",
+        shelf: known.shelf || "",
+        delivery_reference: "",
+        note: ""
       },
       medicineMatch
     };
@@ -186,3 +202,4 @@ function validationFor(parse) {
   return "Local-first route. No AI token needed.";
 }
 import { matchCatalogMedicine } from "./brainAdapters.js";
+import { normalizeMedicineReviewRow } from "./medicineFieldSchema.js";

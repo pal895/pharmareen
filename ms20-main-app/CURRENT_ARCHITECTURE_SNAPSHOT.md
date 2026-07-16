@@ -80,6 +80,7 @@ Existing offline app route expected on backend:
 - Hidden attach/actions menu.
 - First-run onboarding card.
 - Browser speech capture from the Mic button.
+- Honest voice recovery distinguishes offline, microphone permission, network failure, and no speech. Recognized restock speech stays a real Restock card; partial transcripts remain visible and are never completed by guessing.
 - Direct camera capture and photo library upload.
 - Silent card cancel with no chat noise.
 - Persistent editable-card text-size controls.
@@ -92,6 +93,7 @@ Existing offline app route expected on backend:
 - Deterministic notifications for catalog needed, low stock, out of stock, expiry windows, and pending review items.
 - Editable card workspace.
 - Local deterministic sale parser.
+- Local deterministic restock parsing with canonical medicine matching, explicit positive stock quantity, separate bonus stock, reusable saved details, optional delivery traceability, and a three-section owner review before mutation.
 - Offline queue.
 - Duplicate/idempotency demo.
 - Live backend readiness route mapping.

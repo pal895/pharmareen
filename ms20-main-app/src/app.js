@@ -417,7 +417,8 @@ function cardTemplate(card) {
   const displayed = fields.length ? fields : Object.keys(card.fields || {});
   const progressiveMedicine = PROGRESSIVE_MEDICINE_CARD_TYPES.has(card.type);
   const note = ownerCardNote(card);
-  const noteBeforeBody = ["CatalogImportCard", "VisualScanCard", "PhotoReviewCard"].includes(card.type)
+  const noteBeforeBody = (["CatalogImportCard", "VisualScanCard", "PhotoReviewCard"].includes(card.type)
+    || (card.type === "RestockCard" && card.fields?.voice_transcript))
     && Boolean(String(card.fields?.review_feedback || "").trim());
   return `
     <article class="card-message ${card.status}" data-card-id="${card.id}">
@@ -611,7 +612,7 @@ function fieldTemplate(card, field) {
     : `<input data-card-id="${card.id}" data-field="${field}" ${inputMode ? `inputmode="${inputMode}"` : ""} value="${escapeHtml(String(value))}">`;
   return `
     <label>
-      <span>${escapeHtml(fieldLabel(field))}</span>
+      <span>${escapeHtml(card.type === "RestockCard" && field === "quantity" ? "Stock to add" : fieldLabel(field))}</span>
       ${control}
     </label>
   `;
@@ -620,10 +621,17 @@ function fieldTemplate(card, field) {
 function medicineDetailTemplate(card, displayed) {
   const ordered = orderedMedicineFields(displayed);
   const fieldSet = new Set(ordered);
-  const slideOneFields = ["medicine", "selling_price", "quantity"].filter((field) => fieldSet.has(field));
-  const slideTwoFields = ["stock", "current_stock", "strength", "form", "unit", "cost_price", "expiry", "pack_size", "reorder_level"].filter((field) => fieldSet.has(field));
+  const restock = card.type === "RestockCard";
+  const slideOneFields = (restock
+    ? ["medicine", "quantity", "bonus_quantity", "unit"]
+    : ["medicine", "selling_price", "quantity"]).filter((field) => fieldSet.has(field));
+  const slideTwoFields = (restock
+    ? ["pack_size", "strength", "form", "cost_price", "selling_price", "supplier"]
+    : ["stock", "current_stock", "strength", "form", "unit", "cost_price", "expiry", "pack_size", "reorder_level"]).filter((field) => fieldSet.has(field));
   const used = new Set([...slideOneFields, ...slideTwoFields, "payment"]);
-  const slideThreeFields = ["supplier", "barcode", "batch", "alias", "aliases", "message", "shelf", "category", "reason", "file", "scan_type", "total", "correct_stock"].filter((field) => fieldSet.has(field) && !used.has(field));
+  const slideThreeFields = (restock
+    ? ["batch", "expiry", "barcode", "shelf", "delivery_reference", "note"]
+    : ["supplier", "barcode", "batch", "alias", "aliases", "message", "shelf", "category", "reason", "file", "scan_type", "total", "correct_stock"]).filter((field) => fieldSet.has(field) && !used.has(field));
   const remaining = ordered.filter((field) => !used.has(field) && !slideThreeFields.includes(field));
   slideThreeFields.push(...remaining);
   const strength = String(card.fields?.strength || "").trim();
@@ -821,7 +829,7 @@ function activeActionsTemplate(card) {
   const confirmationBlocker = medicineReviewBlocker(card);
   return `
     <div class="card-actions">
-      <button data-action="confirm-card" data-card-id="${card.id}" ${confirmationBlocker ? `disabled title="${escapeHtml(confirmationBlocker)}"` : ""}>Confirm</button>
+      <button data-action="confirm-card" data-card-id="${card.id}" ${confirmationBlocker ? `disabled title="${escapeHtml(confirmationBlocker)}"` : ""}>${card.type === "RestockCard" ? "Add stock" : "Confirm"}</button>
       <button data-action="correct-card" data-card-id="${card.id}">Correct</button>
       <button data-action="reject-card" data-card-id="${card.id}">Cancel</button>
     </div>
@@ -1170,7 +1178,12 @@ function handleVoiceTranscript(text) {
     recordCard(card);
     render();
   } else {
-    if (card.type !== "MedicineMatchCard") {
+    if (card.type === "RestockCard") {
+      card.title = "Check restock";
+      card.fields.voice_transcript = String(text || "").trim();
+      card.fields.review_feedback = `Heard: “${String(text || "").trim()}”. Check the medicine, stock to add, and unit. Add delivery details only when you have them. Nothing changes until you confirm.`;
+      card.validation = card.fields.review_feedback;
+    } else if (card.type !== "MedicineMatchCard") {
       card.type = "VoiceReviewCard";
       card.title = "Check voice result";
       card.fields = {
@@ -1193,6 +1206,11 @@ function startVoiceCapture() {
     render();
     return;
   }
+  if (navigator.onLine === false) {
+    state.voice.status = "Voice needs internet on this phone. You can type while offline.";
+    render();
+    return;
+  }
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
     state.voice.status = "Voice is not available in this browser. Please type for now.";
@@ -1203,12 +1221,15 @@ function startVoiceCapture() {
   recognition.lang = "en-KE";
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
+  let heardResult = false;
+  let voiceError = false;
   activeRecognition = recognition;
   state.voice.listening = true;
   state.voice.status = "Listening...";
   render();
   recognition.onresult = (event) => {
     const transcript = event.results?.[0]?.[0]?.transcript || "";
+    heardResult = Boolean(transcript.trim());
     state.voice.listening = false;
     state.voice.status = "";
     activeRecognition = null;
@@ -1218,26 +1239,36 @@ function startVoiceCapture() {
       render();
     }
   };
-  recognition.onerror = () => {
+  recognition.onerror = (event) => {
+    voiceError = true;
     state.voice.listening = false;
-    state.voice.status = "Voice did not start. Check microphone permission.";
+    const error = String(event?.error || "");
+    state.voice.status = error === "not-allowed" || error === "service-not-allowed"
+      ? "Microphone access is off. Allow it in your browser settings, then try again."
+      : error === "network"
+        ? "Voice could not connect. Check the internet, or type the command."
+        : error === "no-speech"
+          ? "I did not hear any words. Tap Mic and try again."
+          : "Voice stopped before it heard the command. Tap Mic and try again.";
     activeRecognition = null;
     render();
   };
   recognition.onend = () => {
-    if (state.voice.listening) {
-      state.voice.listening = false;
+    activeRecognition = null;
+    state.voice.listening = false;
+    if (!heardResult && !voiceError && state.voice.status === "Listening...") {
+      state.voice.status = "I did not hear any words. Tap Mic and try again.";
+    } else if (state.voice.status === "Listening...") {
       state.voice.status = "";
-      activeRecognition = null;
-      render();
     }
+    render();
   };
   try {
     recognition.start();
   } catch {
     activeRecognition = null;
     state.voice.listening = false;
-    state.voice.status = "Voice did not start. Check microphone permission.";
+    state.voice.status = "Voice could not start. Check the internet and microphone access, or type the command.";
     render();
   }
 }
@@ -2594,20 +2625,21 @@ function applyLocalSaleStock(card) {
 }
 
 function applyLocalRestockStock(card) {
+  const quantity = Number(card.fields?.quantity || 0);
+  const bonusQuantity = Number(card.fields?.bonus_quantity || 0);
+  if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(bonusQuantity) || bonusQuantity < 0) return;
   const match = pharmacyBrain.findMedicine(card.fields?.medicine);
   if (match.status !== "matched") return;
   const medicine = pharmacyBrain.upsertCatalogItem(medicineRecordFromFields(card.fields, {
     source: "restock_review",
     quantityIsStock: false
   }));
-  const quantity = Number(card.fields?.quantity || 0);
   card.fields.medicine = medicine.name;
-  if (!Number.isFinite(quantity) || quantity <= 0) return;
   const currentStock = medicine.stockLeft === null || medicine.stockLeft === undefined || medicine.stockLeft === ""
     ? 0
     : Number(medicine.stockLeft);
   if (!Number.isFinite(currentStock)) return;
-  const stockLeft = currentStock + quantity;
+  const stockLeft = currentStock + quantity + bonusQuantity;
   medicine.stockLeft = stockLeft;
   card.fields.stockLeft = stockLeft;
   state.catalog.items = pharmacyBrain.catalog;
@@ -2832,8 +2864,11 @@ function savedReplyFor(card) {
   if (card.type === "RestockCard") {
     const medicine = card.fields?.medicine || "Medicine";
     const quantity = card.fields?.quantity || "0";
+    const bonusQuantity = Number(card.fields?.bonus_quantity || 0);
     const unit = card.fields?.unit || "item";
-    const lines = [`✅ ${medicine} +${quantity} ${unit}${Number(quantity) === 1 ? "" : "s"} added`];
+    const totalAdded = Number(quantity) + bonusQuantity;
+    const lines = [`✅ ${medicine} +${totalAdded} ${unit}${totalAdded === 1 ? "" : "s"} added`];
+    if (bonusQuantity > 0) lines.push(`${quantity} bought + ${bonusQuantity} bonus`);
     const stockLine = stockReplyLine(card);
     if (stockLine) lines.push(stockLine);
     return lines.join("\n");
@@ -2980,7 +3015,7 @@ function fieldLabel(field) {
 }
 
 function inputModeForField(field) {
-  if (["quantity", "stock", "current_stock", "correct_stock", "stockLeft"].includes(field)) return "numeric";
+  if (["quantity", "bonus_quantity", "stock", "current_stock", "correct_stock", "stockLeft"].includes(field)) return "numeric";
   if (["selling_price", "cost_price", "line_total", "invoice_total", "total"].includes(field)) return "decimal";
   return "";
 }
