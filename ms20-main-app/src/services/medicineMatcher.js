@@ -105,6 +105,11 @@ function scoreLabel(wanted, label) {
   const compactWanted = wanted.replace(/\s/g, "");
   const compactLabel = label.replace(/\s/g, "");
   if (compactWanted === compactLabel) return { score: 0.99, reason: "normalized", matchesAllTerms: true };
+  const spokenWanted = phoneticSkeleton(wanted);
+  const spokenLabel = phoneticSkeleton(label);
+  if (spokenWanted.length >= 4 && spokenWanted === spokenLabel) {
+    return { score: 0.92, reason: "phonetic_phrase", matchesAllTerms: true };
+  }
   if (label.startsWith(wanted) && wanted.length >= 3) return { score: 0.93, reason: "prefix", matchesAllTerms: true };
   if (label.includes(wanted) && wanted.length >= 3) return { score: 0.9, reason: "partial", matchesAllTerms: true };
   if (compactLabel.includes(compactWanted) && compactWanted.length >= 4) return { score: 0.89, reason: "compact_partial", matchesAllTerms: true };
@@ -123,6 +128,19 @@ function scoreLabel(wanted, label) {
     reason: score >= 0.72 ? "close_spelling" : "nearby",
     matchesAllTerms: tokenScores.every((value) => value >= 0.74)
   };
+}
+
+function phoneticSkeleton(value) {
+  return String(value || "")
+    .replace(/\s+/g, "")
+    .replace(/ph/g, "f")
+    .replace(/x/g, "ks")
+    .replace(/q/g, "k")
+    .replace(/c(?=[eiy])/g, "s")
+    .replace(/c/g, "k")
+    .replace(/z/g, "s")
+    .replace(/[aeiouy]/g, "")
+    .replace(/(.)\1+/g, "$1");
 }
 
 function tokenSimilarity(left, right) {

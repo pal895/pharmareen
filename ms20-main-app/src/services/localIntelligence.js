@@ -32,7 +32,8 @@ export function resolveStockCheck(input, catalog = []) {
 
 export function parseLocalCommand(input, catalog = []) {
   const raw = String(input || "").trim();
-  const text = normalize(raw);
+  const commandText = normalizeSpokenNumbers(raw);
+  const text = normalize(commandText);
   if (!text) {
     return { kind: "empty", cardType: null, aiRequired: false, confidence: 0 };
   }
@@ -78,7 +79,7 @@ export function parseLocalCommand(input, catalog = []) {
   }
 
   if (text.includes("restock")) {
-    const restockText = raw.replace(/restock/gi, "").trim();
+    const restockText = commandText.replace(/restock/gi, "").trim();
     const quantityMatch = /^(.*?)(?:\s+(\d+(?:\.\d+)?))?$/.exec(restockText);
     const enteredMedicine = String(quantityMatch?.[1] || restockText).trim();
     const enteredQuantity = quantityMatch?.[2] || "";
@@ -111,8 +112,8 @@ export function parseLocalCommand(input, catalog = []) {
     };
   }
 
-  const sale = raw.match(/^(.+?)[\s-]*(\d+(?:\.\d+)?)(?:\s*)?(cash|mpesa|m-pesa|credit|mixed)$/i)
-    || raw.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*$/i);
+  const sale = commandText.match(/^(.+?)[\s-]*(\d+(?:\.\d+)?)(?:\s*)?(cash|mpesa|m-pesa|credit|mixed)$/i)
+    || commandText.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*$/i);
   if (sale) {
     const medicine = sale[1].trim();
     const quantity = Number(sale[2]);
@@ -145,6 +146,23 @@ export function parseLocalCommand(input, catalog = []) {
       payment: ""
     }
   };
+}
+
+function normalizeSpokenNumbers(value) {
+  const numbers = new Map([
+    ["one", "1"], ["moja", "1"],
+    ["two", "2"], ["mbili", "2"],
+    ["three", "3"], ["tatu", "3"],
+    ["four", "4"], ["nne", "4"],
+    ["five", "5"], ["tano", "5"],
+    ["six", "6"], ["sita", "6"],
+    ["seven", "7"], ["saba", "7"],
+    ["eight", "8"], ["nane", "8"],
+    ["nine", "9"], ["tisa", "9"],
+    ["ten", "10"], ["kumi", "10"],
+    ["eleven", "11"], ["twelve", "12"]
+  ]);
+  return String(value || "").replace(/\b[a-z]+\b/gi, (word) => numbers.get(word.toLowerCase()) || word);
 }
 
 function parseOnboarding(raw) {

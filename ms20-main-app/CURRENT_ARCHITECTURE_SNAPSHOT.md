@@ -224,6 +224,8 @@ Onboarding Test A.1: open the MS2.0 Assistant and confirm catalog onboarding cho
 
 The Main App now has one reusable catalog spelling resolver used by parsing and pharmacy lookup. Canonical catalog names flow into sale/restock cards and confirmations. Accepted next architecture work extends this same resolver—rather than parallel matchers—for autocomplete, voice, scanning, imports, duplicate checks, medicine action cards, and canonical reporting.
 
+The resolver now includes a bounded phrase-level phonetic skeleton for accent- and recognizer-shaped catalog text. It runs locally after exact/normalized comparisons, never creates a medicine, preserves strength ambiguity, and retains the generic-form identity block. The command parser also converts common spoken English/Kiswahili number words into editable sale/restock quantities. Medicine Match confirmation shares a readiness gate requiring medicine, positive quantity, supported payment, and positive selling price.
+
 Implemented and live-verified:
 
 - Unique spelling variation resolution (`Cefimixe` → `Cefixime`).

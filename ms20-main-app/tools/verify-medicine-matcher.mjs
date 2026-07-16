@@ -24,6 +24,11 @@ assert(matchMedicine("Lumefantrine Artemether", catalog).matches[0].id === "arte
 assert(matchMedicine("am0xicillin", catalog).matches[0].id === "amoxicillin", "OCR-style character error failed");
 assert(matchMedicine("Cefixime 400mg", catalog).matches[0].id === "cefixime-400", "Strength-aware ranking failed");
 assert(matchMedicine("Cefixime", catalog).status === "ambiguous", "Different strengths must remain safely ambiguous");
+const accentCatalog = [
+  { id: "cefixime", name: "Cefixime", forms: ["tablet"] },
+  { id: "zinc", name: "Zinc", forms: ["syrup"] }
+];
+assert(matchMedicine("suffix may", accentCatalog).matches[0].id === "cefixime", "Accent-shaped multi-word speech must match a close catalog medicine phonetically");
 assert(matchMedicine("syrup", catalog).status === "insufficient_identity", "A generic form alone must never identify one medicine");
 assert(matchMedicine("bottle", catalog).status === "insufficient_identity", "A generic unit alone must never identify one medicine");
 assert(rankMedicineMatches("zinc sirup", catalog)[0].medicine.id === "zinc", "Ranked result must put intended medicine first");
@@ -36,6 +41,10 @@ assert(parseLocalCommand("restock zinc sirup", catalog).medicineMatch.matches[0]
 const genericRestock = parseLocalCommand("restock syrup 12", catalog);
 assert(genericRestock.medicineMatch.status === "insufficient_identity" && genericRestock.fields.medicine === "", "A voice transcript missing the medicine name must create a blocked restock review");
 assert(parseLocalCommand("zinc sirup 2 cash", catalog).medicineMatch.matches[0].id === "zinc", "Sales lookup must use shared matcher");
+const spokenNumberSale = parseLocalCommand("zinc syrup one cash", catalog);
+assert(spokenNumberSale.fields.quantity === 1 && spokenNumberSale.fields.payment === "cash", "Spoken number words must become editable sale quantities");
+const spokenNumberRestock = parseLocalCommand("restock zinc syrup twelve", catalog);
+assert(spokenNumberRestock.fields.quantity === "12", "Spoken number words must become editable restock quantities");
 const genericSale = parseLocalCommand("syrup 12 cash", catalog);
 assert(genericSale.cardType === "MedicineMatchCard" && genericSale.fields.medicine === "", "A generic-form sale must ask for medicine identity instead of selecting a catalog record");
 assert(matchMedicineName("zinc sirup", catalog).matches[0].id === "zinc", "Speech-recognized text must be ready for shared local matching");
