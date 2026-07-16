@@ -1234,7 +1234,6 @@ function startVoiceCapture() {
     render();
   };
   recognition.onaudiostart = markAudioReady;
-  recognition.onstart = markAudioReady;
   recognition.onresult = (event) => {
     const transcript = event.results?.[0]?.[0]?.transcript || "";
     heardResult = Boolean(transcript.trim());

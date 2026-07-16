@@ -83,6 +83,7 @@ Existing offline app route expected on backend:
 - Honest voice recovery distinguishes offline, microphone permission, network failure, and no speech. Recognized restock speech stays a real Restock card; partial transcripts remain visible and are never completed by guessing.
 - Browser speech may play a native device start sound that the web app cannot suppress without changing transcription technology. Listening stops automatically, never offers a manual Stop control, pins the exact heard transcript, replaces stale voice drafts, and keeps every voice mutation review-first.
 - Browser voice startup is explicitly phased: `Wait` while the speech service prepares, then `Speak` only after the browser's real recognition/audio-start event. This prevents early words from being silently lost and keeps compact mobile composer controls readable.
+- The ready phase uses `onaudiostart` only; the earlier recognition-service `onstart` event is not treated as proof that audio is being captured.
 - Direct camera capture and photo library upload.
 - Silent card cancel with no chat noise.
 - Persistent editable-card text-size controls.
@@ -96,6 +97,7 @@ Existing offline app route expected on backend:
 - Editable card workspace.
 - Local deterministic sale parser.
 - Local deterministic restock parsing with canonical medicine matching, explicit positive stock quantity, separate bonus stock, reusable saved details, optional delivery traceability, and a three-section owner review before mutation.
+- Generic forms and units such as syrup, tablet, bottle, pack, or box are never sufficient medicine identity. Shared matching returns a blocked clarification instead of selecting an arbitrary catalog medicine.
 - Offline queue.
 - Duplicate/idempotency demo.
 - Live backend readiness route mapping.

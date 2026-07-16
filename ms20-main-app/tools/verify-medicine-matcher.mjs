@@ -24,6 +24,8 @@ assert(matchMedicine("Lumefantrine Artemether", catalog).matches[0].id === "arte
 assert(matchMedicine("am0xicillin", catalog).matches[0].id === "amoxicillin", "OCR-style character error failed");
 assert(matchMedicine("Cefixime 400mg", catalog).matches[0].id === "cefixime-400", "Strength-aware ranking failed");
 assert(matchMedicine("Cefixime", catalog).status === "ambiguous", "Different strengths must remain safely ambiguous");
+assert(matchMedicine("syrup", catalog).status === "insufficient_identity", "A generic form alone must never identify one medicine");
+assert(matchMedicine("bottle", catalog).status === "insufficient_identity", "A generic unit alone must never identify one medicine");
 assert(rankMedicineMatches("zinc sirup", catalog)[0].medicine.id === "zinc", "Ranked result must put intended medicine first");
 assert(catalogWorkspaceItems(catalog, "zinc sirup")[0].id === "zinc", "Pharmacy Catalog must use shared matcher");
 
@@ -31,7 +33,11 @@ const pharmacy = new PharmacyBrain({ pharmacyId: "test", catalog });
 assert(pharmacy.findMedicine("zinc sirup").matches[0].id === "zinc", "Pharmacy Brain must use shared matcher");
 assert(resolveStockCheck("stock for zinc sirup", catalog).medicine.id === "zinc", "Operations Chat stock lookup must use shared matcher");
 assert(parseLocalCommand("restock zinc sirup", catalog).medicineMatch.matches[0].id === "zinc", "Restock lookup must use shared matcher");
+const genericRestock = parseLocalCommand("restock syrup 12", catalog);
+assert(genericRestock.medicineMatch.status === "insufficient_identity" && genericRestock.fields.medicine === "", "A voice transcript missing the medicine name must create a blocked restock review");
 assert(parseLocalCommand("zinc sirup 2 cash", catalog).medicineMatch.matches[0].id === "zinc", "Sales lookup must use shared matcher");
+const genericSale = parseLocalCommand("syrup 12 cash", catalog);
+assert(genericSale.cardType === "MedicineMatchCard" && genericSale.fields.medicine === "", "A generic-form sale must ask for medicine identity instead of selecting a catalog record");
 assert(matchMedicineName("zinc sirup", catalog).matches[0].id === "zinc", "Speech-recognized text must be ready for shared local matching");
 
 const source = new SourceBrain({ medicines: catalog });

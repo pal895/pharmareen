@@ -35,6 +35,9 @@ export function rankMedicineMatches(query, medicines = [], { limit = 5, requireA
 export function matchMedicine(query, medicines = []) {
   const wanted = normalizeMedicineText(query);
   if (!wanted) return { status: "missing_name", confidence: 0, matches: [], ranked: [] };
+  if (isGenericOnlyQuery(wanted, medicines)) {
+    return { status: "insufficient_identity", confidence: 0, matches: [], ranked: [], matchType: "generic_only" };
+  }
   const ranked = rankMedicineMatches(wanted, medicines);
   if (!ranked.length) return { status: "not_in_catalog", confidence: 0.2, matches: [], ranked: [] };
   const top = ranked[0];
@@ -56,6 +59,22 @@ export function matchMedicine(query, medicines = []) {
     ranked,
     matchType: top.reason
   };
+}
+
+function isGenericOnlyQuery(wanted, medicines) {
+  const common = new Set([
+    "tablet", "capsule", "syrup", "suspension", "cream", "gel", "drop", "eye drop",
+    "inhaler", "vial", "ampoule", "tube", "sachet", "bottle", "strip", "box", "pack",
+    "unit", "medicine", "drug"
+  ]);
+  for (const medicine of medicines) {
+    for (const value of [medicine.form, ...(medicine.forms || []), medicine.unit, ...(medicine.units || [])]) {
+      const normalized = normalizeMedicineText(value);
+      if (normalized) common.add(normalized);
+    }
+  }
+  const tokens = wanted.split(" ").filter(Boolean);
+  return tokens.length > 0 && tokens.every((token) => common.has(token));
 }
 
 function scoreMedicine(wanted, medicine) {

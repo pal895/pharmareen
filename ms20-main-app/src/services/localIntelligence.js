@@ -90,7 +90,7 @@ export function parseLocalCommand(input, catalog = []) {
       aiRequired: false,
       confidence: medicineMatch.status === "matched" ? 0.94 : 0.72,
       fields: {
-        medicine: medicineMatch.matches?.[0]?.name || enteredMedicine,
+        medicine: medicineMatch.status === "insufficient_identity" ? "" : medicineMatch.matches?.[0]?.name || enteredMedicine,
         quantity: enteredQuantity,
         bonus_quantity: "",
         unit: known.unit || "",
@@ -120,11 +120,11 @@ export function parseLocalCommand(input, catalog = []) {
     const medicineMatch = matchMedicineName(medicine, catalog);
     return {
       kind: "sale",
-      cardType: medicineMatch.status === "ambiguous" ? "MedicineMatchCard" : "SaleCard",
+      cardType: ["ambiguous", "insufficient_identity"].includes(medicineMatch.status) ? "MedicineMatchCard" : "SaleCard",
       aiRequired: false,
       confidence: medicineMatch.status === "matched" ? 0.96 : medicineMatch.confidence,
       fields: {
-        medicine: medicineMatch.matches[0]?.name || medicine,
+        medicine: medicineMatch.status === "insufficient_identity" ? "" : medicineMatch.matches[0]?.name || medicine,
         quantity,
         payment,
         stockLeft: medicineMatch.matches[0]?.stockLeft ?? "Catalog sync needed"
@@ -198,6 +198,9 @@ function validationFor(parse) {
   }
   if (parse.medicineMatch?.status === "needs_pharmacy_catalog") {
     return "Medicine catalog sync needed before live stock writes.";
+  }
+  if (parse.medicineMatch?.status === "insufficient_identity") {
+    return "Add the medicine name. A form such as syrup or tablet is not enough.";
   }
   return "Local-first route. No AI token needed.";
 }
