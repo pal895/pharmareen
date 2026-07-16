@@ -240,6 +240,12 @@ MS2.0 uses one Transaction Completion Engine rather than a standalone Payment En
 
 The local foundation is implemented and documented in `docs/engineering-memory/transaction-completion-engine.md`. Existing confirmed sales use Fast Record through the TCE. Owner-facing Setup selection, Request & Verify queue screens, full reconciliation hooks, subscription UI and official providers remain staged future work.
 
+Pharmacy payments are tenant-owned: customer funds go directly to each pharmacy's authorized merchant account. MS2.0 subscriptions use a separate MS2.0-owned merchant account. Credentials stay in encrypted backend storage and never in client code, chat, logs, Sheets or Git.
+
+Future production supports either direct per-pharmacy merchant connections or an explicitly approved platform/aggregator arrangement through the same Payment Adapter contract. The platform model remains disabled until confirmed. Provider capabilities determine which verified actions the UI may offer.
+
+Unresolved production question: whether Safaricom permits an approved multi-tenant SaaS authorization model for independently owned pharmacies or requires separate Daraja production applications. No answer is assumed; direct provider confirmation is required.
+
 Implemented and live-verified:
 
 - Unique spelling variation resolution (`Cefimixe` → `Cefixime`).
