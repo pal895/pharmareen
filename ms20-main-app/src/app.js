@@ -59,11 +59,12 @@ const cloudGateway = new CloudMemoryGateway();
 const queue = new OfflineQueue();
 const syncAdapter = new SyncAdapter({ queue, cloudGateway });
 const backendAdapters = new BackendAdapterRegistry();
+const paymentSimulator = new SimulatorPaymentAdapter({ scenario: "delayed_confirmation" });
 const transactionEngine = new TransactionCompletionEngine({
   adapters: {
     cash: new CashPaymentAdapter(),
     manual: new ManualPaymentAdapter(),
-    simulator: new SimulatorPaymentAdapter()
+    simulator: paymentSimulator
   }
 });
 const pharmacyBrain = new PharmacyBrain({ pharmacyId: state.pharmacy.id });
@@ -176,7 +177,7 @@ function render() {
   state.sync.pending = queue.pendingCount();
   root.innerHTML = `
     <main class="chat-app" style="--card-font-scale: ${state.cardFontScale};">
-      ${state.ui.screen === "chat" ? chatScreenTemplate() : chatHomeTemplate()}
+      ${state.ui.screen === "chat" ? chatScreenTemplate() : state.ui.screen === "payments" ? paymentQueueScreenTemplate() : chatHomeTemplate()}
       ${shelfAcquisitionTemplate()}
       ${cameraOverlayTemplate()}
     </main>
@@ -225,8 +226,57 @@ function chatHomeTemplate() {
           </span>
           <span class="row-arrow">Open</span>
       </button>
+      <button class="conversation-row" type="button" data-action="open-payment-queue" aria-label="Open Payment Queue">
+        <span class="assistant-avatar">P</span>
+        <span class="conversation-copy">
+          <strong>Payment Queue</strong>
+          <small>${transactionEngine.pending().length} waiting</small>
+          <span>Keep serving while payment confirmation is pending.</span>
+        </span>
+        <span class="row-arrow">Open</span>
+      </button>
     </section>
   `;
+}
+
+function paymentQueueScreenTemplate() {
+  const settings = transactionEngine.settings();
+  const pending = transactionEngine.pending();
+  const recent = transactionEngine.list().slice(-10).reverse();
+  return `
+    <section class="chat-screen" aria-label="Payment Queue">
+      <header class="chat-header">
+        <button class="icon-button" type="button" data-action="back-home" aria-label="Back">&lt;</button>
+        <span class="assistant-avatar">P</span>
+        <span class="chat-title"><strong>Payment Queue</strong><small>${pending.length} waiting · Simulator only</small></span>
+      </header>
+      <section class="chat-body payment-queue-body">
+        <article class="operation-card payment-setup-card">
+          <p class="card-eyebrow">Transaction completion</p>
+          <h2>Choose how sales complete</h2>
+          <p>No real payment is requested in simulator mode.</p>
+          <div class="card-actions">
+            <button data-action="set-completion-mode" data-mode="always_fast_record" class="${settings.completionMode === "always_fast_record" ? "selected" : ""}">Fast Record</button>
+            <button data-action="set-completion-mode" data-mode="request_verify" class="${settings.completionMode === "request_verify" ? "selected" : ""}">Request &amp; Verify</button>
+          </div>
+        </article>
+        ${pending.length ? pending.map(paymentQueueItemTemplate).join("") : '<article class="operation-card"><h2>No payments waiting</h2><p>New pending requests will appear here without blocking the next sale.</p></article>'}
+        ${recent.length ? `<article class="operation-card"><p class="card-eyebrow">Recent</p>${recent.map((item) => `<p><strong>${escapeHtml(item.saleLabel || item.kind)}</strong> · ${escapeHtml(paymentLabel(item.paymentMethod))} · ${escapeHtml(item.status)}</p>`).join("")}</article>` : ""}
+      </section>
+    </section>`;
+}
+
+function paymentQueueItemTemplate(item) {
+  return `<article class="operation-card payment-queue-item">
+    <p class="card-eyebrow">${escapeHtml(item.saleLabel || "Transaction")}</p>
+    <h2>${escapeHtml(item.metadata?.medicine || "Payment")}</h2>
+    <p>${Number(item.metadata?.quantity || 0)} item(s) · ${escapeHtml(paymentLabel(item.paymentMethod))} · Waiting</p>
+    <p>Serving can continue. Stock changes only after confirmation.</p>
+    <div class="card-actions">
+      <button data-action="simulate-payment-result" data-transaction-id="${escapeHtml(item.id)}" data-status="confirmed">Simulate paid</button>
+      <button data-action="simulate-payment-result" data-transaction-id="${escapeHtml(item.id)}" data-status="failed">Simulate failed</button>
+    </div>
+  </article>`;
 }
 
 function chatScreenTemplate() {
@@ -967,6 +1017,20 @@ function handleAction(dataset) {
   if (action === "open-catalog") {
     navigateToCatalogWorkspace();
     render();
+    return;
+  }
+  if (action === "open-payment-queue") {
+    state.ui.screen = "payments";
+    render();
+    return;
+  }
+  if (action === "set-completion-mode") {
+    transactionEngine.configure({ completionMode: dataset.mode === "request_verify" ? "request_verify" : "always_fast_record" });
+    render();
+    return;
+  }
+  if (action === "simulate-payment-result") {
+    resolveSimulatedPayment(dataset.transactionId, dataset.status);
     return;
   }
   if (action === "open-catalog-medicine") openCatalogMedicine(dataset.medicineId);
@@ -2602,16 +2666,18 @@ function recordCard(card) {
   const backend = backendAdapters.prepareBackendAction(card, state.liveBackend);
   card.integration = backend;
   const saleCard = card.type === "SaleCard" || card.type === "VoiceReviewCard" || card.type === "MedicineMatchCard";
+  const paymentMethod = String(card.fields?.payment || "cash").replace("-", "").toLowerCase();
+  const requestVerify = transactionEngine.settings().completionMode === "request_verify" && paymentMethod !== "cash";
   const transactionResult = saleCard
     ? transactionEngine.start({
       id: `transaction-${card.id}`,
       kind: "sale",
       amount: saleTransactionAmount(card),
-      paymentMethod: String(card.fields?.payment || "cash").replace("-", "").toLowerCase(),
-      mode: "fast_record",
-      adapter: String(card.fields?.payment || "cash").replace("-", "").toLowerCase() === "cash" ? "cash" : "manual",
+      paymentMethod,
+      mode: requestVerify ? "request_verify" : "fast_record",
+      adapter: requestVerify ? "simulator" : paymentMethod === "cash" ? "cash" : "manual",
       reference: card.id,
-      metadata: { medicine: card.fields?.medicine || "", quantity: Number(card.fields?.quantity || 0) }
+      metadata: { medicine: card.fields?.medicine || "", quantity: Number(card.fields?.quantity || 0), sellingPrice: Number(card.fields?.selling_price || 0) }
     })
     : null;
   if (transactionResult?.transaction?.status === "completed") {
@@ -2636,7 +2702,44 @@ function recordCard(card) {
   if (result.added && card.type === "RestockCard") {
     applyLocalRestockStock(card);
   }
-  addFeed("system", result.duplicate ? "Already saved." : savedReplyFor(card));
+  addFeed("system", result.duplicate ? "Already saved." : transactionResult?.transaction?.status === "pending"
+    ? `${transactionResult.transaction.saleLabel} is waiting for simulated ${paymentLabel(paymentMethod)} confirmation. You can keep serving. Open Payment Queue to finish it.`
+    : savedReplyFor(card));
+}
+
+function resolveSimulatedPayment(transactionId, status) {
+  const result = transactionEngine.providerEvent(transactionId, {
+    key: `owner-simulator-${transactionId}-${status}`,
+    status,
+    reason: status === "confirmed" ? "simulated_owner_confirmation" : "simulated_owner_failure"
+  });
+  if (result.updated && status === "confirmed") {
+    applyConfirmedPendingSale(result.transaction);
+    addFeed("system", `${result.transaction.saleLabel}\n✅ ${result.transaction.metadata?.medicine} x${result.transaction.metadata?.quantity} recorded · ${paymentLabel(result.transaction.paymentMethod)}\nStock left: ${result.transaction.metadata?.stockLeft ?? "—"}`);
+  }
+  state.ui.screen = "payments";
+  render();
+}
+
+function applyConfirmedPendingSale(transaction) {
+  if (transaction.metadata?.stockApplied) return;
+  const card = { type: "SaleCard", fields: {
+    medicine: transaction.metadata?.medicine || "",
+    quantity: Number(transaction.metadata?.quantity || 0),
+    payment: transaction.paymentMethod,
+    selling_price: Number(transaction.metadata?.sellingPrice || 0),
+    sale_number: transaction.saleNumber,
+    transaction_id: transaction.permanentId
+  }};
+  applyLocalSaleStock(card);
+  updateTodayTotals(card);
+  transaction.metadata = { ...transaction.metadata, stockApplied: true, stockLeft: card.fields.stockLeft };
+  const transactions = transactionEngine.list();
+  const index = transactions.findIndex((item) => item.id === transaction.id);
+  if (index >= 0) {
+    transactions[index] = transaction;
+    transactionEngine.save(transactions);
+  }
 }
 
 function saleTransactionAmount(card) {

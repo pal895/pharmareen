@@ -30,9 +30,11 @@ const second = engine.start({
 });
 assert(second.transaction.status === "pending" && second.transaction.saleLabel === "Sale 2", "Request & Verify must enter a non-blocking pending queue");
 assert(engine.pending().length === 1, "Pending payment queue must be queryable");
+assert(second.transaction.metadata && Object.keys(second.transaction.metadata).length === 0, "Pending transactions must preserve a metadata envelope for deferred completion");
 const confirmed = engine.providerEvent("sale-b", { key: "callback-1", status: "confirmed" });
 assert(confirmed.transaction.status === "completed", "Provider confirmation must complete the transaction");
 assert(engine.providerEvent("sale-b", { key: "callback-1", status: "confirmed" }).duplicate, "Duplicate callbacks must be ignored");
+assert(engine.pending().length === 0, "Confirmed transactions must leave the pending queue");
 
 const undo = engine.undoSale(1);
 assert(undo.transaction.reversalOf === "sale-a" && undo.transaction.amount === -120, "Undo must create a reconciliable reversal linked to the original sale");

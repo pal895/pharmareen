@@ -1108,6 +1108,40 @@ input:disabled {
   font-size: 0.95em;
 }
 
+.payment-queue-body {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 16px;
+}
+
+.operation-card {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.operation-card h2,
+.operation-card p {
+  margin: 0 0 10px;
+}
+
+.operation-card .card-eyebrow {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.operation-card .card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
 .card-technical {
   margin-top: 12px;
   font-size: 0.86em;
