@@ -2,9 +2,13 @@
 
 ## Preserved state
 
-- Repository baseline before the shared-row fix: `937cc3f` on `main`, already pushed but not pulled into Replit.
-- Replit is live on `1dff3b2`; its current UI does not prove the expiry, notification-pruning, bottom-search, or shared-row fixes.
-- Current stage: finish CSV onboarding validation. The Notifications test is paused except for confirming removal of the four known false expiry alerts after deployment.
+- Authoritative repository root: the current `pharmareen` checkout at `C:\Users\Pal\Documents\New project\.pharmareen_github_merge`.
+- Active branch and remote: `main` tracking `origin/main` at `https://github.com/pal895/pharmareen`.
+- Historical or duplicate checkouts, including `pharmareen (1)`, are non-authoritative and must not be modified. Stop before implementation if the repository root, branch, remote, or current checkpoint cannot be proven.
+- Latest focused fix: `114e66d` (`Fix duplicate-result catalog navigation`), pushed to `origin/main`.
+- Catalog baseline: 35 medicines.
+- Current stage: Test 5 XLSX duplicate-result navigation. Duplicate prevention and 35-item preservation passed; the checkpoint remains open only for the smallest live retest of the result card's `Open catalog` button.
+- Do not advance the validation sequence or claim this retest passed without new live user evidence.
 
 ## Completed and protected live behavior
 
@@ -78,6 +82,14 @@ The Git repository is the authoritative shared source for important development 
 ## Permanent live-test execution rule
 
 Every live-test response must be self-contained and include the exact executable command, exact fixture or route, ordered owner actions, approval boundary, expected result, preserved catalog baseline, and requested next evidence. Use the stable response structure and pre-send completeness check in `live-test-execution-discipline.md`. Focused cycles begin with this current state, the latest relevant diff, and directly affected shared components; they use focused tests plus only necessary protected regressions. Repository-wide rediscovery, repeated architecture analysis, unrelated broad suites, implementation loops, and regeneration of known context are prohibited. Local-first, deterministic-first, zero-token-first, and all existing API-token preservation rules remain mandatory. This process rule does not advance or replace the active checkpoint.
+
+Permanent circuit breaker: after the root cause is identified, if two further inspection or command cycles produce no new evidence, stop expanding the investigation. Implement the smallest justified shared-root fix or report one concrete blocker; never continue an open-ended loop.
+
+## Permanent same-commit Project Brain rule
+
+The repository is the MS2.0 Project Brain. When an accepted change affects architecture, permanent behavior, UX decisions, protected behavior, fixtures, token policy, testing sequence, or the active checkpoint, update the relevant Project Brain and Engineering Memory documents in the same commit as the implementation and focused regression protection. The task is not complete until implementation and focused tests pass, the current live-validation state is accurate, and the commit is pushed. Trivial implementation details that do not change permanent project knowledge do not require documentation churn.
+
+Before modifying MS2.0, a fresh Codex chat must verify the repository root, working directory, branch, remote, latest relevant commit, authoritative Project Brain files, and active checkpoint with safe read-only commands. If repository evidence conflicts with a handoff, stop and report the discrepancy instead of guessing. Synchronization itself performs no implementation.
 
 ## Permanent honesty and simple-language rule
 
