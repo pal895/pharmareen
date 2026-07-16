@@ -7,7 +7,7 @@
 - Historical or duplicate checkouts, including `pharmareen (1)`, are non-authoritative and must not be modified. Stop before implementation if the repository root, branch, remote, or current checkpoint cannot be proven.
 - Latest focused fix: `114e66d` (`Fix duplicate-result catalog navigation`), pushed to `origin/main`.
 - Catalog baseline: 35 medicines.
-- Current stage: Mic Test 2, beginning with the smallest safe voice-navigation checkpoint after Excel onboarding closure.
+- Current stage: Mic Test 2. The safe voice-navigation checkpoint passed; the next checkpoint is one unsaved shared-matcher voice review.
 - Test 5 XLSX onboarding is complete and protected. Do not repeat it without new regression evidence.
 
 ## Completed and protected live behavior
@@ -18,6 +18,7 @@
 - `SHOW ME`, complete catalog browsing, strict multi-term search, filtered `Open & edit`, draft-safe Medicine Action Cards, basic Cefixime sale, and basic Cefixime restock are live-approved.
 - Test 5 XLSX approval and persistence are live-approved: the catalog grew exactly from 32 to 35, and Cetirizine, Co-Amoxiclav, and Paracetamol each persisted once with all reviewed values intact and no pending edit on reopen.
 - The repeat Test 5 XLSX no-new-medicines result is live-approved end to end: `Open catalog` rendered the complete persisted 35-item catalog immediately, and closing returned to the unchanged chat without creating a message, draft, approval, sale, new medicine, or catalog mutation.
+- Mic Test 2 voice navigation is live-approved on mobile: recognized `show me` opened the complete 35-item catalog, repeated safely, closed back to chat, and used zero OpenAI API tokens and requests.
 
 ## Current unresolved validation
 
@@ -164,3 +165,7 @@ Live evidence confirmed the repeat Test 5 XLSX is safely non-approvable: it name
 Live evidence after `114e66d` closed the final Excel checkpoint. Replit pulled through `b399118`, restarted with backend health OK, and the repeated `test-5-excel-import.xlsx` produced the expected non-approvable result naming Cetirizine, Co-Amoxiclav, and Paracetamol and stating that nothing was saved. Tapping `Open catalog` immediately displayed the complete persisted Pharmacy Catalog with `Showing 35 of 35`. Closing returned cleanly to the same chat history. No new chat message, draft, approval request, sale, medicine, or catalog mutation appeared. Modern XLSX onboarding, persistence, duplicate prevention, and all shared catalog-opening entry paths are now complete and protected.
 
 The next authoritative checkpoint is Mic Test 2 before broader sales and restocking. Begin with one safe voice-navigation pass: on the same online mobile device, tap `Mic`, allow microphone access if requested, clearly say `Show me`, and confirm recognized speech uses the shared local catalog-navigation controller to open the complete 35-item Pharmacy Catalog. Close it and confirm the unchanged chat returns with no Medicine Check, draft, approval, sale, new medicine, or catalog mutation. This first checkpoint approves or saves nothing and establishes the live microphone-permission, listening, recognized-text, shared-route, mobile, and zero-mutation boundary before voice sale or editable-card coverage.
+
+Live evidence after `d9feb8c` closed the first Mic Test 2 checkpoint. Replit pulled and restarted with backend health OK. On the mobile app, spoken `show me` was recognized twice on intentional repeat, and each attempt opened the complete persisted Pharmacy Catalog with `Showing 35 of 35`. Closing returned to the same chat, where only the two intentional recognized owner entries were added. OpenAI Platform evidence before and after showed zero tokens, zero requests, and zero spend. No Medicine Check, approval, sale, new medicine, or catalog mutation occurred. Repeated safe voice catalog navigation is now protected.
+
+The next Mic Test 2 checkpoint is one unsaved shared-matcher voice review. Tap `Mic`, say `Restock zinc sirup`, and verify the recognized transcript opens an editable `Check voice result` card whose medicine is canonically resolved to `Zinc` despite the spoken form spelling variation. Do not approve or save it. Close the card and confirm no stock, catalog, sale, approval, or API-token change occurred. This is the smallest controlled proof that speech-recognized text reaches the shared local medicine matcher and editable review boundary before any voice mutation is tested.
