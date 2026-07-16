@@ -41,7 +41,9 @@ assert(app.includes('Voice needs internet on this phone. You can type while offl
 assert(app.includes('I did not hear any words. Tap Mic and try again.'), "No-result voice attempts need a clear recovery");
 assert(app.includes('card.type === "RestockCard"') && app.includes("card.fields.voice_transcript"), "Voice restock must preserve its workflow card and visible transcript");
 assert(app.includes('card.type === "RestockCard" ? "Add stock" : "Confirm"'), "Restock approval must use simple action wording");
-assert(app.includes('state.voice.listening ? "Listening" : "Mic"') && app.includes('state.voice.listening ? "disabled" : ""'), "Listening must stop automatically without inviting a second manual stop sound");
+assert(app.includes('state.voice.starting ? "Wait" : state.voice.listening ? "Speak" : "Mic"') && app.includes("const voiceBusy = state.voice.starting || state.voice.listening"), "The compact Mic control must distinguish startup from ready-to-speak without overlapping Send");
+assert(app.includes('state.voice.status = "Starting microphone… Please wait."') && app.includes('state.voice.status = "Speak now."'), "Voice must not tell the owner to speak before the browser audio stream is ready");
+assert(app.includes("recognition.onaudiostart = markAudioReady") && app.includes("recognition.onstart = markAudioReady"), "The ready state must follow the browser's actual recognition/audio start event");
 assert(app.includes("card.voiceSource = true") && app.includes("removeCardsByPredicate((item) => item.voiceSource === true)"), "A new voice result must replace an older voice draft instead of leaving a stale card visible");
 assert(app.includes("if (card.voiceSource && card.fields?.review_feedback)"), "Every voice review must show exactly what was heard before the action fields");
 assert(!/handleVoiceTranscript[\s\S]{0,900}canRecordInstantly/.test(app), "Voice commands must remain review-first instead of mutating immediately after recognition");

@@ -82,6 +82,7 @@ Existing offline app route expected on backend:
 - Browser speech capture from the Mic button.
 - Honest voice recovery distinguishes offline, microphone permission, network failure, and no speech. Recognized restock speech stays a real Restock card; partial transcripts remain visible and are never completed by guessing.
 - Browser speech may play a native device start sound that the web app cannot suppress without changing transcription technology. Listening stops automatically, never offers a manual Stop control, pins the exact heard transcript, replaces stale voice drafts, and keeps every voice mutation review-first.
+- Browser voice startup is explicitly phased: `Wait` while the speech service prepares, then `Speak` only after the browser's real recognition/audio-start event. This prevents early words from being silently lost and keeps compact mobile composer controls readable.
 - Direct camera capture and photo library upload.
 - Silent card cancel with no chat noise.
 - Persistent editable-card text-size controls.

@@ -143,7 +143,7 @@ const FIELD_LABELS = {
 let activeRecognition = null;
 
 state.ui = { screen: "home", workspace: "operations" };
-state.voice = { listening: false, status: "" };
+state.voice = { starting: false, listening: false, status: "" };
 state.camera = { open: false, scanType: "medicine_photo", stream: null, status: "", lightAvailable: false, lightOn: false, capturedFile: null, capturedUrl: "", retryRequired: false };
 state.shelfAcquisitionOpen = false;
 state.pendingScanType = "medicine_photo";
@@ -293,6 +293,8 @@ function feedItemTemplate(item) {
 }
 
 function composerTemplate() {
+  const voiceBusy = state.voice.starting || state.voice.listening;
+  const voiceLabel = state.voice.starting ? "Wait" : state.voice.listening ? "Speak" : "Mic";
   return `
     <footer class="chat-composer" aria-label="Message composer">
       <details class="attach-menu">
@@ -313,8 +315,8 @@ function composerTemplate() {
       </details>
       <form class="message-form" id="commandForm">
         <input id="commandInput" type="text" autocomplete="off" inputmode="text" placeholder="Message MS2.0">
-        <button class="icon-button ${state.voice.listening ? "listening" : ""}" type="button" data-action="start-voice" aria-label="${state.voice.listening ? "Listening" : "Use voice"}" ${state.voice.listening ? "disabled" : ""}>
-          ${state.voice.listening ? "Listening" : "Mic"}
+        <button class="icon-button ${voiceBusy ? "listening" : ""}" type="button" data-action="start-voice" aria-label="${state.voice.starting ? "Starting microphone" : state.voice.listening ? "Speak now" : "Use voice"}" ${voiceBusy ? "disabled" : ""}>
+          ${voiceLabel}
         </button>
         <button class="send-button" type="submit">Send</button>
       </form>
@@ -1199,7 +1201,7 @@ function handleVoiceTranscript(text) {
 }
 
 function startVoiceCapture() {
-  if (state.voice.listening) return;
+  if (state.voice.starting || state.voice.listening) return;
   if (navigator.onLine === false) {
     state.voice.status = "Voice needs internet on this phone. You can type while offline.";
     render();
@@ -1217,13 +1219,26 @@ function startVoiceCapture() {
   recognition.maxAlternatives = 1;
   let heardResult = false;
   let voiceError = false;
+  let audioReady = false;
   activeRecognition = recognition;
-  state.voice.listening = true;
-  state.voice.status = "Speak now. Listening stops by itself.";
+  state.voice.starting = true;
+  state.voice.listening = false;
+  state.voice.status = "Starting microphone… Please wait.";
   render();
+  const markAudioReady = () => {
+    if (audioReady) return;
+    audioReady = true;
+    state.voice.starting = false;
+    state.voice.listening = true;
+    state.voice.status = "Speak now.";
+    render();
+  };
+  recognition.onaudiostart = markAudioReady;
+  recognition.onstart = markAudioReady;
   recognition.onresult = (event) => {
     const transcript = event.results?.[0]?.[0]?.transcript || "";
     heardResult = Boolean(transcript.trim());
+    state.voice.starting = false;
     state.voice.listening = false;
     state.voice.status = "";
     activeRecognition = null;
@@ -1235,6 +1250,7 @@ function startVoiceCapture() {
   };
   recognition.onerror = (event) => {
     voiceError = true;
+    state.voice.starting = false;
     state.voice.listening = false;
     const error = String(event?.error || "");
     state.voice.status = error === "not-allowed" || error === "service-not-allowed"
@@ -1249,10 +1265,11 @@ function startVoiceCapture() {
   };
   recognition.onend = () => {
     activeRecognition = null;
+    state.voice.starting = false;
     state.voice.listening = false;
-    if (!heardResult && !voiceError && state.voice.status === "Speak now. Listening stops by itself.") {
+    if (!heardResult && !voiceError && (state.voice.status === "Speak now." || state.voice.status === "Starting microphone… Please wait.")) {
       state.voice.status = "I did not hear any words. Tap Mic and try again.";
-    } else if (state.voice.status === "Speak now. Listening stops by itself.") {
+    } else if (state.voice.status === "Speak now." || state.voice.status === "Starting microphone… Please wait.") {
       state.voice.status = "";
     }
     render();
@@ -1261,6 +1278,7 @@ function startVoiceCapture() {
     recognition.start();
   } catch {
     activeRecognition = null;
+    state.voice.starting = false;
     state.voice.listening = false;
     state.voice.status = "Voice could not start. Check the internet and microphone access, or type the command.";
     render();
