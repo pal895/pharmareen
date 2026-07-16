@@ -7,8 +7,8 @@
 - Historical or duplicate checkouts, including `pharmareen (1)`, are non-authoritative and must not be modified. Stop before implementation if the repository root, branch, remote, or current checkpoint cannot be proven.
 - Latest focused fix: `114e66d` (`Fix duplicate-result catalog navigation`), pushed to `origin/main`.
 - Catalog baseline: 35 medicines.
-- Current stage: Test 5 XLSX duplicate-result navigation. Duplicate prevention and 35-item preservation passed; the checkpoint remains open only for the smallest live retest of the result card's `Open catalog` button.
-- Do not advance the validation sequence or claim this retest passed without new live user evidence.
+- Current stage: Mic Test 2, beginning with the smallest safe voice-navigation checkpoint after Excel onboarding closure.
+- Test 5 XLSX onboarding is complete and protected. Do not repeat it without new regression evidence.
 
 ## Completed and protected live behavior
 
@@ -17,6 +17,7 @@
 - CSV imported four medicines and increased the saved catalog from 21 to 25 without duplication. Strength, quantity, prices, supplier, batch, and optional blank barcode reached the catalog and Medicine Action Card.
 - `SHOW ME`, complete catalog browsing, strict multi-term search, filtered `Open & edit`, draft-safe Medicine Action Cards, basic Cefixime sale, and basic Cefixime restock are live-approved.
 - Test 5 XLSX approval and persistence are live-approved: the catalog grew exactly from 32 to 35, and Cetirizine, Co-Amoxiclav, and Paracetamol each persisted once with all reviewed values intact and no pending edit on reopen.
+- The repeat Test 5 XLSX no-new-medicines result is live-approved end to end: `Open catalog` rendered the complete persisted 35-item catalog immediately, and closing returned to the unchanged chat without creating a message, draft, approval, sale, new medicine, or catalog mutation.
 
 ## Current unresolved validation
 
@@ -159,3 +160,7 @@ Live evidence verified the compact header catalog icon: it opened the complete 3
 All list-based catalog acquisition now uses one `prepareCatalogImport` boundary. It partitions incoming rows against the current Pharmacy Catalog before any editable review is created. An all-existing XLSX/CSV/TSV file produces a non-approvable no-changes result that names the existing medicines, states that nothing was saved, and offers Open catalog, Read, or Close. A mixed file exposes only genuinely new rows and discloses which existing medicines were not added again. The active checkpoint has not advanced: repeat the same committed Test 5 XLSX, verify the no-new result, then open the catalog and confirm it remains exactly 35. Do not approve anything.
 
 Live evidence confirmed the repeat Test 5 XLSX is safely non-approvable: it named all three existing medicines, stated that nothing was saved, and preserved the 35-item catalog. The remaining checkpoint defect is isolated to the result card's `Open catalog` action. The card already called the shared `navigateToCatalogWorkspace` controller, but its direct action branch omitted the render performed by the header and typed-command routes. The branch now renders immediately after shared navigation. Retest only this button; the catalog must open at 35 with no message, draft, approval, or mutation.
+
+Live evidence after `114e66d` closed the final Excel checkpoint. Replit pulled through `b399118`, restarted with backend health OK, and the repeated `test-5-excel-import.xlsx` produced the expected non-approvable result naming Cetirizine, Co-Amoxiclav, and Paracetamol and stating that nothing was saved. Tapping `Open catalog` immediately displayed the complete persisted Pharmacy Catalog with `Showing 35 of 35`. Closing returned cleanly to the same chat history. No new chat message, draft, approval request, sale, medicine, or catalog mutation appeared. Modern XLSX onboarding, persistence, duplicate prevention, and all shared catalog-opening entry paths are now complete and protected.
+
+The next authoritative checkpoint is Mic Test 2 before broader sales and restocking. Begin with one safe voice-navigation pass: on the same online mobile device, tap `Mic`, allow microphone access if requested, clearly say `Show me`, and confirm recognized speech uses the shared local catalog-navigation controller to open the complete 35-item Pharmacy Catalog. Close it and confirm the unchanged chat returns with no Medicine Check, draft, approval, sale, new medicine, or catalog mutation. This first checkpoint approves or saves nothing and establishes the live microphone-permission, listening, recognized-text, shared-route, mobile, and zero-mutation boundary before voice sale or editable-card coverage.
