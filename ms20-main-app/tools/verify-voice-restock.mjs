@@ -41,6 +41,10 @@ assert(app.includes('Voice needs internet on this phone. You can type while offl
 assert(app.includes('I did not hear any words. Tap Mic and try again.'), "No-result voice attempts need a clear recovery");
 assert(app.includes('card.type === "RestockCard"') && app.includes("card.fields.voice_transcript"), "Voice restock must preserve its workflow card and visible transcript");
 assert(app.includes('card.type === "RestockCard" ? "Add stock" : "Confirm"'), "Restock approval must use simple action wording");
+assert(app.includes('state.voice.listening ? "Listening" : "Mic"') && app.includes('state.voice.listening ? "disabled" : ""'), "Listening must stop automatically without inviting a second manual stop sound");
+assert(app.includes("card.voiceSource = true") && app.includes("removeCardsByPredicate((item) => item.voiceSource === true)"), "A new voice result must replace an older voice draft instead of leaving a stale card visible");
+assert(app.includes("if (card.voiceSource && card.fields?.review_feedback)"), "Every voice review must show exactly what was heard before the action fields");
+assert(!/handleVoiceTranscript[\s\S]{0,900}canRecordInstantly/.test(app), "Voice commands must remain review-first instead of mutating immediately after recognition");
 assert(!/openai|anthropic|gemini|fetch\(/i.test(fs.readFileSync(path.join(root, "src/services/localIntelligence.js"), "utf8")), "Voice restock parsing must remain local and zero-token");
 
 console.log("Voice restock verification passed: honest offline/no-result recovery, canonical local matching, complete three-section review, blocked incomplete approval, bonus stock, and zero-token behavior.");

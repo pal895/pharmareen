@@ -313,8 +313,8 @@ function composerTemplate() {
       </details>
       <form class="message-form" id="commandForm">
         <input id="commandInput" type="text" autocomplete="off" inputmode="text" placeholder="Message MS2.0">
-        <button class="icon-button ${state.voice.listening ? "listening" : ""}" type="button" data-action="start-voice" aria-label="Use voice">
-          ${state.voice.listening ? "Stop" : "Mic"}
+        <button class="icon-button ${state.voice.listening ? "listening" : ""}" type="button" data-action="start-voice" aria-label="${state.voice.listening ? "Listening" : "Use voice"}" ${state.voice.listening ? "disabled" : ""}>
+          ${state.voice.listening ? "Listening" : "Mic"}
         </button>
         <button class="send-button" type="submit">Send</button>
       </form>
@@ -418,7 +418,7 @@ function cardTemplate(card) {
   const progressiveMedicine = PROGRESSIVE_MEDICINE_CARD_TYPES.has(card.type);
   const note = ownerCardNote(card);
   const noteBeforeBody = (["CatalogImportCard", "VisualScanCard", "PhotoReviewCard"].includes(card.type)
-    || (card.type === "RestockCard" && card.fields?.voice_transcript))
+    || card.voiceSource === true)
     && Boolean(String(card.fields?.review_feedback || "").trim());
   return `
     <article class="card-message ${card.status}" data-card-id="${card.id}">
@@ -1174,38 +1174,32 @@ function handleVoiceTranscript(text) {
   const card = buildCommandCard(text);
   addFeed("owner", text);
   prepareUnknownMedicineFallback(card, text);
-  if (canRecordInstantly(card, text)) {
-    recordCard(card);
-    render();
+  removeCardsByPredicate((item) => item.voiceSource === true);
+  card.voiceSource = true;
+  if (card.type === "RestockCard") {
+    card.title = "Check restock";
+    card.fields.voice_transcript = String(text || "").trim();
+    card.fields.review_feedback = `Heard: “${String(text || "").trim()}”. Check the medicine, stock to add, and unit. Add delivery details only when you have them. Nothing changes until you confirm.`;
+    card.validation = card.fields.review_feedback;
+  } else if (card.type !== "MedicineMatchCard") {
+    card.type = "VoiceReviewCard";
+    card.title = "Check voice result";
+    card.fields = {
+      transcript: text,
+      medicine: card.fields?.medicine || "",
+      quantity: card.fields?.quantity || "",
+      payment: card.fields?.payment || ""
+    };
   } else {
-    if (card.type === "RestockCard") {
-      card.title = "Check restock";
-      card.fields.voice_transcript = String(text || "").trim();
-      card.fields.review_feedback = `Heard: “${String(text || "").trim()}”. Check the medicine, stock to add, and unit. Add delivery details only when you have them. Nothing changes until you confirm.`;
-      card.validation = card.fields.review_feedback;
-    } else if (card.type !== "MedicineMatchCard") {
-      card.type = "VoiceReviewCard";
-      card.title = "Check voice result";
-      card.fields = {
-        transcript: text,
-        medicine: card.fields?.medicine || "",
-        quantity: card.fields?.quantity || "",
-        payment: card.fields?.payment || ""
-      };
-    }
-    addCard(card);
+    card.fields.voice_transcript = String(text || "").trim();
+    card.fields.review_feedback = `Heard: “${String(text || "").trim()}”. Check every field. Nothing changes until you confirm.`;
+    card.validation = card.fields.review_feedback;
   }
+  addCard(card);
 }
 
 function startVoiceCapture() {
-  if (state.voice.listening && activeRecognition) {
-    activeRecognition.stop();
-    activeRecognition = null;
-    state.voice.listening = false;
-    state.voice.status = "";
-    render();
-    return;
-  }
+  if (state.voice.listening) return;
   if (navigator.onLine === false) {
     state.voice.status = "Voice needs internet on this phone. You can type while offline.";
     render();
@@ -1225,7 +1219,7 @@ function startVoiceCapture() {
   let voiceError = false;
   activeRecognition = recognition;
   state.voice.listening = true;
-  state.voice.status = "Listening...";
+  state.voice.status = "Speak now. Listening stops by itself.";
   render();
   recognition.onresult = (event) => {
     const transcript = event.results?.[0]?.[0]?.transcript || "";
@@ -1256,9 +1250,9 @@ function startVoiceCapture() {
   recognition.onend = () => {
     activeRecognition = null;
     state.voice.listening = false;
-    if (!heardResult && !voiceError && state.voice.status === "Listening...") {
+    if (!heardResult && !voiceError && state.voice.status === "Speak now. Listening stops by itself.") {
       state.voice.status = "I did not hear any words. Tap Mic and try again.";
-    } else if (state.voice.status === "Listening...") {
+    } else if (state.voice.status === "Speak now. Listening stops by itself.") {
       state.voice.status = "";
     }
     render();
@@ -2707,6 +2701,12 @@ function removeCardsByType(types) {
   if (state.cards.length !== before) persistActiveCards();
 }
 
+function removeCardsByPredicate(predicate) {
+  const before = state.cards.length;
+  state.cards = state.cards.filter((card) => !predicate(card));
+  if (state.cards.length !== before) persistActiveCards();
+}
+
 function setPayment(cardId, payment) {
   updateCardField(cardId, "payment", payment);
   render();
@@ -2811,6 +2811,9 @@ function friendlyCardLabel(card) {
 }
 
 function ownerCardNote(card) {
+  if (card.voiceSource && card.fields?.review_feedback) {
+    return String(card.fields.review_feedback).trim();
+  }
   if ((card.type === "VisualScanCard" || card.type === "PhotoReviewCard") && card.fields?.review_feedback) {
     return String(card.fields.review_feedback).trim();
   }
