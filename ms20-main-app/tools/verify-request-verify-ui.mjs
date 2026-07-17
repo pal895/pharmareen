@@ -5,6 +5,7 @@ const styles = fs.readFileSync(new URL("../src/styles.css", import.meta.url), "u
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 
 assert(source.includes('state.ui.screen === "payments" ? paymentQueueScreenTemplate()'), "Payment Queue must be a first-class screen");
+assert(source.includes('root.querySelector("#paymentQueueBody")?.scrollTo({ top: 0 })'), "Payment Queue must open at its heading instead of inheriting a scrolled position");
 assert(source.includes('data-action="set-completion-mode"'), "Owner must be able to choose the completion mode");
 assert(source.includes('data-mode="request_verify"'), "Request & Verify must be owner-selectable");
 assert(source.includes('requestVerify ? "request_verify" : "fast_record"'), "Confirmed sales must route through the selected completion mode");
@@ -14,6 +15,8 @@ assert(source.includes('transactionResult?.transaction?.status === "pending"'), 
 assert(source.includes("applyConfirmedPendingSale(result.transaction)"), "Only confirmation may apply deferred sale stock");
 assert(source.includes("transaction.metadata?.stockApplied"), "Deferred stock application must be idempotent");
 assert(source.includes("You can keep serving"), "Pending copy must explicitly preserve non-blocking service");
+assert(source.includes("transactionDayLabel(item)"), "Queue history must distinguish daily sale-number resets");
 assert(styles.includes(".payment-queue-body") && styles.includes(".operation-card"), "Payment Queue must have responsive card styling");
+assert(styles.includes(".payment-setup-card .card-actions button.selected"), "Only the selected completion mode may use the filled active style");
 
 console.log("Request & Verify UI verification passed: owner mode selection, simulator-only routing, non-blocking queue, confirmation-gated idempotent stock mutation, and mobile card layout.");

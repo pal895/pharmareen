@@ -1142,6 +1142,18 @@ input:disabled {
   margin-top: 14px;
 }
 
+.payment-setup-card .card-actions button {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.payment-setup-card .card-actions button.selected {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
 .card-technical {
   margin-top: 12px;
   font-size: 0.86em;

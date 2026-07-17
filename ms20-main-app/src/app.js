@@ -184,7 +184,8 @@ function render() {
   `;
   bindEvents();
   hideReplitBadge();
-  scrollChatToBottom();
+  if (state.ui.screen === "payments") root.querySelector("#paymentQueueBody")?.scrollTo({ top: 0 });
+  else scrollChatToBottom();
 }
 
 function chatHomeTemplate() {
@@ -250,7 +251,7 @@ function paymentQueueScreenTemplate() {
         <span class="assistant-avatar">P</span>
         <span class="chat-title"><strong>Payment Queue</strong><small>${pending.length} waiting · Simulator only</small></span>
       </header>
-      <section class="chat-body payment-queue-body">
+      <section class="chat-body payment-queue-body" id="paymentQueueBody">
         <article class="operation-card payment-setup-card">
           <p class="card-eyebrow">Transaction completion</p>
           <h2>Choose how sales complete</h2>
@@ -261,14 +262,14 @@ function paymentQueueScreenTemplate() {
           </div>
         </article>
         ${pending.length ? pending.map(paymentQueueItemTemplate).join("") : '<article class="operation-card"><h2>No payments waiting</h2><p>New pending requests will appear here without blocking the next sale.</p></article>'}
-        ${recent.length ? `<article class="operation-card"><p class="card-eyebrow">Recent</p>${recent.map((item) => `<p><strong>${escapeHtml(item.saleLabel || item.kind)}</strong> · ${escapeHtml(paymentLabel(item.paymentMethod))} · ${escapeHtml(item.status)}</p>`).join("")}</article>` : ""}
+        ${recent.length ? `<article class="operation-card"><p class="card-eyebrow">Recent by pharmacy day</p>${recent.map((item) => `<p><strong>${escapeHtml(transactionDayLabel(item))} · ${escapeHtml(item.saleLabel || item.kind)}</strong> · ${escapeHtml(paymentLabel(item.paymentMethod))} · ${escapeHtml(item.status)}</p>`).join("")}</article>` : ""}
       </section>
     </section>`;
 }
 
 function paymentQueueItemTemplate(item) {
   return `<article class="operation-card payment-queue-item">
-    <p class="card-eyebrow">${escapeHtml(item.saleLabel || "Transaction")}</p>
+    <p class="card-eyebrow">${escapeHtml(transactionDayLabel(item))} · ${escapeHtml(item.saleLabel || "Transaction")}</p>
     <h2>${escapeHtml(item.metadata?.medicine || "Payment")}</h2>
     <p>${Number(item.metadata?.quantity || 0)} item(s) · ${escapeHtml(paymentLabel(item.paymentMethod))} · Waiting</p>
     <p>Serving can continue. Stock changes only after confirmation.</p>
@@ -277,6 +278,10 @@ function paymentQueueItemTemplate(item) {
       <button data-action="simulate-payment-result" data-transaction-id="${escapeHtml(item.id)}" data-status="failed">Simulate failed</button>
     </div>
   </article>`;
+}
+
+function transactionDayLabel(item) {
+  return item.businessDay === transactionEngine.businessDay() ? "Today" : item.businessDay || "Previous day";
 }
 
 function chatScreenTemplate() {
@@ -2703,7 +2708,7 @@ function recordCard(card) {
     applyLocalRestockStock(card);
   }
   addFeed("system", result.duplicate ? "Already saved." : transactionResult?.transaction?.status === "pending"
-    ? `${transactionResult.transaction.saleLabel} is waiting for simulated ${paymentLabel(paymentMethod)} confirmation. You can keep serving. Open Payment Queue to finish it.`
+    ? `Today's ${transactionResult.transaction.saleLabel} is waiting for simulated ${paymentLabel(paymentMethod)} confirmation. You can keep serving. Open Payment Queue to finish it.`
     : savedReplyFor(card));
 }
 
