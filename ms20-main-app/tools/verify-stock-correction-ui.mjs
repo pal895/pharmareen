@@ -22,6 +22,7 @@ for (const required of [
   'data-action="stock-fix-read-control"',
   'data-action="stop-reading"',
   'state.pendingScanType = "stock_fix_photo"',
+  'resolveStockFixPhotoTestFixture',
   'localOnly: true',
   'handleStockFixVoice(stockFixCard, text)',
   'completeStockCorrection(card);',

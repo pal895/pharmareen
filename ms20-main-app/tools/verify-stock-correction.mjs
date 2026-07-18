@@ -3,6 +3,9 @@ import { applyStockCorrectionVoice, PharmacyPronunciationMemory, reviewStockCorr
 import { executeStockCorrection, replayPendingStockCorrections } from "../src/services/stockCorrectionExecution.js";
 import { OfflineQueue } from "../src/services/offlineQueue.js";
 import { SyncAdapter } from "../src/services/syncAdapter.js";
+import fs from "node:fs";
+import crypto from "node:crypto";
+import { findStockFixPhotoTestFixture, StockFixPhotoTestFixtures } from "../src/data/stockFixPhotoTestFixtures.js";
 
 const catalog = [{ name: "Losartan", stock: 37, aliases: ["Losartan 50"] }];
 assert.equal(trustedCatalogStock({ name: "Cefixime", stockLeft: 23 }), 23);
@@ -129,5 +132,20 @@ protectedQueue.add({ id: "stock-fix-protected", type: "StockCorrectionCard", fie
 const genericSync = new SyncAdapter({ queue: protectedQueue, cloudGateway: { saveAction: async () => ({ saved: true }) } });
 await genericSync.syncPending({ excludeTypes: ["StockCorrectionCard"] });
 assert.equal(protectedQueue.pendingCount(), 1);
+
+const photoManifest = JSON.parse(fs.readFileSync(new URL("../fixtures/stock-fix-prednisolone-5mg.json", import.meta.url), "utf8"));
+const photoPng = fs.readFileSync(new URL("../fixtures/stock-fix-prednisolone-5mg.png", import.meta.url));
+const photoHash = crypto.createHash("sha256").update(photoPng).digest("hex");
+const photoFixture = findStockFixPhotoTestFixture({ fileName: photoManifest.fileName });
+assert.equal(StockFixPhotoTestFixtures.length, 1);
+assert.equal(photoHash, photoManifest.sha256);
+assert.equal(photoFixture.sha256, photoHash);
+assert.equal(photoFixture.item.name, "Prednisolone");
+assert.equal(photoFixture.item.stock, "");
+assert.equal(findStockFixPhotoTestFixture({ sha256: photoHash }), photoFixture);
+assert.equal(findStockFixPhotoTestFixture({ perceptualHash: photoFixture.perceptualHash, aspectRatio: 0.6667 }), photoFixture);
+assert.equal(findStockFixPhotoTestFixture({ perceptualHash: "0000000000000000", aspectRatio: 0.6667 }), null);
+const photoCatalog = [{ name: "Prednisolone", strength: "5 mg", stockLeft: 24 }];
+assert.equal(reviewStockCorrection({ medicine: photoFixture.item.name, current_stock: 24, correct_stock: 23, reason: "Picture count" }, photoCatalog).ok, true);
 
 console.log("Stock correction workflow verification passed: shared validation and entry, immediate online apply, offline single-queue fallback, automatic idempotent replay, and duplicate-confirm protection.");

@@ -1,0 +1,20 @@
+{
+  "fixtureId": "stock-fix-prednisolone-5mg",
+  "fileName": "stock-fix-prednisolone-5mg.png",
+  "sha256": "c21df57c10a9cf8c39972674274e7ad8c50d0953b15902e18bba23b958974874",
+  "perceptualHash": "fcfcf4f4fcfc4000",
+  "aspectRatio": 0.6667,
+  "workflow": "stock_fix_photo",
+  "expectedSavedStock": 24,
+  "item": {
+    "name": "Prednisolone",
+    "strength": "5 mg",
+    "form": "tablet",
+    "unit": "tablet",
+    "pack_size": "100 tablets",
+    "stock": "",
+    "batch": "PRE-5T",
+    "expiry": "2028-11"
+  },
+  "expected": "The active Stock Fix draft matches saved Prednisolone locally, fills trusted current stock 24 from Pharmacy Catalog, and leaves corrected stock and reason for the owner."
+}

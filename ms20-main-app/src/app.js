@@ -7,6 +7,7 @@ import { PharmacyBrain, SourceBrain, AIFallbackAdapter } from "./services/brainA
 import { findBarcodeTestFixture } from "./data/barcodeTestFixtures.js";
 import { findShelfTestFixture } from "./data/shelfTestFixtures.js";
 import { findMedicinePhotoTestFixture } from "./data/medicinePhotoTestFixtures.js";
+import { findStockFixPhotoTestFixture } from "./data/stockFixPhotoTestFixtures.js";
 import { runVisualPipeline, buildPhotoReviewCard } from "./services/visualPipeline.js";
 import {
   createCatalogChoiceCard,
@@ -1534,6 +1535,7 @@ async function resolveVisualTestFixture(fileOrName, findFixture) {
 
 const resolveShelfTestFixture = (fileOrName) => resolveVisualTestFixture(fileOrName, findShelfTestFixture);
 const resolveMedicinePhotoTestFixture = (fileOrName) => resolveVisualTestFixture(fileOrName, findMedicinePhotoTestFixture);
+const resolveStockFixPhotoTestFixture = (fileOrName) => resolveVisualTestFixture(fileOrName, findStockFixPhotoTestFixture);
 
 async function addPhotoCards(fileOrName, scanType, knownFixture) {
   state.ui.screen = "chat";
@@ -1543,7 +1545,7 @@ async function addPhotoCards(fileOrName, scanType, knownFixture) {
     const card = state.cards.find((item) => item.id === state.stockFixPhotoCardId && item.type === "StockCorrectionCard")
       || state.cards.find((item) => item.type === "StockCorrectionCard");
     if (!card) return false;
-    const fixture = knownFixture === undefined ? await resolveMedicinePhotoTestFixture(fileOrName) : knownFixture;
+    const fixture = knownFixture === undefined ? await resolveStockFixPhotoTestFixture(fileOrName) : knownFixture;
     const catalogMatch = fixture ? matchMedicine(fixture.item?.name, pharmacyBrain.catalog) : { status: "not_in_catalog" };
     if (catalogMatch.status === "matched") {
       const medicine = catalogMatch.matches[0];
