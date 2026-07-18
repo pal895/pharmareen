@@ -62,7 +62,7 @@ export function applyStockCorrectionVoice(fields = {}, transcript = "", catalog 
   if (/^(cancel|stop)$/.test(normalized)) return { intent: "cancel", fields };
   if (/^(read|repeat)$/.test(normalized)) return { intent: "read", fields };
   if (/^(go back|back)$/.test(normalized)) return { intent: "slide", slide: Math.max(0, Number(fields.active_slide || 0) - 1), fields };
-  const changeTargets = { "change medicine": 0, "change current stock": 1, "change correct stock": 2, "change reason": 2 };
+  const changeTargets = { "change medicine": 0, "change stock": 1, "change current stock": 1, "change correct stock": 2, "change reason": 2 };
   if (Object.hasOwn(changeTargets, normalized)) return { intent: "slide", slide: changeTargets[normalized], fields };
 
   const next = { ...fields };

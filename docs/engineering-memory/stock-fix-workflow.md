@@ -14,6 +14,12 @@ The shared fix updates readiness, button disabled/title state and owner guidance
 
 The second manual live attempt exposed two additional shared-root facts. First, canonical saved Pharmacy Catalog records expose transaction-updated stock as `stockLeft`; the Stock Fix trusted-stock reader omitted that canonical shape and therefore falsely reported that both Losartan and Cefixime had no trusted stock, leaving Confirm disabled. One shared `trustedCatalogStock` reader now covers `stock`, `stockLeft`, `current_stock` and legacy `quantity` without inventing a value. Second, Android/Chrome did not reliably resume the single long Web Speech utterance and speech had no visual slide synchronization. Stock Fix Read is now three deterministic local utterance segments. Each segment moves to its matching slide on `onstart`; Pause cancels safely while retaining the segment index, Resume restarts that segment and continues, Stop ends the session, and Read starts again from slide 1. This keeps visible review and speech aligned without AI calls.
 
+## Shared media and guided-voice repair — 2026-07-18
+
+Camera, Photo and File previously depended on controlled file identity, and File used a special octet-stream picker. Re-encoding by Android photo providers broke identity while the special picker added memory pressure and inconsistent acquisition behavior.
+
+All three sources now accept normal images and converge on one Stock Fix evidence pipeline. It stops active speech, cancels any older scan, decodes one bitmap, downsizes it to at most 1600 pixels, compresses to one JPEG buffer, closes the bitmap, clears the canvas, and sends only that bounded buffer to the existing local Tesseract backend. One normalized result contract performs catalog-first deterministic matching and carries canonical identity, package details, confidence, ambiguity, source and missing fields; trusted current stock is read only from the Pharmacy Catalog and corrected stock is never read or invented. Unsupported File evidence stays inside Stock Fix with a short explanation. Guided microphone entry uses the same card and catalog matcher, advances medicine → stock → reason, reviews locally, resumes listening for Confirm, and retains duplicate-submit protection.
+
 ## Reusable interaction behavior
 
 - Confirm reads the complete authoritative draft across all slides, uses a submitting guard, then queues one idempotent action. Cancellation removes the draft without mutation.

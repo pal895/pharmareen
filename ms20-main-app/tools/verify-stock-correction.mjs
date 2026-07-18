@@ -44,6 +44,7 @@ assert.equal(voice.review, true);
 assert.equal(applyStockCorrectionVoice(voice.fields, "Confirm", catalog).intent, "confirm");
 assert.equal(applyStockCorrectionVoice(voice.fields, "Cancel", catalog).intent, "cancel");
 assert.equal(applyStockCorrectionVoice(voice.fields, "Change correct stock", catalog).slide, 2);
+assert.equal(applyStockCorrectionVoice(voice.fields, "Change stock", catalog).slide, 1);
 
 const ambiguousCatalog = [{ name: "Losartan", stock: 37, aliases: ["lora"] }, { name: "Loratadine", stock: 12, aliases: ["lora"] }];
 const uncertain = applyStockCorrectionVoice({}, "lora", ambiguousCatalog);

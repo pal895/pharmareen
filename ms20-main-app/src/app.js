@@ -7,7 +7,6 @@ import { PharmacyBrain, SourceBrain, AIFallbackAdapter } from "./services/brainA
 import { findBarcodeTestFixture } from "./data/barcodeTestFixtures.js";
 import { findShelfTestFixture } from "./data/shelfTestFixtures.js";
 import { findMedicinePhotoTestFixture } from "./data/medicinePhotoTestFixtures.js";
-import { findStockFixPhotoTestFixture } from "./data/stockFixPhotoTestFixtures.js";
 import { runVisualPipeline, buildPhotoReviewCard } from "./services/visualPipeline.js";
 import {
   createCatalogChoiceCard,
@@ -49,6 +48,7 @@ import { CashPaymentAdapter, ManualPaymentAdapter, SimulatorPaymentAdapter } fro
 import { TransactionCompletionEngine } from "./services/transactionCompletionEngine.js";
 import { applyStockCorrectionVoice, PharmacyPronunciationMemory, reviewStockCorrection, stockCorrectionGuidance, trustedCatalogStock } from "./services/stockCorrectionPolicy.js";
 import { executeStockCorrection, replayPendingStockCorrections } from "./services/stockCorrectionExecution.js";
+import { hydrateStockFixDraft, normalizeStockFixEvidence } from "./services/stockFixEvidencePipeline.js";
 import { readXlsxInventory } from "./services/excelInventory.js";
 import { listRouteSlots, resolveOfflineSlot } from "./routes/routeRegistry.js";
 import {
@@ -88,6 +88,8 @@ const ACTIVE_CARD_RESUME_LIMIT = 12;
 const CARD_FONT_SCALE_MIN = 0.85;
 const CARD_FONT_SCALE_MAX = 1.25;
 const CARD_FONT_SCALE_STEP = 0.1;
+let activeStockFixScan = null;
+let pendingStockFixEvidenceSource = "photo";
 const CATALOG_TABLE_COLUMNS = medicineFieldColumns(CATALOG_IMPORT_FIELD_KEYS);
 const INVOICE_TABLE_COLUMNS = [
   ...CATALOG_TABLE_COLUMNS.filter((column) => column.key !== "supplier"),
@@ -402,7 +404,7 @@ function composerTemplate() {
       <input id="photoInput" class="hidden-input" type="file" accept="image/*">
       <input id="cameraInput" class="hidden-input" type="file" accept="image/*" capture="environment">
       <input id="documentInput" class="hidden-input" type="file" accept=".csv,.txt,.tsv,.xls,.xlsx,.pdf,image/*,text/csv,text/plain">
-      <input id="stockFixFileInput" class="hidden-input" type="file" accept=".ms20image,application/octet-stream">
+      <input id="stockFixFileInput" class="hidden-input" type="file" accept="image/*">
     </footer>
   `;
 }
@@ -1012,7 +1014,8 @@ function bindEvents() {
 
   root.querySelector("#photoInput")?.addEventListener("change", (event) => {
     const file = event.target.files?.[0];
-    void addPhotoCards(file || "camera-photo.jpg", state.pendingScanType || "medicine_photo");
+    if (file) void addPhotoCards(file, state.pendingScanType || "medicine_photo");
+    event.target.value = "";
     state.pendingScanType = "medicine_photo";
   });
 
@@ -1033,6 +1036,7 @@ function bindEvents() {
   root.querySelector("#stockFixFileInput")?.addEventListener("change", (event) => {
     const file = event.target.files?.[0];
     if (file) void addPhotoCards(file, "stock_fix_photo");
+    event.target.value = "";
   });
   root.querySelectorAll("[data-catalog-search]").forEach((input) => input.addEventListener("input", (event) => {
     updateCatalogSearch(event.target.dataset.cardId, event.target.value, event.target);
@@ -1394,7 +1398,12 @@ function startVoiceCapture() {
     state.voice.status = "";
     activeRecognition = null;
     if (transcript.trim()) {
+      const guidedStockFix = state.cards.some((card) => card.type === "StockCorrectionCard");
       handleVoiceTranscript(transcript);
+      const continuingCard = state.cards.find((card) => card.type === "StockCorrectionCard");
+      if (guidedStockFix && continuingCard && !continuingCard.ui?.reviewedSlides) {
+        setTimeout(() => startVoiceCapture(), 350);
+      }
     } else {
       render();
     }
@@ -1542,7 +1551,6 @@ async function resolveVisualTestFixture(fileOrName, findFixture) {
 
 const resolveShelfTestFixture = (fileOrName) => resolveVisualTestFixture(fileOrName, findShelfTestFixture);
 const resolveMedicinePhotoTestFixture = (fileOrName) => resolveVisualTestFixture(fileOrName, findMedicinePhotoTestFixture);
-const resolveStockFixPhotoTestFixture = (fileOrName) => resolveVisualTestFixture(fileOrName, findStockFixPhotoTestFixture);
 
 async function addPhotoCards(fileOrName, scanType, knownFixture) {
   state.ui.screen = "chat";
@@ -1552,26 +1560,12 @@ async function addPhotoCards(fileOrName, scanType, knownFixture) {
     const card = state.cards.find((item) => item.id === state.stockFixPhotoCardId && item.type === "StockCorrectionCard")
       || state.cards.find((item) => item.type === "StockCorrectionCard");
     if (!card) return false;
-    const fixture = knownFixture === undefined ? await resolveStockFixPhotoTestFixture(fileOrName) : knownFixture;
-    const catalogMatch = fixture ? matchMedicine(fixture.item?.name, pharmacyBrain.catalog) : { status: "not_in_catalog" };
-    if (catalogMatch.status === "matched") {
-      const medicine = catalogMatch.matches[0];
-      card.fields.medicine = medicine.name || medicine.medicine;
-      card.fields.current_stock = trustedCatalogStock(medicine) ?? "";
-      card.validation = "Photo matched this pharmacy’s saved medicine locally. Add only the corrected stock and reason, then review all three sections.";
-      card.confidence = 0.96;
-    } else {
-      card.validation = "I could not safely match this photo to one saved medicine. Type or say the medicine name; the image did not invent any stock value.";
-      card.confidence = 0.3;
+    if (!(fileOrName instanceof Blob) || !String(fileOrName.type || "").startsWith("image/")) {
+      card.validation = "Choose a supported image file. Stock Fix did not start another import workflow.";
+      render();
+      return false;
     }
-    card.source = `Stock fix photo: ${fileName}`;
-    card.photoEvidence = { fileName, localOnly: true, capturedAt: new Date().toISOString(), aiUsed: false };
-    card.ui = { ...(card.ui || {}), activeSlide: catalogMatch.status === "matched" ? 1 : 0 };
-    state.stockFixPhotoCardId = "";
-    persistActiveCards();
-    render();
-    focusCard(card.id);
-    return true;
+    return processStockFixEvidence(card, fileOrName, fileName, pendingStockFixEvidenceSource);
   }
   const shelfFixture = scanType === "shelf_photo"
     ? (knownFixture === undefined ? await resolveShelfTestFixture(fileOrName) : knownFixture)
@@ -2176,6 +2170,62 @@ async function resizeImageForReading(file) {
   ));
 }
 
+async function prepareStockFixImage(file) {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.getContext("2d", { alpha: false }).drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob = await new Promise((resolve, reject) => canvas.toBlob(
+    (value) => value ? resolve(value) : reject(new Error("I could not prepare this image.")), "image/jpeg", 0.82
+  ));
+  canvas.width = 1;
+  canvas.height = 1;
+  return blob;
+}
+
+async function processStockFixEvidence(card, file, fileName, evidenceSource) {
+  stopStockFixReading();
+  activeStockFixScan?.abort();
+  const controller = new AbortController();
+  activeStockFixScan = controller;
+  card.validation = "Reading this medicine locally...";
+  render();
+  try {
+    const prepared = await prepareStockFixImage(file);
+    if (controller.signal.aborted) return false;
+    const body = new FormData();
+    body.append("file", prepared, "stock-fix.jpg");
+    const response = await fetch("/api/ms20/stock-fix-scan", { method: "POST", body, signal: controller.signal });
+    const ocr = await response.json();
+    if (!response.ok) throw new Error(ocr.detail || "I could not read this image.");
+    const result = normalizeStockFixEvidence(ocr, pharmacyBrain.catalog, evidenceSource);
+    card.fields = hydrateStockFixDraft(card.fields, result);
+    card.recognition = result;
+    card.source = `Stock fix ${evidenceSource}: ${fileName}`;
+    card.photoEvidence = { fileName, localOnly: true, capturedAt: new Date().toISOString(), aiUsed: false };
+    card.confidence = result.confidence;
+    card.ui = { ...(card.ui || {}), activeSlide: result.canonicalName ? 1 : 0 };
+    card.validation = result.canonicalName
+      ? `Matched ${result.displayName} locally. Saved stock is authoritative; add only corrected stock and reason.`
+      : result.ambiguityChoices.length
+        ? `Choose ${result.ambiguityChoices.join(" or ")}.`
+        : "I could not safely match this image to one saved medicine. Type or say the medicine name; no stock value was invented.";
+    persistActiveCards();
+    render();
+    focusCard(card.id);
+    return Boolean(result.canonicalName);
+  } catch (error) {
+    if (error?.name !== "AbortError") card.validation = error?.message || "I could not read this image. You can retry now.";
+    render();
+    return false;
+  } finally {
+    if (activeStockFixScan === controller) activeStockFixScan = null;
+  }
+}
+
 function addOnboardingCard() {
   addCard(createOnboardingCard());
 }
@@ -2380,6 +2430,8 @@ function startCatalogStockFix(medicineId) {
 }
 
 function startStockFixPhoto(cardId, camera) {
+  stopStockFixReading();
+  pendingStockFixEvidenceSource = camera ? "camera" : "photo";
   state.stockFixPhotoCardId = cardId;
   state.pendingScanType = "stock_fix_photo";
   if (camera) void openLightweightCamera("stock_fix_photo");
@@ -2387,6 +2439,8 @@ function startStockFixPhoto(cardId, camera) {
 }
 
 function startStockFixFile(cardId) {
+  stopStockFixReading();
+  pendingStockFixEvidenceSource = "file";
   state.stockFixPhotoCardId = cardId;
   root.querySelector("#stockFixFileInput")?.click();
 }
@@ -2418,6 +2472,7 @@ function stockFixSlideInstruction(slide) {
 }
 
 function handleStockFixVoice(card, transcript) {
+  card.ui = { ...(card.ui || {}), voiceGuided: true };
   const learnedCanonical = pronunciationMemory.resolve(transcript);
   const spokenInput = learnedCanonical || transcript;
   const result = applyStockCorrectionVoice({ ...card.fields, active_slide: card.ui?.activeSlide || 0 }, spokenInput, pharmacyBrain.catalog);
@@ -2946,7 +3001,9 @@ function speakStockFixSegment(sequence) {
     if (stockFixReading.index < stockFixReading.segments.length) speakStockFixSegment(sequence);
     else {
       updateStockFixReadButton(reading.cardId, "Read");
+      const reviewedCard = state.cards.find((card) => card.id === reading.cardId && card.ui?.voiceGuided);
       stockFixReading = null;
+      if (reviewedCard) setTimeout(() => startVoiceCapture(), 350);
     }
   };
   utterance.onerror = () => {

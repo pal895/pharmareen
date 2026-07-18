@@ -60,6 +60,7 @@ from app.services.medicine_catalog import (
 )
 from app.services.medicine_onboarding import import_pharmacy_medicines
 from app.services.local_invoice_ocr import scan_invoice_locally
+from app.services.local_stock_fix_ocr import scan_stock_fix_evidence_locally
 from app.services.photo_intake import (
     append_photo_intake_log,
     build_invoice_extraction_placeholder,
@@ -90,6 +91,7 @@ offline_whatsapp_confirmation_history: list[dict[str, Any]] = []
 pending_voice_confirmations: dict[str, tuple[str, float]] = {}
 pending_invoice_reviews: dict[str, dict[str, Any]] = {}
 main_app_invoice_ocr_cache: dict[str, dict[str, Any]] = {}
+main_app_stock_fix_ocr_cache: dict[str, dict[str, Any]] = {}
 PENDING_VOICE_TTL_SECONDS = 600
 startup_status_printed = False
 XML_CONTENT_TYPE = "application/xml"
@@ -411,6 +413,28 @@ async def main_app_invoice_scan(file: UploadFile = File(...)) -> dict[str, Any]:
     if len(main_app_invoice_ocr_cache) >= 24:
         main_app_invoice_ocr_cache.pop(next(iter(main_app_invoice_ocr_cache)))
     main_app_invoice_ocr_cache[fingerprint] = result
+    return result
+
+
+@app.post("/api/ms20/stock-fix-scan")
+async def main_app_stock_fix_scan(file: UploadFile = File(...)) -> dict[str, Any]:
+    image_bytes = await file.read()
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="Choose one medicine image first.")
+    if len(image_bytes) > 4_000_000:
+        raise HTTPException(status_code=413, detail="This image is too large. Choose a normal clear image and try again.")
+    fingerprint = hashlib.sha256(image_bytes).hexdigest()
+    if fingerprint in main_app_stock_fix_ocr_cache:
+        return {**main_app_stock_fix_ocr_cache[fingerprint], "from_cache": True}
+    try:
+        result = scan_stock_fix_evidence_locally(image_bytes)
+    except Exception:
+        logger.exception("Local Stock Fix scan failed")
+        result = {"visible_text": "", "confidence": 0.0, "ocr_engine": "local_tesseract", "ai_used": False}
+    result.update({"file_name": file.filename or "medicine.jpg", "fingerprint": fingerprint, "from_cache": False})
+    if len(main_app_stock_fix_ocr_cache) >= 12:
+        main_app_stock_fix_ocr_cache.pop(next(iter(main_app_stock_fix_ocr_cache)))
+    main_app_stock_fix_ocr_cache[fingerprint] = result
     return result
 
 
