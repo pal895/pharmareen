@@ -504,3 +504,9 @@ Every active discoverable feature must eventually receive controlled live valida
 | Setup | Owner fields | Onboarding/setup memory | First-use completion and correction | Ready pharmacy setup | Explicit confirmation | Offline-safe where supported; zero-token | Basic setup represented | Remaining scheduled setup coverage |
 
 For every row, retain the full internal mapping: entry point, source, shared root, unique responsibility, visible result, mutation/no-mutation, approval, offline behavior, token expectation, regression protection, prior coverage, and smallest remaining live test. A shared-root pass reduces repetition but never hides an untested permission, acquisition, parser, format, recognition, export, or failure path.
+
+## Next controlled live sequence: automatic completion
+
+1. Home/catalog protection: refresh, return home, verify the SHOW ME tile is absent, then use the header catalog icon and confirm the complete 35-medicine catalog opens without mutation.
+2. Quiet concurrency: keep Request & Verify selected; create two different one-item M-Pesa requests, verify two waiting cards and unchanged stock, complete the second first, verify the first remains waiting and only the second stock changes once, then complete the first.
+3. Confirm the queue reaches zero, both receipts/history rows are truthful, Notifications contain no routine-success noise, and saved stock reflects exactly one deduction per completed sale. Simulator only; no credentials or real payment.

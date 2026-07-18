@@ -218,15 +218,6 @@ function chatHomeTemplate() {
         </span>
         <span class="row-arrow">Open</span>
       </button>
-      <button class="show-me-action" type="button" data-action="open-catalog" aria-label="Show my complete pharmacy catalog">
-          <span class="show-me-icon" aria-hidden="true">&#128065;</span>
-          <span class="conversation-copy">
-            <strong>SHOW ME</strong>
-            <small>${pharmacyBrain.catalog.length} saved medicine${pharmacyBrain.catalog.length === 1 ? "" : "s"}</small>
-            <span>Open, search, and safely edit your Pharmacy Catalog.</span>
-          </span>
-          <span class="row-arrow">Open</span>
-      </button>
       <button class="conversation-row" type="button" data-action="open-payment-queue" aria-label="Open Payment Queue">
         <span class="assistant-avatar">P</span>
         <span class="conversation-copy">
@@ -242,6 +233,7 @@ function chatHomeTemplate() {
 
 function paymentQueueScreenTemplate() {
   const settings = transactionEngine.settings();
+  const simulatorMode = settings.environment !== "production";
   const pending = transactionEngine.pending();
   const recent = transactionEngine.list().slice(-10).reverse();
   return `
@@ -249,13 +241,13 @@ function paymentQueueScreenTemplate() {
       <header class="chat-header">
         <button class="icon-button" type="button" data-action="back-home" aria-label="Back">&lt;</button>
         <span class="assistant-avatar">P</span>
-        <span class="chat-title"><strong>Payment Queue</strong><small>${pending.length} waiting · Simulator only</small></span>
+        <span class="chat-title"><strong>Payment Queue</strong><small>${pending.length} waiting${simulatorMode ? " · Simulator only" : ""}</small></span>
       </header>
       <section class="chat-body payment-queue-body" id="paymentQueueBody">
         <article class="operation-card payment-setup-card">
           <p class="card-eyebrow">Transaction completion</p>
           <h2>Choose how sales complete</h2>
-          <p>No real payment is requested in simulator mode.</p>
+          <p>${simulatorMode ? "No real payment is requested in simulator mode." : "Electronic payments complete automatically after an authenticated provider event."}</p>
           <div class="card-actions">
             <button data-action="set-completion-mode" data-mode="always_fast_record" class="${settings.completionMode === "always_fast_record" ? "selected" : ""}">Fast Record</button>
             <button data-action="set-completion-mode" data-mode="request_verify" class="${settings.completionMode === "request_verify" ? "selected" : ""}">Request &amp; Verify</button>
@@ -268,16 +260,17 @@ function paymentQueueScreenTemplate() {
 }
 
 function paymentQueueItemTemplate(item) {
+  const simulatorMode = transactionEngine.settings().environment !== "production";
   return `<article class="operation-card payment-queue-item">
     <p class="card-eyebrow">${escapeHtml(transactionDayLabel(item))} · ${escapeHtml(item.saleLabel || "Transaction")}</p>
     <h2>${escapeHtml(item.metadata?.medicine || "Payment")}</h2>
     <p>${Number(item.metadata?.quantity || 0)} item(s) · ${escapeHtml(paymentLabel(item.paymentMethod))} · Waiting</p>
     <p><strong>Expected amount: ${escapeHtml(paymentAmountLabel(item.amount))}</strong></p>
     <p>Serving can continue. Stock changes only after confirmation.</p>
-    <div class="card-actions">
+    ${simulatorMode ? `<div class="card-actions">
       <button data-action="simulate-payment-result" data-transaction-id="${escapeHtml(item.id)}" data-status="confirmed">Simulate paid</button>
       <button data-action="simulate-payment-result" data-transaction-id="${escapeHtml(item.id)}" data-status="failed">Simulate failed</button>
-    </div>
+    </div>` : ""}
   </article>`;
 }
 
@@ -2695,7 +2688,15 @@ function recordCard(card) {
       mode: requestVerify ? "request_verify" : "fast_record",
       adapter: requestVerify ? "simulator" : paymentMethod === "cash" ? "cash" : "manual",
       reference: card.id,
-      metadata: { medicine: card.fields?.medicine || "", quantity: Number(card.fields?.quantity || 0), sellingPrice: Number(card.fields?.selling_price || 0) }
+      metadata: {
+        medicine: card.fields?.medicine || "",
+        quantity: Number(card.fields?.quantity || 0),
+        sellingPrice: Number(card.fields?.selling_price || 0),
+        pharmacyId: state.pharmacy.id,
+        branchId: state.pharmacy.branch,
+        merchantAccountId: requestVerify ? "simulator-pharmacy-merchant" : "manual-record",
+        paymentRequestId: `request-${card.id}`
+      }
     })
     : null;
   if (transactionResult?.transaction?.status === "completed") {
@@ -2726,17 +2727,43 @@ function recordCard(card) {
 }
 
 function resolveSimulatedPayment(transactionId, status) {
-  const result = transactionEngine.providerEvent(transactionId, {
+  return processTransactionProviderEvent(transactionId, {
     key: `owner-simulator-${transactionId}-${status}`,
     status,
-    reason: status === "confirmed" ? "simulated_owner_confirmation" : "simulated_owner_failure"
+    reason: status === "confirmed" ? "simulated_owner_confirmation" : "simulated_owner_failure",
+    source: "simulator"
   });
-  if (result.updated && status === "confirmed") {
+}
+
+function processTransactionProviderEvent(transactionId, event) {
+  const result = transactionEngine.providerEvent(transactionId, event);
+  if (result.updated && event.status === "confirmed") {
     applyConfirmedPendingSale(result.transaction);
     addFeed("system", `${result.transaction.saleLabel}\n✅ ${result.transaction.metadata?.medicine} x${result.transaction.metadata?.quantity} recorded · ${paymentLabel(result.transaction.paymentMethod)}\nStock left: ${result.transaction.metadata?.stockLeft ?? "—"}`);
+    const remaining = transactionEngine.pending();
+    if (remaining.length) addFeed("system", `${result.transaction.saleLabel} completed. ${remaining.length} payment${remaining.length === 1 ? " is" : "s are"} still waiting. You can keep serving.`);
+  } else if (result.updated && ["failed", "cancelled"].includes(event.status)) {
+    addTransactionNotification(result.transaction, event.status);
   }
   state.ui.screen = "payments";
   render();
+  return result;
+}
+
+function addTransactionNotification(transaction, status) {
+  const notification = {
+    id: `payment-${transaction.id}-${status}`,
+    category: "Payment",
+    title: `${transaction.saleLabel || "Payment"} ${status}`,
+    message: `${transaction.metadata?.medicine || "Payment"} was not completed. Stock and paid records were not changed.`,
+    action: "Review payment",
+    status: "unread",
+    createdAt: new Date().toISOString(),
+    aiUsed: false,
+    origin: "transaction"
+  };
+  state.notifications = [notification, ...(state.notifications || []).filter((item) => item.id !== notification.id)];
+  safeLocalStorage()?.setItem(NOTIFICATION_KEY, JSON.stringify(state.notifications));
 }
 
 function applyConfirmedPendingSale(transaction) {

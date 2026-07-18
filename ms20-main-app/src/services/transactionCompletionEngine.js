@@ -14,12 +14,13 @@ export class TransactionCompletionEngine {
     this.adapters = new Map(Object.entries(adapters));
     this.storage = storage;
     this.memory = [];
+    this.memorySettings = {};
     this.now = now;
   }
 
   settings() {
-    const defaults = { completionMode: "always_fast_record", preferredPaymentMethod: "cash", businessDayStartHour: 0 };
-    if (!this.storage) return defaults;
+    const defaults = { completionMode: "always_fast_record", preferredPaymentMethod: "cash", businessDayStartHour: 0, environment: "simulator" };
+    if (!this.storage) return { ...defaults, ...this.memorySettings };
     try {
       return { ...defaults, ...JSON.parse(this.storage.getItem(SETTINGS_KEY) || "{}") };
     } catch {
@@ -30,6 +31,7 @@ export class TransactionCompletionEngine {
   configure(patch = {}) {
     const next = { ...this.settings(), ...patch };
     if (this.storage) this.storage.setItem(SETTINGS_KEY, JSON.stringify(next));
+    else this.memorySettings = next;
     return next;
   }
 
@@ -92,12 +94,19 @@ export class TransactionCompletionEngine {
     return { created: true, duplicate: false, transaction };
   }
 
-  providerEvent(transactionId, { key, status, reason = "" }) {
+  providerEvent(transactionId, event = {}) {
+    const { key, status, reason = "", source = "provider" } = event;
     const transactions = this.list();
     const index = transactions.findIndex((item) => item.id === transactionId);
     if (index < 0) return { updated: false, missing: true };
     const transaction = transactions[index];
+    if (source === "simulator" && this.settings().environment === "production") {
+      return { updated: false, rejected: true, reason: "simulator_disabled_in_production", transaction };
+    }
+    const mismatch = paymentEventMismatch(transaction, event);
+    if (mismatch) return { updated: false, rejected: true, reason: mismatch, transaction };
     if (key && transaction.callbackKeys.includes(key)) return { updated: false, duplicate: true, transaction };
+    if (transaction.status !== "pending") return { updated: false, terminal: true, transaction };
     const updated = {
       ...transaction,
       paymentStatus: status,
@@ -154,6 +163,16 @@ export class TransactionCompletionEngine {
     if (!this.storage) this.memory = [...transactions];
     else this.storage.setItem(STORAGE_KEY, JSON.stringify(transactions));
   }
+}
+
+function paymentEventMismatch(transaction, event) {
+  const checks = [["amount", Number], ["pharmacyId", String], ["branchId", String], ["merchantAccountId", String], ["paymentRequestId", String]];
+  for (const [field, normalize] of checks) {
+    if (event[field] === undefined || event[field] === null || event[field] === "") continue;
+    const expected = field === "amount" ? transaction.amount : transaction.metadata?.[field];
+    if (expected === undefined || expected === null || expected === "" || normalize(event[field]) !== normalize(expected)) return `${field}_mismatch`;
+  }
+  return "";
 }
 
 function transactionStatus(paymentStatus) {

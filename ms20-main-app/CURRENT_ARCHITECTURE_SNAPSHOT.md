@@ -262,3 +262,12 @@ Planned at their proper test stages:
 - Deterministic packaging/unit navigation.
 - Canonical reporting/export proof.
 - Full onboarding, scanner/import, document, completion-state, token-log, offline/reconnect, and representative device coverage already accepted in the live plan.
+
+## Automatic transaction completion boundary
+
+- Simulator and future authenticated provider results enter the same TCE `providerEvent` root.
+- Supplied tenant, branch, merchant, payment-request and amount identity must match before completion.
+- Concurrent requests are isolated; duplicate and late events cannot repeat or rewrite terminal effects.
+- Confirmed stock applies once. Failure/cancellation creates no stock movement or paid receipt and is routed to Notifications.
+- Simulator actions are visible only in simulator mode and rejected by the TCE in production mode.
+- The redundant home SHOW ME tile is removed; header, typed/voice, and result-card catalog routes remain protected.

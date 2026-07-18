@@ -95,6 +95,9 @@ export function mergeNotifications(existing = [], generated = []) {
       completedAt: previous?.completedAt
     });
   }
+  for (const item of existing) {
+    if (!generated.some((generatedItem) => generatedItem.id === item.id) && item.origin === "transaction") merged.push(item);
+  }
   return merged.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }
 

@@ -36,6 +36,26 @@ assert(confirmed.transaction.status === "completed", "Provider confirmation must
 assert(engine.providerEvent("sale-b", { key: "callback-1", status: "confirmed" }).duplicate, "Duplicate callbacks must be ignored");
 assert(engine.pending().length === 0, "Confirmed transactions must leave the pending queue");
 
+simulator.setScenario("delayed_confirmation");
+const identity = { pharmacyId: "pharmacy-a", branchId: "main", merchantAccountId: "till-a", paymentRequestId: "request-d" };
+engine.start({ id: "sale-d", kind: "sale", amount: 25, paymentMethod: "mpesa", mode: "request_verify", adapter: "simulator", metadata: identity });
+engine.start({ id: "sale-e", kind: "sale", amount: 40, paymentMethod: "mpesa", mode: "request_verify", adapter: "simulator", metadata: { ...identity, paymentRequestId: "request-e" } });
+assert(engine.pending().length === 2, "Concurrent electronic requests must wait independently");
+const secondFirst = engine.providerEvent("sale-e", { key: "provider-e", status: "confirmed", amount: 40, ...identity, paymentRequestId: "request-e" });
+assert(secondFirst.updated && engine.pending().length === 1 && engine.pending()[0].id === "sale-d", "A second payment may complete first without changing the first request");
+const wrongAmount = engine.providerEvent("sale-d", { key: "wrong-amount", status: "confirmed", amount: 26, ...identity });
+assert(wrongAmount.rejected && wrongAmount.reason === "amount_mismatch" && engine.pending().length === 1, "Mismatched amounts must be rejected without completion");
+const wrongTenant = engine.providerEvent("sale-d", { key: "wrong-tenant", status: "confirmed", amount: 25, ...identity, pharmacyId: "pharmacy-b" });
+assert(wrongTenant.rejected && wrongTenant.reason === "pharmacyId_mismatch", "Cross-tenant events must be rejected");
+const failed = engine.providerEvent("sale-d", { key: "provider-d-failed", status: "failed", amount: 25, ...identity });
+assert(failed.updated && failed.transaction.status === "failed", "Authenticated failure must close only its own request");
+assert(engine.providerEvent("sale-d", { key: "late-success", status: "confirmed", amount: 25, ...identity }).terminal, "Late out-of-order events must not rewrite terminal truth");
+
+const productionEngine = new TransactionCompletionEngine({ storage: null, adapters: { simulator: new SimulatorPaymentAdapter({ scenario: "delayed_confirmation" }) } });
+productionEngine.configure({ environment: "production" });
+productionEngine.start({ id: "production-sale", kind: "sale", amount: 10, paymentMethod: "mpesa", mode: "request_verify", adapter: "simulator" });
+assert(productionEngine.providerEvent("production-sale", { key: "manual", status: "confirmed", source: "simulator" }).rejected, "Simulator controls must be rejected in production");
+
 const undo = engine.undoSale(1);
 assert(undo.transaction.reversalOf === "sale-a" && undo.transaction.amount === -120, "Undo must create a reconciliable reversal linked to the original sale");
 assert(engine.undoSale(1).duplicate, "Undo must not create duplicate reversals");
@@ -50,4 +70,4 @@ for (const scenario of ["success", "timeout", "cancellation", "wrong_pin", "insu
   assert(result.status && result.reason, `Simulator scenario ${scenario} must produce a production-shaped result`);
 }
 
-console.log("Transaction Completion Engine verification passed: adapter isolation, Fast Record, Request & Verify queue, simulator outcomes, daily sale numbering, idempotency, duplicate callbacks, and undo/reversal linkage.");
+console.log("Transaction Completion Engine verification passed: automatic provider events, tenant/amount isolation, concurrent out-of-order completion, terminal truth, simulator separation, daily numbering, idempotency, and reversal linkage.");
