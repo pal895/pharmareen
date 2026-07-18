@@ -18,10 +18,19 @@ def scan_stock_fix_evidence_locally(image_bytes: bytes) -> dict[str, Any]:
         gray = ImageOps.grayscale(image)
         enhanced = ImageEnhance.Sharpness(ImageOps.autocontrast(gray)).enhance(1.8)
         binary = enhanced.point(lambda value: 255 if value >= 155 else 0)
+        width, height = enhanced.size
+        package_region = enhanced.crop((
+            int(width * 0.12),
+            int(height * 0.22),
+            int(width * 0.88),
+            int(height * 0.98),
+        ))
         readings = [
             pytesseract.image_to_string(enhanced, config="--psm 6"),
             pytesseract.image_to_string(enhanced, config="--psm 11"),
             pytesseract.image_to_string(binary, config="--psm 11"),
+            pytesseract.image_to_string(package_region, config="--psm 6"),
+            pytesseract.image_to_string(package_region, config="--psm 11"),
         ]
 
     visible_text = merge_ocr_readings(readings)

@@ -42,4 +42,17 @@ const cameraDraft = hydrateStockFixDraft({ correct_stock: "", reason: "" }, came
 assert.equal(cameraDraft.batch, "MET-400C");
 assert.equal(cameraDraft.expiry, "2029-03");
 assert.equal(cameraDraft.correct_stock, "", "camera evidence must never invent corrected stock");
+
+const nameMissed = normalizeStockFixEvidence({
+  visible_text: "400 mg TABLETS 20 tablets Batch MET-400C EXP 2029-03",
+  strength: "400 mg", form: "tablet", unit: "tablet", batch: "MET-400C", expiry: "2029-03", confidence: 0.88
+}, [{ id: "metro", name: "Metronidazole", stockLeft: 34, batch: "MET-400C", strength: "400 mg", expiry: "2029-03" }], "camera");
+assert.equal(nameMissed.canonicalName, "Metronidazole", "a unique saved batch must recover a missed printed name safely");
+assert.equal(nameMissed.currentStock, 34);
+assert.equal(nameMissed.matchBasis, "unique_catalog_batch");
+const duplicateBatch = normalizeStockFixEvidence({ visible_text: "Batch SHARED-1", batch: "SHARED-1" }, [
+  { name: "Medicine A", stockLeft: 2, batch: "SHARED-1" },
+  { name: "Medicine B", stockLeft: 3, batch: "SHARED-1" }
+], "camera");
+assert.equal(duplicateBatch.canonicalName, "", "a non-unique package identifier must never choose a medicine");
 console.log("Stock Fix shared evidence checks passed.");
