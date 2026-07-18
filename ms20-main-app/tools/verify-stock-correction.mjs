@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { applyStockCorrectionVoice, PharmacyPronunciationMemory, reviewStockCorrection, stockCorrectionGuidance, stockCorrectionSummary, trustedCatalogStock } from "../src/services/stockCorrectionPolicy.js";
+import { executeStockCorrection, replayPendingStockCorrections } from "../src/services/stockCorrectionExecution.js";
+import { OfflineQueue } from "../src/services/offlineQueue.js";
+import { SyncAdapter } from "../src/services/syncAdapter.js";
 
 const catalog = [{ name: "Losartan", stock: 37, aliases: ["Losartan 50"] }];
 assert.equal(trustedCatalogStock({ name: "Cefixime", stockLeft: 23 }), 23);
@@ -19,11 +22,11 @@ assert.deepEqual(approved.fields, {
   correct_stock: 36,
   reason: "Physical count",
   adjustment: -1,
-  mutation_status: "queued_not_applied"
+  mutation_status: "ready"
 });
 
 assert.equal(stockCorrectionGuidance(approved.fields, catalog).ready, true);
-assert.equal(stockCorrectionGuidance(approved.fields, catalog).message, "Ready. Check the details, then tap Confirm. Saved stock will not change yet.");
+assert.equal(stockCorrectionGuidance(approved.fields, catalog).message, "Ready. Check the details, then tap Confirm. If you are online, saved stock updates now.");
 assert.match(stockCorrectionSummary(approved.fields), /Medicine: Losartan\. Current stock: 37\. Correct stock: 36\. Reason: Physical count\./);
 
 let voice = applyStockCorrectionVoice({ medicine: "", current_stock: "", correct_stock: "", reason: "", active_slide: 0 }, "Losartan", catalog);
@@ -57,4 +60,74 @@ for (const activeSlide of [0, 1, 2, 0]) acrossSlides.active_slide = activeSlide;
 delete acrossSlides.active_slide;
 assert.deepEqual(acrossSlides, draft);
 
-console.log("Stock correction workflow verification passed: authoritative cross-slide draft, live readiness, canonical validation, concise Read summary, guided voice update/confirm/cancel, safe ambiguity, tenant-isolated pronunciation memory, and queued-not-applied metadata.");
+class MemoryStorage {
+  constructor() { this.values = new Map(); }
+  getItem(key) { return this.values.get(key) ?? null; }
+  setItem(key, value) { this.values.set(key, String(value)); }
+}
+
+const executionStorage = new MemoryStorage();
+const executionQueue = new OfflineQueue(null);
+let savedCatalog = [{ name: "Losartan", stockLeft: 37 }];
+let persistenceCalls = 0;
+const action = { id: "stock-fix-online-1", type: "StockCorrectionCard", fields: approved.fields };
+const execute = (overrides = {}) => executeStockCorrection({
+  action,
+  catalog: savedCatalog,
+  online: true,
+  queue: executionQueue,
+  storage: executionStorage,
+  persistCatalog: (items) => { persistenceCalls += 1; savedCatalog = items; return true; },
+  replaceCatalog: (items) => { savedCatalog = items; },
+  ...overrides
+});
+assert.equal(execute().status, "completed");
+assert.equal(savedCatalog[0].stockLeft, 36);
+assert.equal(executionQueue.pendingCount(), 0);
+assert.equal(execute().duplicate, true);
+assert.equal(persistenceCalls, 1);
+
+const offlineStorage = new MemoryStorage();
+const offlineQueue = new OfflineQueue(null);
+let offlineCatalog = [{ name: "Cefixime", stockLeft: 23 }];
+const offlineAction = {
+  id: "stock-fix-offline-1",
+  type: "StockCorrectionCard",
+  fields: reviewStockCorrection({ medicine: "Cefixime", current_stock: 23, correct_stock: 22, reason: "Count" }, offlineCatalog).fields
+};
+const offlineResult = executeStockCorrection({
+  action: offlineAction,
+  catalog: offlineCatalog,
+  online: false,
+  queue: offlineQueue,
+  storage: offlineStorage,
+  persistCatalog: () => { throw new Error("must not write while offline"); },
+  replaceCatalog: () => { throw new Error("must not mutate while offline"); }
+});
+assert.equal(offlineResult.status, "pending");
+assert.equal(offlineCatalog[0].stockLeft, 23);
+assert.equal(offlineQueue.pendingCount(), 1);
+assert.equal(executeStockCorrection({ ...offlineResult, action: offlineAction, catalog: offlineCatalog, online: false, queue: offlineQueue, storage: offlineStorage }).duplicate, true);
+
+let replayWrites = 0;
+const replay = replayPendingStockCorrections({
+  getCatalog: () => offlineCatalog,
+  online: true,
+  queue: offlineQueue,
+  storage: offlineStorage,
+  persistCatalog: (items) => { replayWrites += 1; offlineCatalog = items; return true; },
+  replaceCatalog: (items) => { offlineCatalog = items; }
+});
+assert.equal(replay[0].status, "completed");
+assert.equal(offlineCatalog[0].stockLeft, 22);
+assert.equal(offlineQueue.pendingCount(), 0);
+assert.equal(replayWrites, 1);
+assert.equal(replayPendingStockCorrections({ getCatalog: () => offlineCatalog, online: true, queue: offlineQueue, storage: offlineStorage }).length, 0);
+
+const protectedQueue = new OfflineQueue(null);
+protectedQueue.add({ id: "stock-fix-protected", type: "StockCorrectionCard", fields: offlineAction.fields });
+const genericSync = new SyncAdapter({ queue: protectedQueue, cloudGateway: { saveAction: async () => ({ saved: true }) } });
+await genericSync.syncPending({ excludeTypes: ["StockCorrectionCard"] });
+assert.equal(protectedQueue.pendingCount(), 1);
+
+console.log("Stock correction workflow verification passed: shared validation and entry, immediate online apply, offline single-queue fallback, automatic idempotent replay, and duplicate-confirm protection.");

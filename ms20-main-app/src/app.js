@@ -47,6 +47,7 @@ import { medicineReviewBlocker } from "./services/medicineReviewReadiness.js";
 import { CashPaymentAdapter, ManualPaymentAdapter, SimulatorPaymentAdapter } from "./services/paymentAdapters.js";
 import { TransactionCompletionEngine } from "./services/transactionCompletionEngine.js";
 import { applyStockCorrectionVoice, PharmacyPronunciationMemory, reviewStockCorrection, stockCorrectionGuidance, trustedCatalogStock } from "./services/stockCorrectionPolicy.js";
+import { executeStockCorrection, replayPendingStockCorrections } from "./services/stockCorrectionExecution.js";
 import { readXlsxInventory } from "./services/excelInventory.js";
 import { listRouteSlots, resolveOfflineSlot } from "./routes/routeRegistry.js";
 import {
@@ -2596,7 +2597,8 @@ function confirmCard(cardId) {
       return;
     }
     card.fields = review.fields;
-    card.validation = "Validated against saved stock. This correction will be queued and will not change stock directly.";
+    completeStockCorrection(card);
+    return;
   }
   if (card.type === "CatalogOnboardingCard") {
     removeCard(cardId);
@@ -3017,6 +3019,67 @@ function recordCard(card) {
     : savedReplyFor(card));
 }
 
+function completeStockCorrection(card) {
+  const backend = backendAdapters.prepareBackendAction(card, state.liveBackend);
+  const action = {
+    id: `action-${card.id}`,
+    type: card.type,
+    fields: { ...card.fields },
+    backend,
+    localFirst: true,
+    aiUsed: false
+  };
+  const result = executeStockCorrection({
+    action,
+    catalog: pharmacyBrain.catalog,
+    online: navigator.onLine !== false,
+    queue,
+    storage: safeLocalStorage(),
+    persistCatalog: persistCorrectedCatalog,
+    replaceCatalog: replaceCorrectedCatalog
+  });
+  removeCard(card.id);
+  if (result.status === "completed") {
+    void cloudGateway.saveAction(result.action);
+    addFeed("system", result.duplicate ? "Stock was already updated." : `Stock updated.\n${card.fields.medicine}: ${card.fields.current_stock} → ${card.fields.correct_stock}.`);
+  } else if (result.status === "pending") {
+    addFeed("system", `No internet. Stock fix saved and will update automatically when connection returns.\n${card.fields.medicine}: ${card.fields.current_stock} → ${card.fields.correct_stock}.`);
+  } else {
+    addFeed("system", result.message || "Stock could not be updated. Please review and try again.");
+  }
+  refreshNotifications();
+  render();
+}
+
+function persistCorrectedCatalog(items) {
+  const storage = safeLocalStorage();
+  if (!storage) return false;
+  storage.setItem(CATALOG_KEY, JSON.stringify(items));
+  return true;
+}
+
+function replaceCorrectedCatalog(items) {
+  pharmacyBrain.loadCatalog(items);
+  state.catalog.items = pharmacyBrain.catalog;
+  void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);
+}
+
+function syncPendingStockCorrections() {
+  if (navigator.onLine === false) return;
+  const results = replayPendingStockCorrections({
+    getCatalog: () => pharmacyBrain.catalog,
+    online: true,
+    queue,
+    storage: safeLocalStorage(),
+    persistCatalog: persistCorrectedCatalog,
+    replaceCatalog: replaceCorrectedCatalog
+  });
+  for (const result of results.filter((item) => item.status === "completed" && !item.duplicate)) {
+    void cloudGateway.saveAction(result.action);
+    addFeed("system", `Stock updated.\n${result.action.fields.medicine}: ${result.action.fields.current_stock} → ${result.action.fields.correct_stock}.`);
+  }
+}
+
 function resolveSimulatedPayment(transactionId, status) {
   return processTransactionProviderEvent(transactionId, {
     key: `owner-simulator-${transactionId}-${status}`,
@@ -3215,7 +3278,8 @@ function bumpQuantity(cardId, amount) {
 }
 
 async function syncNow() {
-  const result = await syncAdapter.syncPending();
+  syncPendingStockCorrections();
+  const result = await syncAdapter.syncPending({ excludeTypes: ["StockCorrectionCard"] });
   state.sync.lastSync = result.lastSync || "Not synced";
   addFeed("system", `Synced ${result.synced.length} saved item(s).`);
   render();
@@ -3360,7 +3424,7 @@ function savedReplyFor(card) {
     const payment = paymentLabel(String(card.fields?.payment || "cash").toLowerCase());
     return `${medicine} added.\nSale recorded.\n${medicine} x${quantity}\nPayment: ${payment}`;
   }
-  if (card.type === "StockCorrectionCard") return `Stock fix waiting to sync\n${card.fields?.medicine}: ${card.fields?.current_stock} → ${card.fields?.correct_stock}\nReason: ${card.fields?.reason}\nSaved stock is still ${card.fields?.current_stock}.`;
+  if (card.type === "StockCorrectionCard") return `Stock updated.\n${card.fields?.medicine}: ${card.fields?.current_stock} → ${card.fields?.correct_stock}.`;
   if (card.type === "RestockCard") {
     const medicine = card.fields?.medicine || "Medicine";
     const quantity = card.fields?.quantity || "0";
@@ -3615,12 +3679,13 @@ function hideReplitBadge() {
   });
 }
 
-window.addEventListener("online", render);
+window.addEventListener("online", () => { syncPendingStockCorrections(); render(); });
 window.addEventListener("offline", render);
 
 void sourceBrain.lookupMedicine("demo");
 void aiFallback.enabled;
 
+syncPendingStockCorrections();
 render();
 window.setInterval(hideReplitBadge, 1500);
 if (shouldAutoProbeBackend()) {

@@ -24,7 +24,9 @@ for (const required of [
   'state.pendingScanType = "stock_fix_photo"',
   'localOnly: true',
   'handleStockFixVoice(stockFixCard, text)',
-  'Stock fix waiting to sync'
+  'completeStockCorrection(card);',
+  'syncPendingStockCorrections();',
+  'Stock updated.'
 ]) assert.ok(app.includes(required), `Missing Stock fix UI protection: ${required}`);
 
 assert.match(css, /@media \(hover: hover\) and \(pointer: fine\)[\s\S]*button:hover/);
@@ -37,4 +39,4 @@ assert.equal(queue.add(action).added, true);
 assert.equal(queue.add(action).duplicate, true);
 assert.equal(queue.pendingCount(), 1);
 
-console.log("Stock correction UI verification passed: live draft/control synchronization, one active slide, Read controls, shared photo/voice entry, queue truth, and duplicate-submit protection.");
+console.log("Stock correction UI verification passed: live draft/control synchronization, one active slide, Read controls, shared entry, online completion, automatic reconnect, and duplicate-submit protection.");

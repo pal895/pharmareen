@@ -10,8 +10,9 @@ export class SyncAdapter {
     return this.queue.add(action);
   }
 
-  async syncPending() {
-    const pending = this.queue.list().filter((item) => item.status === "pending");
+  async syncPending({ excludeTypes = [] } = {}) {
+    const excluded = new Set(excludeTypes);
+    const pending = this.queue.list().filter((item) => item.status === "pending" && !excluded.has(item.type));
     const synced = [];
     for (const action of pending) {
       await this.cloudGateway.saveAction(action);

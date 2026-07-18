@@ -34,14 +34,14 @@ export function reviewStockCorrection(fields = {}, catalog = []) {
       correct_stock: correctStock,
       reason,
       adjustment: correctStock - savedStock,
-      mutation_status: "queued_not_applied"
+      mutation_status: "ready"
     }
   };
 }
 
 export function stockCorrectionGuidance(fields = {}, catalog = []) {
   const review = reviewStockCorrection(fields, catalog);
-  if (review.ok) return { ready: true, message: "Ready. Check the details, then tap Confirm. Saved stock will not change yet." };
+  if (review.ok) return { ready: true, message: "Ready. Check the details, then tap Confirm. If you are online, saved stock updates now." };
   return { ready: false, message: review.message };
 }
 

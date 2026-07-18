@@ -2,7 +2,9 @@
 
 ## Shared architecture
 
-Typed/manual, Pharmacy Catalog, picture-assisted and microphone-guided Stock Fix entry all create or hydrate one `StockCorrectionCard`. Every source converges before validation on the same fields: canonical medicine, trusted current stock, requested corrected stock and audit reason. The shared policy owns catalog matching, whole non-negative stock validation, stale-current rejection, no-op rejection, signed adjustment and `queued_not_applied` truth. The safe offline action queue is authoritative at this stage; Stock Fix does not directly mutate Pharmacy Catalog stock.
+Typed/manual, Pharmacy Catalog, picture-assisted and microphone-guided Stock Fix entry all create or hydrate one `StockCorrectionCard`. Every source converges before validation on the same fields: canonical medicine, trusted current stock, requested corrected stock and audit reason. One shared execution policy owns catalog matching, whole non-negative stock validation, stale-current rejection, no-op rejection, signed adjustment, immediate online application and the automatic offline fallback.
+
+Online Confirm updates the durable local Pharmacy Catalog immediately, writes one audit completion and creates no pending duplicate. When the device is offline or durable local storage is unavailable, the same idempotent action is retained once in the offline queue; startup or the browser `online` event retries it automatically and applies it once. Ordinary Stock Fix never requires a separate Sync tap.
 
 ## Live failure and root cause — 2026-07-18
 
@@ -26,8 +28,16 @@ The second manual live attempt exposed two additional shared-root facts. First, 
 
 `npm run verify:stock-fix` protects visible-draft/control synchronization, cross-slide persistence, active-tab truth, canonical validation, stale/current/no-op safeguards, concise Read behavior, photo/voice convergence, spoken Confirm/Cancel and change-field commands, safe ambiguity, pharmacy-isolated pronunciation memory, duplicate queue idempotency and queued-not-applied result truth.
 
+It now also protects immediate online saved-stock application, no online pending duplicate, one offline fallback, duplicate-Confirm safety and idempotent automatic replay. Online result copy says `Stock updated`; offline copy plainly says the saved fix will update automatically.
+
 ## Live discipline
 
 Keep the original manual checkpoint open until new screenshots pass. Resume one test at a time: first manual with a different saved medicine, then picture-assisted with another medicine, then voice-guided with a harder name. Do not combine them and do not repeat Losartan unless regression evidence specifically requires it.
 
 Latest live evidence passes the segmented Read behavior: speech follows the three visible sections and pause/resume works as requested. It also shows the repaired ready state with an active Confirm button. No screenshot yet proves the queued result, so manual Stock Fix remains open only at Confirm. Do not repeat Read. Resume with the existing Cefixime 23 to 22 draft, tap Confirm once, and verify the simple waiting-to-sync result while saved stock stays 23.
+
+## Corrected online checkpoint — 2026-07-18
+
+The Cefixime 23 to 22 screenshot proves only that the former queue-first mechanism accepted the draft, left it pending and retained saved stock 23. It is product friction under the corrected owner intent, not a completed online Stock Fix. The shared execution repair supersedes the queue-first acceptance wording above.
+
+Next live test: after pull/restart, note Losartan's saved stock, open Stock Fix and enter a different correct whole-number quantity with a short reason, then Confirm once. Pass only if the result says `Stock updated` and Pharmacy Catalog immediately shows the corrected saved quantity. Do not test Read again or begin picture assistance yet.
