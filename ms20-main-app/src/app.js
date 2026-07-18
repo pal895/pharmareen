@@ -2428,12 +2428,23 @@ async function generateReport(card) {
   persistActiveCards();
   render();
   try {
-    const response = await fetch("/reports/daily?send_whatsapp=false", { method: "POST" });
+    const response = await fetch(`/reports/daily?send_whatsapp=false&refresh=${Date.now()}`, {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" }
+    });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.detail || "The report could not be generated right now.");
-    card.fields = { period: "Today", focus: "Sales, stock, cash, M-Pesa, credit", report_date: result.date || "Today", report_text: result.report || "No report details were returned." };
+    const generatedAt = result.generated_at ? new Date(result.generated_at) : new Date();
+    card.fields = {
+      period: "Today",
+      focus: "Sales, stock, cash, M-Pesa, credit",
+      report_date: result.date || "Today",
+      generated_at: Number.isNaN(generatedAt.getTime()) ? "Just now" : generatedAt.toLocaleString("en-KE", { timeZone: "Africa/Nairobi" }),
+      report_text: result.report || "No report details were returned."
+    };
     card.title = "Today's report";
-    card.validation = "Generated from saved pharmacy records. Nothing was sent to WhatsApp.";
+    card.validation = "Fresh report generated from saved sales, activity and stock records. Nothing was sent to WhatsApp or saved as a duplicate report.";
   } catch (error) {
     card.validation = error?.message || "The report could not be generated right now.";
   } finally {

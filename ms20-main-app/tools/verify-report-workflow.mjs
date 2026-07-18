@@ -8,8 +8,9 @@ const [app, cards] = await Promise.all([
 
 for (const required of [
   'function generateReport(card)',
-  'fetch("/reports/daily?send_whatsapp=false", { method: "POST" })',
-  'Nothing was sent to WhatsApp.',
+  'cache: "no-store"',
+  'generated_at',
+  'Nothing was sent to WhatsApp or saved as a duplicate report.',
   'report_text',
   'Generate report',
   'Refresh report',
@@ -18,7 +19,7 @@ for (const required of [
 
 assert.ok(!/fields:\s*\{[\s\S]{0,180}backend_route:/.test(app), "Owner report cards must not expose an internal backend route");
 assert.ok(!/card\.type === "ReportCard"[\s\S]{0,500}export-catalog-csv/.test(app), "Report actions must not mislabel catalog CSV as a report download");
-assert.ok(cards.includes('ReportCard: ["period", "focus", "report_date", "report_text"]'), "Report card schema must render the returned date and report text");
+assert.ok(cards.includes('ReportCard: ["period", "focus", "report_date", "generated_at", "report_text"]'), "Report card schema must render report freshness, date and text");
 assert.ok(!cards.includes('ReportCard: ["period", "focus", "backend_route"]'), "Report card schema must not retain the technical route field");
 assert.ok(app.includes('if (card.type === "ReportCard") return card.validation'), "Report guidance must reflect generation success or failure");
 

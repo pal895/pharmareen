@@ -115,7 +115,10 @@ def test_render_report_contains_demo_summary():
     report = render_report(metrics, deterministic_recommendations(metrics), report_time="18:30")
 
     assert report.startswith("📊 MS2.0 Daily Report\nDate: 2026-04-27")
-    assert "Sales: KES 50" in report
+    assert "Total Sales: KES 50" in report
+    assert report.count("Total Sales:") == 1
+    assert "Generated: 18:30 Africa/Nairobi" in report
+    assert "Source: saved sales ledger, activity log, and current stock records" in report
     assert "Cost: KES 0" in report
     assert "Gross Profit: KES 0" in report
     assert "Transactions: 1" in report

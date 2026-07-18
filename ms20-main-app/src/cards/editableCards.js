@@ -6,7 +6,7 @@ export function cardFieldsFor(type) {
     ...MEDICINE_CARD_FIELD_KEYS,
     OnboardingCard: ["pharmacy", "owner", "branch", "location", "payments"],
     StockCorrectionCard: ["medicine", "current_stock", "correct_stock", "reason"],
-    ReportCard: ["period", "focus", "report_date", "report_text"],
+    ReportCard: ["period", "focus", "report_date", "generated_at", "report_text"],
     VoiceReviewCard: ["transcript", "medicine", "quantity", "payment"],
     CatalogOnboardingCard: ["question", "choices"],
     CatalogImportCard: ["method", "items_text", "notes"],

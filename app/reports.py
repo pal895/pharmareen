@@ -118,10 +118,15 @@ class ReportService:
         self.timezone = timezone
         self.sale_ledger = sale_ledger
 
+    def generate_daily_preview(self, report_date: date | str) -> str:
+        """Recompute an owner preview without sending or appending report history."""
+        return self.generate_daily_report(report_date, send_whatsapp=False, persist_report=False)
+
     def generate_daily_report(
         self,
         report_date: date | str,
         send_whatsapp: bool = True,
+        persist_report: bool = True,
     ) -> str:
         date_text = report_date.isoformat() if isinstance(report_date, date) else report_date
         logs = self.store.read_daily_logs(date_text)
@@ -146,8 +151,9 @@ class ReportService:
             report_time=now_in_timezone(self.timezone).strftime("%H:%M"),
         )
 
-        self.store.append_daily_report(
-            {
+        if persist_report:
+            self.store.append_daily_report(
+                {
                 "Date": date_text,
                 "Total Sales": metrics.total_sales,
                 "Total Cost": metrics.total_cost,
@@ -161,8 +167,8 @@ class ReportService:
                 "Low Stock Warnings": summarize_low_stock(metrics.low_stock_warnings),
                 "AI Recommendation Summary": " | ".join(recommendations),
                 "Full Report Text": report_text,
-            }
-        )
+                }
+            )
 
         if send_whatsapp and self.whatsapp is not None:
             self.whatsapp.send_message(report_text)
@@ -374,8 +380,7 @@ def render_daily_summary(
         f"📊 {pharmacy_name} Daily Report",
         f"Date: {metrics.report_date}",
         "",
-        f"Sales: {format_ksh(metrics.total_sales).replace('Ksh', 'KES')}",
-        f"Total sales: {format_ksh(metrics.total_sales)}",
+        f"Total Sales: {format_ksh(metrics.total_sales).replace('Ksh', 'KES')}",
         f"Payment totals: {format_payment_totals(metrics.payment_totals)}",
         f"Cost: {format_ksh(metrics.total_cost).replace('Ksh', 'KES')}",
         f"Gross Profit: {format_ksh(metrics.gross_profit).replace('Ksh', 'KES')}",
@@ -388,6 +393,8 @@ def render_daily_summary(
         f"Peak Sales Count: {metrics.peak_sales_count}",
         f"Peak Items Sold: {metrics.peak_items_sold}",
         f"Low Stock Items: {compact_low_stock(metrics.low_stock_warnings)}",
+        f"Generated: {report_time} Africa/Nairobi",
+        "Source: saved sales ledger, activity log, and current stock records",
     ]
     if metrics.missed_sales:
         lines.append(f"Missed sales today: {summarize_pairs(metrics.missed_sales)}")

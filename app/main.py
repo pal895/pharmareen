@@ -3246,10 +3246,14 @@ def generate_daily_report(
 
     target_date = report_date or now_in_timezone(settings.timezone).date()
     try:
-        report_text = get_report_service().generate_daily_report(
-            target_date,
-            send_whatsapp=send_whatsapp,
-        )
+        generated_at = now_in_timezone(settings.timezone)
+        report_service = get_report_service()
+        if send_whatsapp:
+            report_text = report_service.generate_daily_report(target_date, send_whatsapp=True)
+        elif hasattr(report_service, "generate_daily_preview"):
+            report_text = report_service.generate_daily_preview(target_date)
+        else:
+            report_text = report_service.generate_daily_report(target_date, send_whatsapp=False)
     except SheetsUnavailableError:
         raise HTTPException(status_code=503, detail=SHEETS_UNAVAILABLE_MESSAGE) from None
     except Exception:
@@ -3261,6 +3265,8 @@ def generate_daily_report(
     return {
         "date": target_date.isoformat(),
         "sent_whatsapp": send_whatsapp,
+        "generated_at": generated_at.isoformat(),
+        "source": "saved_sales_activity_and_stock_records",
         "report": report_text,
     }
 

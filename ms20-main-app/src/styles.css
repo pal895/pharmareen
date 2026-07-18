@@ -808,9 +808,16 @@ input:disabled {
 
 .report-result pre {
   margin-top: 8px;
+  max-height: none;
+  padding: 0;
+  overflow: visible;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font: inherit;
+  line-height: 1.45;
 }
 
 .catalog-edit-grid label span {
