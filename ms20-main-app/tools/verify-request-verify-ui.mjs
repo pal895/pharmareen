@@ -16,7 +16,11 @@ assert(source.includes("applyConfirmedPendingSale(result.transaction)"), "Only c
 assert(source.includes("transaction.metadata?.stockApplied"), "Deferred stock application must be idempotent");
 assert(source.includes("You can keep serving"), "Pending copy must explicitly preserve non-blocking service");
 assert(source.includes("transactionDayLabel(item)"), "Queue history must distinguish daily sale-number resets");
+assert(source.includes("Expected amount: ${escapeHtml(paymentAmountLabel(item.amount))}"), "Waiting payments must show the amount the owner is verifying");
+assert(source.includes("paymentHistoryLineTemplate"), "Completed history must use the financially complete transaction summary");
+assert(source.includes("${escapeHtml(medicine)} x${quantity}"), "History must identify the medicine and quantity");
+assert(source.includes('return `KES ${value.toLocaleString("en-KE"'), "Payment amounts must use an explicit Kenyan currency label");
 assert(styles.includes(".payment-queue-body") && styles.includes(".operation-card"), "Payment Queue must have responsive card styling");
 assert(styles.includes(".payment-setup-card .card-actions button.selected"), "Only the selected completion mode may use the filled active style");
 
-console.log("Request & Verify UI verification passed: owner mode selection, simulator-only routing, non-blocking queue, confirmation-gated idempotent stock mutation, and mobile card layout.");
+console.log("Request & Verify UI verification passed: owner mode selection, explicit verification amounts, complete history, simulator-only routing, non-blocking queue, confirmation-gated idempotent stock mutation, and mobile card layout.");

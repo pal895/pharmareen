@@ -262,7 +262,7 @@ function paymentQueueScreenTemplate() {
           </div>
         </article>
         ${pending.length ? pending.map(paymentQueueItemTemplate).join("") : '<article class="operation-card"><h2>No payments waiting</h2><p>New pending requests will appear here without blocking the next sale.</p></article>'}
-        ${recent.length ? `<article class="operation-card"><p class="card-eyebrow">Recent by pharmacy day</p>${recent.map((item) => `<p><strong>${escapeHtml(transactionDayLabel(item))} · ${escapeHtml(item.saleLabel || item.kind)}</strong> · ${escapeHtml(paymentLabel(item.paymentMethod))} · ${escapeHtml(item.status)}</p>`).join("")}</article>` : ""}
+        ${recent.length ? `<article class="operation-card"><p class="card-eyebrow">Recent by pharmacy day</p>${recent.map(paymentHistoryLineTemplate).join("")}</article>` : ""}
       </section>
     </section>`;
 }
@@ -272,12 +272,25 @@ function paymentQueueItemTemplate(item) {
     <p class="card-eyebrow">${escapeHtml(transactionDayLabel(item))} · ${escapeHtml(item.saleLabel || "Transaction")}</p>
     <h2>${escapeHtml(item.metadata?.medicine || "Payment")}</h2>
     <p>${Number(item.metadata?.quantity || 0)} item(s) · ${escapeHtml(paymentLabel(item.paymentMethod))} · Waiting</p>
+    <p><strong>Expected amount: ${escapeHtml(paymentAmountLabel(item.amount))}</strong></p>
     <p>Serving can continue. Stock changes only after confirmation.</p>
     <div class="card-actions">
       <button data-action="simulate-payment-result" data-transaction-id="${escapeHtml(item.id)}" data-status="confirmed">Simulate paid</button>
       <button data-action="simulate-payment-result" data-transaction-id="${escapeHtml(item.id)}" data-status="failed">Simulate failed</button>
     </div>
   </article>`;
+}
+
+function paymentHistoryLineTemplate(item) {
+  const medicine = item.metadata?.medicine || "Payment";
+  const quantity = Number(item.metadata?.quantity || 0);
+  return `<p><strong>${escapeHtml(transactionDayLabel(item))} · ${escapeHtml(item.saleLabel || item.kind)}</strong> · ${escapeHtml(medicine)} x${quantity} · ${escapeHtml(paymentAmountLabel(item.amount))} · ${escapeHtml(paymentLabel(item.paymentMethod))} · ${escapeHtml(item.status)}</p>`;
+}
+
+function paymentAmountLabel(amount) {
+  const value = Number(amount);
+  if (!Number.isFinite(value) || value < 0) return "Amount unavailable";
+  return `KES ${value.toLocaleString("en-KE", { maximumFractionDigits: 2 })}`;
 }
 
 function transactionDayLabel(item) {
