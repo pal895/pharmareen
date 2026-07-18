@@ -55,4 +55,24 @@ const duplicateBatch = normalizeStockFixEvidence({ visible_text: "Batch SHARED-1
   { name: "Medicine B", stockLeft: 3, batch: "SHARED-1" }
 ], "camera");
 assert.equal(duplicateBatch.canonicalName, "", "a non-unique package identifier must never choose a medicine");
+
+const fileFixture = JSON.parse(readFileSync(new URL("../fixtures/stock-fix-ibuprofen-200mg-file.json", import.meta.url), "utf8"));
+const fileImage = readFileSync(new URL(`../fixtures/${fileFixture.fileName}`, import.meta.url));
+assert.equal(createHash("sha256").update(fileImage).digest("hex"), fileFixture.sha256, "File fixture hash must remain exact");
+const fileCatalog = [{
+  id: "ibuprofen", name: "Ibuprofen", stockLeft: 28, strength: "200 mg", form: "tablet", unit: "tablet", batch: "IBU-200C", expiry: "2028-12"
+}];
+const fileResult = normalizeStockFixEvidence({
+  visible_text: "IBUPROFEN 200 mg TABLETS 24 tablets Batch IBU-200C EXP 2028-12",
+  strength: "200 mg", form: "tablet", unit: "tablet", batch: "IBU-200C", expiry: "2028-12", confidence: 0.94
+}, fileCatalog, "file");
+assert.equal(fileResult.canonicalName, "Ibuprofen");
+assert.equal(fileResult.currentStock, 28, "File evidence must read stock only from the saved catalog");
+assert.equal(fileResult.evidenceSource, "file");
+assert.deepEqual(fileResult.fieldsStillRequired, ["correct_stock"]);
+const fileDraft = hydrateStockFixDraft({ correct_stock: "", reason: "" }, fileResult);
+assert.equal(fileDraft.batch, "IBU-200C");
+assert.equal(fileDraft.expiry, "2028-12");
+assert.equal(fileDraft.correct_stock, "");
+assert.equal(fileDraft.reason, "");
 console.log("Stock Fix shared evidence checks passed.");

@@ -1,0 +1,24 @@
+{
+  "fixtureId": "stock-fix-ibuprofen-200mg-file",
+  "fileName": "stock-fix-ibuprofen-200mg-file.png",
+  "sha256": "0465e06d5302043e9c354d4fe932247da33cfc2ab992670769b2e2dbb8746dab",
+  "workflow": "stock_fix_file",
+  "catalogBaseline": {
+    "name": "Ibuprofen",
+    "stock": 28
+  },
+  "visiblePackageEvidence": {
+    "name": "Ibuprofen",
+    "strength": "200 mg",
+    "form": "tablet",
+    "unit": "tablet",
+    "pack_size": "24 tablets",
+    "batch": "IBU-200C",
+    "expiry": "2028-12"
+  },
+  "ownerCorrection": {
+    "correct_stock": 27,
+    "reason": ""
+  },
+  "expected": "File selection matches saved Ibuprofen locally, fills trusted current stock 28 from Pharmacy Catalog, leaves corrected stock and optional reason for the owner, and applies 28 to 27 after one confirmation."
+}
