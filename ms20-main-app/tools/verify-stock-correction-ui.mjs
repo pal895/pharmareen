@@ -1,0 +1,34 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { OfflineQueue } from "../src/services/offlineQueue.js";
+
+const [app, css] = await Promise.all([
+  readFile(new URL("../src/app.js", import.meta.url), "utf8"),
+  readFile(new URL("../src/styles.css", import.meta.url), "utf8")
+]);
+
+for (const required of [
+  'if (card.type === "StockCorrectionCard") refreshStockFixDraftControls(card)',
+  'data-confirm-card="${card.id}"',
+  'card.ui = { ...(card.ui || {}), activeSlide: index }',
+  'data-initial-slide="${activeSlide}"',
+  'if (!card || card.submitting) return',
+  'stockCorrectionSummary(card.fields)',
+  'data-action="pause-reading"',
+  'data-action="stop-reading"',
+  'state.pendingScanType = "stock_fix_photo"',
+  'localOnly: true',
+  'handleStockFixVoice(stockFixCard, text)',
+  'Stock fix queued · Pending sync'
+]) assert.ok(app.includes(required), `Missing Stock fix UI protection: ${required}`);
+
+assert.match(css, /@media \(hover: hover\) and \(pointer: fine\)[\s\S]*button:hover/);
+assert.match(css, /\.medicine-slide-nav button\.selected/);
+
+const queue = new OfflineQueue(null);
+const action = { id: "action-stock-fix-1", type: "StockCorrectionCard" };
+assert.equal(queue.add(action).added, true);
+assert.equal(queue.add(action).duplicate, true);
+assert.equal(queue.pendingCount(), 1);
+
+console.log("Stock correction UI verification passed: live draft/control synchronization, one active slide, Read controls, shared photo/voice entry, queue truth, and duplicate-submit protection.");

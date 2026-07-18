@@ -64,9 +64,20 @@ button,
   text-decoration: none;
 }
 
-button:hover,
 button.selected,
 .button-link:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  button:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+}
+
+.medicine-slide-nav button.selected {
   border-color: var(--accent);
   background: var(--accent-soft);
 }

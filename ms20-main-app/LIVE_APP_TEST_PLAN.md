@@ -513,7 +513,10 @@ For every row, retain the full internal mapping: entry point, source, shared roo
 
 ## Next controlled live sequence: Stock fix
 
-1. Pull and restart, open MS2.0, tap `+`, then `Stock fix`. Verify one blank editable `Check stock correction` card appears and nothing changes before confirmation.
-2. Enter Medicine `Losartan`, Current stock `37`, Correct stock `36`, and Reason `Physical count test`. Tap Confirm once. This is explicit approval to queue the proposed correction only, not to apply it.
-3. Expect the exact truthful result: `Stock fix queued for Losartan. Saved stock is still 37; requested stock 36 has not been applied.` Reopen Losartan from the complete saved Pharmacy Catalog and confirm Current stock remains 37 with `No changes yet`.
-4. Do not tap Sync or repeat the correction. Return screenshots of the completed card/result, unchanged saved Losartan stock, and any visible pending-sync count. The expected queue metadata is canonical Losartan, current 37, corrected 36, adjustment -1, reason `Physical count test`, and `queued_not_applied`.
+The first Losartan attempt failed before queueing: all values were visible, but Confirm and guidance retained readiness from the initial blank render. The shared lifecycle fix is implemented and protected; this checkpoint is not passed until screenshots prove it.
+
+1. Pull and restart, open MS2.0, tap `+`, then `Stock fix`. Verify one blank editable card appears and nothing changes before confirmation.
+2. Use a different saved medicine: Medicine `Cefixime`, Current stock `23`, Correct stock `22`, Reason `Physical count test`. Visit all three sections and return to each once. Verify every value remains and only the current section is highlighted.
+3. Tap Read and verify the local spoken summary covers Cefixime, 23, 22 and the reason. Pause/Resume/Stop may be checked without changing the draft.
+4. Tap Confirm once. Expect a `Stock fix queued · Pending sync` result showing `Cefixime: 23 → 22`, the reason, and an explicit statement that saved stock remains 23 and the correction is not applied.
+5. Reopen Cefixime from the complete saved Pharmacy Catalog and confirm Current stock remains 23 with `No changes yet`. Do not tap Sync or repeat. Return the populated three sections, queued result and unchanged saved stock. Picture-assisted and voice-guided Stock Fix remain separate later tests with different medicines.
