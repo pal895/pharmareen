@@ -1119,6 +1119,10 @@ input:disabled {
   min-width: 0;
 }
 
+.stock-fix-more-actions[open] {
+  grid-column: 1 / -1;
+}
+
 .stock-fix-more-actions > summary {
   display: grid;
   min-height: 48px;
@@ -1135,18 +1139,16 @@ input:disabled {
 }
 
 .stock-fix-more-actions > div {
-  position: absolute;
-  z-index: 4;
-  right: 18px;
+  position: static;
   display: grid;
-  width: min(260px, calc(100% - 36px));
+  width: 100%;
   gap: 8px;
   margin-top: 8px;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--surface);
-  box-shadow: var(--shadow);
+  box-shadow: none;
 }
 
 .card-note {

@@ -33,6 +33,8 @@ for (const required of [
 assert.match(css, /@media \(hover: hover\) and \(pointer: fine\)[\s\S]*button:hover/);
 assert.match(css, /\.medicine-slide-nav button\.selected/);
 assert.match(css, /\.stock-fix-main-actions[\s\S]*grid-template-columns: repeat\(3/);
+assert.match(css, /\.stock-fix-more-actions\[open\][\s\S]*grid-column: 1 \/ -1/);
+assert.match(css, /\.stock-fix-more-actions > div[\s\S]*position: static[\s\S]*width: 100%/);
 
 const queue = new OfflineQueue(null);
 const action = { id: "action-stock-fix-1", type: "StockCorrectionCard" };
