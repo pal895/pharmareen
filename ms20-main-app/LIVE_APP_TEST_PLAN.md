@@ -536,3 +536,5 @@ Prepared picture checkpoint: use `/main-app/fixtures/stock-fix-prednisolone-5mg.
 The first attempt stopped before photo selection because More's options were clipped outside the carousel and appeared unresponsive. After the layout repair, resume the same blank Stock Fix card at More → Photo; do not recreate or repeat any passed step beyond what refresh requires.
 
 The repaired More panel and Google Photos picker passed, but the first selected representation returned to a blank card because its cropped/re-encoded visual identity was outside the initial bounded references. After deployment, repeat only Photo selection with the same Prednisolone fixture. It must either fill Prednisolone/current stock 24 or show an explicit safe failure; if filled, continue with 23 and `Picture count test` as already specified.
+
+The repeat produced the required explicit safe failure; Google Photos remains unsuitable for this controlled exact fixture. After deployment, resume at More → File, choose `stock-fix-prednisolone-5mg.png` from Downloads, and expect deterministic Prednisolone/current stock 24. Do not repeat Google Photos or broaden recognition.

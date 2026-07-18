@@ -936,6 +936,7 @@ function stockFixActionsTemplate(card) {
           <button data-action="stop-reading" data-card-id="${card.id}">Stop reading</button>
           <button data-action="stock-fix-camera" data-card-id="${card.id}">Camera</button>
           <button data-action="stock-fix-photo" data-card-id="${card.id}">Photo</button>
+          <button data-action="stock-fix-file" data-card-id="${card.id}">File</button>
           ${card.learnedSpokenMedicine ? `<button data-action="forget-stock-fix-pronunciation" data-card-id="${card.id}">Forget voice name</button>` : ""}
           <button data-action="reject-card" data-card-id="${card.id}">Cancel</button>
         </div>
@@ -1026,6 +1027,11 @@ function bindEvents() {
 
   root.querySelector("#documentInput")?.addEventListener("change", (event) => {
     const file = event.target.files?.[0];
+    if (file && state.pendingScanType === "stock_fix_photo") {
+      void addPhotoCards(file, "stock_fix_photo");
+      state.pendingScanType = "medicine_photo";
+      return;
+    }
     if (file) void handleDocumentFile(file);
   });
   root.querySelectorAll("[data-catalog-search]").forEach((input) => input.addEventListener("input", (event) => {
@@ -1183,6 +1189,7 @@ function handleAction(dataset) {
   if (action === "demo-stock-correction") addStockCorrectionCard();
   if (action === "stock-fix-camera") startStockFixPhoto(dataset.cardId, true);
   if (action === "stock-fix-photo") startStockFixPhoto(dataset.cardId, false);
+  if (action === "stock-fix-file") startStockFixFile(dataset.cardId);
   if (action === "start-stock-fix") startCatalogStockFix(dataset.medicineId);
   if (action === "forget-stock-fix-pronunciation") forgetStockFixPronunciation(dataset.cardId);
   if (action === "refresh-live-status") void refreshLiveStatus();
@@ -2377,6 +2384,12 @@ function startStockFixPhoto(cardId, camera) {
   state.pendingScanType = "stock_fix_photo";
   if (camera) void openLightweightCamera("stock_fix_photo");
   else root.querySelector("#photoInput")?.click();
+}
+
+function startStockFixFile(cardId) {
+  state.stockFixPhotoCardId = cardId;
+  state.pendingScanType = "stock_fix_photo";
+  root.querySelector("#documentInput")?.click();
 }
 
 function refreshStockFixDraftControls(card) {

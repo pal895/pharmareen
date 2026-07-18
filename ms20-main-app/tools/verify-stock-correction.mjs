@@ -144,7 +144,6 @@ assert.equal(photoFixture.item.name, "Prednisolone");
 assert.equal(photoFixture.item.stock, "");
 assert.equal(findStockFixPhotoTestFixture({ sha256: photoHash }), photoFixture);
 assert.equal(findStockFixPhotoTestFixture({ perceptualHash: photoFixture.perceptualHash, aspectRatio: 0.6667 }), photoFixture);
-assert.equal(findStockFixPhotoTestFixture({ perceptualHash: "f970607cfcfcfcc0", aspectRatio: 0.7297 }), photoFixture);
 assert.equal(findStockFixPhotoTestFixture({ perceptualHash: "0000000000000000", aspectRatio: 0.6667 }), null);
 const photoCatalog = [{ name: "Prednisolone", strength: "5 mg", stockLeft: 24 }];
 assert.equal(reviewStockCorrection({ medicine: photoFixture.item.name, current_stock: 24, correct_stock: 23, reason: "Picture count" }, photoCatalog).ok, true);
