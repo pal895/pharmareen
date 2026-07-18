@@ -692,7 +692,8 @@ function catalogMedicineEditorTemplate(card) {
 
 function fieldTemplate(card, field) {
   const value = card.fields?.[field] ?? "";
-  const longFields = new Set(["items_text", "choices", "notes", "mapping", "message", "action", "missing_columns"]);
+  if (card.type === "ReportCard" && field === "report_text") return `<section class="report-result" aria-label="Generated report"><h4>Report</h4><pre>${escapeHtml(String(value))}</pre></section>`;
+  const longFields = new Set(["items_text", "choices", "notes", "mapping", "message", "action", "missing_columns", "report_text"]);
   const inputMode = inputModeForField(field);
   const control = longFields.has(field)
     ? `<textarea data-card-id="${card.id}" data-field="${field}" rows="${field === "items_text" ? 8 : 3}">${escapeHtml(String(value))}</textarea>`
@@ -907,10 +908,9 @@ function activeActionsTemplate(card) {
   if (card.type === "ReportCard" || card.type === "DocumentExportCard") {
     return `
       <div class="card-actions">
-        <button data-action="confirm-card" data-card-id="${card.id}">Confirm</button>
+        ${card.type === "ReportCard" ? `<button data-action="confirm-card" data-card-id="${card.id}">${card.fields?.report_text ? "Refresh report" : "Generate report"}</button>` : `<button data-action="confirm-card" data-card-id="${card.id}">Confirm</button>`}
         <button data-action="read-card" data-card-id="${card.id}">Read</button>
-        <button data-action="export-catalog-csv">Download CSV</button>
-        <button data-action="correct-card" data-card-id="${card.id}">Correct</button>
+        ${card.type === "ReportCard" ? "" : `<button data-action="correct-card" data-card-id="${card.id}">Correct</button>`}
         <button data-action="reject-card" data-card-id="${card.id}">Cancel</button>
       </div>
     `;
@@ -2404,19 +2404,44 @@ function resetOnboarding() {
 }
 
 function addReportCard() {
-  const routes = backendAdapters.endpointLinks();
   addCard(createEditableCard({
     type: "ReportCard",
     title: "Check report",
     source: "Today report",
     fields: {
       period: "Today",
-      focus: "Sales, stock, cash, M-Pesa, credit",
-      backend_route: routes.dailyReport || "/reports/daily?send_whatsapp=false"
+      focus: "Sales, stock, cash, M-Pesa, credit"
     },
     confidence: 0.94,
-    validation: "Reports use corrected ledger totals through the live report route when backend sync is enabled."
+    validation: "Generate this report from the pharmacy's saved records. Nothing is sent to WhatsApp."
   }));
+}
+
+async function generateReport(card) {
+  if (navigator.onLine === false) {
+    card.validation = "This report needs the live pharmacy records. Reconnect, then tap Generate report again.";
+    render();
+    return;
+  }
+  card.submitting = true;
+  card.validation = "Generating today's report from saved pharmacy records…";
+  persistActiveCards();
+  render();
+  try {
+    const response = await fetch("/reports/daily?send_whatsapp=false", { method: "POST" });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.detail || "The report could not be generated right now.");
+    card.fields = { period: "Today", focus: "Sales, stock, cash, M-Pesa, credit", report_date: result.date || "Today", report_text: result.report || "No report details were returned." };
+    card.title = "Today's report";
+    card.validation = "Generated from saved pharmacy records. Nothing was sent to WhatsApp.";
+  } catch (error) {
+    card.validation = error?.message || "The report could not be generated right now.";
+  } finally {
+    card.submitting = false;
+    persistActiveCards();
+    render();
+    focusCard(card.id);
+  }
 }
 
 function addSyncCard() {
@@ -2760,6 +2785,7 @@ function reviewPasteList(cardId) {
 function confirmCard(cardId) {
   const card = state.cards.find((item) => item.id === cardId);
   if (!card || card.submitting) return;
+  if (card.type === "ReportCard") return void generateReport(card);
   if (card.type === "StockCorrectionCard" && requestGuidedStockFixConfirmation(card)) return;
   card.submitting = true;
   const confirmationBlocker = medicineReviewBlocker(card);

@@ -794,6 +794,25 @@ input:disabled {
   gap: 10px;
 }
 
+.report-result {
+  grid-column: 1 / -1;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.report-result h4,
+.report-result pre {
+  margin: 0;
+}
+
+.report-result pre {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+}
+
 .catalog-edit-grid label span {
   display: block;
   margin-bottom: 5px;
