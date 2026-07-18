@@ -3113,8 +3113,26 @@ function readCardAloud(cardId) {
   const card = state.cards.find((item) => item.id === cardId) || activeNotificationCards().find((item) => item.id === cardId);
   if (!card || !window.speechSynthesis) return;
   if (card.type === "StockCorrectionCard") return startStockFixReading(card);
+  if (card.type === "ReportCard") return readReportAloud(card);
   const fields = Object.entries(card.fields || {}).map(([key, value]) => `${key.replaceAll("_", " ")} ${value}`).join(". ");
   const utterance = new SpeechSynthesisUtterance(`${card.title}. ${fields}`);
+  utterance.lang = "en-KE";
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
+}
+
+function readReportAloud(card) {
+  const report = String(card.fields?.report_text || "").trim();
+  if (!report) {
+    card.validation = "Generate the report before using Read.";
+    persistActiveCards();
+    render();
+    return;
+  }
+  const utterance = new SpeechSynthesisUtterance(report
+    .replaceAll("KES", "Kenyan shillings")
+    .replaceAll("Ksh", "Kenyan shillings")
+    .replaceAll("M-Pesa", "M Pesa"));
   utterance.lang = "en-KE";
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);

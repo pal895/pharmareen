@@ -12,6 +12,8 @@ for (const required of [
   'controller.abort()',
   'resumeDurableCard',
   'Not refreshed yet',
+  'function readReportAloud(card)',
+  'Generate the report before using Read.',
   'generated_at',
   'Nothing was sent to WhatsApp or saved as a duplicate report.',
   'report_text',
