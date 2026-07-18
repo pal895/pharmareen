@@ -63,3 +63,7 @@ The next mobile selection proved More and Photo acquisition, then exposed a boun
 Repeated Google Photos selection still failed safely and visibly. Rather than broaden the visual gate again, More now includes File: it selects the downloaded repository PNG through Android Files/Downloads and feeds the exact same Stock Fix photo pipeline. Exact filename/SHA recognition is deterministic; Photo and Camera remain separate ordinary acquisition choices.
 
 Android routed the first File implementation through Google Photos because it reused an image-capable document input. Stock Fix File is now a dedicated `.ms20image`/octet-stream input. The transport file is byte-identical to the PNG and must pass the same SHA-256 gate, but Android treats it as a normal downloaded file rather than a gallery photo.
+
+## Photo live acceptance — 2026-07-18
+
+The superseding shared normal-image pipeline passed its first live source test through Android Photo selection. The selected Prednisolone package populated canonical identity and trusted catalog stock 24 without a low-memory failure. Corrected stock and reason remained owner inputs; one Confirm with 23 and `Picture count test` reported `Stock updated. Prednisolone: 24 → 23.` The saved Medicine Action Card independently showed stock 23, retained medicine/commercial data, no changes, and disabled approval. Photo is protected; Camera, File and microphone remain distinct source tests and must be validated one at a time with different saved medicines.
