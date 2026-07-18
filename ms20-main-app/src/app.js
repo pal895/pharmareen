@@ -718,9 +718,9 @@ function medicineDetailTemplate(card, displayed) {
   return `
     <section class="medicine-review-workspace" data-medicine-workspace="${card.id}">
       <div class="medicine-slide-nav" aria-label="Medicine review sections">
-        <button type="button" class="${activeSlide === 0 ? "selected" : ""}" data-action="show-medicine-slide" data-card-id="${card.id}" data-slide="0">Fast action</button>
-        <button type="button" class="${activeSlide === 1 ? "selected" : ""}" data-action="show-medicine-slide" data-card-id="${card.id}" data-slide="1">Stock &amp; details</button>
-        <button type="button" class="${activeSlide === 2 ? "selected" : ""}" data-action="show-medicine-slide" data-card-id="${card.id}" data-slide="2">${card.type === "StockCorrectionCard" ? "Reason &amp; review" : "Traceability"}</button>
+        <button type="button" class="${activeSlide === 0 ? "selected" : ""}" data-action="show-medicine-slide" data-card-id="${card.id}" data-slide="0">${card.type === "StockCorrectionCard" ? "Medicine" : "Fast action"}</button>
+        <button type="button" class="${activeSlide === 1 ? "selected" : ""}" data-action="show-medicine-slide" data-card-id="${card.id}" data-slide="1">${card.type === "StockCorrectionCard" ? "Stock" : "Stock &amp; details"}</button>
+        <button type="button" class="${activeSlide === 2 ? "selected" : ""}" data-action="show-medicine-slide" data-card-id="${card.id}" data-slide="2">${card.type === "StockCorrectionCard" ? "Reason" : "Traceability"}</button>
       </div>
       <div class="medicine-slide-status"><span data-medicine-slide-indicator="${card.id}">${activeSlide + 1} of 3</span><span>${card.type === "StockCorrectionCard" ? stockFixSlideInstruction(activeSlide) : "Swipe or use the section buttons"}</span></div>
       <div class="medicine-slide-track" data-medicine-carousel="${card.id}" data-initial-slide="${activeSlide}">
@@ -907,6 +907,7 @@ function activeActionsTemplate(card) {
       </div>
     `;
   }
+  if (card.type === "StockCorrectionCard") return stockFixActionsTemplate(card);
   const stockFixGuidance = card.type === "StockCorrectionCard" ? stockCorrectionGuidance(card.fields, pharmacyBrain.catalog) : null;
   const confirmationBlocker = stockFixGuidance ? (stockFixGuidance.ready ? "" : stockFixGuidance.message) : medicineReviewBlocker(card);
   return `
@@ -917,6 +918,26 @@ function activeActionsTemplate(card) {
       ${card.type === "StockCorrectionCard" && card.learnedSpokenMedicine ? `<button data-action="forget-stock-fix-pronunciation" data-card-id="${card.id}">Forget voice name</button>` : ""}
       <button data-action="correct-card" data-card-id="${card.id}">Correct</button>
       <button data-action="reject-card" data-card-id="${card.id}">Cancel</button>
+    </div>
+  `;
+}
+
+function stockFixActionsTemplate(card) {
+  const guidance = stockCorrectionGuidance(card.fields, pharmacyBrain.catalog);
+  return `
+    <div class="card-actions stock-fix-main-actions">
+      <button data-action="confirm-card" data-confirm-card="${card.id}" data-card-id="${card.id}" ${guidance.ready ? "" : `disabled title="${escapeHtml(guidance.message)}"`}>Confirm</button>
+      <button data-action="stock-fix-read-control" data-stock-fix-read="${card.id}" data-card-id="${card.id}">Read</button>
+      <details class="stock-fix-more-actions">
+        <summary>More</summary>
+        <div>
+          <button data-action="stop-reading" data-card-id="${card.id}">Stop reading</button>
+          <button data-action="stock-fix-camera" data-card-id="${card.id}">Camera</button>
+          <button data-action="stock-fix-photo" data-card-id="${card.id}">Photo</button>
+          ${card.learnedSpokenMedicine ? `<button data-action="forget-stock-fix-pronunciation" data-card-id="${card.id}">Forget voice name</button>` : ""}
+          <button data-action="reject-card" data-card-id="${card.id}">Cancel</button>
+        </div>
+      </details>
     </div>
   `;
 }
@@ -1149,6 +1170,7 @@ function handleAction(dataset) {
   if (action === "export-catalog-csv") exportCatalogCsv();
   if (action === "download-template") downloadBulkPasteTemplate();
   if (action === "read-card") readCardAloud(dataset.cardId);
+  if (action === "stock-fix-read-control") toggleStockFixReading(dataset.cardId);
   if (action === "pause-reading") pauseStockFixReading();
   if (action === "resume-reading") resumeStockFixReading();
   if (action === "stop-reading") stopStockFixReading();
@@ -2366,6 +2388,16 @@ function refreshStockFixDraftControls(card) {
   if (note) note.textContent = guidance.message;
 }
 
+function fillTrustedStockForDraft(card, medicineText) {
+  const match = matchMedicine(medicineText, pharmacyBrain.catalog);
+  if (match.status !== "matched") return;
+  const savedStock = trustedCatalogStock(match.matches[0]);
+  if (savedStock === null) return;
+  card.fields.current_stock = savedStock;
+  const currentInput = root.querySelector(`[data-card-id="${card.id}"][data-field="current_stock"]`);
+  if (currentInput) currentInput.value = String(savedStock);
+}
+
 function stockFixSlideInstruction(slide) {
   return ["Choose the saved medicine.", "Check current stock.", "Add corrected stock and reason."][slide] || "Review the stock fix.";
 }
@@ -2452,7 +2484,10 @@ function updateCardField(cardId, field, value) {
   const card = state.cards.find((item) => item.id === cardId);
   if (!card) return;
   card.fields[field] = value;
-  if (card.type === "StockCorrectionCard") refreshStockFixDraftControls(card);
+  if (card.type === "StockCorrectionCard") {
+    if (field === "medicine") fillTrustedStockForDraft(card, value);
+    refreshStockFixDraftControls(card);
+  }
   if (card.type === "CatalogImportCard" && card.fields?.entry_mode === "paste_input" && field === "items_text") {
     delete card.fields.review_feedback;
     card.validation = "Paste one medicine per line, then review the proposed rows before saving.";
@@ -2863,7 +2898,22 @@ function startStockFixReading(card) {
       `Correct stock: ${card.fields?.correct_stock === "" ? "not set" : card.fields?.correct_stock}. Reason: ${card.fields?.reason || "not set"}. Say confirm or tap Confirm to continue.`
     ]
   };
+  updateStockFixReadButton(card.id, "Pause");
   speakStockFixSegment(sequence);
+}
+
+function toggleStockFixReading(cardId) {
+  if (stockFixReading?.cardId === cardId) {
+    if (stockFixReading.paused) resumeStockFixReading();
+    else pauseStockFixReading();
+    return;
+  }
+  readCardAloud(cardId);
+}
+
+function updateStockFixReadButton(cardId, label) {
+  const button = root.querySelector(`[data-stock-fix-read="${cardId}"]`);
+  if (button) button.textContent = label;
 }
 
 function speakStockFixSegment(sequence) {
@@ -2878,10 +2928,16 @@ function speakStockFixSegment(sequence) {
     if (stockFixReading?.sequence !== sequence || stockFixReading.paused) return;
     stockFixReading.index += 1;
     if (stockFixReading.index < stockFixReading.segments.length) speakStockFixSegment(sequence);
-    else stockFixReading = null;
+    else {
+      updateStockFixReadButton(reading.cardId, "Read");
+      stockFixReading = null;
+    }
   };
   utterance.onerror = () => {
-    if (stockFixReading?.sequence === sequence && !stockFixReading.paused) stockFixReading = null;
+    if (stockFixReading?.sequence === sequence && !stockFixReading.paused) {
+      updateStockFixReadButton(reading.cardId, "Read");
+      stockFixReading = null;
+    }
   };
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
@@ -2890,16 +2946,19 @@ function speakStockFixSegment(sequence) {
 function pauseStockFixReading() {
   if (!stockFixReading) return;
   stockFixReading.paused = true;
+  updateStockFixReadButton(stockFixReading.cardId, "Resume");
   window.speechSynthesis?.cancel();
 }
 
 function resumeStockFixReading() {
   if (!stockFixReading?.paused) return;
   stockFixReading.paused = false;
+  updateStockFixReadButton(stockFixReading.cardId, "Pause");
   speakStockFixSegment(stockFixReading.sequence);
 }
 
 function stopStockFixReading() {
+  if (stockFixReading?.cardId) updateStockFixReadButton(stockFixReading.cardId, "Read");
   stockFixReading = null;
   stockFixReadingSequence += 1;
   window.speechSynthesis?.cancel();
@@ -3301,7 +3360,7 @@ function savedReplyFor(card) {
     const payment = paymentLabel(String(card.fields?.payment || "cash").toLowerCase());
     return `${medicine} added.\nSale recorded.\n${medicine} x${quantity}\nPayment: ${payment}`;
   }
-  if (card.type === "StockCorrectionCard") return `Stock fix queued · Pending sync\n${card.fields?.medicine}: ${card.fields?.current_stock} → ${card.fields?.correct_stock}\nReason: ${card.fields?.reason}\nSaved stock is still ${card.fields?.current_stock}. The requested correction has not been applied.`;
+  if (card.type === "StockCorrectionCard") return `Stock fix waiting to sync\n${card.fields?.medicine}: ${card.fields?.current_stock} → ${card.fields?.correct_stock}\nReason: ${card.fields?.reason}\nSaved stock is still ${card.fields?.current_stock}.`;
   if (card.type === "RestockCard") {
     const medicine = card.fields?.medicine || "Medicine";
     const quantity = card.fields?.quantity || "0";

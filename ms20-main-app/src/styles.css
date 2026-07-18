@@ -1110,6 +1110,45 @@ input:disabled {
   border-color: var(--accent);
 }
 
+.stock-fix-main-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.stock-fix-more-actions {
+  min-width: 0;
+}
+
+.stock-fix-more-actions > summary {
+  display: grid;
+  min-height: 48px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  cursor: pointer;
+  list-style: none;
+}
+
+.stock-fix-more-actions > summary::-webkit-details-marker {
+  display: none;
+}
+
+.stock-fix-more-actions > div {
+  position: absolute;
+  z-index: 4;
+  right: 18px;
+  display: grid;
+  width: min(260px, calc(100% - 36px));
+  gap: 8px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
 .card-note {
   margin: 12px 0 0;
   padding: 10px 12px;

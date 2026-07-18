@@ -8,7 +8,7 @@ const [app, css] = await Promise.all([
 ]);
 
 for (const required of [
-  'if (card.type === "StockCorrectionCard") refreshStockFixDraftControls(card)',
+  'refreshStockFixDraftControls(card);',
   'data-confirm-card="${card.id}"',
   'card.ui = { ...(card.ui || {}), activeSlide: index }',
   'data-initial-slide="${activeSlide}"',
@@ -17,17 +17,19 @@ for (const required of [
   'showMedicineSlide(reading.cardId, reading.index)',
   'function pauseStockFixReading()',
   'function resumeStockFixReading()',
+  'function toggleStockFixReading(cardId)',
   'speakStockFixSegment(stockFixReading.sequence)',
-  'data-action="pause-reading"',
+  'data-action="stock-fix-read-control"',
   'data-action="stop-reading"',
   'state.pendingScanType = "stock_fix_photo"',
   'localOnly: true',
   'handleStockFixVoice(stockFixCard, text)',
-  'Stock fix queued · Pending sync'
+  'Stock fix waiting to sync'
 ]) assert.ok(app.includes(required), `Missing Stock fix UI protection: ${required}`);
 
 assert.match(css, /@media \(hover: hover\) and \(pointer: fine\)[\s\S]*button:hover/);
 assert.match(css, /\.medicine-slide-nav button\.selected/);
+assert.match(css, /\.stock-fix-main-actions[\s\S]*grid-template-columns: repeat\(3/);
 
 const queue = new OfflineQueue(null);
 const action = { id: "action-stock-fix-1", type: "StockCorrectionCard" };

@@ -15,8 +15,9 @@ The second manual live attempt exposed two additional shared-root facts. First, 
 ## Reusable interaction behavior
 
 - Confirm reads the complete authoritative draft across all slides, uses a submitting guard, then queues one idempotent action. Cancellation removes the draft without mutation.
-- Result copy shows medicine, previous stock, requested stock, reason and `Pending sync`, and repeats that saved stock has not changed.
+- Result copy shows medicine, previous stock, requested stock and reason, says it is waiting to sync, and repeats that saved stock has not changed.
 - Read uses three local device speech-synthesis segments and speaks only the concise owner fields. The active slide follows the segment being spoken. Pause, Resume, Stop and replay through Read make no AI call.
+- The owner path shows only three main choices: Confirm, one Read/Pause/Resume control, and More. More holds optional tools. The three sections use the short labels Medicine, Stock, and Reason.
 - Stock Fix Camera and Photo reuse the existing acquisition pipeline. A locally recognized controlled package is matched against the active Pharmacy Catalog before it can prefill canonical medicine/current stock. Unknown or uncertain images fill nothing and ask for the missing identity. Image audit metadata remains local runtime state and is never a Git asset.
 - The microphone routes into the active Stock Fix draft before general command parsing. It supports medicine, current/correct stock, reason, back/change-field, Read/Repeat, Confirm and Cancel. Confident fields advance only in voice mode; manual editing never triggers surprise slide movement. A complete voice draft performs a three-slide review pass and concise local Read summary.
 - Medicine resolution remains catalog-first, alias/fuzzy/phonetic aware and ambiguity-safe. A short choice is required when confidence is insufficient. Confirmed pronunciation mappings are pharmacy-scoped, correctable and never replace canonical medicine names or leak to another tenant.
@@ -28,3 +29,5 @@ The second manual live attempt exposed two additional shared-root facts. First, 
 ## Live discipline
 
 Keep the original manual checkpoint open until new screenshots pass. Resume one test at a time: first manual with a different saved medicine, then picture-assisted with another medicine, then voice-guided with a harder name. Do not combine them and do not repeat Losartan unless regression evidence specifically requires it.
+
+Latest live evidence passes the segmented Read behavior: speech follows the three visible sections and pause/resume works as requested. It also shows the repaired ready state with an active Confirm button. No screenshot yet proves the queued result, so manual Stock Fix remains open only at Confirm. Do not repeat Read. Resume with the existing Cefixime 23 to 22 draft, tap Confirm once, and verify the simple waiting-to-sync result while saved stock stays 23.

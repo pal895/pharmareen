@@ -23,6 +23,7 @@ assert.deepEqual(approved.fields, {
 });
 
 assert.equal(stockCorrectionGuidance(approved.fields, catalog).ready, true);
+assert.equal(stockCorrectionGuidance(approved.fields, catalog).message, "Ready. Check the details, then tap Confirm. Saved stock will not change yet.");
 assert.match(stockCorrectionSummary(approved.fields), /Medicine: Losartan\. Current stock: 37\. Correct stock: 36\. Reason: Physical count\./);
 
 let voice = applyStockCorrectionVoice({ medicine: "", current_stock: "", correct_stock: "", reason: "", active_slide: 0 }, "Losartan", catalog);

@@ -65,3 +65,7 @@ These checks belong in design review, implementation review, regression tests wh
 ## Product goal
 
 The owner should feel that MS2.0 is honest, easy to understand, helpful, and never trying to sound clever. Clarity is more important than technical language. Trust is more important than sounding intelligent.
+
+## Fast owner paths
+
+The normal path to a result must take no more than three clear steps. Show no more than three main choices at once. Put less-used tools under More. A safety review can still block an unsafe save, but it must say what is missing in simple English and take the owner straight to the needed field.

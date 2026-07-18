@@ -41,7 +41,7 @@ export function reviewStockCorrection(fields = {}, catalog = []) {
 
 export function stockCorrectionGuidance(fields = {}, catalog = []) {
   const review = reviewStockCorrection(fields, catalog);
-  if (review.ok) return { ready: true, message: "Ready to confirm. Review the medicine, both stock values and reason. Confirm queues one correction; saved stock will not change yet." };
+  if (review.ok) return { ready: true, message: "Ready. Check the details, then tap Confirm. Saved stock will not change yet." };
   return { ready: false, message: review.message };
 }
 
