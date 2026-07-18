@@ -272,3 +272,4 @@ Planned at their proper test stages:
 - Simulator actions are visible only in simulator mode and rejected by the TCE in production mode.
 - The redundant home SHOW ME tile is removed; header, typed/voice, and result-card catalog routes remain protected.
 - Mobile live evidence on 2026-07-18 confirms home retains MS2.0 Assistant, Notifications and Payment Queue, the header catalog route opens all 35 saved medicines, and closing it causes no mutation or operational noise.
+- Mobile live evidence on 2026-07-18 confirms two concurrent Simulator M-Pesa requests can complete second-first without cross-request mutation: each stock change applies once, the queue reaches zero, history/receipts stay truthful and routine success creates no Notification. Protected stocks are Cefixime 23 and Losartan 37.
