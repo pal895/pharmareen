@@ -1,0 +1,24 @@
+{
+  "fixtureId": "stock-fix-metronidazole-400mg-camera",
+  "fileName": "stock-fix-metronidazole-400mg-camera.png",
+  "sha256": "a892786e8fe171aadf159ed09cf616fc7dedf3190e233edd88ce2d7724a3f17e",
+  "workflow": "stock_fix_camera",
+  "catalogBaseline": {
+    "name": "Metronidazole",
+    "stock": 36
+  },
+  "visiblePackageEvidence": {
+    "name": "Metronidazole",
+    "strength": "400 mg",
+    "form": "tablet",
+    "unit": "tablet",
+    "pack_size": "20 tablets",
+    "batch": "MET-400C",
+    "expiry": "2029-03"
+  },
+  "ownerCorrection": {
+    "correct_stock": 35,
+    "reason": "Camera count test"
+  },
+  "expected": "Camera capture matches saved Metronidazole locally, fills trusted current stock 36 from Pharmacy Catalog, leaves corrected stock and reason for the owner, and applies 36 to 35 after one confirmation."
+}
