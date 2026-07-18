@@ -50,6 +50,12 @@ export function reviewCatalogEdit(catalog = [], originalId, draft = {}) {
   return { valid: true, original, changes };
 }
 
+export function catalogEditPresentation(review = {}) {
+  if (review.error) return { status: "Needs attention", description: "Resolve the issue below before this medicine can be saved.", state: "error" };
+  if (review.changes?.length) return { status: "Unsaved changes", description: "Check the changes below. The saved medicine stays unchanged until you approve.", state: "changed" };
+  return { status: "Saved medicine", description: "This card shows the medicine currently saved in the Pharmacy Catalog.", state: "saved" };
+}
+
 export function applyApprovedCatalogEdit(catalog = [], originalId, draft = {}) {
   const review = reviewCatalogEdit(catalog, originalId, draft);
   if (!review.valid) return { ...review, catalog };

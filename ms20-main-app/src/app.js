@@ -28,6 +28,7 @@ import {
   createCatalogEditDraft,
   createCatalogWorkspaceCard,
   catalogWorkspaceItems,
+  catalogEditPresentation,
   reviewCatalogEdit
 } from "./services/catalogWorkspace.js";
 import { cardFieldsFor, createEditableCard, paymentOptions, quantityBumps } from "./cards/editableCards.js";
@@ -667,6 +668,7 @@ function catalogWorkspaceItemTemplate(item) {
 function catalogMedicineEditorTemplate(card) {
   const draft = catalogEditDraft(card);
   const review = reviewCatalogEdit(pharmacyBrain.catalog, card.fields.selected_id, draft);
+  const presentation = catalogEditPresentation(review);
   const advanced = new Set(["pack_size", "supplier", "shelf", "barcode", "batch", "expiry", "reorder_level", "aliases"]);
   const fields = (showAdvanced) => CATALOG_EDIT_FIELDS.filter((field) => advanced.has(field) === showAdvanced).map((field) => `
     <label><span>${escapeHtml(fieldLabel(field))}</span><input data-catalog-edit-field="${field}" data-card-id="${card.id}" value="${escapeHtml(String(draft[field] ?? ""))}" ${["stock", "selling_price", "cost_price", "reorder_level"].includes(field) ? 'inputmode="decimal"' : ""}></label>
@@ -674,8 +676,8 @@ function catalogMedicineEditorTemplate(card) {
   return `
     <section class="catalog-medicine-editor" aria-label="Edit ${escapeHtml(draft.name || "medicine")}">
       <button class="catalog-back" type="button" data-action="cancel-catalog-edit" data-card-id="${card.id}">&larr; Back to catalog</button>
-      <div class="catalog-editor-heading"><div><small>Medicine Action Card</small><h3>${escapeHtml(draft.name || "Medicine")}</h3></div><span>Unsaved draft</span></div>
-      <p>Check the changes below. The saved medicine stays unchanged until you approve.</p>
+      <div class="catalog-editor-heading"><div><small>Medicine Action Card</small><h3>${escapeHtml(draft.name || "Medicine")}</h3></div><span data-catalog-edit-status data-state="${presentation.state}">${presentation.status}</span></div>
+      <p data-catalog-edit-description>${presentation.description}</p>
       <div class="catalog-edit-grid">${fields(false)}</div>
       <details class="catalog-advanced-fields"><summary>Packaging, supplier and other details</summary><div class="catalog-edit-grid">${fields(true)}</div></details>
       ${review.error ? `<p class="catalog-edit-warning" role="alert">${escapeHtml(review.error)}</p>` : review.changes?.length ? `<p class="catalog-change-summary">Review: ${review.changes.length} field${review.changes.length === 1 ? "" : "s"} changed — ${review.changes.map(fieldLabel).join(", ")}.</p>` : '<p class="catalog-change-summary">No changes yet.</p>'}
@@ -2851,6 +2853,14 @@ function updateCatalogEditDraft(cardId, field, value) {
   persistActiveCards();
   const warning = root.querySelector(".catalog-edit-warning, .catalog-change-summary");
   const review = reviewCatalogEdit(pharmacyBrain.catalog, card.fields.selected_id, draft);
+  const presentation = catalogEditPresentation(review);
+  const status = root.querySelector("[data-catalog-edit-status]");
+  if (status) {
+    status.textContent = presentation.status;
+    status.dataset.state = presentation.state;
+  }
+  const description = root.querySelector("[data-catalog-edit-description]");
+  if (description) description.textContent = presentation.description;
   if (warning) {
     warning.className = review.error ? "catalog-edit-warning" : "catalog-change-summary";
     warning.textContent = review.error || (review.changes.length ? `Review: ${review.changes.length} field${review.changes.length === 1 ? "" : "s"} changed — ${review.changes.map(fieldLabel).join(", ")}.` : "No changes yet.");

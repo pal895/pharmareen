@@ -778,6 +778,16 @@ input:disabled {
   font-weight: 800;
 }
 
+.catalog-editor-heading > span[data-state="saved"] {
+  background: #e8f5ef;
+  color: var(--accent-strong);
+}
+
+.catalog-editor-heading > span[data-state="error"] {
+  background: #fdeaea;
+  color: #8d2424;
+}
+
 .catalog-edit-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
