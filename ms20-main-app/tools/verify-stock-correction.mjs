@@ -135,10 +135,12 @@ assert.equal(protectedQueue.pendingCount(), 1);
 
 const photoManifest = JSON.parse(fs.readFileSync(new URL("../fixtures/stock-fix-prednisolone-5mg.json", import.meta.url), "utf8"));
 const photoPng = fs.readFileSync(new URL("../fixtures/stock-fix-prednisolone-5mg.png", import.meta.url));
+const photoTransport = fs.readFileSync(new URL("../fixtures/stock-fix-prednisolone-5mg.ms20image", import.meta.url));
 const photoHash = crypto.createHash("sha256").update(photoPng).digest("hex");
 const photoFixture = findStockFixPhotoTestFixture({ fileName: photoManifest.fileName });
 assert.equal(StockFixPhotoTestFixtures.length, 1);
 assert.equal(photoHash, photoManifest.sha256);
+assert.equal(crypto.createHash("sha256").update(photoTransport).digest("hex"), photoHash);
 assert.equal(photoFixture.sha256, photoHash);
 assert.equal(photoFixture.item.name, "Prednisolone");
 assert.equal(photoFixture.item.stock, "");

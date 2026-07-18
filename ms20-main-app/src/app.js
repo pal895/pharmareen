@@ -402,6 +402,7 @@ function composerTemplate() {
       <input id="photoInput" class="hidden-input" type="file" accept="image/*">
       <input id="cameraInput" class="hidden-input" type="file" accept="image/*" capture="environment">
       <input id="documentInput" class="hidden-input" type="file" accept=".csv,.txt,.tsv,.xls,.xlsx,.pdf,image/*,text/csv,text/plain">
+      <input id="stockFixFileInput" class="hidden-input" type="file" accept=".ms20image,application/octet-stream">
     </footer>
   `;
 }
@@ -1027,12 +1028,11 @@ function bindEvents() {
 
   root.querySelector("#documentInput")?.addEventListener("change", (event) => {
     const file = event.target.files?.[0];
-    if (file && state.pendingScanType === "stock_fix_photo") {
-      void addPhotoCards(file, "stock_fix_photo");
-      state.pendingScanType = "medicine_photo";
-      return;
-    }
     if (file) void handleDocumentFile(file);
+  });
+  root.querySelector("#stockFixFileInput")?.addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    if (file) void addPhotoCards(file, "stock_fix_photo");
   });
   root.querySelectorAll("[data-catalog-search]").forEach((input) => input.addEventListener("input", (event) => {
     updateCatalogSearch(event.target.dataset.cardId, event.target.value, event.target);
@@ -2388,8 +2388,7 @@ function startStockFixPhoto(cardId, camera) {
 
 function startStockFixFile(cardId) {
   state.stockFixPhotoCardId = cardId;
-  state.pendingScanType = "stock_fix_photo";
-  root.querySelector("#documentInput")?.click();
+  root.querySelector("#stockFixFileInput")?.click();
 }
 
 function refreshStockFixDraftControls(card) {
