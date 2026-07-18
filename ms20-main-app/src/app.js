@@ -1370,11 +1370,13 @@ function startVoiceCapture() {
   }
   const recognition = new SpeechRecognition();
   recognition.lang = "en-KE";
-  recognition.interimResults = false;
+  recognition.interimResults = true;
   recognition.maxAlternatives = 1;
   let heardResult = false;
   let voiceError = false;
   let audioReady = false;
+  let captureTimer = null;
+  let latestTranscript = "";
   activeRecognition = recognition;
   state.voice.starting = true;
   state.voice.listening = false;
@@ -1388,27 +1390,56 @@ function startVoiceCapture() {
     const stockFixCard = state.cards.find((card) => card.type === "StockCorrectionCard");
     state.voice.status = stockFixCard ? stockFixVoicePrompt(stockFixCard) : "Speak now.";
     render();
+    captureTimer = setTimeout(() => {
+      if (activeRecognition !== recognition) return;
+      state.voice.status = latestTranscript
+        ? `Heard: “${latestTranscript}”. Finishing…`
+        : "Finishing this listening attempt…";
+      render();
+      try { recognition.stop(); } catch { /* already stopped */ }
+    }, 8000);
   };
   recognition.onaudiostart = markAudioReady;
   recognition.onresult = (event) => {
-    const transcript = event.results?.[0]?.[0]?.transcript || "";
-    heardResult = Boolean(transcript.trim());
+    let transcript = "";
+    let finalTranscript = "";
+    for (let index = event.resultIndex || 0; index < (event.results?.length || 0); index += 1) {
+      const words = event.results[index]?.[0]?.transcript || "";
+      transcript = `${transcript} ${words}`.trim();
+      if (event.results[index]?.isFinal) finalTranscript = `${finalTranscript} ${words}`.trim();
+    }
+    if (transcript) {
+      latestTranscript = transcript;
+      state.voice.status = `Heard: “${transcript}”${finalTranscript ? "." : "…"}`;
+      render();
+    }
+    if (!finalTranscript) return;
+    heardResult = true;
+    if (captureTimer) clearTimeout(captureTimer);
     state.voice.starting = false;
     state.voice.listening = false;
-    state.voice.status = "";
+    state.voice.status = `Heard: “${finalTranscript}”.`;
     activeRecognition = null;
-    if (transcript.trim()) {
+    if (finalTranscript.trim()) {
       const guidedStockFix = state.cards.some((card) => card.type === "StockCorrectionCard");
-      handleVoiceTranscript(transcript);
+      handleVoiceTranscript(finalTranscript);
       const continuingCard = state.cards.find((card) => card.type === "StockCorrectionCard");
-      if (guidedStockFix && continuingCard && !continuingCard.ui?.reviewedSlides) {
+      if (guidedStockFix && continuingCard && !continuingCard.ui?.reviewedSlides && !continuingCard.ui?.voiceAwaitingManualRetry) {
         setTimeout(() => startVoiceCapture(), 350);
       }
     } else {
       render();
     }
   };
+  recognition.onspeechend = () => {
+    state.voice.status = latestTranscript
+      ? `Heard: “${latestTranscript}”. Finishing…`
+      : "Speech ended. Finishing…";
+    render();
+    try { recognition.stop(); } catch { /* already stopped */ }
+  };
   recognition.onerror = (event) => {
+    if (captureTimer) clearTimeout(captureTimer);
     voiceError = true;
     state.voice.starting = false;
     state.voice.listening = false;
@@ -1424,9 +1455,11 @@ function startVoiceCapture() {
     render();
   };
   recognition.onend = () => {
+    if (captureTimer) clearTimeout(captureTimer);
     activeRecognition = null;
     state.voice.starting = false;
     state.voice.listening = false;
+    if (!heardResult && !voiceError) state.voice.status = "I did not receive a completed transcript. Tap Mic and try once more.";
     if (!heardResult && !voiceError && (state.voice.status === "Speak now." || state.voice.status === "Starting microphone… Please wait.")) {
       state.voice.status = "I did not hear any words. Tap Mic and try again.";
     } else if (state.voice.status === "Speak now." || state.voice.status === "Starting microphone… Please wait.") {
@@ -2494,13 +2527,16 @@ function handleStockFixVoice(card, transcript) {
     return confirmCard(card.id);
   }
   if (result.intent === "disambiguate") {
-    card.validation = `Did you mean ${result.choices.join(" or ")}? Say one exact medicine name.`;
+    card.validation = `I heard “${transcript}”. Did you mean ${result.choices.join(" or ")}? Tap Mic, then say one exact medicine name.`;
     card.pendingSpokenMedicine = transcript;
+    card.ui = { ...(card.ui || {}), voiceAwaitingManualRetry: true };
   } else if (result.intent === "retry") {
-    card.validation = "I could not safely match that medicine. Say the exact saved name, or type it.";
+    card.validation = `I heard “${transcript}”. I could not safely match that medicine. Tap Mic, then say the exact saved name, or type it.`;
+    card.ui = { ...(card.ui || {}), voiceAwaitingManualRetry: true };
   } else {
     const { active_slide, ...fields } = result.fields;
     card.fields = fields;
+    card.ui = { ...(card.ui || {}), voiceAwaitingManualRetry: false };
     if (card.pendingSpokenMedicine && fields.medicine) {
       pronunciationMemory.remember(card.pendingSpokenMedicine, fields.medicine);
       card.learnedSpokenMedicine = card.pendingSpokenMedicine;
