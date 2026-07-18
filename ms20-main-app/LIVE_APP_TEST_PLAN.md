@@ -507,6 +507,6 @@ For every row, retain the full internal mapping: entry point, source, shared roo
 
 ## Next controlled live sequence: automatic completion
 
-1. Home/catalog protection: refresh, return home, verify the SHOW ME tile is absent, then use the header catalog icon and confirm the complete 35-medicine catalog opens without mutation.
-2. Quiet concurrency: keep Request & Verify selected; create two different one-item M-Pesa requests, verify two waiting cards and unchanged stock, complete the second first, verify the first remains waiting and only the second stock changes once, then complete the first.
+1. Passed on 2026-07-18 — Home/catalog protection: after a clean Replit pull and restart, home retained MS2.0 Assistant, Notifications and Payment Queue, the SHOW ME tile was absent, the header icon opened `Showing 35 of 35`, and closing returned home without a message, draft, approval, sale, mutation, notification or waiting-payment change. Do not repeat without regression evidence.
+2. Next — Quiet concurrency: keep Request & Verify selected; create two different one-item M-Pesa requests, verify two waiting cards and unchanged stock, complete the second first, verify the first remains waiting and only the second stock changes once, then complete the first.
 3. Confirm the queue reaches zero, both receipts/history rows are truthful, Notifications contain no routine-success noise, and saved stock reflects exactly one deduction per completed sale. Simulator only; no credentials or real payment.
