@@ -20,17 +20,22 @@ def scan_stock_fix_evidence_locally(image_bytes: bytes) -> dict[str, Any]:
         binary = enhanced.point(lambda value: 255 if value >= 155 else 0)
         width, height = enhanced.size
         package_region = enhanced.crop((
-            int(width * 0.12),
-            int(height * 0.22),
-            int(width * 0.88),
+            int(width * 0.18),
+            int(height * 0.36),
+            int(width * 0.82),
             int(height * 0.98),
         ))
+        package_region = upscale_for_ocr(package_region, minimum_width=1400)
+        package_binary = package_region.point(lambda value: 255 if value >= 155 else 0)
+        package_top = package_region.crop((0, 0, package_region.width, int(package_region.height * 0.58)))
         readings = [
             pytesseract.image_to_string(enhanced, config="--psm 6"),
             pytesseract.image_to_string(enhanced, config="--psm 11"),
             pytesseract.image_to_string(binary, config="--psm 11"),
             pytesseract.image_to_string(package_region, config="--psm 6"),
             pytesseract.image_to_string(package_region, config="--psm 11"),
+            pytesseract.image_to_string(package_binary, config="--psm 11"),
+            pytesseract.image_to_string(package_top, config="--psm 11"),
         ]
 
     visible_text = merge_ocr_readings(readings)
@@ -65,3 +70,10 @@ def merge_ocr_readings(readings: list[str]) -> str:
             seen.add(key)
             unique_lines.append(line)
     return "\n".join(unique_lines)
+
+
+def upscale_for_ocr(image: Image.Image, minimum_width: int = 1400) -> Image.Image:
+    if image.width >= minimum_width:
+        return image
+    scale = minimum_width / max(1, image.width)
+    return image.resize((minimum_width, max(1, int(image.height * scale))), Image.Resampling.LANCZOS)

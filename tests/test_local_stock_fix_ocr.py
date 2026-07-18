@@ -28,8 +28,10 @@ def test_package_region_can_recover_name_missed_by_whole_frame(monkeypatch) -> N
     readings = iter([
         "Stock Fix instructions\n400 mg",
         "20 tablets",
-        "Batch MET-400C\nEXP 2029-03",
+        "surrounding laptop text",
         "TABLETS",
+        "Batch MET-400C\nEXP 2029-03",
+        "400 mg",
         "METRONIDAZOLE\n400 mg",
     ])
     fake_tesseract = SimpleNamespace(image_to_string=lambda *_args, **_kwargs: next(readings))
