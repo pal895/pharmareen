@@ -23,6 +23,7 @@ for (const required of [
   'data-action="stop-reading"',
   'state.pendingScanType = "stock_fix_photo"',
   'resolveStockFixPhotoTestFixture',
+  'card.photoEvidence && !String(card.fields?.medicine || "").trim() && card.validation',
   'localOnly: true',
   'handleStockFixVoice(stockFixCard, text)',
   'completeStockCorrection(card);',

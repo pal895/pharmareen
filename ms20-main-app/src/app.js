@@ -3389,7 +3389,10 @@ function ownerCardNote(card) {
   }
   if (card.type === "CatalogImportCard") return "Review the list, edit if needed, then approve.";
   if (card.type === "CatalogWorkspaceCard") return "This view uses the complete saved Pharmacy Catalog.";
-  if (card.type === "StockCorrectionCard") return stockCorrectionGuidance(card.fields, pharmacyBrain.catalog).message;
+  if (card.type === "StockCorrectionCard") {
+    if (card.photoEvidence && !String(card.fields?.medicine || "").trim() && card.validation) return card.validation;
+    return stockCorrectionGuidance(card.fields, pharmacyBrain.catalog).message;
+  }
   const confirmationBlocker = medicineReviewBlocker(card);
   if (confirmationBlocker) return confirmationBlocker;
   if (card.status === "needs_correction") return "Edit anything that looks wrong, then confirm.";

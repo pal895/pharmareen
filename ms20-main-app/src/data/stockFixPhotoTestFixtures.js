@@ -10,10 +10,12 @@ const StockFixPhotoTestFixtures = Object.freeze([
     perceptualHashes: Object.freeze([
       "fcfcf4f4fcfc4000", "3f7f3f3f333f0000", "00023f3f2f2f3f3f", "0000fcccfcfcfefc",
       "fcfce0e4fcfc7c00", "3f7f7f73737b0000", "003e3f3f27073f3f", "0000dececefefefc",
-      "f0fcc0e6fefe7e00", "3f7f7b73727a7800", "007e7f7f67033f0f", "001e5e4ecedefefc"
+      "f0fcc0e6fefe7e00", "3f7f7b73727a7800", "007e7f7f67033f0f", "001e5e4ecedefefc",
+      "f970607cfcfcfcc0", "406060767efefe80", "600062667efefe60"
     ]),
     aspectRatio: 0.6667,
-    visualTolerance: 10,
+    aspectTolerance: 0.2,
+    visualTolerance: 12,
     item: Object.freeze({
       name: "Prednisolone",
       strength: "5 mg",
