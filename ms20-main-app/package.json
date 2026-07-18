@@ -9,6 +9,7 @@
     "verify:catalog": "node tools/verify-catalog-workspace.mjs",
     "verify:voice-restock": "node tools/verify-voice-restock.mjs",
     "verify:tce": "node tools/verify-transaction-completion-engine.mjs && node tools/verify-request-verify-ui.mjs",
+    "verify:stock-fix": "node tools/verify-stock-correction.mjs",
     "verify:consistency": "node tools/verify-consistency-gate.mjs",
     "verify": "node tools/verify-architecture.mjs",
     "serve": "node tools/serve.mjs"

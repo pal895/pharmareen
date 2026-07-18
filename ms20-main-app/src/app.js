@@ -45,6 +45,7 @@ import { catalogReviewCapabilities, reorderedCatalogRows } from "./services/cata
 import { medicineReviewBlocker } from "./services/medicineReviewReadiness.js";
 import { CashPaymentAdapter, ManualPaymentAdapter, SimulatorPaymentAdapter } from "./services/paymentAdapters.js";
 import { TransactionCompletionEngine } from "./services/transactionCompletionEngine.js";
+import { reviewStockCorrection } from "./services/stockCorrectionPolicy.js";
 import { readXlsxInventory } from "./services/excelInventory.js";
 import { listRouteSlots, resolveOfflineSlot } from "./routes/routeRegistry.js";
 import {
@@ -2388,6 +2389,17 @@ function confirmCard(cardId) {
     render();
     return;
   }
+  if (card.type === "StockCorrectionCard") {
+    const review = reviewStockCorrection(card.fields, pharmacyBrain.catalog);
+    if (!review.ok) {
+      card.validation = review.message;
+      persistActiveCards();
+      render();
+      return;
+    }
+    card.fields = review.fields;
+    card.validation = "Validated against saved stock. This correction will be queued and will not change stock directly.";
+  }
   if (card.type === "CatalogOnboardingCard") {
     removeCard(cardId);
     addCard(createPasteImportCard());
@@ -3068,7 +3080,7 @@ function savedReplyFor(card) {
     const payment = paymentLabel(String(card.fields?.payment || "cash").toLowerCase());
     return `${medicine} added.\nSale recorded.\n${medicine} x${quantity}\nPayment: ${payment}`;
   }
-  if (card.type === "StockCorrectionCard") return "Stock correction saved.";
+  if (card.type === "StockCorrectionCard") return `Stock fix queued for ${card.fields?.medicine}. Saved stock is still ${card.fields?.current_stock}; requested stock ${card.fields?.correct_stock} has not been applied.`;
   if (card.type === "RestockCard") {
     const medicine = card.fields?.medicine || "Medicine";
     const quantity = card.fields?.quantity || "0";
