@@ -9,6 +9,9 @@ const [app, cards] = await Promise.all([
 for (const required of [
   'function generateReport(card)',
   'cache: "no-store"',
+  'controller.abort()',
+  'resumeDurableCard',
+  'Not refreshed yet',
   'generated_at',
   'Nothing was sent to WhatsApp or saved as a duplicate report.',
   'report_text',

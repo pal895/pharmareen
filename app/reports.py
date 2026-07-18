@@ -130,10 +130,12 @@ class ReportService:
     ) -> str:
         date_text = report_date.isoformat() if isinstance(report_date, date) else report_date
         logs = self.store.read_daily_logs(date_text)
-        try:
-            transactions = self.store.read_transactions(date_text)
-        except Exception:
-            transactions = []
+        transactions: list[dict[str, Any]] = []
+        if self.sale_ledger is None:
+            try:
+                transactions = self.store.read_transactions(date_text)
+            except Exception:
+                transactions = []
         try:
             low_stock = low_stock_from_items(self.store.list_low_stock_items())
         except Exception:

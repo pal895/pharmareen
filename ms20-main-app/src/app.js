@@ -2427,11 +2427,14 @@ async function generateReport(card) {
   card.validation = "Generating today's report from saved pharmacy records…";
   persistActiveCards();
   render();
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 20000);
   try {
     const response = await fetch(`/reports/daily?send_whatsapp=false&refresh=${Date.now()}`, {
       method: "POST",
       cache: "no-store",
-      headers: { "Cache-Control": "no-cache" }
+      headers: { "Cache-Control": "no-cache" },
+      signal: controller.signal
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.detail || "The report could not be generated right now.");
@@ -2446,8 +2449,11 @@ async function generateReport(card) {
     card.title = "Today's report";
     card.validation = "Fresh report generated from saved sales, activity and stock records. Nothing was sent to WhatsApp or saved as a duplicate report.";
   } catch (error) {
-    card.validation = error?.message || "The report could not be generated right now.";
+    card.validation = error?.name === "AbortError"
+      ? "Report refresh took too long. Your previous report is unchanged; tap Refresh report to try again."
+      : error?.message || "The report could not be generated right now.";
   } finally {
+    window.clearTimeout(timeoutId);
     card.submitting = false;
     persistActiveCards();
     render();
@@ -3733,10 +3739,24 @@ function readActiveCards() {
   try {
     const cards = JSON.parse(safeLocalStorage()?.getItem(ACTIVE_CARDS_KEY) || "[]");
     if (!Array.isArray(cards)) return [];
-    return cards.filter(isDurableCard).slice(0, ACTIVE_CARD_RESUME_LIMIT);
+    return cards.filter(isDurableCard).slice(0, ACTIVE_CARD_RESUME_LIMIT).map(resumeDurableCard);
   } catch {
     return [];
   }
+}
+
+function resumeDurableCard(card) {
+  const resumed = { ...card, submitting: false };
+  if (resumed.type === "ReportCard") {
+    resumed.fields = {
+      ...resumed.fields,
+      generated_at: resumed.fields?.generated_at || "Not refreshed yet"
+    };
+    if (String(resumed.validation || "").startsWith("Generating today")) {
+      resumed.validation = "The previous refresh was interrupted. Your saved report is unchanged; tap Refresh report to try again.";
+    }
+  }
+  return resumed;
 }
 
 function persistActiveCards() {
