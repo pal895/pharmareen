@@ -49,6 +49,18 @@ assert.equal(applyStockCorrectionVoice(voice.fields, "Cancel", catalog).intent, 
 assert.equal(applyStockCorrectionVoice(voice.fields, "Change correct stock", catalog).slide, 2);
 assert.equal(applyStockCorrectionVoice(voice.fields, "Change stock", catalog).slide, 1);
 
+const coAmoxiclavCatalog = [{ name: "Co-Amoxiclav", stockLeft: 24 }];
+let guided = applyStockCorrectionVoice({ medicine: "", current_stock: "", correct_stock: "", reason: "", active_slide: 0 }, "medicine Co-Amoxiclav", coAmoxiclavCatalog);
+assert.equal(guided.fields.medicine, "Co-Amoxiclav");
+assert.equal(guided.fields.current_stock, 24);
+guided = applyStockCorrectionVoice({ ...guided.fields, active_slide: 1 }, "current stock is 24 new stock is 23", coAmoxiclavCatalog);
+assert.equal(guided.fields.current_stock, "24");
+assert.equal(guided.fields.correct_stock, "23");
+guided = applyStockCorrectionVoice({ ...guided.fields, active_slide: 2 }, "no reason", coAmoxiclavCatalog);
+assert.equal(guided.fields.reason, "");
+assert.equal(guided.review, true);
+assert.equal(applyStockCorrectionVoice({ medicine: "Co-Amoxiclav", current_stock: 24, correct_stock: "", reason: "", active_slide: 1 }, "new stock 23", coAmoxiclavCatalog).fields.correct_stock, "23");
+
 const ambiguousCatalog = [{ name: "Losartan", stock: 37, aliases: ["lora"] }, { name: "Loratadine", stock: 12, aliases: ["lora"] }];
 const uncertain = applyStockCorrectionVoice({}, "lora", ambiguousCatalog);
 assert.ok(["disambiguate", "retry"].includes(uncertain.intent));

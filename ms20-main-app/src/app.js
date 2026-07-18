@@ -517,6 +517,7 @@ function cardTemplate(card) {
       </div>
       ${noteBeforeBody ? `<p class="card-note card-note-before-review">${escapeHtml(note)}</p>` : ""}
       ${cardBodyTemplate(card, displayed)}
+      ${card.type === "StockCorrectionCard" && card.voiceTranscripts?.length ? `<section class="stock-fix-voice-transcript" aria-label="Voice transcript"><strong>Voice transcript</strong>${card.voiceTranscripts.map((entry, index) => `<p>${index + 1}. ${escapeHtml(entry)}</p>`).join("")}</section>` : ""}
       ${!progressiveMedicine && (card.type === "SaleCard" || card.type === "VoiceReviewCard") ? paymentToolbar(card) : ""}
       ${!progressiveMedicine && (card.type === "SaleCard" || card.type === "RestockCard") ? quantityToolbar(card) : ""}
       ${noteBeforeBody ? "" : `<p class="card-note" data-card-note="${card.id}">${escapeHtml(note)}</p>`}
@@ -1425,7 +1426,7 @@ function startVoiceCapture() {
       handleVoiceTranscript(finalTranscript);
       const continuingCard = state.cards.find((card) => card.type === "StockCorrectionCard");
       if (guidedStockFix && continuingCard && !continuingCard.ui?.reviewedSlides && !continuingCard.ui?.voiceAwaitingManualRetry) {
-        setTimeout(() => startVoiceCapture(), 350);
+        announceStockFixNextStep(continuingCard);
       }
     } else {
       render();
@@ -2506,9 +2507,11 @@ function stockFixSlideInstruction(slide) {
 
 function handleStockFixVoice(card, transcript) {
   card.ui = { ...(card.ui || {}), voiceGuided: true };
+  card.voiceTranscripts = [...(card.voiceTranscripts || []), transcript].slice(-6);
+  const guidedStage = stockFixGuidedStage(card);
   const learnedCanonical = pronunciationMemory.resolve(transcript);
   const spokenInput = learnedCanonical || transcript;
-  const result = applyStockCorrectionVoice({ ...card.fields, active_slide: card.ui?.activeSlide || 0 }, spokenInput, pharmacyBrain.catalog);
+  const result = applyStockCorrectionVoice({ ...card.fields, active_slide: guidedStage }, spokenInput, pharmacyBrain.catalog);
   if (result.intent === "cancel") {
     rejectCard(card.id);
     state.voice.status = "Stock fix cancelled. Nothing changed.";
@@ -2542,8 +2545,12 @@ function handleStockFixVoice(card, transcript) {
       card.learnedSpokenMedicine = card.pendingSpokenMedicine;
       delete card.pendingSpokenMedicine;
     }
+    if (guidedStage === 0 && fields.medicine && !learnedCanonical && String(transcript).trim().toLowerCase() !== String(fields.medicine).trim().toLowerCase()) {
+      pronunciationMemory.remember(transcript, fields.medicine);
+      card.learnedSpokenMedicine = transcript;
+    }
     card.ui = { ...(card.ui || {}), activeSlide: result.slide ?? card.ui?.activeSlide ?? 0 };
-    card.validation = stockCorrectionGuidance(card.fields, pharmacyBrain.catalog).message;
+    card.validation = stockFixVoiceProgressMessage(card, result);
     if (result.review) card.ui.reviewedSlides = [0, 1, 2];
   }
   persistActiveCards();
@@ -2564,10 +2571,48 @@ function forgetStockFixPronunciation(cardId) {
 }
 
 function stockFixVoicePrompt(card) {
-  const slide = Number(card.ui?.activeSlide || 0);
+  const slide = stockFixGuidedStage(card);
   if (slide === 0) return "Say the medicine name.";
-  if (slide === 1) return card.fields?.current_stock === "" ? "Say current and correct stock." : `Current stock is ${card.fields.current_stock}. Say the correct stock.`;
+  if (slide === 1) return card.fields?.current_stock === "" ? "Say current and new stock." : `Current stock is ${card.fields.current_stock}. Say the new correct stock.`;
   return "Say a reason, or say Confirm to continue.";
+}
+
+function stockFixGuidedStage(card) {
+  if (!String(card?.fields?.medicine || "").trim()) return 0;
+  if (card?.fields?.correct_stock === "" || card?.fields?.correct_stock === null || card?.fields?.correct_stock === undefined) return 1;
+  return 2;
+}
+
+function stockFixVoiceProgressMessage(card, result = {}) {
+  const stage = stockFixGuidedStage(card);
+  if (stage === 1) {
+    if (result.currentAcknowledged) return `Current stock ${card.fields.current_stock} noted. Next, say the new correct stock.`;
+    return `${card.fields.medicine} matched in the Pharmacy Catalog. Saved current stock is ${card.fields.current_stock}. Next, say the new correct stock.`;
+  }
+  if (stage === 2) {
+    return `New correct stock ${card.fields.correct_stock} noted. Reason is optional. Next, say a reason or say Confirm to review everything.`;
+  }
+  return "Say the medicine name.";
+}
+
+function announceStockFixNextStep(card) {
+  const stage = stockFixGuidedStage(card);
+  card.ui = { ...(card.ui || {}), activeSlide: stage };
+  card.validation = stockFixVoiceProgressMessage(card);
+  persistActiveCards();
+  render();
+  focusCard(card.id);
+  const message = card.validation;
+  if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+    setTimeout(() => startVoiceCapture(), 650);
+    return;
+  }
+  const utterance = new SpeechSynthesisUtterance(message);
+  utterance.lang = "en-KE";
+  utterance.onend = () => setTimeout(() => startVoiceCapture(), 350);
+  utterance.onerror = () => setTimeout(() => startVoiceCapture(), 350);
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
 }
 
 function cycleStockFixReview(cardId) {
@@ -3506,6 +3551,7 @@ function ownerCardNote(card) {
   if (card.type === "CatalogWorkspaceCard") return "This view uses the complete saved Pharmacy Catalog.";
   if (card.type === "StockCorrectionCard") {
     if (card.photoEvidence && !String(card.fields?.medicine || "").trim() && card.validation) return card.validation;
+    if (card.ui?.voiceGuided && card.validation) return card.validation;
     return stockCorrectionGuidance(card.fields, pharmacyBrain.catalog).message;
   }
   const confirmationBlocker = medicineReviewBlocker(card);

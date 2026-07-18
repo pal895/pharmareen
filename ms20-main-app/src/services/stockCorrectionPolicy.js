@@ -65,8 +65,9 @@ export function applyStockCorrectionVoice(fields = {}, transcript = "", catalog 
   if (Object.hasOwn(changeTargets, normalized)) return { intent: "slide", slide: changeTargets[normalized], fields };
 
   const next = { ...fields };
-  const currentAndCorrect = normalized.match(/current(?: stock)?\s+(\d+)\D+correct(?: stock)?\s+(\d+)/);
-  const correctOnly = normalized.match(/(?:correct(?: stock)?|set(?: stock)? to)\s+(\d+)/);
+  const currentAndCorrect = normalized.match(/current(?: stock)?(?: is)?\s+(\d+)\D+(?:correct|new)(?: stock)?(?: is| to)?\s+(\d+)/);
+  const currentOnly = normalized.match(/^current(?: stock)?(?: is)?\s+(\d+)$/);
+  const correctOnly = normalized.match(/^(?:(?:correct|new)(?: stock)?(?: is| to)?|set(?: stock)? to|change(?: stock)? to)\s+(\d+)$/);
   if (currentAndCorrect) {
     next.current_stock = currentAndCorrect[1];
     next.correct_stock = currentAndCorrect[2];
@@ -76,16 +77,25 @@ export function applyStockCorrectionVoice(fields = {}, transcript = "", catalog 
     next.correct_stock = correctOnly[1];
     return { intent: "update", slide: 2, fields: next };
   }
+  if (currentOnly && Number(fields.active_slide) === 1) {
+    next.current_stock = currentOnly[1];
+    return { intent: "update", slide: 1, currentAcknowledged: true, fields: next };
+  }
   if (Number(fields.active_slide) === 1 && /^\d+$/.test(normalized)) {
     next.correct_stock = normalized;
     return { intent: "update", slide: 2, fields: next };
+  }
+  if (String(next.medicine || "").trim() && next.current_stock !== "" && next.correct_stock !== "" && /^(?:no reason|skip reason|reason not provided)$/.test(normalized)) {
+    next.reason = "";
+    return { intent: "update", slide: 2, review: true, fields: next };
   }
   const reason = normalized.match(/^(?:reason\s+)?(.+)$/);
   if (String(next.medicine || "").trim() && next.current_stock !== "" && next.correct_stock !== "" && !String(next.reason || "").trim() && reason) {
     next.reason = text.replace(/^reason\s+/i, "").trim();
     return { intent: "update", slide: 2, review: true, fields: next };
   }
-  const match = matchMedicine(text, catalog);
+  const medicineText = text.replace(/^(?:medicine|the medicine is|medicine name is)\s+/i, "").trim();
+  const match = matchMedicine(medicineText, catalog);
   if (match.status === "matched") {
     const medicine = match.matches[0];
     next.medicine = medicine.name || medicine.medicine;
