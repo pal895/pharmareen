@@ -46,7 +46,7 @@ import { catalogReviewCapabilities, reorderedCatalogRows } from "./services/cata
 import { medicineReviewBlocker } from "./services/medicineReviewReadiness.js";
 import { CashPaymentAdapter, ManualPaymentAdapter, SimulatorPaymentAdapter } from "./services/paymentAdapters.js";
 import { TransactionCompletionEngine } from "./services/transactionCompletionEngine.js";
-import { applyStockCorrectionVoice, PharmacyPronunciationMemory, reviewStockCorrection, stockCorrectionGuidance, stockCorrectionSummary } from "./services/stockCorrectionPolicy.js";
+import { applyStockCorrectionVoice, PharmacyPronunciationMemory, reviewStockCorrection, stockCorrectionGuidance, trustedCatalogStock } from "./services/stockCorrectionPolicy.js";
 import { readXlsxInventory } from "./services/excelInventory.js";
 import { listRouteSlots, resolveOfflineSlot } from "./routes/routeRegistry.js";
 import {
@@ -154,6 +154,8 @@ const FIELD_LABELS = {
   items_text: "Medicine list"
 };
 let activeRecognition = null;
+let stockFixReading = null;
+let stockFixReadingSequence = 0;
 
 state.ui = { screen: "home", workspace: "operations" };
 state.voice = { starting: false, listening: false, status: "" };
@@ -1147,9 +1149,9 @@ function handleAction(dataset) {
   if (action === "export-catalog-csv") exportCatalogCsv();
   if (action === "download-template") downloadBulkPasteTemplate();
   if (action === "read-card") readCardAloud(dataset.cardId);
-  if (action === "pause-reading") window.speechSynthesis?.pause();
-  if (action === "resume-reading") window.speechSynthesis?.resume();
-  if (action === "stop-reading") window.speechSynthesis?.cancel();
+  if (action === "pause-reading") pauseStockFixReading();
+  if (action === "resume-reading") resumeStockFixReading();
+  if (action === "stop-reading") stopStockFixReading();
   if (action === "mark-notifications-read") markNotificationsRead();
   if (action === "dismiss-notification") dismissNotification(dataset.notificationId);
   if (action === "demo-report") addReportCard();
@@ -1523,7 +1525,7 @@ async function addPhotoCards(fileOrName, scanType, knownFixture) {
     if (catalogMatch.status === "matched") {
       const medicine = catalogMatch.matches[0];
       card.fields.medicine = medicine.name || medicine.medicine;
-      card.fields.current_stock = medicine.stock ?? medicine.current_stock ?? medicine.quantity ?? "";
+      card.fields.current_stock = trustedCatalogStock(medicine) ?? "";
       card.validation = "Photo matched this pharmacy’s saved medicine locally. Add only the corrected stock and reason, then review all three sections.";
       card.confidence = 0.96;
     } else {
@@ -2327,7 +2329,7 @@ function addStockCorrectionCard() {
 }
 
 function addStockCorrectionCardFromMedicine(medicine, source = "Pharmacy Catalog") {
-  const currentStock = medicine?.stock ?? medicine?.current_stock ?? medicine?.quantity ?? "";
+  const currentStock = trustedCatalogStock(medicine) ?? "";
   addCard(createEditableCard({
     type: "StockCorrectionCard",
     title: "Check stock correction",
@@ -2421,8 +2423,7 @@ function stockFixVoicePrompt(card) {
 }
 
 function cycleStockFixReview(cardId) {
-  [0, 1, 2].forEach((slide, index) => setTimeout(() => showMedicineSlide(cardId, slide), index * 650));
-  setTimeout(() => readCardAloud(cardId), 2050);
+  readCardAloud(cardId);
 }
 
 function addCard(card) {
@@ -2840,12 +2841,68 @@ function downloadBulkPasteTemplate() {
 function readCardAloud(cardId) {
   const card = state.cards.find((item) => item.id === cardId) || activeNotificationCards().find((item) => item.id === cardId);
   if (!card || !window.speechSynthesis) return;
+  if (card.type === "StockCorrectionCard") return startStockFixReading(card);
   const fields = Object.entries(card.fields || {}).map(([key, value]) => `${key.replaceAll("_", " ")} ${value}`).join(". ");
-  const spokenText = card.type === "StockCorrectionCard" ? stockCorrectionSummary(card.fields) : `${card.title}. ${fields}`;
-  const utterance = new SpeechSynthesisUtterance(spokenText);
+  const utterance = new SpeechSynthesisUtterance(`${card.title}. ${fields}`);
   utterance.lang = "en-KE";
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
+}
+
+function startStockFixReading(card) {
+  stopStockFixReading();
+  const sequence = ++stockFixReadingSequence;
+  stockFixReading = {
+    sequence,
+    cardId: card.id,
+    index: 0,
+    paused: false,
+    segments: [
+      `Medicine: ${card.fields?.medicine || "not set"}.`,
+      `Current stock: ${card.fields?.current_stock === "" ? "not set" : card.fields?.current_stock}.`,
+      `Correct stock: ${card.fields?.correct_stock === "" ? "not set" : card.fields?.correct_stock}. Reason: ${card.fields?.reason || "not set"}. Say confirm or tap Confirm to continue.`
+    ]
+  };
+  speakStockFixSegment(sequence);
+}
+
+function speakStockFixSegment(sequence) {
+  const reading = stockFixReading;
+  if (!reading || reading.sequence !== sequence || reading.paused || reading.index >= reading.segments.length) return;
+  const utterance = new SpeechSynthesisUtterance(reading.segments[reading.index]);
+  utterance.lang = "en-KE";
+  utterance.onstart = () => {
+    if (stockFixReading?.sequence === sequence) showMedicineSlide(reading.cardId, reading.index);
+  };
+  utterance.onend = () => {
+    if (stockFixReading?.sequence !== sequence || stockFixReading.paused) return;
+    stockFixReading.index += 1;
+    if (stockFixReading.index < stockFixReading.segments.length) speakStockFixSegment(sequence);
+    else stockFixReading = null;
+  };
+  utterance.onerror = () => {
+    if (stockFixReading?.sequence === sequence && !stockFixReading.paused) stockFixReading = null;
+  };
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
+}
+
+function pauseStockFixReading() {
+  if (!stockFixReading) return;
+  stockFixReading.paused = true;
+  window.speechSynthesis?.cancel();
+}
+
+function resumeStockFixReading() {
+  if (!stockFixReading?.paused) return;
+  stockFixReading.paused = false;
+  speakStockFixSegment(stockFixReading.sequence);
+}
+
+function stopStockFixReading() {
+  stockFixReading = null;
+  stockFixReadingSequence += 1;
+  window.speechSynthesis?.cancel();
 }
 
 function recordCard(card) {

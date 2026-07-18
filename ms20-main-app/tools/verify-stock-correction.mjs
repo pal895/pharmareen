@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { applyStockCorrectionVoice, PharmacyPronunciationMemory, reviewStockCorrection, stockCorrectionGuidance, stockCorrectionSummary } from "../src/services/stockCorrectionPolicy.js";
+import { applyStockCorrectionVoice, PharmacyPronunciationMemory, reviewStockCorrection, stockCorrectionGuidance, stockCorrectionSummary, trustedCatalogStock } from "../src/services/stockCorrectionPolicy.js";
 
 const catalog = [{ name: "Losartan", stock: 37, aliases: ["Losartan 50"] }];
+assert.equal(trustedCatalogStock({ name: "Cefixime", stockLeft: 23 }), 23);
+assert.equal(reviewStockCorrection({ medicine: "Cefixime", current_stock: 23, correct_stock: 22, reason: "Physical count" }, [{ name: "Cefixime", stockLeft: 23 }]).ok, true);
 
 assert.equal(reviewStockCorrection({ medicine: "", current_stock: 37, correct_stock: 36, reason: "Count" }, catalog).ok, false);
 assert.equal(reviewStockCorrection({ medicine: "Losartan", current_stock: 38, correct_stock: 36, reason: "Count" }, catalog).ok, false);

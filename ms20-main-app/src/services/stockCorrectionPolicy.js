@@ -13,7 +13,7 @@ export function reviewStockCorrection(fields = {}, catalog = []) {
   }
 
   const medicine = match.matches[0];
-  const savedStock = finiteStock(medicine.stock ?? medicine.current_stock ?? medicine.quantity);
+  const savedStock = trustedCatalogStock(medicine);
   const enteredCurrent = finiteStock(fields.current_stock);
   const correctStock = finiteStock(fields.correct_stock);
   const reason = String(fields.reason || "").trim();
@@ -90,7 +90,7 @@ export function applyStockCorrectionVoice(fields = {}, transcript = "", catalog 
   if (match.status === "matched") {
     const medicine = match.matches[0];
     next.medicine = medicine.name || medicine.medicine;
-    const savedStock = finiteStock(medicine.stock ?? medicine.current_stock ?? medicine.quantity);
+    const savedStock = trustedCatalogStock(medicine);
     if (savedStock !== null) next.current_stock = savedStock;
     return { intent: "update", slide: 1, fields: next };
   }
@@ -143,4 +143,8 @@ function finiteStock(value) {
   if (value === "" || value === null || value === undefined) return null;
   const number = Number(value);
   return Number.isInteger(number) && number >= 0 ? number : null;
+}
+
+export function trustedCatalogStock(medicine = {}) {
+  return finiteStock(medicine.stock ?? medicine.stockLeft ?? medicine.current_stock ?? medicine.quantity);
 }
