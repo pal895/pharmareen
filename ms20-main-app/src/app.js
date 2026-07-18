@@ -3638,7 +3638,7 @@ function ownerCardNote(card) {
   if (card.type === "ImportMappingCard") return "Map the columns once, then MS2.0 can reuse the pattern.";
   if (card.type === "NotificationCard") return "Generated locally from pharmacy records.";
   if (card.type === "DocumentExportCard") return "Download or print when ready.";
-  if (card.type === "ReportCard") return "Check the report request before saving.";
+  if (card.type === "ReportCard") return card.validation || "Generate the report from saved pharmacy records.";
   if (card.type === "SyncReviewCard") return "Review saved work before syncing.";
   return "Check the details, then confirm.";
 }
