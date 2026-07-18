@@ -2482,7 +2482,17 @@ function handleStockFixVoice(card, transcript) {
     return;
   }
   if (result.intent === "read") return readCardAloud(card.id);
-  if (result.intent === "confirm") return confirmCard(card.id);
+  if (result.intent === "confirm") {
+    if (!card.ui?.reviewedSlides) {
+      card.ui = { ...(card.ui || {}), reviewedSlides: [0, 1, 2] };
+      card.validation = "Reviewing the complete stock fix. Say Confirm again after the review to apply it.";
+      persistActiveCards();
+      render();
+      focusCard(card.id);
+      return cycleStockFixReview(card.id);
+    }
+    return confirmCard(card.id);
+  }
   if (result.intent === "disambiguate") {
     card.validation = `Did you mean ${result.choices.join(" or ")}? Say one exact medicine name.`;
     card.pendingSpokenMedicine = transcript;
