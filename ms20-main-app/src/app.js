@@ -1462,7 +1462,10 @@ function startVoiceCapture() {
     activeRecognition = null;
     state.voice.starting = false;
     state.voice.listening = false;
-    if (!heardResult && !voiceError) state.voice.status = "I did not receive a completed transcript. Tap Mic and try once more.";
+    const completedStockFixReview = state.cards.find((card) => card.type === "StockCorrectionCard" && card.ui?.voiceReviewCompleted);
+    if (!heardResult && !voiceError) state.voice.status = completedStockFixReview
+      ? "Review complete. Tap Mic and say Confirm again to apply this stock fix once."
+      : "I did not receive a completed transcript. Tap Mic and try once more.";
     if (!heardResult && !voiceError && (state.voice.status === "Speak now." || state.voice.status === "Starting microphone… Please wait.")) {
       state.voice.status = "I did not hear any words. Tap Mic and try again.";
     } else if (state.voice.status === "Speak now." || state.voice.status === "Starting microphone… Please wait.") {
@@ -2521,20 +2524,7 @@ function handleStockFixVoice(card, transcript) {
   }
   if (result.intent === "read") return readCardAloud(card.id);
   if (result.intent === "confirm") {
-    if (!card.ui?.voiceReviewCompleted) {
-      if (card.ui?.voiceReviewStarted && stockFixReading?.cardId === card.id) {
-        card.validation = "Finish the complete review before saying Confirm again.";
-        persistActiveCards();
-        render();
-        return focusCard(card.id);
-      }
-      card.ui = { ...(card.ui || {}), reviewedSlides: [0, 1, 2], voiceReviewStarted: true, voiceReviewCompleted: false };
-      card.validation = "Reviewing the complete stock fix. Say Confirm again after the review to apply it.";
-      persistActiveCards();
-      render();
-      focusCard(card.id);
-      return cycleStockFixReview(card.id);
-    }
+    if (requestGuidedStockFixConfirmation(card)) return;
     return confirmCard(card.id);
   }
   if (result.intent === "disambiguate") {
@@ -2571,6 +2561,24 @@ function handleStockFixVoice(card, transcript) {
   focusCard(card.id);
 }
 
+function requestGuidedStockFixConfirmation(card) {
+  if (!card?.ui?.voiceGuided || card.ui.voiceReviewCompleted) return false;
+  if (card.ui.voiceReviewStarted && stockFixReading?.cardId === card.id) {
+    card.validation = "Finish the complete review. MS2.0 will then ask you to say Confirm again to apply it.";
+    persistActiveCards();
+    render();
+    focusCard(card.id);
+    return true;
+  }
+  card.ui = { ...(card.ui || {}), reviewedSlides: [0, 1, 2], voiceReviewStarted: true, voiceReviewCompleted: false };
+  card.validation = "First Confirm received. Reviewing Medicine, Stock and Reason now. After the review, say Confirm again to apply once.";
+  persistActiveCards();
+  render();
+  focusCard(card.id);
+  cycleStockFixReview(card.id);
+  return true;
+}
+
 function forgetStockFixPronunciation(cardId) {
   const card = state.cards.find((item) => item.id === cardId && item.type === "StockCorrectionCard");
   if (!card?.learnedSpokenMedicine) return;
@@ -2586,7 +2594,7 @@ function stockFixVoicePrompt(card) {
   const slide = stockFixGuidedStage(card);
   if (slide === 0) return "Say the medicine name.";
   if (slide === 1) return card.fields?.current_stock === "" ? "Say current and new stock." : `Current stock is ${card.fields.current_stock}. Say the new correct stock.`;
-  return "Say a reason, or say Confirm to continue.";
+  return "Say a reason, or say Confirm once to review and again after review to apply.";
 }
 
 function stockFixGuidedStage(card) {
@@ -2602,7 +2610,8 @@ function stockFixVoiceProgressMessage(card, result = {}) {
     return `${card.fields.medicine} matched in the Pharmacy Catalog. Saved current stock is ${card.fields.current_stock}. Next, say the new correct stock.`;
   }
   if (stage === 2) {
-    return `New correct stock ${card.fields.correct_stock} noted. Reason is optional. Next, say a reason or say Confirm to review everything.`;
+    if (result.review) return "Reason not provided. Say Confirm once to hear the complete review, then say Confirm again after the review to apply this stock fix.";
+    return `New correct stock ${card.fields.correct_stock} noted. Reason is optional. Next, say a reason, or say Confirm once to review and again after review to apply.`;
   }
   return "Say the medicine name.";
 }
@@ -2751,6 +2760,7 @@ function reviewPasteList(cardId) {
 function confirmCard(cardId) {
   const card = state.cards.find((item) => item.id === cardId);
   if (!card || card.submitting) return;
+  if (card.type === "StockCorrectionCard" && requestGuidedStockFixConfirmation(card)) return;
   card.submitting = true;
   const confirmationBlocker = medicineReviewBlocker(card);
   if (confirmationBlocker) {
@@ -3078,7 +3088,7 @@ function startStockFixReading(card) {
     segments: [
       `Medicine: ${card.fields?.medicine || "not set"}.`,
       `Current stock: ${card.fields?.current_stock === "" ? "not set" : card.fields?.current_stock}.`,
-      `Correct stock: ${card.fields?.correct_stock === "" ? "not set" : card.fields?.correct_stock}. Reason: ${card.fields?.reason || "not provided"}. Say confirm or tap Confirm to continue.`
+      `Correct stock: ${card.fields?.correct_stock === "" ? "not set" : card.fields?.correct_stock}. Reason: ${card.fields?.reason || "not provided"}. Complete review finished. When listening resumes, say Confirm again to apply this stock fix once.`
     ]
   };
   updateStockFixReadButton(card.id, "Pause");
