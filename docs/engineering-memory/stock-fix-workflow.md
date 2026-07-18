@@ -41,3 +41,7 @@ Latest live evidence passes the segmented Read behavior: speech follows the thre
 The Cefixime 23 to 22 screenshot proves only that the former queue-first mechanism accepted the draft, left it pending and retained saved stock 23. It is product friction under the corrected owner intent, not a completed online Stock Fix. The shared execution repair supersedes the queue-first acceptance wording above.
 
 Next live test: after pull/restart, note Losartan's saved stock, open Stock Fix and enter a different correct whole-number quantity with a short reason, then Confirm once. Pass only if the result says `Stock updated` and Pharmacy Catalog immediately shows the corrected saved quantity. Do not test Read again or begin picture assistance yet.
+
+The corrected online checkpoint passed after `9deb92f`. Startup automatically applied the retained Cefixime 23 to 22 fallback once. A separate manual Losartan correction then changed saved stock immediately from 37 to 39; the result said `Stock updated`, and the independently reopened Medicine Action Card showed Current stock 39 with `No changes yet`. Manual Stock Fix is complete.
+
+Next stage is picture-assisted Stock Fix with a different catalog medicine. Prepare and protect one realistic non-overlapping controlled package plus its exact trusted saved-stock baseline before asking the owner to test it; do not reuse the completed Amoxicillin onboarding fixture because it has no trusted saved stock.
