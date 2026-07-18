@@ -696,7 +696,7 @@ function fieldTemplate(card, field) {
     : `<input data-card-id="${card.id}" data-field="${field}" ${inputMode ? `inputmode="${inputMode}"` : ""} value="${escapeHtml(String(value))}">`;
   return `
     <label>
-      <span>${escapeHtml(card.type === "RestockCard" && field === "quantity" ? "Stock to add" : fieldLabel(field))}</span>
+      <span>${escapeHtml(card.type === "RestockCard" && field === "quantity" ? "Stock to add" : card.type === "StockCorrectionCard" && field === "reason" ? "Reason (optional)" : fieldLabel(field))}</span>
       ${control}
     </label>
   `;
@@ -2209,7 +2209,7 @@ async function processStockFixEvidence(card, file, fileName, evidenceSource) {
     card.confidence = result.confidence;
     card.ui = { ...(card.ui || {}), activeSlide: result.canonicalName ? 1 : 0 };
     card.validation = result.canonicalName
-      ? `Matched ${result.displayName} locally. Saved stock is authoritative; add only corrected stock and reason.`
+      ? `Matched ${result.displayName} locally. Saved stock is authoritative; add corrected stock. Reason is optional.`
       : result.ambiguityChoices.length
         ? `Choose ${result.ambiguityChoices.join(" or ")}.`
         : "I could not safely match this image to one saved medicine. Type or say the medicine name; no stock value was invented.";
@@ -2406,7 +2406,7 @@ function addStockCorrectionCard() {
     source: "Manual stock fix",
     fields: { medicine: "", current_stock: "", correct_stock: "", reason: "" },
     confidence: 0.82,
-    validation: "Choose a saved medicine. Add the current stock, corrected stock and reason. Nothing changes until you confirm the complete review."
+    validation: "Choose a saved medicine and add the corrected stock. Reason is optional. Nothing changes until you confirm."
   }));
 }
 
@@ -2418,7 +2418,7 @@ function addStockCorrectionCardFromMedicine(medicine, source = "Pharmacy Catalog
     source,
     fields: { medicine: medicine?.name || medicine?.medicine || "", current_stock: currentStock, correct_stock: "", reason: "" },
     confidence: 1,
-    validation: "Saved medicine and current stock are filled. Add corrected stock and a reason, then review before confirming."
+    validation: "Saved medicine and current stock are filled. Add corrected stock; reason is optional."
   }));
 }
 
@@ -2468,7 +2468,7 @@ function fillTrustedStockForDraft(card, medicineText) {
 }
 
 function stockFixSlideInstruction(slide) {
-  return ["Choose the saved medicine.", "Check current stock.", "Add corrected stock and reason."][slide] || "Review the stock fix.";
+  return ["Choose the saved medicine.", "Check current stock.", "Add corrected stock. Reason is optional."][slide] || "Review the stock fix.";
 }
 
 function handleStockFixVoice(card, transcript) {
@@ -2521,7 +2521,7 @@ function stockFixVoicePrompt(card) {
   const slide = Number(card.ui?.activeSlide || 0);
   if (slide === 0) return "Say the medicine name.";
   if (slide === 1) return card.fields?.current_stock === "" ? "Say current and correct stock." : `Current stock is ${card.fields.current_stock}. Say the correct stock.`;
-  return "Say the reason for the stock correction.";
+  return "Say a reason, or say Confirm to continue.";
 }
 
 function cycleStockFixReview(cardId) {
@@ -2966,7 +2966,7 @@ function startStockFixReading(card) {
     segments: [
       `Medicine: ${card.fields?.medicine || "not set"}.`,
       `Current stock: ${card.fields?.current_stock === "" ? "not set" : card.fields?.current_stock}.`,
-      `Correct stock: ${card.fields?.correct_stock === "" ? "not set" : card.fields?.correct_stock}. Reason: ${card.fields?.reason || "not set"}. Say confirm or tap Confirm to continue.`
+      `Correct stock: ${card.fields?.correct_stock === "" ? "not set" : card.fields?.correct_stock}. Reason: ${card.fields?.reason || "not provided"}. Say confirm or tap Confirm to continue.`
     ]
   };
   updateStockFixReadButton(card.id, "Pause");

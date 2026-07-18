@@ -14,7 +14,9 @@ assert.equal(reviewStockCorrection({ medicine: "Cefixime", current_stock: 23, co
 assert.equal(reviewStockCorrection({ medicine: "", current_stock: 37, correct_stock: 36, reason: "Count" }, catalog).ok, false);
 assert.equal(reviewStockCorrection({ medicine: "Losartan", current_stock: 38, correct_stock: 36, reason: "Count" }, catalog).ok, false);
 assert.equal(reviewStockCorrection({ medicine: "Losartan", current_stock: 37, correct_stock: -1, reason: "Count" }, catalog).ok, false);
-assert.equal(reviewStockCorrection({ medicine: "Losartan", current_stock: 37, correct_stock: 36, reason: "" }, catalog).ok, false);
+const withoutReason = reviewStockCorrection({ medicine: "Losartan", current_stock: 37, correct_stock: 36, reason: "" }, catalog);
+assert.equal(withoutReason.ok, true, "rush-hour Stock Fix must allow an omitted reason");
+assert.equal(withoutReason.fields.reason, "");
 assert.equal(reviewStockCorrection({ medicine: "Losartan", current_stock: 37, correct_stock: 37, reason: "Count" }, catalog).ok, false);
 
 const approved = reviewStockCorrection({ medicine: "losartan 50", current_stock: "37", correct_stock: "36", reason: "Physical count" }, catalog);
@@ -31,6 +33,7 @@ assert.deepEqual(approved.fields, {
 assert.equal(stockCorrectionGuidance(approved.fields, catalog).ready, true);
 assert.equal(stockCorrectionGuidance(approved.fields, catalog).message, "Ready. Check the details, then tap Confirm. If you are online, saved stock updates now.");
 assert.match(stockCorrectionSummary(approved.fields), /Medicine: Losartan\. Current stock: 37\. Correct stock: 36\. Reason: Physical count\./);
+assert.match(stockCorrectionSummary(withoutReason.fields), /Reason: not provided\./);
 
 let voice = applyStockCorrectionVoice({ medicine: "", current_stock: "", correct_stock: "", reason: "", active_slide: 0 }, "Losartan", catalog);
 assert.equal(voice.fields.medicine, "Losartan");
@@ -90,6 +93,27 @@ assert.equal(savedCatalog[0].stockLeft, 36);
 assert.equal(executionQueue.pendingCount(), 0);
 assert.equal(execute().duplicate, true);
 assert.equal(persistenceCalls, 1);
+
+const optionalReasonStorage = new MemoryStorage();
+const optionalReasonQueue = new OfflineQueue(null);
+let optionalReasonCatalog = [{ name: "Metronidazole", stockLeft: 35 }];
+const optionalReasonAction = {
+  id: "stock-fix-optional-reason-1",
+  type: "StockCorrectionCard",
+  fields: reviewStockCorrection({ medicine: "Metronidazole", current_stock: 35, correct_stock: 34, reason: "" }, optionalReasonCatalog).fields
+};
+const optionalReasonResult = executeStockCorrection({
+  action: optionalReasonAction,
+  catalog: optionalReasonCatalog,
+  online: true,
+  queue: optionalReasonQueue,
+  storage: optionalReasonStorage,
+  persistCatalog: (items) => { optionalReasonCatalog = items; return true; },
+  replaceCatalog: (items) => { optionalReasonCatalog = items; }
+});
+assert.equal(optionalReasonResult.status, "completed");
+assert.equal(optionalReasonCatalog[0].stockLeft, 34);
+assert.equal(JSON.parse(optionalReasonStorage.getItem("ms20-main-app:stock-fix-audit"))[0].reason, "", "audit must preserve an omitted reason as blank");
 
 const offlineStorage = new MemoryStorage();
 const offlineQueue = new OfflineQueue(null);

@@ -16,13 +16,15 @@ def scan_stock_fix_evidence_locally(image_bytes: bytes) -> dict[str, Any]:
         if max(image.size) > 1800:
             image.thumbnail((1800, 1800), Image.Resampling.LANCZOS)
         gray = ImageOps.grayscale(image)
-        enhanced = ImageEnhance.Contrast(gray).enhance(1.7)
+        enhanced = ImageEnhance.Sharpness(ImageOps.autocontrast(gray)).enhance(1.8)
+        binary = enhanced.point(lambda value: 255 if value >= 155 else 0)
         readings = [
             pytesseract.image_to_string(enhanced, config="--psm 6"),
             pytesseract.image_to_string(enhanced, config="--psm 11"),
+            pytesseract.image_to_string(binary, config="--psm 11"),
         ]
 
-    visible_text = max(readings, key=len, default="").strip()
+    visible_text = merge_ocr_readings(readings)
     compact = re.sub(r"\s+", " ", visible_text)
     strength = (re.search(r"\b(\d+(?:\.\d+)?)\s*(mg|mcg|g|ml)\b", compact, re.I) or [None, "", ""])
     batch = re.search(r"\b(?:batch|lot)\s*(?:no\.?|number|#|:)?\s*([A-Z0-9-]{3,})", compact, re.I)
@@ -39,3 +41,18 @@ def scan_stock_fix_evidence_locally(image_bytes: bytes) -> dict[str, Any]:
         "ocr_engine": "local_tesseract",
         "ai_used": False,
     }
+
+
+def merge_ocr_readings(readings: list[str]) -> str:
+    """Keep complementary OCR evidence instead of discarding every pass but the longest."""
+    unique_lines: list[str] = []
+    seen: set[str] = set()
+    for reading in readings:
+        for raw_line in str(reading or "").splitlines():
+            line = re.sub(r"\s+", " ", raw_line).strip()
+            key = re.sub(r"[^a-z0-9]", "", line.lower())
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            unique_lines.append(line)
+    return "\n".join(unique_lines)

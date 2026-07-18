@@ -28,7 +28,7 @@ export function normalizeStockFixEvidence(ocr = {}, catalog = [], evidenceSource
     ambiguityChoices: match.status === "ambiguous" ? match.matches.map((item) => item.name || item.medicine) : [],
     evidenceSource,
     currentStock: medicine ? trustedCatalogStock(medicine) : null,
-    fieldsStillRequired: medicine ? ["correct_stock", "reason"] : ["medicine", "correct_stock", "reason"],
+    fieldsStillRequired: medicine ? ["correct_stock"] : ["medicine", "correct_stock"],
     visibleText
   };
 }

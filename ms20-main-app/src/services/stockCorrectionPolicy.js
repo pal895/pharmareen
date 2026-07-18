@@ -22,7 +22,6 @@ export function reviewStockCorrection(fields = {}, catalog = []) {
   if (enteredCurrent === null) return { ok: false, message: "Enter the current saved stock before confirming this stock fix." };
   if (enteredCurrent !== savedStock) return { ok: false, message: `Current saved stock is ${savedStock}. Review the card before confirming.` };
   if (correctStock === null) return { ok: false, message: "Enter a whole-number corrected stock value of zero or more." };
-  if (!reason) return { ok: false, message: "Add a short reason for the stock correction audit trail." };
   if (correctStock === savedStock) return { ok: false, message: "Corrected stock matches saved stock. No correction is needed." };
 
   return {
@@ -50,7 +49,7 @@ export function stockCorrectionSummary(fields = {}) {
     `Medicine: ${fields.medicine || "not set"}.`,
     `Current stock: ${fields.current_stock === "" ? "not set" : fields.current_stock}.`,
     `Correct stock: ${fields.correct_stock === "" ? "not set" : fields.correct_stock}.`,
-    `Reason: ${fields.reason || "not set"}.`,
+    `Reason: ${fields.reason || "not provided"}.`,
     "Say confirm or tap Confirm to continue."
   ].join(" ");
 }

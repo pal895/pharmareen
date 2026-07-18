@@ -15,7 +15,7 @@ for (const source of ["camera", "photo", "file"]) {
   const result = normalizeStockFixEvidence(ocr, catalog, source);
   assert.equal(result.canonicalName, "Prednisolone");
   assert.equal(result.currentStock, 24, "saved catalog stock must remain authoritative");
-  assert.deepEqual(result.fieldsStillRequired, ["correct_stock", "reason"]);
+  assert.deepEqual(result.fieldsStillRequired, ["correct_stock"]);
   const draft = hydrateStockFixDraft({ correct_stock: "", reason: "" }, result);
   assert.equal(draft.current_stock, 24);
   assert.equal(draft.batch, "PRE-5T");
@@ -37,7 +37,7 @@ const cameraOcr = {
 const cameraResult = normalizeStockFixEvidence(cameraOcr, cameraCatalog, "camera");
 assert.equal(cameraResult.canonicalName, "Metronidazole");
 assert.equal(cameraResult.currentStock, 36, "camera evidence must read stock only from the saved catalog");
-assert.deepEqual(cameraResult.fieldsStillRequired, ["correct_stock", "reason"]);
+assert.deepEqual(cameraResult.fieldsStillRequired, ["correct_stock"]);
 const cameraDraft = hydrateStockFixDraft({ correct_stock: "", reason: "" }, cameraResult);
 assert.equal(cameraDraft.batch, "MET-400C");
 assert.equal(cameraDraft.expiry, "2029-03");
