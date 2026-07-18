@@ -2521,8 +2521,14 @@ function handleStockFixVoice(card, transcript) {
   }
   if (result.intent === "read") return readCardAloud(card.id);
   if (result.intent === "confirm") {
-    if (!card.ui?.reviewedSlides) {
-      card.ui = { ...(card.ui || {}), reviewedSlides: [0, 1, 2] };
+    if (!card.ui?.voiceReviewCompleted) {
+      if (card.ui?.voiceReviewStarted && stockFixReading?.cardId === card.id) {
+        card.validation = "Finish the complete review before saying Confirm again.";
+        persistActiveCards();
+        render();
+        return focusCard(card.id);
+      }
+      card.ui = { ...(card.ui || {}), reviewedSlides: [0, 1, 2], voiceReviewStarted: true, voiceReviewCompleted: false };
       card.validation = "Reviewing the complete stock fix. Say Confirm again after the review to apply it.";
       persistActiveCards();
       render();
@@ -2551,14 +2557,18 @@ function handleStockFixVoice(card, transcript) {
       pronunciationMemory.remember(transcript, fields.medicine);
       card.learnedSpokenMedicine = transcript;
     }
-    card.ui = { ...(card.ui || {}), activeSlide: result.slide ?? card.ui?.activeSlide ?? 0 };
+    card.ui = {
+      ...(card.ui || {}),
+      activeSlide: result.slide ?? card.ui?.activeSlide ?? 0,
+      reviewedSlides: undefined,
+      voiceReviewStarted: false,
+      voiceReviewCompleted: false
+    };
     card.validation = stockFixVoiceProgressMessage(card, result);
-    if (result.review) card.ui.reviewedSlides = [0, 1, 2];
   }
   persistActiveCards();
   render();
   focusCard(card.id);
-  if (result.review) cycleStockFixReview(card.id);
 }
 
 function forgetStockFixPronunciation(cardId) {
@@ -2648,6 +2658,7 @@ function updateCardField(cardId, field, value) {
   if (!card) return;
   card.fields[field] = value;
   if (card.type === "StockCorrectionCard") {
+    card.ui = { ...(card.ui || {}), reviewedSlides: undefined, voiceReviewStarted: false, voiceReviewCompleted: false };
     if (field === "medicine") fillTrustedStockForDraft(card, value);
     refreshStockFixDraftControls(card);
   }
@@ -3104,11 +3115,26 @@ function speakStockFixSegment(sequence) {
       updateStockFixReadButton(reading.cardId, "Read");
       const reviewedCard = state.cards.find((card) => card.id === reading.cardId && card.ui?.voiceGuided);
       stockFixReading = null;
+      if (reviewedCard?.ui?.voiceReviewStarted) {
+        reviewedCard.ui = { ...reviewedCard.ui, voiceReviewCompleted: true };
+        reviewedCard.validation = "Complete review finished. Say Confirm to apply this stock fix once.";
+        persistActiveCards();
+        render();
+        focusCard(reviewedCard.id);
+      }
       if (reviewedCard) setTimeout(() => startVoiceCapture(), 350);
     }
   };
   utterance.onerror = () => {
     if (stockFixReading?.sequence === sequence && !stockFixReading.paused) {
+      const interruptedCard = state.cards.find((card) => card.id === reading.cardId && card.ui?.voiceReviewStarted);
+      if (interruptedCard) {
+        interruptedCard.ui = { ...interruptedCard.ui, voiceReviewStarted: false, voiceReviewCompleted: false };
+        interruptedCard.validation = "The complete review did not finish. Say Confirm to start it again; nothing was applied.";
+        persistActiveCards();
+        render();
+        focusCard(interruptedCard.id);
+      }
       updateStockFixReadButton(reading.cardId, "Read");
       stockFixReading = null;
     }

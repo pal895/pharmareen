@@ -49,13 +49,21 @@ for (const required of [
   'Saved current stock is ${card.fields.current_stock}. Next, say the new correct stock.',
   'Reason is optional. Next, say a reason or say Confirm to review everything.',
   'Reviewing the complete stock fix. Say Confirm again after the review to apply it.',
-  'if (!card.ui?.reviewedSlides)',
-  'reviewedSlides: [0, 1, 2]',
+  'if (!card.ui?.voiceReviewCompleted)',
+  'voiceReviewStarted: true, voiceReviewCompleted: false',
+  'stockFixReading?.cardId === card.id',
+  'reviewedSlides: undefined, voiceReviewStarted: false, voiceReviewCompleted: false',
+  'Complete review finished. Say Confirm to apply this stock fix once.',
+  'The complete review did not finish. Say Confirm to start it again; nothing was applied.',
   'setTimeout(() => startVoiceCapture(), 350)',
   'completeStockCorrection(card);',
   'syncPendingStockCorrections();',
   'Stock updated.'
 ]) assert.ok(app.includes(required), `Missing Stock fix UI protection: ${required}`);
+
+assert.ok(!app.includes('if (result.review) card.ui.reviewedSlides'), "Draft readiness must never masquerade as a completed guided review");
+assert.ok(!app.includes('if (result.review) cycleStockFixReview'), "Completing Reason must not silently satisfy or start the Confirm review gate");
+assert.match(app, /if \(!card\.ui\?\.voiceReviewCompleted\)[\s\S]*return cycleStockFixReview\(card\.id\);[\s\S]*return confirmCard\(card\.id\);/, "Only a completed guided review may reach Stock Fix execution");
 
 assert.match(css, /@media \(hover: hover\) and \(pointer: fine\)[\s\S]*button:hover/);
 assert.match(css, /\.medicine-slide-nav button\.selected/);
