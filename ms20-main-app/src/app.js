@@ -2452,7 +2452,12 @@ async function generateReport(card) {
   const startedAt = performance.now();
   activeReportRequest?.controller.abort();
   activeReportRequest = { cardId: card.id, controller };
-  const timeoutId = window.setTimeout(() => controller.abort(), 10000);
+  const slowNoticeId = window.setTimeout(() => {
+    if (activeReportRequest?.controller !== controller) return;
+    card.validation = "Still reading the saved pharmacy records. Keep this report open; no duplicate request has been sent.";
+    render();
+  }, 10000);
+  const timeoutId = window.setTimeout(() => controller.abort(), 30000);
   try {
     const selectedPeriod = String(card.fields?.period || "Today").trim();
     const reportPeriod = selectedPeriod === "Custom date"
@@ -2486,9 +2491,10 @@ async function generateReport(card) {
       : `Fresh report generated in ${elapsedSeconds} seconds from saved sales, activity and stock records. Nothing was sent to WhatsApp or saved as a duplicate report.`;
   } catch (error) {
     card.validation = error?.name === "AbortError"
-      ? "Report refresh exceeded 10 seconds. The last successful report remains below and its date and Generated At are intentionally unchanged; tap Refresh report to try again."
+      ? "Report refresh exceeded 30 seconds. The last successful report remains below and its date and Generated At are intentionally unchanged; tap Refresh report to try again."
       : error?.message || "The report could not be generated right now.";
   } finally {
+    window.clearTimeout(slowNoticeId);
     window.clearTimeout(timeoutId);
     if (activeReportRequest?.controller === controller) activeReportRequest = null;
     card.submitting = false;
