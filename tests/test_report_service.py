@@ -197,3 +197,18 @@ def test_period_preview_uses_saved_range_and_is_deterministic():
     assert "Low Stock Items: Not shown for historical periods" in first
     assert "Source: saved sales ledger and activity log" in first
     assert "current stock records" not in first
+
+
+def test_report_preview_never_calls_ai_recommender():
+    class Store:
+        def read_report_source_records(self, start_date, end_date): return [], []
+
+    class ForbiddenRecommender:
+        def generate_recommendations(self, metrics):
+            raise AssertionError("Routine report generation must not call AI")
+
+    service = ReportService(Store(), recommender=ForbiddenRecommender())
+    report = service.generate_period_preview(date(2026, 7, 13), date(2026, 7, 19), "2026-07-13 to 2026-07-19")
+
+    assert "No urgent action found today." not in report
+    assert "Source: saved sales ledger and activity log" in report

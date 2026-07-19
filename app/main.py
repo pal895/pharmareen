@@ -4174,7 +4174,7 @@ def get_report_service() -> ReportService:
     return ReportService(
         store=get_sheet_store(),
         whatsapp=get_whatsapp_client(),
-        recommender=get_ai_service(),
+        recommender=None,
         pharmacy_name=settings.pharmacy_name,
         timezone=settings.timezone,
         sale_ledger=get_sale_ledger(),

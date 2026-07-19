@@ -27,6 +27,8 @@ ms20-main-app/
 
 `GoogleSheetsStore` owns one bounded source snapshot per configured pharmacy spreadsheet for Daily Log and Transactions. It is warmed after schema setup, refreshed every five minutes, expires after ten minutes, coalesces concurrent cold loads, and receives write-through updates after successful in-app log/transaction writes. Report periods and the shared daily-log/transaction readers filter this canonical snapshot locally. Store-instance ownership prevents cross-pharmacy cache leakage; oversize or unavailable snapshots fall back to the authoritative combined Sheets read. Capacity is bounded at 100,000 combined rows and non-sensitive readiness/count/age/hit/miss diagnostics are exposed with report responses; warmup completion and row counts are emitted to deployment logs. This shared layer removes repeated network waits without adding AI, report mutation, duplicate persistence, or current-stock-as-history behavior.
 
+Routine report recommendation construction is deterministic-only. `ReportService` never calls OpenAI for Today, historical, custom-range or refreshed reports; the production factory supplies no recommender. This preserves token-minimal AI-last execution and prevents an external model round trip from dominating otherwise local cached report construction.
+
 Local app URL used during verification:
 
 ```text

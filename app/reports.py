@@ -202,13 +202,7 @@ class ReportService:
         return report_text
 
     def _recommendations(self, metrics: ReportMetrics) -> list[str]:
-        if self.recommender is not None:
-            try:
-                recommendations = self.recommender.generate_recommendations(metrics.as_dict())
-                if recommendations:
-                    return recommendations
-            except Exception:
-                logger.exception("AI recommendations failed; using deterministic recommendations")
+        """Reports are routine deterministic reads; never wait for or spend tokens on AI."""
         return deterministic_recommendations(metrics)
 
 
