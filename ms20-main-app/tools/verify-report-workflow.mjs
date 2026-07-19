@@ -14,6 +14,8 @@ for (const required of [
   'Not refreshed yet',
   'function readReportAloud(card)',
   'Generate the report before using Read.',
+  'function speakUtterance(utterance)',
+  'function warmSpeechSynthesis()',
   'generated_at',
   'Nothing was sent to WhatsApp or saved as a duplicate report.',
   'report_text',

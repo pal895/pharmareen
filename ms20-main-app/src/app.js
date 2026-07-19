@@ -2674,8 +2674,7 @@ function announceStockFixNextStep(card) {
   utterance.lang = "en-KE";
   utterance.onend = () => setTimeout(() => startVoiceCapture(), 350);
   utterance.onerror = () => setTimeout(() => startVoiceCapture(), 350);
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(utterance);
+  speakUtterance(utterance);
 }
 
 function cycleStockFixReview(cardId) {
@@ -3117,8 +3116,7 @@ function readCardAloud(cardId) {
   const fields = Object.entries(card.fields || {}).map(([key, value]) => `${key.replaceAll("_", " ")} ${value}`).join(". ");
   const utterance = new SpeechSynthesisUtterance(`${card.title}. ${fields}`);
   utterance.lang = "en-KE";
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(utterance);
+  speakUtterance(utterance);
 }
 
 function readReportAloud(card) {
@@ -3134,8 +3132,7 @@ function readReportAloud(card) {
     .replaceAll("Ksh", "Kenyan shillings")
     .replaceAll("M-Pesa", "M Pesa"));
   utterance.lang = "en-KE";
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(utterance);
+  speakUtterance(utterance);
 }
 
 function startStockFixReading(card) {
@@ -3210,8 +3207,23 @@ function speakStockFixSegment(sequence) {
       stockFixReading = null;
     }
   };
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(utterance);
+  speakUtterance(utterance);
+}
+
+function speakUtterance(utterance) {
+  const synthesis = window.speechSynthesis;
+  if (!synthesis) return;
+  if (synthesis.speaking || synthesis.pending) {
+    synthesis.cancel();
+    window.setTimeout(() => synthesis.speak(utterance), 60);
+    return;
+  }
+  synthesis.speak(utterance);
+}
+
+function warmSpeechSynthesis() {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.getVoices();
 }
 
 function pauseStockFixReading() {
@@ -3973,6 +3985,8 @@ void sourceBrain.lookupMedicine("demo");
 void aiFallback.enabled;
 
 syncPendingStockCorrections();
+warmSpeechSynthesis();
+window.speechSynthesis?.addEventListener?.("voiceschanged", warmSpeechSynthesis, { once: true });
 render();
 window.setInterval(hideReplitBadge, 1500);
 if (shouldAutoProbeBackend()) {
