@@ -21,6 +21,8 @@ for (const required of [
   'stop-card-reading',
   'Last 7 days',
   'URLSearchParams({ send_whatsapp: "false"',
+  '!speechControl.paused',
+  'Current stock was not presented as historical stock.',
   'generated_at',
   'Nothing was sent to WhatsApp or saved as a duplicate report.',
   'report_text',

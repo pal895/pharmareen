@@ -3251,10 +3251,11 @@ def generate_daily_report(
     try:
         generated_at = now_in_timezone(settings.timezone)
         report_service = get_report_service()
-        if send_whatsapp and start_date == end_date:
-            report_text = report_service.generate_daily_report(start_date, send_whatsapp=True)
-        elif start_date != end_date and hasattr(report_service, "generate_period_preview"):
+        is_today = start_date == end_date == today
+        if not is_today and hasattr(report_service, "generate_period_preview"):
             report_text = report_service.generate_period_preview(start_date, end_date, period_label)
+        elif send_whatsapp:
+            report_text = report_service.generate_daily_report(start_date, send_whatsapp=True)
         elif hasattr(report_service, "generate_daily_preview"):
             report_text = report_service.generate_daily_preview(start_date)
         else:
@@ -3272,9 +3273,9 @@ def generate_daily_report(
         "period": period_label,
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat(),
-        "sent_whatsapp": bool(send_whatsapp and start_date == end_date),
+        "sent_whatsapp": bool(send_whatsapp and is_today),
         "generated_at": generated_at.isoformat(),
-        "source": "saved_sales_activity_and_stock_records",
+        "source": "saved_sales_activity_and_stock_records" if is_today else "saved_historical_sales_and_activity_records",
         "report": report_text,
     }
 

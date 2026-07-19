@@ -169,6 +169,10 @@ class DemoPharmacyStore:
             if start_date <= str(row.get("Date") or "") <= end_date
         ]
 
+    def read_report_source_records(self, start_date: str, end_date: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        logs = [row.copy() for row in self._daily_logs if start_date <= str(row.get("Date") or "") <= end_date]
+        return logs, self.read_transactions(start_date, end_date)
+
     def list_low_stock_items(self) -> list[StockItem]:
         return [
             deepcopy(item)

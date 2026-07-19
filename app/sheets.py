@@ -736,6 +736,26 @@ class GoogleSheetsStore:
             if str(record.get("Date") or "").strip() == report_date
         ]
 
+    def read_report_source_records(self, start_date: str, end_date: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Fetch report logs and transactions in one Google Sheets request."""
+        response = self.spreadsheet.values_batch_get(
+            ranges=[f"'{DAILY_LOG}'", f"'{TRANSACTIONS}'"]
+        )
+        ranges = response.get("valueRanges") or []
+
+        def records(index: int, expected_headers: list[str]) -> list[dict[str, Any]]:
+            values = (ranges[index].get("values") if index < len(ranges) else None) or []
+            if not values:
+                return []
+            headers = [str(value).strip() for value in values[0]]
+            if not headers:
+                headers = expected_headers
+            return [dict(zip(headers, [*row, *([""] * max(0, len(headers) - len(row)))])) for row in values[1:]]
+
+        logs = [row for row in records(0, DAILY_LOG_HEADERS) if start_date <= str(row.get("Date") or "").strip() <= end_date]
+        transactions = [row for row in records(1, TRANSACTION_HEADERS) if start_date <= str(row.get("Date") or "").strip() <= end_date]
+        return logs, transactions
+
     def read_transactions(self, start_date: str, end_date: str | None = None) -> list[dict[str, Any]]:
         end_date = end_date or start_date
         try:

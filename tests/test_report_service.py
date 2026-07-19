@@ -194,3 +194,6 @@ def test_period_preview_uses_saved_range_and_is_deterministic():
     assert "Total Sales: KES 30" in first
     assert "Cost: KES 16" in first
     assert "Gross Profit: KES 14" in first
+    assert "Low Stock Items: Not shown for historical periods" in first
+    assert "Source: saved sales ledger and activity log" in first
+    assert "current stock records" not in first

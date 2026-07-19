@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 from typing import Any, Protocol
 
@@ -70,6 +70,7 @@ class ReportMetrics:
     peak_sales_count: int = 0
     peak_items_sold: int = 0
     payment_totals: dict[str, float] = field(default_factory=dict)
+    historical_period: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -123,22 +124,26 @@ class ReportService:
         return self.generate_daily_report(report_date, send_whatsapp=False, persist_report=False)
 
     def generate_period_preview(self, start_date: date, end_date: date, period_label: str) -> str:
-        logs: list[dict[str, Any]] = []
-        cursor = start_date
-        while cursor <= end_date:
-            logs.extend(self.store.read_daily_logs(cursor.isoformat()))
-            cursor += timedelta(days=1)
-        try:
-            transactions = self.store.read_transactions(start_date.isoformat(), end_date.isoformat())
-        except Exception:
-            transactions = []
-        low_stock = low_stock_from_items(self.store.list_low_stock_items()) if end_date == now_in_timezone(self.timezone).date() else []
+        if hasattr(self.store, "read_report_source_records"):
+            logs, transactions = self.store.read_report_source_records(start_date.isoformat(), end_date.isoformat())
+        else:
+            logs = []
+            cursor = start_date
+            while cursor <= end_date:
+                logs.extend(self.store.read_daily_logs(cursor.isoformat()))
+                cursor += timedelta(days=1)
+            try:
+                transactions = self.store.read_transactions(start_date.isoformat(), end_date.isoformat())
+            except Exception:
+                transactions = []
+        low_stock: list[LowStockWarning] = []
         if transactions:
             metrics = build_transaction_metrics(period_label, transactions, low_stock)
         elif self.sale_ledger is not None:
             metrics = build_report_metrics_from_ledger_range(period_label, start_date, end_date, self.sale_ledger, logs, low_stock)
         else:
             metrics = build_report_metrics(period_label, logs, low_stock)
+        metrics = replace(metrics, historical_period=True)
         return render_report(metrics, self._recommendations(metrics), pharmacy_name=self.pharmacy_name, report_time=now_in_timezone(self.timezone).strftime("%H:%M"))
 
     def generate_daily_report(
@@ -413,8 +418,8 @@ def render_daily_summary(
         f"Peak Time: {metrics.peak_activity_time}",
         f"Peak Sales Count: {metrics.peak_sales_count}",
         f"Peak Items Sold: {metrics.peak_items_sold}",
-        f"Low Stock Items: {compact_low_stock(metrics.low_stock_warnings)}",
-        "Source: saved sales ledger, activity log, and current stock records",
+        f"Low Stock Items: {'Not shown for historical periods' if metrics.historical_period else compact_low_stock(metrics.low_stock_warnings)}",
+        "Source: saved sales ledger and activity log" if metrics.historical_period else "Source: saved sales ledger, activity log, and current stock records",
     ]
     if metrics.missed_sales:
         lines.append(f"Missed sales today: {summarize_pairs(metrics.missed_sales)}")

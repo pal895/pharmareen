@@ -1,6 +1,7 @@
 from datetime import date
 
 from app.main import resolve_report_period
+from app.sheets import GoogleSheetsStore
 
 
 def test_report_period_presets_and_custom_range():
@@ -9,3 +10,22 @@ def test_report_period_presets_and_custom_range():
     assert resolve_report_period("Last 7 days", today, today)[:2] == (date(2026, 7, 13), today)
     assert resolve_report_period("Last week", today, today)[:2] == (date(2026, 7, 6), date(2026, 7, 12))
     assert resolve_report_period("2026-07-01 to 2026-07-18", today, today)[:2] == (date(2026, 7, 1), date(2026, 7, 18))
+
+
+def test_google_report_sources_use_one_batch_request():
+    class Spreadsheet:
+        def __init__(self): self.calls = 0
+        def values_batch_get(self, ranges):
+            self.calls += 1
+            return {"valueRanges": [
+                {"values": [["Date", "Drug Name", "Action", "Quantity"], ["2026-07-18", "Cetirizine", "Sold", 1]]},
+                {"values": [["Timestamp", "Date", "Type", "Drug", "Quantity"], ["2026-07-18 10:00:00", "2026-07-18", "sale", "Cetirizine", 1]]},
+            ]}
+
+    spreadsheet = Spreadsheet()
+    store = object.__new__(GoogleSheetsStore)
+    store.spreadsheet = spreadsheet
+    logs, transactions = store.read_report_source_records("2026-07-18", "2026-07-18")
+    assert spreadsheet.calls == 1
+    assert logs[0]["Drug Name"] == "Cetirizine"
+    assert transactions[0]["Type"] == "sale"

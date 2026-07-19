@@ -2452,14 +2452,16 @@ async function generateReport(card) {
     if (!response.ok) throw new Error(result.detail || "The report could not be generated right now.");
     const generatedAt = result.generated_at ? new Date(result.generated_at) : new Date();
     card.fields = {
-      period: result.period || reportPeriod,
+      period: reportPeriod,
       focus: "Sales, stock, cash, M-Pesa, credit",
       report_date: result.start_date === result.end_date ? result.start_date : `${result.start_date} to ${result.end_date}`,
       generated_at: Number.isNaN(generatedAt.getTime()) ? "Just now" : generatedAt.toLocaleString("en-KE", { timeZone: "Africa/Nairobi" }),
       report_text: result.report || "No report details were returned."
     };
-    card.title = "Today's report";
-    card.validation = "Fresh report generated from saved sales, activity and stock records. Nothing was sent to WhatsApp or saved as a duplicate report.";
+    card.title = reportPeriod.toLowerCase() === "today" ? "Today's report" : `${reportPeriod} report`;
+    card.validation = result.source === "saved_historical_sales_and_activity_records"
+      ? "Fresh historical report generated from saved sales and activity records. Current stock was not presented as historical stock. Nothing was sent to WhatsApp or saved as a duplicate report."
+      : "Fresh report generated from saved sales, activity and stock records. Nothing was sent to WhatsApp or saved as a duplicate report.";
   } catch (error) {
     card.validation = error?.name === "AbortError"
       ? "Report refresh took too long. Your previous report is unchanged; tap Refresh report to try again."
@@ -3255,7 +3257,7 @@ function pauseCardReading(cardId) {
 }
 
 function resumeCardReading(cardId) {
-  if (speechControl.cardId !== cardId || !window.speechSynthesis?.paused) return;
+  if (speechControl.cardId !== cardId || !speechControl.paused) return;
   window.speechSynthesis.resume();
   speechControl = { cardId, paused: false };
   render();
