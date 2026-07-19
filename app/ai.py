@@ -8,6 +8,8 @@ from typing import Any
 
 from openai import OpenAI
 
+from app.ai_policy import require_approved_ai_workflow
+
 from app.config import Settings
 from app.domain import Action, ParsedEvent, ParseResult
 from app.utils import normalize_key
@@ -157,11 +159,16 @@ NUMBER_WORDS = {
 class AIService:
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.client = OpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
+        self.client = (
+            OpenAI(api_key=settings.openai_api_key, timeout=45.0, max_retries=0)
+            if settings.openai_api_key
+            else None
+        )
 
     def transcribe_audio(self, audio_bytes: bytes, content_type: str | None) -> str:
         if self.client is None:
             return ""
+        require_approved_ai_workflow("voice_transcription")
         clean_content_type = (content_type or "audio/ogg").split(";")[0].strip()
         extension = mimetypes.guess_extension(clean_content_type) or ".ogg"
         filename = f"voice-note{extension}"
@@ -191,6 +198,7 @@ class AIService:
         if not known_drugs:
             known_drugs = "- No Master_Stock drugs were loaded."
 
+        require_approved_ai_workflow("ambiguous_command_parsing")
         log_ai_call("local_parser_failed", "chat/completions", "messy text normalization")
         completion = self.client.chat.completions.create(
             model=self.settings.openai_parse_model,
@@ -263,44 +271,16 @@ class AIService:
         )
 
     def generate_recommendations(self, metrics: dict[str, Any]) -> list[str]:
-        if self.client is None:
-            return []
-        log_ai_call("advanced_summary_requested", "chat/completions", "business recommendations")
-        completion = self.client.chat.completions.create(
-            model=self.settings.openai_parse_model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You write concise daily business recommendations for a small pharmacy owner. "
-                        "Use only the supplied facts. Do not invent prices, stock levels, or medical advice. "
-                        "Return short, practical WhatsApp-ready recommendations as JSON. "
-                        "Focus on what to restock urgently, what to increase stock for, "
-                        "which missed demand could be causing lost sales, and which drugs moved fastest."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": json.dumps(metrics, ensure_ascii=True),
-                },
-            ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "pharmacy_recommendations",
-                    "strict": True,
-                    "schema": RECOMMENDATION_SCHEMA,
-                },
-            },
-        )
-        raw_content = completion.choices[0].message.content or "{}"
-        data = json.loads(raw_content)
-        recommendations = data.get("recommendations") or []
-        return [str(item).strip() for item in recommendations if str(item).strip()]
+        # Standard report recommendations are deterministic. Keeping this
+        # compatibility method fail-closed prevents old dependency injection
+        # from silently restoring the removed paid-AI report path.
+        require_approved_ai_workflow("routine_report_recommendations")
+        return []  # pragma: no cover - the policy guard always raises
 
     def extract_restock_from_image(self, image_bytes: bytes, content_type: str | None = None) -> dict[str, Any]:
         if self.client is None or not image_bytes:
             return {"items": [], "confidence": 0, "message": "Image AI is not configured."}
+        require_approved_ai_workflow("photo_invoice_extraction")
         clean_content_type = (content_type or "image/jpeg").split(";")[0].strip()
         encoded = base64.b64encode(image_bytes).decode("ascii")
         data_url = f"data:{clean_content_type};base64,{encoded}"

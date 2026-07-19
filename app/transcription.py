@@ -6,6 +6,7 @@ from openai import OpenAI
 
 from app.config import Settings
 from app.ai import log_ai_call
+from app.ai_policy import require_approved_ai_workflow
 
 
 class TranscriptionUnavailableError(RuntimeError):
@@ -24,7 +25,11 @@ PHARMACY_TRANSCRIPTION_PROMPT = (
 class TranscriptionService:
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.client = OpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
+        self.client = (
+            OpenAI(api_key=settings.openai_api_key, timeout=30.0, max_retries=0)
+            if settings.openai_api_key
+            else None
+        )
 
     @property
     def is_available(self) -> bool:
@@ -37,6 +42,8 @@ class TranscriptionService:
             raise TranscriptionUnavailableError(
                 "Voice notes need OPENAI_API_KEY. Please type it like: Panadol 2"
             )
+
+        require_approved_ai_workflow("voice_transcription")
 
         clean_content_type = (content_type or "audio/ogg").split(";")[0].strip()
         extension = mimetypes.guess_extension(clean_content_type) or ".ogg"

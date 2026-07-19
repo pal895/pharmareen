@@ -45,7 +45,7 @@ if curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
   done
 fi
 
-echo "Starting PharMareen backend on port $PORT..."
+echo "Starting MS2.0 backend on port $PORT..."
 "$PYTHON_BIN" -m uvicorn app.main:app --host 0.0.0.0 --port "$PORT" > "$BACKEND_LOG" 2>&1 &
 BACKEND_PID=$!
 echo "$BACKEND_PID" > server.pid
@@ -75,6 +75,23 @@ done
 
 if ! curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
   echo "Backend health: NOT READY"
+fi
+
+# Warmup runs inside the backend and writes its truthful result to server.log.
+# Read only the recent log tail: grep -a treats a binary-detected log as text,
+# the fixed phrase selects the event, and tail -1 returns its newest occurrence.
+# This displays an existing marker; it never initiates or fabricates warmup.
+WARMUP_MARKER=""
+for _ in $(seq 1 30); do
+  WARMUP_MARKER="$(tail -n 200 "$BACKEND_LOG" 2>/dev/null | grep -aF "REPORT_SOURCE_SNAPSHOT_WARMED" | tail -1 || true)"
+  if [ -n "$WARMUP_MARKER" ]; then
+    echo "$WARMUP_MARKER"
+    break
+  fi
+  sleep 0.5
+done
+if [ -z "$WARMUP_MARKER" ]; then
+  echo "WARNING: report snapshot warmup marker did not appear within 15 seconds; check $BACKEND_LOG for backend diagnostics."
 fi
 
 if [ -n "${REPLIT_DEV_DOMAIN:-}" ]; then

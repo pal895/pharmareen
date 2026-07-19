@@ -29,6 +29,14 @@ ms20-main-app/
 
 Routine report recommendation construction is deterministic-only. `ReportService` never calls OpenAI for Today, historical, custom-range or refreshed reports; the production factory supplies no recommender. This preserves token-minimal AI-last execution and prevents an external model round trip from dominating otherwise local cached report construction.
 
+## Zero-unjustified-AI policy (2026-07-19)
+
+No routine operational workflow may invoke an LLM or paid AI API unless there is a documented engineering justification. Reports, totals, stock and sales calculations, catalog lookup, date filtering, dashboards, exports, documents, invoices, order lists, barcode lookup, deterministic command parsing, cache retrieval and pharmacy data reads remain local/deterministic. `app/ai_policy.py` is the fail-closed production registry: an unregistered workflow raises before an API call. Each approval records the deterministic limitation, user value, unavailable fallback, token/cost controls, timeout, retry maximum, cache behavior, privacy scope, approval state and responsible code/owner.
+
+The only approved production AI boundaries are uncached voice-note transcription when browser-local recognition is unavailable, ambiguous free-form command parsing only after the shared local parser fails, and explicitly enabled invoice/photo extraction only after local handling cannot produce a safe review. All remain review-first or clarification-first, use bounded timeouts, disable automatic retries, and have non-AI fallbacks. Routine report recommendations are explicitly unapproved and fail closed even if legacy dependency injection attempts to restore them.
+
+Replit redirects backend stdout/stderr to `server.log`, so the truthful background snapshot marker was produced but hidden from the startup shell. `start.sh` now waits after health for at most 15 seconds, inspects only the newest 200 log lines as text, prints the newest real `REPORT_SOURCE_SNAPSHOT_WARMED` marker exactly once, and warns without claiming success if it does not arrive.
+
 Local app URL used during verification:
 
 ```text
