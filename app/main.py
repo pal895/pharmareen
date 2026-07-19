@@ -188,7 +188,11 @@ async def lifespan(app: FastAPI):
     print_startup_console_status()
     print("PHASE6_ROUTES_LOADED /offline-app /debug/offline-app")
     try:
-        get_sheet_store().ensure_schema()
+        sheet_store = get_sheet_store()
+        sheet_store.ensure_schema()
+        start_report_warmup = getattr(sheet_store, "start_report_source_warmup", None)
+        if callable(start_report_warmup):
+            start_report_warmup()
     except SheetsUnavailableError:
         logger.warning(SHEETS_UNAVAILABLE_MESSAGE)
     except Exception:

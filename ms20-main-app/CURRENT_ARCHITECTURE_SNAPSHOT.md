@@ -23,6 +23,10 @@ The owner should not need to think about backend, Sheets, queues, route slots, t
 ms20-main-app/
 ```
 
+## Reporting source-read performance delta (2026-07-19)
+
+`GoogleSheetsStore` owns one bounded source snapshot per configured pharmacy spreadsheet for Daily Log and Transactions. It is warmed after schema setup, refreshed every five minutes, expires after ten minutes, coalesces concurrent cold loads, and receives write-through updates after successful in-app log/transaction writes. Report periods and the shared daily-log/transaction readers filter this canonical snapshot locally. Store-instance ownership prevents cross-pharmacy cache leakage; oversize or unavailable snapshots fall back to the authoritative combined Sheets read. This shared layer removes repeated network waits without adding AI, report mutation, duplicate persistence, or current-stock-as-history behavior.
+
 Local app URL used during verification:
 
 ```text

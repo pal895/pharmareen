@@ -4,6 +4,8 @@ import json
 import logging
 import os
 import tempfile
+import threading
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -33,6 +35,10 @@ SUPPLIERS = "Suppliers"
 IMPORT_REVIEW_QUEUE = "Import_Review_Queue"
 OFFLINE_SYNC_LOG = "Offline_Sync_Log"
 MEDICINE_CATALOG_METADATA = "Medicine_Catalog_Metadata"
+
+REPORT_SOURCE_CACHE_TTL_SECONDS = 600.0
+REPORT_SOURCE_REFRESH_SECONDS = 300.0
+REPORT_SOURCE_CACHE_MAX_ROWS = 20000
 PHARMACIES = "Pharmacies"
 
 SHEETS_UNAVAILABLE_MESSAGE = (
@@ -408,6 +414,7 @@ class GoogleSheetsStore:
             client = gspread.authorize(credentials)
             self.spreadsheet = client.open_by_key(settings.google_sheets_spreadsheet_id)
             logger.info("Google Sheets connected successfully")
+            self._ensure_report_cache_state()
         except Exception as exc:
             logger.warning("Google Sheets is unavailable: %s", exc)
 
@@ -682,19 +689,21 @@ class GoogleSheetsStore:
     ) -> None:
         created_at = created_at or now_in_timezone(self.settings.timezone)
         worksheet = self._worksheet(DAILY_LOG)
+        values = [
+            created_at.date().isoformat(),
+            created_at.strftime("%H:%M:%S"),
+            event.drug_name,
+            event.action.value if event.action else "",
+            event.quantity,
+            "" if price is None else price,
+            "" if total_value is None else total_value,
+            event.notes,
+        ]
         worksheet.append_row(
-            [
-                created_at.date().isoformat(),
-                created_at.strftime("%H:%M:%S"),
-                event.drug_name,
-                event.action.value if event.action else "",
-                event.quantity,
-                "" if price is None else price,
-                "" if total_value is None else total_value,
-                event.notes,
-            ],
+            values,
             value_input_option="USER_ENTERED",
         )
+        self._append_report_source_cache("logs", dict(zip(DAILY_LOG_HEADERS, values)))
 
     def append_transaction(
         self,
@@ -711,34 +720,44 @@ class GoogleSheetsStore:
     ) -> None:
         created_at = created_at or now_in_timezone(self.settings.timezone)
         worksheet = self._worksheet(TRANSACTIONS)
+        values = [
+            created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            created_at.date().isoformat(),
+            transaction_type,
+            drug_name,
+            quantity,
+            "" if unit_cost is None else unit_cost,
+            "" if unit_selling_price is None else unit_selling_price,
+            "" if total_cost is None else total_cost,
+            "" if total_sales is None else total_sales,
+            "" if profit is None else profit,
+            note,
+        ]
         worksheet.append_row(
-            [
-                created_at.strftime("%Y-%m-%d %H:%M:%S"),
-                created_at.date().isoformat(),
-                transaction_type,
-                drug_name,
-                quantity,
-                "" if unit_cost is None else unit_cost,
-                "" if unit_selling_price is None else unit_selling_price,
-                "" if total_cost is None else total_cost,
-                "" if total_sales is None else total_sales,
-                "" if profit is None else profit,
-                note,
-            ],
+            values,
             value_input_option="USER_ENTERED",
         )
+        self._append_report_source_cache("transactions", dict(zip(TRANSACTION_HEADERS, values)))
 
     def read_daily_logs(self, report_date: str) -> list[dict[str, Any]]:
-        records = self._records(DAILY_LOG, DAILY_LOG_HEADERS)
+        records, _transactions = self._report_source_records()
         return [
-            record
+            record.copy()
             for record in records
             if str(record.get("Date") or "").strip() == report_date
         ]
 
     def read_report_source_records(self, start_date: str, end_date: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        """Fetch report logs and transactions in one Google Sheets request."""
-        response = self.spreadsheet.values_batch_get(
+        """Read one shared pharmacy-scoped source snapshot and filter it locally."""
+        logs, transactions = self._report_source_records()
+        return (
+            [row.copy() for row in logs if start_date <= str(row.get("Date") or "").strip() <= end_date],
+            [row.copy() for row in transactions if start_date <= str(row.get("Date") or "").strip() <= end_date],
+        )
+
+    def _fetch_report_source_records(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Fetch both canonical report sources in exactly one Sheets API call."""
+        response = self._require_spreadsheet().values_batch_get(
             ranges=[f"'{DAILY_LOG}'", f"'{TRANSACTIONS}'"]
         )
         ranges = response.get("valueRanges") or []
@@ -752,18 +771,83 @@ class GoogleSheetsStore:
                 headers = expected_headers
             return [dict(zip(headers, [*row, *([""] * max(0, len(headers) - len(row)))])) for row in values[1:]]
 
-        logs = [row for row in records(0, DAILY_LOG_HEADERS) if start_date <= str(row.get("Date") or "").strip() <= end_date]
-        transactions = [row for row in records(1, TRANSACTION_HEADERS) if start_date <= str(row.get("Date") or "").strip() <= end_date]
-        return logs, transactions
+        return records(0, DAILY_LOG_HEADERS), records(1, TRANSACTION_HEADERS)
+
+    def _ensure_report_cache_state(self) -> None:
+        if hasattr(self, "_report_cache_condition"):
+            return
+        self._report_cache_condition = threading.Condition(threading.RLock())
+        self._report_cache_snapshot: tuple[list[dict[str, Any]], list[dict[str, Any]]] | None = None
+        self._report_cache_loaded_at = 0.0
+        self._report_cache_loading = False
+        self._report_cache_warmup_started = False
+
+    def _report_source_records(self, *, force_refresh: bool = False) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        self._ensure_report_cache_state()
+        condition = self._report_cache_condition
+        with condition:
+            if not force_refresh and self._report_cache_snapshot is not None and time.monotonic() - self._report_cache_loaded_at < REPORT_SOURCE_CACHE_TTL_SECONDS:
+                return self._report_cache_snapshot
+            if self._report_cache_loading:
+                if self._report_cache_snapshot is not None:
+                    return self._report_cache_snapshot
+                condition.wait_for(lambda: not self._report_cache_loading, timeout=30.0)
+                if self._report_cache_snapshot is not None:
+                    return self._report_cache_snapshot
+            self._report_cache_loading = True
+        try:
+            snapshot = self._fetch_report_source_records()
+            if len(snapshot[0]) + len(snapshot[1]) > REPORT_SOURCE_CACHE_MAX_ROWS:
+                logger.warning("Report source snapshot exceeds bounded cache size; serving without retention")
+                return snapshot
+            with condition:
+                self._report_cache_snapshot = snapshot
+                self._report_cache_loaded_at = time.monotonic()
+            return snapshot
+        finally:
+            with condition:
+                self._report_cache_loading = False
+                condition.notify_all()
+
+    def start_report_source_warmup(self) -> None:
+        self._ensure_report_cache_state()
+        with self._report_cache_condition:
+            if self._report_cache_warmup_started or not self.is_available:
+                return
+            self._report_cache_warmup_started = True
+        threading.Thread(target=self._report_source_refresh_loop, name="report-source-warmup", daemon=True).start()
+
+    def _report_source_refresh_loop(self) -> None:
+        while True:
+            self._warm_report_source_cache()
+            time.sleep(REPORT_SOURCE_REFRESH_SECONDS)
+
+    def _warm_report_source_cache(self) -> None:
+        try:
+            self._report_source_records(force_refresh=True)
+            logger.info("Report source snapshot warmed")
+        except Exception:
+            logger.exception("Report source warmup failed; requests will use the authoritative fallback")
+
+    def _append_report_source_cache(self, source: str, row: dict[str, Any]) -> None:
+        self._ensure_report_cache_state()
+        with self._report_cache_condition:
+            if self._report_cache_snapshot is None:
+                return
+            logs, transactions = self._report_cache_snapshot
+            target = logs if source == "logs" else transactions
+            if len(logs) + len(transactions) >= REPORT_SOURCE_CACHE_MAX_ROWS:
+                self._report_cache_snapshot = None
+                self._report_cache_loaded_at = 0.0
+                return
+            target.append(row)
+            self._report_cache_loaded_at = time.monotonic()
 
     def read_transactions(self, start_date: str, end_date: str | None = None) -> list[dict[str, Any]]:
         end_date = end_date or start_date
-        try:
-            records = self._records(TRANSACTIONS, TRANSACTION_HEADERS)
-        except WorksheetNotFound:
-            return []
+        _logs, records = self._report_source_records()
         return [
-            record
+            record.copy()
             for record in records
             if start_date <= str(record.get("Date") or "").strip() <= end_date
         ]
