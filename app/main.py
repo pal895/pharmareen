@@ -3272,6 +3272,7 @@ def generate_daily_report(
             status_code=503,
             detail="I could not generate the daily report right now. Please check the Google Sheets connection.",
         ) from None
+    cache_status = getattr(report_service.store, "report_source_cache_status", None)
     return {
         "date": start_date.isoformat(),
         "period": period_label,
@@ -3280,6 +3281,7 @@ def generate_daily_report(
         "sent_whatsapp": bool(send_whatsapp and is_today),
         "generated_at": generated_at.isoformat(),
         "source": "saved_sales_activity_and_stock_records" if is_today else "saved_historical_sales_and_activity_records",
+        "source_cache": cache_status() if callable(cache_status) else {"ready": False},
         "report": report_text,
     }
 

@@ -41,6 +41,8 @@ def test_google_report_sources_use_one_batch_request():
     assert transactions[0]["Type"] == "sale"
     assert repeat_logs == logs
     assert repeat_transactions == transactions
+    assert store.report_source_cache_status()["hits"] == 1
+    assert store.report_source_cache_status()["misses"] == 1
 
 
 def test_report_source_cache_makes_period_changes_fast_and_write_through():
@@ -110,3 +112,5 @@ def test_concurrent_report_reads_coalesce_per_store_without_cross_pharmacy_leaka
     assert second.spreadsheet.calls == 1
     assert all(result[0][0]["Drug Name"] == "Pharmacy A medicine" for result in results)
     assert other_logs[0]["Drug Name"] == "Pharmacy B medicine"
+    assert first.report_source_cache_status()["log_rows"] == 1
+    assert second.report_source_cache_status()["log_rows"] == 1

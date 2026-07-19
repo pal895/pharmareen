@@ -38,7 +38,7 @@ MEDICINE_CATALOG_METADATA = "Medicine_Catalog_Metadata"
 
 REPORT_SOURCE_CACHE_TTL_SECONDS = 600.0
 REPORT_SOURCE_REFRESH_SECONDS = 300.0
-REPORT_SOURCE_CACHE_MAX_ROWS = 20000
+REPORT_SOURCE_CACHE_MAX_ROWS = 100000
 PHARMACIES = "Pharmacies"
 
 SHEETS_UNAVAILABLE_MESSAGE = (
@@ -781,20 +781,25 @@ class GoogleSheetsStore:
         self._report_cache_loaded_at = 0.0
         self._report_cache_loading = False
         self._report_cache_warmup_started = False
+        self._report_cache_hits = 0
+        self._report_cache_misses = 0
 
     def _report_source_records(self, *, force_refresh: bool = False) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         self._ensure_report_cache_state()
         condition = self._report_cache_condition
         with condition:
             if not force_refresh and self._report_cache_snapshot is not None and time.monotonic() - self._report_cache_loaded_at < REPORT_SOURCE_CACHE_TTL_SECONDS:
+                self._report_cache_hits += 1
                 return self._report_cache_snapshot
             if self._report_cache_loading:
                 if self._report_cache_snapshot is not None:
+                    self._report_cache_hits += 1
                     return self._report_cache_snapshot
                 condition.wait_for(lambda: not self._report_cache_loading, timeout=30.0)
                 if self._report_cache_snapshot is not None:
                     return self._report_cache_snapshot
             self._report_cache_loading = True
+            self._report_cache_misses += 1
         try:
             snapshot = self._fetch_report_source_records()
             if len(snapshot[0]) + len(snapshot[1]) > REPORT_SOURCE_CACHE_MAX_ROWS:
@@ -824,10 +829,27 @@ class GoogleSheetsStore:
 
     def _warm_report_source_cache(self) -> None:
         try:
-            self._report_source_records(force_refresh=True)
-            logger.info("Report source snapshot warmed")
+            logs, transactions = self._report_source_records(force_refresh=True)
+            logger.info("Report source snapshot warmed: logs=%s transactions=%s", len(logs), len(transactions))
+            print(f"REPORT_SOURCE_SNAPSHOT_WARMED logs={len(logs)} transactions={len(transactions)}", flush=True)
         except Exception:
             logger.exception("Report source warmup failed; requests will use the authoritative fallback")
+
+    def report_source_cache_status(self) -> dict[str, Any]:
+        self._ensure_report_cache_state()
+        with self._report_cache_condition:
+            logs, transactions = self._report_cache_snapshot or ([], [])
+            age_seconds = None if self._report_cache_snapshot is None else round(max(0.0, time.monotonic() - self._report_cache_loaded_at), 3)
+            return {
+                "ready": self._report_cache_snapshot is not None,
+                "loading": self._report_cache_loading,
+                "log_rows": len(logs),
+                "transaction_rows": len(transactions),
+                "age_seconds": age_seconds,
+                "hits": self._report_cache_hits,
+                "misses": self._report_cache_misses,
+                "max_rows": REPORT_SOURCE_CACHE_MAX_ROWS,
+            }
 
     def _append_report_source_cache(self, source: str, row: dict[str, Any]) -> None:
         self._ensure_report_cache_state()
