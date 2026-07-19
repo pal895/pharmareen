@@ -20,7 +20,11 @@ import {
   buildCatalogSavedSummary
 } from "./services/catalogOnboarding.js";
 import { buildDeterministicNotifications, mergeNotifications, notificationToCard } from "./services/notificationCenter.js";
-import { buildCatalogCsv, buildBulkPasteTemplate, buildDocumentCard, downloadTextFile } from "./services/documentGenerator.js";
+import {
+  EXPORT_FORMATS, buildBulkPasteTemplate, buildCanonicalInventoryExport, buildDocumentCard,
+  buildInventoryCsv, buildInventoryDocx, buildInventoryPdf, buildInventoryPptx,
+  buildInventoryXlsx, buildPrintHtml, downloadBlobFile, downloadTextFile, exportFilename
+} from "./services/documentGenerator.js";
 import {
   CATALOG_EDIT_FIELDS,
   applyApprovedCatalogEdit,
@@ -393,7 +397,7 @@ function composerTemplate() {
           <button type="button" data-action="start-catalog-paste">Paste list</button>
           <button type="button" data-action="demo-stock-correction">Stock fix</button>
           <button type="button" data-action="demo-report">Report</button>
-          <button type="button" data-action="export-catalog-csv">Export CSV</button>
+          <button type="button" data-action="open-export-hub">Export Hub</button>
           <button type="button" data-action="demo-onboarding">Setup</button>
         </div>
       </details>
@@ -565,6 +569,7 @@ function cardCloseButtonTemplate(card, placement) {
 }
 
 function cardBodyTemplate(card, displayed) {
+  if (card.type === "ExportHubCard") return exportHubTemplate(card);
   if (card.type === "CatalogWorkspaceCard") return catalogWorkspaceTemplate(card);
   if (card.type === "CatalogOnboardingCard") {
     return `
@@ -1200,6 +1205,8 @@ function handleAction(dataset) {
     addMissingMedicineCard();
   }
   if (action === "export-catalog-csv") exportCatalogCsv();
+  if (action === "open-export-hub") openExportHub();
+  if (action === "download-inventory-export") downloadInventoryExport(dataset.format, dataset.cardId);
   if (action === "download-template") downloadBulkPasteTemplate();
   if (action === "read-card") readCardAloud(dataset.cardId);
   if (action === "pause-card-reading") pauseCardReading(dataset.cardId);
@@ -3150,13 +3157,56 @@ function addMissingMedicineCard() {
 }
 
 function exportCatalogCsv() {
-  const csv = buildCatalogCsv(pharmacyBrain.catalog);
-  downloadTextFile({
-    filename: "ms20-pharmacy-catalog.csv",
-    contents: csv,
-    mime: "text/csv;charset=utf-8"
+  downloadInventoryExport("csv");
+}
+
+function openExportHub() {
+  const existing = state.cards.find((card) => card.type === "ExportHubCard");
+  if (existing) return focusCard(existing.id);
+  addCard({
+    id: `card-export-hub-${Date.now()}`, type: "ExportHubCard", title: "Export Hub",
+    source: "Canonical Pharmacy Catalog", confidence: 1, status: "ready", aiRequired: false,
+    fields: { item_count: String(pharmacyBrain.catalog.length), last_download: "None yet" },
+    validation: "Downloads are generated locally from this pharmacy's canonical records with zero AI formatting."
   });
-  addFeed("system", "Catalog CSV downloaded.");
+}
+
+function exportHubTemplate(card) {
+  return `<section class="export-hub" aria-label="Export Hub">
+    <div class="export-hub-summary"><strong>${pharmacyBrain.catalog.length} medicines</strong><span>${escapeHtml(state.pharmacy.name)} · ${escapeHtml(state.pharmacy.branch || "Main")}</span></div>
+    <p>Choose one owner-ready format. Every file uses the same saved Pharmacy Catalog values and Kenya generation time.</p>
+    <div class="export-format-grid">${EXPORT_FORMATS.map((format) => `<button type="button" data-action="download-inventory-export" data-format="${format.id}" data-card-id="${card.id}"><strong>${format.label}</strong><span>${format.help}</span></button>`).join("")}</div>
+    <p class="export-hub-status" aria-live="polite">${escapeHtml(card.fields?.last_download || "None yet")}</p>
+    <p class="export-hub-assurance">Generated locally · Pharmacy-isolated · Canonical data · Zero AI formatting</p>
+  </section>`;
+}
+
+function downloadInventoryExport(format, cardId = "") {
+  const model = buildCanonicalInventoryExport({ pharmacy: state.pharmacy, items: pharmacyBrain.catalog });
+  const formats = {
+    csv: [buildInventoryCsv, "csv", "text/csv;charset=utf-8"],
+    xlsx: [buildInventoryXlsx, "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+    pdf: [buildInventoryPdf, "pdf", "application/pdf"],
+    docx: [buildInventoryDocx, "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+    pptx: [buildInventoryPptx, "pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"]
+  };
+  if (format === "print") {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return updateExportHubStatus(cardId, "Print view was blocked. Allow pop-ups for MS2.0, then try again.");
+    printWindow.document.open(); printWindow.document.write(buildPrintHtml(model)); printWindow.document.close();
+    return updateExportHubStatus(cardId, `Print-ready inventory opened for ${model.rows.length} medicines.`);
+  }
+  const selected = formats[format];
+  if (!selected) return updateExportHubStatus(cardId, "That export format is not supported.");
+  const [builder, extension, mime] = selected;
+  downloadBlobFile({ filename: exportFilename(model, extension), contents: builder(model), mime });
+  updateExportHubStatus(cardId, `${extension.toUpperCase()} downloaded for ${model.rows.length} medicines at ${model.generatedKenya} Africa/Nairobi.`);
+}
+
+function updateExportHubStatus(cardId, message) {
+  const card = state.cards.find((item) => item.id === cardId) || state.cards.find((item) => item.type === "ExportHubCard");
+  if (card) { card.fields.last_download = message; persistActiveCards(); }
+  addFeed("system", message);
   render();
 }
 
