@@ -48,6 +48,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -927,6 +928,7 @@ input:disabled {
 }
 
 .field-grid input,
+.field-grid select,
 .field-grid textarea,
 .medicine-detail-grid input,
 .medicine-detail-grid textarea,
@@ -939,6 +941,23 @@ input:disabled {
   color: var(--ink);
   background: #fff;
   outline: none;
+}
+
+.report-period-picker,
+.report-date-range {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 10px;
+}
+
+.report-date-range {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 520px) {
+  .report-date-range {
+    grid-template-columns: 1fr;
+  }
 }
 
 .field-grid textarea,

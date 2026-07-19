@@ -88,7 +88,9 @@ const FEED_RESUME_LIMIT = 40;
 const ACTIVE_CARD_RESUME_LIMIT = 12;
 const CARD_FONT_SCALE_MIN = 0.85;
 const CARD_FONT_SCALE_MAX = 1.25;
-let speechControl = { cardId: "", paused: false };
+let speechControl = { cardId: "", paused: false, segments: [], index: 0 };
+let speechRunId = 0;
+let activeReportRequest = null;
 const CARD_FONT_SCALE_STEP = 0.1;
 let activeStockFixScan = null;
 let pendingStockFixEvidenceSource = "photo";
@@ -694,7 +696,7 @@ function catalogMedicineEditorTemplate(card) {
 function fieldTemplate(card, field) {
   const value = card.fields?.[field] ?? "";
   if (card.type === "ReportCard" && field === "report_text") return `<section class="report-result" aria-label="Generated report"><h4>Report</h4><pre>${escapeHtml(String(value))}</pre></section>`;
-  if (card.type === "ReportCard" && field === "period") return `<label><span>Period</span><input data-card-id="${card.id}" data-field="period" list="report-periods-${card.id}" value="${escapeHtml(String(value))}"><datalist id="report-periods-${card.id}"><option>Today</option><option>Yesterday</option><option>Last 7 days</option><option>This week</option><option>Last week</option><option>This month</option><option>Last month</option></datalist><small>Or enter YYYY-MM-DD or YYYY-MM-DD to YYYY-MM-DD</small></label>`;
+  if (card.type === "ReportCard" && field === "period") return reportPeriodTemplate(card, value);
   const longFields = new Set(["items_text", "choices", "notes", "mapping", "message", "action", "missing_columns", "report_text"]);
   const inputMode = inputModeForField(field);
   const control = longFields.has(field)
@@ -706,6 +708,14 @@ function fieldTemplate(card, field) {
       ${control}
     </label>
   `;
+}
+
+function reportPeriodTemplate(card, value) {
+  const presets = ["Today", "Yesterday", "Last 7 days", "This week", "Last week", "Last 30 days", "This month", "Last month", "Last 3 months", "Last 6 months", "This year", "Custom date", "Custom date range"];
+  const text = String(value || "Today");
+  const selected = presets.includes(text) ? text : text.includes(" to ") ? "Custom date range" : /^\d{4}-\d{2}-\d{2}$/.test(text) ? "Custom date" : "Today";
+  const parts = text.split(" to ");
+  return `<div class="report-period-picker"><label><span>Period</span><select data-card-id="${card.id}" data-field="period">${presets.map((option) => `<option ${option === selected ? "selected" : ""}>${option}</option>`).join("")}</select></label>${selected === "Custom date" ? `<label><span>Date</span><input type="date" data-card-id="${card.id}" data-field="custom_start" value="${escapeHtml(String(card.fields?.custom_start || text))}"></label>` : ""}${selected === "Custom date range" ? `<div class="report-date-range"><label><span>Start date</span><input type="date" data-card-id="${card.id}" data-field="custom_start" value="${escapeHtml(String(card.fields?.custom_start || parts[0] || ""))}"></label><label><span>End date</span><input type="date" data-card-id="${card.id}" data-field="custom_end" value="${escapeHtml(String(card.fields?.custom_end || parts[1] || ""))}"></label></div>` : ""}</div>`;
 }
 
 function medicineDetailTemplate(card, displayed) {
@@ -910,7 +920,7 @@ function activeActionsTemplate(card) {
   if (card.type === "ReportCard" || card.type === "DocumentExportCard") {
     return `
       <div class="card-actions">
-        ${card.type === "ReportCard" ? `<button data-action="confirm-card" data-card-id="${card.id}">${card.fields?.report_text ? "Refresh report" : "Generate report"}</button>` : `<button data-action="confirm-card" data-card-id="${card.id}">Confirm</button>`}
+        ${card.type === "ReportCard" ? `<button data-action="confirm-card" data-card-id="${card.id}" ${card.submitting ? "disabled" : ""}>${card.submitting ? "Generating…" : card.fields?.report_text ? "Refresh report" : "Generate report"}</button>` : `<button data-action="confirm-card" data-card-id="${card.id}">Confirm</button>`}
         ${speechControlsTemplate(card)}
         ${card.type === "ReportCard" ? "" : `<button data-action="correct-card" data-card-id="${card.id}">Correct</button>`}
         <button data-action="reject-card" data-card-id="${card.id}">Cancel</button>
@@ -2433,14 +2443,23 @@ async function generateReport(card) {
     render();
     return;
   }
+  stopCardReading(card.id);
   card.submitting = true;
-  card.validation = "Generating today's report from saved pharmacy records…";
+  card.validation = "Generating report from saved pharmacy records…";
   persistActiveCards();
   render();
   const controller = new AbortController();
+  activeReportRequest?.controller.abort();
+  activeReportRequest = { cardId: card.id, controller };
   const timeoutId = window.setTimeout(() => controller.abort(), 20000);
   try {
-    const reportPeriod = String(card.fields?.period || "Today").trim();
+    const selectedPeriod = String(card.fields?.period || "Today").trim();
+    const reportPeriod = selectedPeriod === "Custom date"
+      ? String(card.fields?.custom_start || "")
+      : selectedPeriod === "Custom date range"
+        ? `${card.fields?.custom_start || ""} to ${card.fields?.custom_end || ""}`
+        : selectedPeriod;
+    if (!reportPeriod || reportPeriod.startsWith(" to ") || reportPeriod.endsWith(" to ")) throw new Error("Choose the report date or both range dates.");
     const query = new URLSearchParams({ send_whatsapp: "false", refresh: String(Date.now()), period: reportPeriod });
     const response = await fetch(`/reports/daily?${query}`, {
       method: "POST",
@@ -2452,13 +2471,13 @@ async function generateReport(card) {
     if (!response.ok) throw new Error(result.detail || "The report could not be generated right now.");
     const generatedAt = result.generated_at ? new Date(result.generated_at) : new Date();
     card.fields = {
-      period: reportPeriod,
+      period: selectedPeriod.startsWith("Custom") ? reportPeriod : selectedPeriod,
       focus: "Sales, stock, cash, M-Pesa, credit",
       report_date: result.start_date === result.end_date ? result.start_date : `${result.start_date} to ${result.end_date}`,
       generated_at: Number.isNaN(generatedAt.getTime()) ? "Just now" : generatedAt.toLocaleString("en-KE", { timeZone: "Africa/Nairobi" }),
       report_text: result.report || "No report details were returned."
     };
-    card.title = reportPeriod.toLowerCase() === "today" ? "Today's report" : `${reportPeriod} report`;
+    card.title = reportPeriod.toLowerCase() === "today" ? "Today's report" : `${selectedPeriod.startsWith("Custom") ? reportPeriod : selectedPeriod} report`;
     card.validation = result.source === "saved_historical_sales_and_activity_records"
       ? "Fresh historical report generated from saved sales and activity records. Current stock was not presented as historical stock. Nothing was sent to WhatsApp or saved as a duplicate report."
       : "Fresh report generated from saved sales, activity and stock records. Nothing was sent to WhatsApp or saved as a duplicate report.";
@@ -2468,6 +2487,7 @@ async function generateReport(card) {
       : error?.message || "The report could not be generated right now.";
   } finally {
     window.clearTimeout(timeoutId);
+    if (activeReportRequest?.controller === controller) activeReportRequest = null;
     card.submitting = false;
     persistActiveCards();
     render();
@@ -2721,6 +2741,16 @@ function updateCardField(cardId, field, value) {
   const card = state.cards.find((item) => item.id === cardId);
   if (!card) return;
   card.fields[field] = value;
+  if (card.type === "ReportCard" && (field === "period" || field === "custom_start" || field === "custom_end")) {
+    if (activeReportRequest?.cardId === cardId) activeReportRequest.controller.abort();
+    if (field === "period" && !String(value).startsWith("Custom")) {
+      delete card.fields.custom_start;
+      delete card.fields.custom_end;
+    }
+    persistActiveCards();
+    render();
+    return;
+  }
   if (card.type === "StockCorrectionCard") {
     card.ui = { ...(card.ui || {}), reviewedSlides: undefined, voiceReviewStarted: false, voiceReviewCompleted: false };
     if (field === "medicine") fillTrustedStockForDraft(card, value);
@@ -3128,9 +3158,7 @@ function readCardAloud(cardId) {
   if (card.type === "StockCorrectionCard") return startStockFixReading(card);
   if (card.type === "ReportCard") return readReportAloud(card);
   const fields = Object.entries(card.fields || {}).map(([key, value]) => `${key.replaceAll("_", " ")} ${value}`).join(". ");
-  const utterance = new SpeechSynthesisUtterance(`${card.title}. ${fields}`);
-  utterance.lang = "en-KE";
-  speakUtterance(utterance, card.id);
+  startCardReading(card.id, `${card.title}. ${fields}`);
 }
 
 function readReportAloud(card) {
@@ -3141,12 +3169,10 @@ function readReportAloud(card) {
     render();
     return;
   }
-  const utterance = new SpeechSynthesisUtterance(report
+  startCardReading(card.id, report
     .replaceAll("KES", "Kenyan shillings")
     .replaceAll("Ksh", "Kenyan shillings")
     .replaceAll("M-Pesa", "M Pesa"));
-  utterance.lang = "en-KE";
-  speakUtterance(utterance, card.id);
 }
 
 function startStockFixReading(card) {
@@ -3224,23 +3250,9 @@ function speakStockFixSegment(sequence) {
   speakUtterance(utterance);
 }
 
-function speakUtterance(utterance, cardId = "") {
+function speakUtterance(utterance) {
   const synthesis = window.speechSynthesis;
   if (!synthesis) return;
-  if (cardId) {
-    utterance.onstart = () => {
-      speechControl = { cardId, paused: false };
-      render();
-    };
-    const finish = () => {
-      if (speechControl.cardId === cardId) {
-        speechControl = { cardId: "", paused: false };
-        render();
-      }
-    };
-    utterance.onend = finish;
-    utterance.onerror = finish;
-  }
   if (synthesis.speaking || synthesis.pending) {
     synthesis.cancel();
     window.setTimeout(() => synthesis.speak(utterance), 60);
@@ -3249,24 +3261,60 @@ function speakUtterance(utterance, cardId = "") {
   synthesis.speak(utterance);
 }
 
+function startCardReading(cardId, text) {
+  stopCardReading(speechControl.cardId);
+  const segments = String(text || "").split(/\n+|(?<=[.!?])\s+/).map((part) => part.trim()).filter(Boolean);
+  if (!segments.length) return;
+  speechControl = { cardId, paused: false, segments, index: 0 };
+  render();
+  speakCurrentCardSegment();
+}
+
+function speakCurrentCardSegment() {
+  const session = speechControl;
+  if (!session.cardId || session.paused || session.index >= session.segments.length) {
+    if (session.cardId && session.index >= session.segments.length) {
+      speechControl = { cardId: "", paused: false, segments: [], index: 0 };
+      render();
+    }
+    return;
+  }
+  const utterance = new SpeechSynthesisUtterance(session.segments[session.index]);
+  const runId = ++speechRunId;
+  utterance.lang = "en-KE";
+  utterance.onend = () => {
+    if (speechControl !== session || session.paused || runId !== speechRunId) return;
+    session.index += 1;
+    speakCurrentCardSegment();
+  };
+  utterance.onerror = () => {
+    if (speechControl !== session || session.paused || runId !== speechRunId) return;
+    speechControl = { cardId: "", paused: false, segments: [], index: 0 };
+    render();
+  };
+  window.speechSynthesis.speak(utterance);
+}
+
 function pauseCardReading(cardId) {
-  if (speechControl.cardId !== cardId || !window.speechSynthesis?.speaking) return;
-  window.speechSynthesis.pause();
-  speechControl = { cardId, paused: true };
+  if (speechControl.cardId !== cardId) return;
+  speechControl.paused = true;
+  speechRunId += 1;
+  window.speechSynthesis?.cancel();
   render();
 }
 
 function resumeCardReading(cardId) {
   if (speechControl.cardId !== cardId || !speechControl.paused) return;
-  window.speechSynthesis.resume();
-  speechControl = { cardId, paused: false };
+  speechControl.paused = false;
   render();
+  speakCurrentCardSegment();
 }
 
 function stopCardReading(cardId) {
   if (speechControl.cardId !== cardId) return;
+  speechControl = { cardId: "", paused: false, segments: [], index: 0 };
+  speechRunId += 1;
   window.speechSynthesis?.cancel();
-  speechControl = { cardId: "", paused: false };
   render();
 }
 
@@ -3574,6 +3622,7 @@ function adjustCardFontScale(delta) {
 }
 
 function removeCard(cardId) {
+  stopCardReading(cardId);
   const index = state.cards.findIndex((item) => item.id === cardId);
   if (index >= 0) {
     state.cards.splice(index, 1);

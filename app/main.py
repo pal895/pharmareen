@@ -16,7 +16,7 @@ from html import escape
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -4192,7 +4192,7 @@ def reliability_record_public(result: Any | None) -> dict[str, Any]:
 
 def resolve_report_period(period: str | None, fallback_date: date, today: date) -> tuple[date, date, str]:
     value = str(period or "").strip()
-    key = value.lower()
+    key = re.sub(r"^report\s+(?:for|from)?\s*", "", value.lower()).strip()
     if not value or key == "today":
         return fallback_date, fallback_date, fallback_date.isoformat()
     if key == "yesterday":
@@ -4200,6 +4200,8 @@ def resolve_report_period(period: str | None, fallback_date: date, today: date) 
         return day, day, day.isoformat()
     if key == "last 7 days":
         return today - timedelta(days=6), today, f"{today - timedelta(days=6)} to {today}"
+    if key == "last 30 days":
+        return today - timedelta(days=29), today, f"{today - timedelta(days=29)} to {today}"
     if key == "this week":
         start = today - timedelta(days=today.weekday())
         return start, today, f"{start} to {today}"
@@ -4214,14 +4216,56 @@ def resolve_report_period(period: str | None, fallback_date: date, today: date) 
         end = today.replace(day=1) - timedelta(days=1)
         start = end.replace(day=1)
         return start, end, f"{start} to {end}"
+    if key in {"last 3 months", "last 6 months"}:
+        months = 3 if key == "last 3 months" else 6
+        start = shift_report_month(today, -(months - 1)).replace(day=1)
+        return start, today, f"{start} to {today}"
+    if key == "this year":
+        start = today.replace(month=1, day=1)
+        return start, today, f"{start} to {today}"
+    if key == "six months ago":
+        day = shift_report_month(today, -6)
+        return day, day, day.isoformat()
+    natural_parts = re.split(r"\s+(?:to|through)\s+", key, maxsplit=1)
+    natural_start = parse_named_report_date(natural_parts[0], today)
+    if natural_start is not None:
+        natural_end = parse_named_report_date(natural_parts[1], today) if len(natural_parts) == 2 else natural_start
+        if natural_end is None or natural_start > natural_end or natural_end > today:
+            raise HTTPException(status_code=422, detail="Report dates must be a valid saved period ending today or earlier.")
+        return natural_start, natural_end, natural_start.isoformat() if natural_start == natural_end else f"{natural_start} to {natural_end}"
     match = re.fullmatch(r"(\d{4}-\d{2}-\d{2})(?:\s+(?:to|through)\s+(\d{4}-\d{2}-\d{2}))?", key)
     if not match:
-        raise HTTPException(status_code=422, detail="Use Today, Yesterday, Last 7 days, This week, Last week, This month, Last month, YYYY-MM-DD, or YYYY-MM-DD to YYYY-MM-DD.")
+        raise HTTPException(status_code=422, detail="Choose a report period or calendar date.")
     start = date.fromisoformat(match.group(1))
     end = date.fromisoformat(match.group(2) or match.group(1))
     if start > end or end > today:
         raise HTTPException(status_code=422, detail="Report dates must be a valid saved period ending today or earlier.")
     return start, end, start.isoformat() if start == end else f"{start} to {end}"
+
+
+def shift_report_month(value: date, months: int) -> date:
+    index = value.year * 12 + value.month - 1 + months
+    year, month_index = divmod(index, 12)
+    month = month_index + 1
+    next_month = date(year + (month == 12), 1 if month == 12 else month + 1, 1)
+    last_day = (next_month - timedelta(days=1)).day
+    return value.replace(year=year, month=month, day=min(value.day, last_day))
+
+
+def parse_named_report_date(value: str, today: date) -> date | None:
+    text = str(value or "").strip()
+    for pattern in ("%d %B %Y", "%d %b %Y"):
+        try:
+            return datetime.strptime(text, pattern).date()
+        except ValueError:
+            pass
+    for pattern in ("%d %B", "%d %b"):
+        try:
+            parsed = datetime.strptime(f"{text} {today.year}", f"{pattern} %Y").date()
+        except ValueError:
+            continue
+        return parsed if parsed <= today else parsed.replace(year=today.year - 1)
+    return None
 
 
 def bailey_payload_text(payload: dict[str, Any]) -> str:
