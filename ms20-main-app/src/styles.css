@@ -944,10 +944,20 @@ input:disabled {
 }
 
 .report-period-picker,
+.report-retained-notice,
 .report-date-range {
   display: grid;
   grid-column: 1 / -1;
   gap: 10px;
+}
+
+.report-retained-notice {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border-left: 4px solid #b7791f;
+  border-radius: 0.5rem;
+  background: #fff8e6;
+  color: #744210;
 }
 
 .report-date-range {

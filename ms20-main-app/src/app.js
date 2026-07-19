@@ -695,7 +695,7 @@ function catalogMedicineEditorTemplate(card) {
 
 function fieldTemplate(card, field) {
   const value = card.fields?.[field] ?? "";
-  if (card.type === "ReportCard" && field === "report_text") return `<section class="report-result" aria-label="Generated report"><h4>Report</h4><pre>${escapeHtml(String(value))}</pre></section>`;
+  if (card.type === "ReportCard" && field === "report_text") return `${card.reportSelectionDirty ? '<p class="report-retained-notice" role="status">Showing the last successful report below. Refresh to load the selected period.</p>' : ""}<section class="report-result" aria-label="Generated report"><h4>${card.reportSelectionDirty ? "Last successful report" : "Report"}</h4><pre>${escapeHtml(String(value))}</pre></section>`;
   if (card.type === "ReportCard" && field === "period") return reportPeriodTemplate(card, value);
   const longFields = new Set(["items_text", "choices", "notes", "mapping", "message", "action", "missing_columns", "report_text"]);
   const inputMode = inputModeForField(field);
@@ -704,7 +704,7 @@ function fieldTemplate(card, field) {
     : `<input data-card-id="${card.id}" data-field="${field}" ${inputMode ? `inputmode="${inputMode}"` : ""} value="${escapeHtml(String(value))}">`;
   return `
     <label>
-      <span>${escapeHtml(card.type === "RestockCard" && field === "quantity" ? "Stock to add" : card.type === "StockCorrectionCard" && field === "reason" ? "Reason (optional)" : fieldLabel(field))}</span>
+      <span>${escapeHtml(card.type === "RestockCard" && field === "quantity" ? "Stock to add" : card.type === "StockCorrectionCard" && field === "reason" ? "Reason (optional)" : card.type === "ReportCard" && field === "report_date" ? "Displayed Report Date" : card.type === "ReportCard" && field === "generated_at" ? "Last Generated At" : fieldLabel(field))}</span>
       ${control}
     </label>
   `;
@@ -2449,9 +2449,10 @@ async function generateReport(card) {
   persistActiveCards();
   render();
   const controller = new AbortController();
+  const startedAt = performance.now();
   activeReportRequest?.controller.abort();
   activeReportRequest = { cardId: card.id, controller };
-  const timeoutId = window.setTimeout(() => controller.abort(), 20000);
+  const timeoutId = window.setTimeout(() => controller.abort(), 10000);
   try {
     const selectedPeriod = String(card.fields?.period || "Today").trim();
     const reportPeriod = selectedPeriod === "Custom date"
@@ -2478,12 +2479,14 @@ async function generateReport(card) {
       report_text: result.report || "No report details were returned."
     };
     card.title = reportPeriod.toLowerCase() === "today" ? "Today's report" : `${selectedPeriod.startsWith("Custom") ? reportPeriod : selectedPeriod} report`;
+    card.reportSelectionDirty = false;
+    const elapsedSeconds = Math.max(0.1, (performance.now() - startedAt) / 1000).toFixed(1);
     card.validation = result.source === "saved_historical_sales_and_activity_records"
-      ? "Fresh historical report generated from saved sales and activity records. Current stock was not presented as historical stock. Nothing was sent to WhatsApp or saved as a duplicate report."
-      : "Fresh report generated from saved sales, activity and stock records. Nothing was sent to WhatsApp or saved as a duplicate report.";
+      ? `Fresh historical report generated in ${elapsedSeconds} seconds from saved sales and activity records. Current stock was not presented as historical stock. Nothing was sent to WhatsApp or saved as a duplicate report.`
+      : `Fresh report generated in ${elapsedSeconds} seconds from saved sales, activity and stock records. Nothing was sent to WhatsApp or saved as a duplicate report.`;
   } catch (error) {
     card.validation = error?.name === "AbortError"
-      ? "Report refresh took too long. Your previous report is unchanged; tap Refresh report to try again."
+      ? "Report refresh exceeded 10 seconds. The last successful report remains below and its date and Generated At are intentionally unchanged; tap Refresh report to try again."
       : error?.message || "The report could not be generated right now.";
   } finally {
     window.clearTimeout(timeoutId);
@@ -2747,6 +2750,12 @@ function updateCardField(cardId, field, value) {
       delete card.fields.custom_start;
       delete card.fields.custom_end;
     }
+    card.reportSelectionDirty = Boolean(card.fields?.report_text);
+    const selection = field === "period" ? String(value) : String(card.fields?.period || "Custom period");
+    card.title = selection.toLowerCase() === "today" ? "Today's report" : `${selection} report`;
+    card.validation = card.reportSelectionDirty
+      ? "Period changed. The last successful report remains below; tap Refresh report to load the selected period."
+      : "Period selected. Tap Generate report to load it from saved pharmacy records.";
     persistActiveCards();
     render();
     return;
