@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Protocol
 
 from app.branding import APP_BRAND
@@ -122,6 +122,25 @@ class ReportService:
         """Recompute an owner preview without sending or appending report history."""
         return self.generate_daily_report(report_date, send_whatsapp=False, persist_report=False)
 
+    def generate_period_preview(self, start_date: date, end_date: date, period_label: str) -> str:
+        logs: list[dict[str, Any]] = []
+        cursor = start_date
+        while cursor <= end_date:
+            logs.extend(self.store.read_daily_logs(cursor.isoformat()))
+            cursor += timedelta(days=1)
+        try:
+            transactions = self.store.read_transactions(start_date.isoformat(), end_date.isoformat())
+        except Exception:
+            transactions = []
+        low_stock = low_stock_from_items(self.store.list_low_stock_items()) if end_date == now_in_timezone(self.timezone).date() else []
+        if transactions:
+            metrics = build_transaction_metrics(period_label, transactions, low_stock)
+        elif self.sale_ledger is not None:
+            metrics = build_report_metrics_from_ledger_range(period_label, start_date, end_date, self.sale_ledger, logs, low_stock)
+        else:
+            metrics = build_report_metrics(period_label, logs, low_stock)
+        return render_report(metrics, self._recommendations(metrics), pharmacy_name=self.pharmacy_name, report_time=now_in_timezone(self.timezone).strftime("%H:%M"))
+
     def generate_daily_report(
         self,
         report_date: date | str,
@@ -130,21 +149,21 @@ class ReportService:
     ) -> str:
         date_text = report_date.isoformat() if isinstance(report_date, date) else report_date
         logs = self.store.read_daily_logs(date_text)
-        transactions: list[dict[str, Any]] = []
-        if self.sale_ledger is None:
-            try:
-                transactions = self.store.read_transactions(date_text)
-            except Exception:
-                transactions = []
+        try:
+            transactions = self.store.read_transactions(date_text)
+        except Exception:
+            transactions = []
         try:
             low_stock = low_stock_from_items(self.store.list_low_stock_items())
         except Exception:
             logger.exception("Low-stock lookup failed; report will continue without low-stock section")
             low_stock = []
-        if self.sale_ledger is not None:
+        if transactions:
+            metrics = build_transaction_metrics(date_text, transactions, low_stock)
+        elif self.sale_ledger is not None:
             metrics = build_report_metrics_from_ledger(date_text, self.sale_ledger, logs, low_stock)
         else:
-            metrics = build_transaction_metrics(date_text, transactions, low_stock) if transactions else build_report_metrics(date_text, logs, low_stock)
+            metrics = build_report_metrics(date_text, logs, low_stock)
         recommendations = self._recommendations(metrics)
         report_text = render_report(
             metrics,
@@ -395,7 +414,6 @@ def render_daily_summary(
         f"Peak Sales Count: {metrics.peak_sales_count}",
         f"Peak Items Sold: {metrics.peak_items_sold}",
         f"Low Stock Items: {compact_low_stock(metrics.low_stock_warnings)}",
-        f"Generated: {report_time} Africa/Nairobi",
         "Source: saved sales ledger, activity log, and current stock records",
     ]
     if metrics.missed_sales:
@@ -464,6 +482,34 @@ def build_report_metrics_from_ledger(
         peak_activity_time=format_peak_time(hour_counter),
         payment_totals=payment_totals,
     )
+
+
+def build_report_metrics_from_ledger_range(
+    period_label: str,
+    start_date: date,
+    end_date: date,
+    sale_ledger: SaleFinanceLedger,
+    logs: list[dict[str, Any]] | None = None,
+    low_stock_warnings: list[LowStockWarning] | None = None,
+) -> ReportMetrics:
+    totals = {"active_sales": 0, "total_sales": 0.0, "total_items": 0, "payment_totals": empty_payment_totals(), "sales": []}
+    cursor = start_date
+    while cursor <= end_date:
+        day = sale_ledger.finance_summary(cursor.isoformat())
+        totals["active_sales"] += int(day.get("active_sales") or 0)
+        totals["total_sales"] += float(day.get("total_sales") or 0)
+        totals["total_items"] += int(day.get("total_items") or 0)
+        totals["sales"].extend(day.get("sales") or [])
+        for key, value in dict(day.get("payment_totals") or {}).items():
+            target = key if key in totals["payment_totals"] else "unknown"
+            totals["payment_totals"][target] += float(value or 0)
+        cursor += timedelta(days=1)
+
+    class PeriodLedger:
+        def finance_summary(self, _sale_date: str) -> dict[str, Any]:
+            return totals
+
+    return build_report_metrics_from_ledger(period_label, PeriodLedger(), logs, low_stock_warnings)
 
 
 def empty_payment_totals() -> dict[str, float]:

@@ -88,6 +88,7 @@ const FEED_RESUME_LIMIT = 40;
 const ACTIVE_CARD_RESUME_LIMIT = 12;
 const CARD_FONT_SCALE_MIN = 0.85;
 const CARD_FONT_SCALE_MAX = 1.25;
+let speechControl = { cardId: "", paused: false };
 const CARD_FONT_SCALE_STEP = 0.1;
 let activeStockFixScan = null;
 let pendingStockFixEvidenceSource = "photo";
@@ -693,6 +694,7 @@ function catalogMedicineEditorTemplate(card) {
 function fieldTemplate(card, field) {
   const value = card.fields?.[field] ?? "";
   if (card.type === "ReportCard" && field === "report_text") return `<section class="report-result" aria-label="Generated report"><h4>Report</h4><pre>${escapeHtml(String(value))}</pre></section>`;
+  if (card.type === "ReportCard" && field === "period") return `<label><span>Period</span><input data-card-id="${card.id}" data-field="period" list="report-periods-${card.id}" value="${escapeHtml(String(value))}"><datalist id="report-periods-${card.id}"><option>Today</option><option>Yesterday</option><option>Last 7 days</option><option>This week</option><option>Last week</option><option>This month</option><option>Last month</option></datalist><small>Or enter YYYY-MM-DD or YYYY-MM-DD to YYYY-MM-DD</small></label>`;
   const longFields = new Set(["items_text", "choices", "notes", "mapping", "message", "action", "missing_columns", "report_text"]);
   const inputMode = inputModeForField(field);
   const control = longFields.has(field)
@@ -878,7 +880,7 @@ function activeActionsTemplate(card) {
       return `
         <div class="card-actions">
           <button data-action="open-catalog-card">Open catalog</button>
-          <button data-action="read-card" data-card-id="${card.id}">Read</button>
+          ${speechControlsTemplate(card)}
           <button data-action="reject-card" data-card-id="${card.id}">Close</button>
         </div>
       `;
@@ -891,7 +893,7 @@ function activeActionsTemplate(card) {
           ? '<button data-action="capture-invoice">Scan again</button>'
           : `${invoiceMode ? '<button data-action="capture-invoice">Scan again</button>' : ""}<button data-action="confirm-card" data-card-id="${card.id}">${invoiceMode ? "Approve medicines" : "Approve catalog"}</button>`}
         ${invoiceMode ? "" : '<button data-action="download-template">Template</button>'}
-        <button data-action="read-card" data-card-id="${card.id}">Read</button>
+        ${speechControlsTemplate(card)}
         ${capabilities.correctionAllowed ? `<button data-action="correct-card" data-card-id="${card.id}">Correct</button>` : ""}
         <button data-action="reject-card" data-card-id="${card.id}">Cancel</button>
       </div>
@@ -901,7 +903,7 @@ function activeActionsTemplate(card) {
     return `
       <div class="card-actions">
         <button data-action="dismiss-notification" data-notification-id="${notificationIdFromCard(card)}">Done</button>
-        <button data-action="read-card" data-card-id="${card.id}">Read</button>
+        ${speechControlsTemplate(card)}
       </div>
     `;
   }
@@ -909,7 +911,7 @@ function activeActionsTemplate(card) {
     return `
       <div class="card-actions">
         ${card.type === "ReportCard" ? `<button data-action="confirm-card" data-card-id="${card.id}">${card.fields?.report_text ? "Refresh report" : "Generate report"}</button>` : `<button data-action="confirm-card" data-card-id="${card.id}">Confirm</button>`}
-        <button data-action="read-card" data-card-id="${card.id}">Read</button>
+        ${speechControlsTemplate(card)}
         ${card.type === "ReportCard" ? "" : `<button data-action="correct-card" data-card-id="${card.id}">Correct</button>`}
         <button data-action="reject-card" data-card-id="${card.id}">Cancel</button>
       </div>
@@ -921,13 +923,18 @@ function activeActionsTemplate(card) {
   return `
     <div class="card-actions">
       <button data-action="confirm-card" data-confirm-card="${card.id}" data-card-id="${card.id}" ${confirmationBlocker ? `disabled title="${escapeHtml(confirmationBlocker)}"` : ""}>${card.type === "RestockCard" ? "Add stock" : "Confirm"}</button>
-      <button data-action="read-card" data-card-id="${card.id}">Read</button>
+      ${speechControlsTemplate(card)}
       ${card.type === "StockCorrectionCard" ? `<button data-action="pause-reading">Pause</button><button data-action="resume-reading">Resume</button><button data-action="stop-reading">Stop</button><button data-action="stock-fix-camera" data-card-id="${card.id}">Camera</button><button data-action="stock-fix-photo" data-card-id="${card.id}">Photo</button>` : ""}
       ${card.type === "StockCorrectionCard" && card.learnedSpokenMedicine ? `<button data-action="forget-stock-fix-pronunciation" data-card-id="${card.id}">Forget voice name</button>` : ""}
       <button data-action="correct-card" data-card-id="${card.id}">Correct</button>
       <button data-action="reject-card" data-card-id="${card.id}">Cancel</button>
     </div>
   `;
+}
+
+function speechControlsTemplate(card) {
+  if (speechControl.cardId !== card.id) return `<button data-action="read-card" data-card-id="${card.id}">Read</button>`;
+  return `<button data-action="${speechControl.paused ? "resume-card-reading" : "pause-card-reading"}" data-card-id="${card.id}">${speechControl.paused ? "Resume" : "Pause"}</button><button data-action="stop-card-reading" data-card-id="${card.id}">Stop</button>`;
 }
 
 function stockFixActionsTemplate(card) {
@@ -1185,6 +1192,9 @@ function handleAction(dataset) {
   if (action === "export-catalog-csv") exportCatalogCsv();
   if (action === "download-template") downloadBulkPasteTemplate();
   if (action === "read-card") readCardAloud(dataset.cardId);
+  if (action === "pause-card-reading") pauseCardReading(dataset.cardId);
+  if (action === "resume-card-reading") resumeCardReading(dataset.cardId);
+  if (action === "stop-card-reading") stopCardReading(dataset.cardId);
   if (action === "stock-fix-read-control") toggleStockFixReading(dataset.cardId);
   if (action === "pause-reading") pauseStockFixReading();
   if (action === "resume-reading") resumeStockFixReading();
@@ -2430,7 +2440,9 @@ async function generateReport(card) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), 20000);
   try {
-    const response = await fetch(`/reports/daily?send_whatsapp=false&refresh=${Date.now()}`, {
+    const reportPeriod = String(card.fields?.period || "Today").trim();
+    const query = new URLSearchParams({ send_whatsapp: "false", refresh: String(Date.now()), period: reportPeriod });
+    const response = await fetch(`/reports/daily?${query}`, {
       method: "POST",
       cache: "no-store",
       headers: { "Cache-Control": "no-cache" },
@@ -2440,9 +2452,9 @@ async function generateReport(card) {
     if (!response.ok) throw new Error(result.detail || "The report could not be generated right now.");
     const generatedAt = result.generated_at ? new Date(result.generated_at) : new Date();
     card.fields = {
-      period: "Today",
+      period: result.period || reportPeriod,
       focus: "Sales, stock, cash, M-Pesa, credit",
-      report_date: result.date || "Today",
+      report_date: result.start_date === result.end_date ? result.start_date : `${result.start_date} to ${result.end_date}`,
       generated_at: Number.isNaN(generatedAt.getTime()) ? "Just now" : generatedAt.toLocaleString("en-KE", { timeZone: "Africa/Nairobi" }),
       report_text: result.report || "No report details were returned."
     };
@@ -3116,7 +3128,7 @@ function readCardAloud(cardId) {
   const fields = Object.entries(card.fields || {}).map(([key, value]) => `${key.replaceAll("_", " ")} ${value}`).join(". ");
   const utterance = new SpeechSynthesisUtterance(`${card.title}. ${fields}`);
   utterance.lang = "en-KE";
-  speakUtterance(utterance);
+  speakUtterance(utterance, card.id);
 }
 
 function readReportAloud(card) {
@@ -3132,7 +3144,7 @@ function readReportAloud(card) {
     .replaceAll("Ksh", "Kenyan shillings")
     .replaceAll("M-Pesa", "M Pesa"));
   utterance.lang = "en-KE";
-  speakUtterance(utterance);
+  speakUtterance(utterance, card.id);
 }
 
 function startStockFixReading(card) {
@@ -3210,15 +3222,50 @@ function speakStockFixSegment(sequence) {
   speakUtterance(utterance);
 }
 
-function speakUtterance(utterance) {
+function speakUtterance(utterance, cardId = "") {
   const synthesis = window.speechSynthesis;
   if (!synthesis) return;
+  if (cardId) {
+    utterance.onstart = () => {
+      speechControl = { cardId, paused: false };
+      render();
+    };
+    const finish = () => {
+      if (speechControl.cardId === cardId) {
+        speechControl = { cardId: "", paused: false };
+        render();
+      }
+    };
+    utterance.onend = finish;
+    utterance.onerror = finish;
+  }
   if (synthesis.speaking || synthesis.pending) {
     synthesis.cancel();
     window.setTimeout(() => synthesis.speak(utterance), 60);
     return;
   }
   synthesis.speak(utterance);
+}
+
+function pauseCardReading(cardId) {
+  if (speechControl.cardId !== cardId || !window.speechSynthesis?.speaking) return;
+  window.speechSynthesis.pause();
+  speechControl = { cardId, paused: true };
+  render();
+}
+
+function resumeCardReading(cardId) {
+  if (speechControl.cardId !== cardId || !window.speechSynthesis?.paused) return;
+  window.speechSynthesis.resume();
+  speechControl = { cardId, paused: false };
+  render();
+}
+
+function stopCardReading(cardId) {
+  if (speechControl.cardId !== cardId) return;
+  window.speechSynthesis?.cancel();
+  speechControl = { cardId: "", paused: false };
+  render();
 }
 
 function warmSpeechSynthesis() {

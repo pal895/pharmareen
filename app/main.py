@@ -16,7 +16,7 @@ from html import escape
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from datetime import date
+from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -3238,22 +3238,27 @@ async def legacy_whatsapp_form_webhook(request: Request) -> Response:
 @app.post("/reports/daily")
 def generate_daily_report(
     report_date: date | None = Query(default=None),
+    period: str | None = Query(default=None),
     send_whatsapp: bool = Query(default=True),
     authorization: str | None = Header(default=None),
 ) -> dict[str, Any]:
     settings = get_settings()
     authorize_report_trigger(settings, authorization)
 
-    target_date = report_date or now_in_timezone(settings.timezone).date()
+    today = now_in_timezone(settings.timezone).date()
+    target_date = report_date or today
+    start_date, end_date, period_label = resolve_report_period(period, target_date, today)
     try:
         generated_at = now_in_timezone(settings.timezone)
         report_service = get_report_service()
-        if send_whatsapp:
-            report_text = report_service.generate_daily_report(target_date, send_whatsapp=True)
+        if send_whatsapp and start_date == end_date:
+            report_text = report_service.generate_daily_report(start_date, send_whatsapp=True)
+        elif start_date != end_date and hasattr(report_service, "generate_period_preview"):
+            report_text = report_service.generate_period_preview(start_date, end_date, period_label)
         elif hasattr(report_service, "generate_daily_preview"):
-            report_text = report_service.generate_daily_preview(target_date)
+            report_text = report_service.generate_daily_preview(start_date)
         else:
-            report_text = report_service.generate_daily_report(target_date, send_whatsapp=False)
+            report_text = report_service.generate_daily_report(start_date, send_whatsapp=False)
     except SheetsUnavailableError:
         raise HTTPException(status_code=503, detail=SHEETS_UNAVAILABLE_MESSAGE) from None
     except Exception:
@@ -3263,8 +3268,11 @@ def generate_daily_report(
             detail="I could not generate the daily report right now. Please check the Google Sheets connection.",
         ) from None
     return {
-        "date": target_date.isoformat(),
-        "sent_whatsapp": send_whatsapp,
+        "date": start_date.isoformat(),
+        "period": period_label,
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "sent_whatsapp": bool(send_whatsapp and start_date == end_date),
         "generated_at": generated_at.isoformat(),
         "source": "saved_sales_activity_and_stock_records",
         "report": report_text,
@@ -4179,6 +4187,40 @@ def reliability_record_public(result: Any | None) -> dict[str, Any]:
         "idempotency_key": str(record.get("idempotency_key") or ""),
         "message": str(getattr(result, "message", "") or ""),
     }
+
+
+def resolve_report_period(period: str | None, fallback_date: date, today: date) -> tuple[date, date, str]:
+    value = str(period or "").strip()
+    key = value.lower()
+    if not value or key == "today":
+        return fallback_date, fallback_date, fallback_date.isoformat()
+    if key == "yesterday":
+        day = today - timedelta(days=1)
+        return day, day, day.isoformat()
+    if key == "last 7 days":
+        return today - timedelta(days=6), today, f"{today - timedelta(days=6)} to {today}"
+    if key == "this week":
+        start = today - timedelta(days=today.weekday())
+        return start, today, f"{start} to {today}"
+    if key == "last week":
+        end = today - timedelta(days=today.weekday() + 1)
+        start = end - timedelta(days=6)
+        return start, end, f"{start} to {end}"
+    if key == "this month":
+        start = today.replace(day=1)
+        return start, today, f"{start} to {today}"
+    if key == "last month":
+        end = today.replace(day=1) - timedelta(days=1)
+        start = end.replace(day=1)
+        return start, end, f"{start} to {end}"
+    match = re.fullmatch(r"(\d{4}-\d{2}-\d{2})(?:\s+(?:to|through)\s+(\d{4}-\d{2}-\d{2}))?", key)
+    if not match:
+        raise HTTPException(status_code=422, detail="Use Today, Yesterday, Last 7 days, This week, Last week, This month, Last month, YYYY-MM-DD, or YYYY-MM-DD to YYYY-MM-DD.")
+    start = date.fromisoformat(match.group(1))
+    end = date.fromisoformat(match.group(2) or match.group(1))
+    if start > end or end > today:
+        raise HTTPException(status_code=422, detail="Report dates must be a valid saved period ending today or earlier.")
+    return start, end, start.isoformat() if start == end else f"{start} to {end}"
 
 
 def bailey_payload_text(payload: dict[str, Any]) -> str:

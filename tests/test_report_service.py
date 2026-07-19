@@ -6,7 +6,9 @@ from app.reports import (
     build_transaction_metrics,
     deterministic_recommendations,
     render_report,
+    ReportService,
 )
+from datetime import date
 
 
 def test_build_report_metrics_counts_sales_and_missed_requests():
@@ -117,7 +119,6 @@ def test_render_report_contains_demo_summary():
     assert report.startswith("📊 MS2.0 Daily Report\nDate: 2026-04-27")
     assert "Total Sales: KES 50" in report
     assert report.count("Total Sales:") == 1
-    assert "Generated: 18:30 Africa/Nairobi" in report
     assert "Source: saved sales ledger, activity log, and current stock records" in report
     assert "Cost: KES 0" in report
     assert "Gross Profit: KES 0" in report
@@ -177,3 +178,19 @@ def test_transaction_metrics_calculates_peak_time():
     assert metrics.peak_sales_count == 2
     assert metrics.peak_items_sold == 5
     assert metrics.late_sale_transactions == 1
+
+
+def test_period_preview_uses_saved_range_and_is_deterministic():
+    class Store:
+        def read_daily_logs(self, report_date): return []
+        def read_transactions(self, start_date, end_date=None):
+            return [{"Timestamp": "2026-07-18 10:00:00", "Date": "2026-07-18", "Type": "sale", "Drug": "Cetirizine", "Quantity": 2, "Total Sales": 30, "Total Cost": 16, "Profit": 14}]
+        def list_low_stock_items(self): return []
+
+    service = ReportService(Store())
+    first = service.generate_period_preview(date(2026, 7, 13), date(2026, 7, 19), "2026-07-13 to 2026-07-19")
+    second = service.generate_period_preview(date(2026, 7, 13), date(2026, 7, 19), "2026-07-13 to 2026-07-19")
+    assert first == second
+    assert "Total Sales: KES 30" in first
+    assert "Cost: KES 16" in first
+    assert "Gross Profit: KES 14" in first
