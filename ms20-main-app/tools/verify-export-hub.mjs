@@ -42,6 +42,11 @@ assert.match(outputs.html, /data-label="Medicine">Amoxicillin/);
 assert.match(outputs.html, /@media\(max-width:720px\)/);
 assert.match(outputs.html, /@media print/);
 assert.match(outputs.html, /Close view/);
+assert.match(outputs.html, /Find a medicine/);
+assert.match(outputs.html, /Name, supplier, barcode or shelf/);
+assert.match(outputs.html, /class="medicine-card"[^>]*data-search=/);
+assert.match(outputs.html, /35 medicines shown · Tap a medicine to view every field/);
+assert.match(outputs.html, /card\.hidden=!card\.dataset\.search\.includes\(query\)/);
 assert.equal(exportFilename(model, "xlsx"), "zuri-pharmacy-inventory-2026-07-19.xlsx");
 
 const source = await readFile(new URL("../src/services/documentGenerator.js", import.meta.url), "utf8");
