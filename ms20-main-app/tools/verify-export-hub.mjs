@@ -46,6 +46,7 @@ assert.match(appSource, /data-action="open-export-hub">Export Hub/);
 assert.match(appSource, /buildCanonicalInventoryExport\(\{ pharmacy: state\.pharmacy, items: pharmacyBrain\.catalog \}\)/);
 assert.match(appSource, /download-inventory-export/);
 assert.match(appSource, /card\.type === "CatalogWorkspaceCard" \|\| card\.type === "ExportHubCard"/);
+assert.match(appSource, /card\.type === "ExportHubCard"\) return "Choose a format to download\. No confirmation is required\."/);
 assert.doesNotMatch(appSource, /Export Hub[\s\S]{0,1000}(OpenAI|fetch\s*\()/);
 assert.match(cssSource, /@media \(max-width: 520px\)[^{]*\{[^}]*\.export-format-grid/);
 
