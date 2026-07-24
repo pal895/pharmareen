@@ -3191,9 +3191,14 @@ function downloadInventoryExport(format, cardId = "") {
     pptx: [buildInventoryPptx, "pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"]
   };
   if (format === "print") {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return updateExportHubStatus(cardId, "Print view was blocked. Allow pop-ups for MS2.0, then try again.");
-    printWindow.document.open(); printWindow.document.write(buildPrintHtml(model)); printWindow.document.close();
+    const printHtml = buildPrintHtml(model);
+    const printUrl = URL.createObjectURL(new Blob([printHtml], { type: "text/html;charset=utf-8" }));
+    const printWindow = window.open(printUrl, "_blank");
+    if (!printWindow) {
+      URL.revokeObjectURL(printUrl);
+      return updateExportHubStatus(cardId, "Print view was blocked. Allow pop-ups for MS2.0, then try again.");
+    }
+    window.setTimeout(() => URL.revokeObjectURL(printUrl), 60000);
     return updateExportHubStatus(cardId, `Print-ready inventory opened for ${model.rows.length} medicines.`);
   }
   const selected = formats[format];

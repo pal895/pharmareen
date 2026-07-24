@@ -36,6 +36,12 @@ assert.match(outputs.csv, /Amoxicillin,500 mg,capsule,capsule,20,12,40/);
 assert.equal(new TextDecoder().decode(outputs.pdf.slice(0, 8)), "%PDF-1.4");
 for (const format of ["xlsx", "docx", "pptx"]) assert.equal(new TextDecoder().decode(outputs[format].slice(0, 2)), "PK");
 assert.match(outputs.html, /Generated locally by MS2\.0 with no AI formatting/);
+assert.match(outputs.html, /name="viewport" content="width=device-width,initial-scale=1"/);
+assert.match(outputs.html, /Review before printing/);
+assert.match(outputs.html, /data-label="Medicine">Amoxicillin/);
+assert.match(outputs.html, /@media\(max-width:720px\)/);
+assert.match(outputs.html, /@media print/);
+assert.match(outputs.html, /Close view/);
 assert.equal(exportFilename(model, "xlsx"), "zuri-pharmacy-inventory-2026-07-19.xlsx");
 
 const source = await readFile(new URL("../src/services/documentGenerator.js", import.meta.url), "utf8");
@@ -47,6 +53,8 @@ assert.match(appSource, /buildCanonicalInventoryExport\(\{ pharmacy: state\.phar
 assert.match(appSource, /download-inventory-export/);
 assert.match(appSource, /card\.type === "CatalogWorkspaceCard" \|\| card\.type === "ExportHubCard"/);
 assert.match(appSource, /card\.type === "ExportHubCard"\) return "Choose a format to download\. No confirmation is required\."/);
+assert.match(appSource, /URL\.createObjectURL\(new Blob\(\[printHtml\]/);
+assert.doesNotMatch(appSource, /printWindow\.document\.write/);
 assert.doesNotMatch(appSource, /Export Hub[\s\S]{0,1000}(OpenAI|fetch\s*\()/);
 assert.match(cssSource, /@media \(max-width: 520px\)[^{]*\{[^}]*\.export-format-grid/);
 
