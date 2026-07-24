@@ -869,7 +869,7 @@ function catalogImportMobileRowTemplate(cardId, row, index, rowCount, columns = 
 }
 
 function activeActionsTemplate(card) {
-  if (card.type === "CatalogWorkspaceCard") return "";
+  if (card.type === "CatalogWorkspaceCard" || card.type === "ExportHubCard") return "";
   if (card.type === "CatalogOnboardingCard") {
     return `
       <div class="card-actions onboarding-actions">
