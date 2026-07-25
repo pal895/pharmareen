@@ -17,7 +17,7 @@ for (let index = 3; index <= 35; index += 1) items.push({
   sellingPrice: index * 2, costPrice: index, stockLeft: index + 10, supplier: "Verified Supplier",
   barcode: `616${String(index).padStart(9, "0")}`, batches: [{ batch: `BAT-${index}`, expiry: "2029-12" }], shelf: `S${index}`
 });
-const generatedAt = new Date("2026-07-19T17:00:32.000Z");
+const generatedAt = new Date("2026-07-25T18:00:32.000Z");
 const model = buildCanonicalInventoryExport({ pharmacy, items, generatedAt });
 const other = buildCanonicalInventoryExport({ pharmacy: { ...pharmacy, id: "pharmacy-b", name: "Other Pharmacy" }, items: [items[0]], generatedAt });
 
@@ -25,7 +25,7 @@ assert.equal(model.pharmacyId, "pharmacy-a");
 assert.equal(model.rows.length, 35);
 assert.equal(other.rows.length, 1);
 assert.notEqual(model.pharmacyId, other.pharmacyId);
-assert.equal(model.generatedKenya.includes("20:00:32"), true);
+assert.equal(model.generatedKenya.includes("21:00:32"), true);
 assert.deepEqual(EXPORT_FORMATS.map((format) => format.id), ["csv", "xlsx", "pdf", "docx", "pptx", "print"]);
 
 const outputs = {
@@ -42,6 +42,10 @@ assert.match(outputs.html, /Review before printing/);
 assert.match(outputs.html, /data-label="Medicine">Amoxicillin/);
 assert.match(outputs.html, /@media\(max-width:720px\)/);
 assert.match(outputs.html, /@media print/);
+assert.equal((outputs.html.match(/class="print-sheet"/g) || []).length, 4);
+assert.equal((outputs.html.match(/class="record-main"/g) || []).length, 35);
+assert.match(outputs.html, /font-size:9\.5px/);
+assert.match(outputs.html, /Page 4 of 4/);
 assert.match(outputs.html, /Close view/);
 assert.match(outputs.html, /Fast medicine finder/);
 assert.match(outputs.html, /Scan barcode/);
@@ -54,7 +58,24 @@ assert.match(outputs.html, /ms20:finder-request/);
 assert.match(outputs.html, /result=>wanted\?result\.value>=54:result\.value>0/);
 assert.match(outputs.html, /BroadcastChannel/);
 assert.match(outputs.html, /finder-status/);
-assert.equal(exportFilename(model, "xlsx"), "zuri-pharmacy-inventory-2026-07-19.xlsx");
+assert.equal(exportFilename(model, "xlsx"), "zuri-pharmacy-inventory-2026-07-25-180032Z.xlsx");
+
+const decodedPackages = Object.fromEntries(["xlsx", "docx", "pptx"].map((format) => [format, new TextDecoder().decode(outputs[format])]));
+for (const item of items) {
+  assert.match(outputs.csv, new RegExp(item.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `CSV missing ${item.name}`);
+  for (const format of ["xlsx", "docx", "pptx"]) {
+    assert.match(decodedPackages[format], new RegExp(item.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${format.toUpperCase()} missing ${item.name}`);
+  }
+  assert.match(outputs.html, new RegExp(`class="record-main"[\\s\\S]*?${item.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), `Print missing ${item.name}`);
+}
+assert.equal((decodedPackages.pptx.match(/<p:sldId /g) || []).length, 8);
+assert.equal((decodedPackages.docx.match(/w:type="page"/g) || []).length, 6);
+assert.equal((new TextDecoder().decode(outputs.pdf).match(/\/Type \/Page\b/g) || []).length, 5);
+for (const match of decodedPackages.pptx.matchAll(/<a:off x="(\d+)" y="(\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"\/>/g)) {
+  const [, x, y, width, height] = match.map(Number);
+  assert.ok(x + width <= 12192000, `PPTX shape overflows horizontally: ${x + width}`);
+  assert.ok(y + height <= 6858000, `PPTX shape overflows vertically: ${y + height}`);
+}
 
 const finderFixture = [
   { name: "Paracetamol", aliases: ["Panadol"], strength: "500 mg", forms: ["tablet"], units: ["tablet"], barcode: "616111", supplier: "EastCare Pharma", shelf: "D3", batches: [{ batch: "PAR-500C", expiry: "2026-09" }], stockLeft: 4, reorderLevel: 5 },
@@ -118,12 +139,12 @@ assert.doesNotMatch(appSource, /Export Hub[\s\S]{0,1000}(OpenAI|fetch\s*\()/);
 assert.match(cssSource, /@media \(max-width: 520px\)[^{]*\{[^}]*\.export-format-grid/);
 assert.match(cssSource, /\.print-preview-overlay/);
 
-const outputDir = join(process.cwd(), ".export-hub-verification");
+const outputDir = join(process.cwd(), ".export-hub-verification", "artifacts");
 await rm(outputDir, { recursive: true, force: true });
 await mkdir(outputDir, { recursive: true });
 await Promise.all([
-  writeFile(join(outputDir, "inventory.csv"), outputs.csv), writeFile(join(outputDir, "inventory.xlsx"), outputs.xlsx),
-  writeFile(join(outputDir, "inventory.pdf"), outputs.pdf), writeFile(join(outputDir, "inventory.docx"), outputs.docx),
-  writeFile(join(outputDir, "inventory.pptx"), outputs.pptx), writeFile(join(outputDir, "inventory-print.html"), outputs.html)
+  writeFile(join(outputDir, exportFilename(model, "csv")), outputs.csv), writeFile(join(outputDir, exportFilename(model, "xlsx")), outputs.xlsx),
+  writeFile(join(outputDir, exportFilename(model, "pdf")), outputs.pdf), writeFile(join(outputDir, exportFilename(model, "docx")), outputs.docx),
+  writeFile(join(outputDir, exportFilename(model, "pptx")), outputs.pptx), writeFile(join(outputDir, exportFilename(model, "print.html")), outputs.html)
 ]);
-console.log(`Export Hub verification passed: canonical model, pharmacy isolation, six formats, deterministic zero-AI renderers. 4,200-record finder index ${buildMs.toFixed(1)} ms; exact search ${searchMs.toFixed(1)} ms. Artifacts: ${outputDir}`);
+console.log(`Export Hub verification passed: 35 canonical records in six formats, pharmacy isolation, balanced pagination, fresh filenames, deterministic zero-AI renderers. 4,200-record finder index ${buildMs.toFixed(1)} ms; exact search ${searchMs.toFixed(1)} ms. Artifacts: ${outputDir}`);
