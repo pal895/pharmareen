@@ -49,9 +49,11 @@ assert.match(outputs.html, /Speak medicine/);
 assert.match(outputs.html, /Type only if needed/);
 assert.match(outputs.html, /Name, alias, strength, form, unit, barcode, supplier, shelf or batch/);
 assert.match(outputs.html, /class="medicine-card"[^>]*data-finder-id=/);
-assert.match(outputs.html, /35 medicines shown/);
+assert.match(outputs.html, /35 of 35 medicines shown/);
 assert.match(outputs.html, /ms20:finder-request/);
-assert.match(outputs.html, /event\.source!==window\.opener\|\|event\.origin!==location\.origin/);
+assert.match(outputs.html, /result=>wanted\?result\.value>=54:result\.value>0/);
+assert.match(outputs.html, /BroadcastChannel/);
+assert.match(outputs.html, /finder-status/);
 assert.equal(exportFilename(model, "xlsx"), "zuri-pharmacy-inventory-2026-07-19.xlsx");
 
 const finderFixture = [
@@ -66,6 +68,7 @@ assert.ok(searchMedicineFinder(finderIndex, "tablet").some((entry) => entry.name
 assert.deepEqual(searchMedicineFinder(finderIndex, "", { filter: "lowStock" }).map((entry) => entry.name), ["Ibuprofen", "Paracetamol"]);
 assert.deepEqual(searchMedicineFinder(finderIndex, "", { filter: "outOfStock" }).map((entry) => entry.name), ["Ibuprofen"]);
 assert.deepEqual(searchMedicineFinder(finderIndex, "", { filter: "expiringSoon" }).map((entry) => entry.name), ["Paracetamol"]);
+assert.equal(searchMedicineFinder(finderIndex, "").length, 2);
 
 const scaleItems = Array.from({ length: 4200 }, (_, index) => ({
   id: `scale-${index}`, name: `Scale Medicine ${index}`, aliases: [`SM${index}`], strength: `${index + 1} mg`,
@@ -98,9 +101,12 @@ assert.match(appSource, /download-inventory-export/);
 assert.match(appSource, /card\.type === "CatalogWorkspaceCard" \|\| card\.type === "ExportHubCard"/);
 assert.match(appSource, /card\.type === "ExportHubCard"\) return "Choose a format to download\. No confirmation is required\."/);
 assert.match(appSource, /URL\.createObjectURL\(new Blob\(\[printHtml\]/);
-assert.match(appSource, /startVoiceCapture\(\(transcript\) => postFinderResult\(transcript, "shared_voice_capture"\)\)/);
+assert.match(appSource, /startVoiceCapture\([\s\S]{0,250}shared_voice_capture/);
 assert.match(appSource, /openLightweightCamera\("barcode"\)/);
-assert.match(appSource, /event\.origin !== window\.location\.origin/);
+assert.match(appSource, /new BroadcastChannel\(`ms20-finder-\$\{bridgeId\}`\)/);
+assert.match(appSource, /handleFinderRequest/);
+assert.match(appSource, /Camera could not open\. Allow camera access in browser settings/);
+assert.match(appSource, /Microphone access is off\. Allow it in your browser settings/);
 assert.doesNotMatch(appSource, /printWindow\.document\.write/);
 assert.doesNotMatch(appSource, /Export Hub[\s\S]{0,1000}(OpenAI|fetch\s*\()/);
 assert.match(cssSource, /@media \(max-width: 520px\)[^{]*\{[^}]*\.export-format-grid/);

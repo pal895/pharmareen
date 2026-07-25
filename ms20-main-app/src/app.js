@@ -96,6 +96,8 @@ let speechControl = { cardId: "", paused: false, segments: [], index: 0 };
 let speechRunId = 0;
 let activeReportRequest = null;
 let activeFinderWindow = null;
+const finderChannels = new Map();
+const activeFinderBridgeIds = new Set();
 const CARD_FONT_SCALE_STEP = 0.1;
 let activeStockFixScan = null;
 let pendingStockFixEvidenceSource = "photo";
@@ -1386,16 +1388,18 @@ function handleVoiceTranscript(text) {
   addCard(card);
 }
 
-function startVoiceCapture(onTranscript = null) {
+function startVoiceCapture(onTranscript = null, onStatus = null) {
   if (state.voice.starting || state.voice.listening) return;
   if (navigator.onLine === false) {
     state.voice.status = "Voice needs internet on this phone. You can type while offline.";
+    onStatus?.("Voice needs internet on this phone. Connect, then tap Speak medicine again.");
     render();
     return;
   }
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
     state.voice.status = "Voice is not available in this browser. Please type for now.";
+    onStatus?.("Voice is unavailable in this browser. Use Chrome with microphone access, then try again.");
     render();
     return;
   }
@@ -1419,7 +1423,8 @@ function startVoiceCapture(onTranscript = null) {
     state.voice.starting = false;
     state.voice.listening = true;
     const stockFixCard = state.cards.find((card) => card.type === "StockCorrectionCard");
-    state.voice.status = stockFixCard ? stockFixVoicePrompt(stockFixCard) : "Speak now.";
+    if (stockFixCard) state.voice.status = stockFixVoicePrompt(stockFixCard);
+    else state.voice.status = "Speak now.";
     render();
     captureTimer = setTimeout(() => {
       if (activeRecognition !== recognition) return;
@@ -1486,6 +1491,7 @@ function startVoiceCapture(onTranscript = null) {
         : error === "no-speech"
           ? "I did not hear any words. Tap Mic and try again."
           : "Voice stopped before it heard the command. Tap Mic and try again.";
+    onStatus?.(state.voice.status);
     activeRecognition = null;
     render();
   };
@@ -1498,6 +1504,7 @@ function startVoiceCapture(onTranscript = null) {
     if (!heardResult && !voiceError) state.voice.status = completedStockFixReview
       ? "Review complete. Tap Mic and say Confirm again to apply this stock fix once."
       : "I did not receive a completed transcript. Tap Mic and try once more.";
+    if (!heardResult && !voiceError) onStatus?.(state.voice.status);
     if (!heardResult && !voiceError && (state.voice.status === "Speak now." || state.voice.status === "Starting microphone… Please wait.")) {
       state.voice.status = "I did not hear any words. Tap Mic and try again.";
     } else if (state.voice.status === "Speak now." || state.voice.status === "Starting microphone… Please wait.") {
@@ -1512,6 +1519,7 @@ function startVoiceCapture(onTranscript = null) {
     state.voice.starting = false;
     state.voice.listening = false;
     state.voice.status = "Voice could not start. Check the internet and microphone access, or type the command.";
+    onStatus?.("Voice could not start. Allow microphone access, check the internet, then try again.");
     render();
   }
 }
@@ -1755,9 +1763,11 @@ async function openLightweightCamera(scanType = "medicine_photo") {
       lightButton.addEventListener("click", () => void toggleCameraLight());
       actions.insertBefore(lightButton, actions.lastElementChild);
     }
+    return true;
   } catch {
     state.camera.status = "Camera did not open. Allow camera access and try again.";
     render();
+    return false;
   }
 }
 
@@ -3200,11 +3210,29 @@ function downloadInventoryExport(format, cardId = "") {
     pptx: [buildInventoryPptx, "pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"]
   };
   if (format === "print") {
-    const printHtml = buildPrintHtml(model);
+    const bridgeId = globalThis.crypto?.randomUUID?.() || `finder-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    activeFinderBridgeIds.add(bridgeId);
+    const finderChannel = "BroadcastChannel" in window ? new BroadcastChannel(`ms20-finder-${bridgeId}`) : null;
+    if (finderChannel) {
+      finderChannels.set(bridgeId, finderChannel);
+      finderChannel.addEventListener("message", (event) => {
+        if (event.data?.type !== "ms20:finder-request" || event.data.bridgeId !== bridgeId) return;
+        handleFinderRequest(event.data, (payload) => finderChannel.postMessage({ ...payload, bridgeId }));
+      });
+      window.setTimeout(() => {
+        finderChannels.get(bridgeId)?.close();
+        finderChannels.delete(bridgeId);
+        activeFinderBridgeIds.delete(bridgeId);
+      }, 15 * 60 * 1000);
+    }
+    const printHtml = buildPrintHtml(model, { bridgeId });
     const printUrl = URL.createObjectURL(new Blob([printHtml], { type: "text/html;charset=utf-8" }));
     const printWindow = window.open(printUrl, "_blank");
     if (!printWindow) {
       URL.revokeObjectURL(printUrl);
+      finderChannel?.close();
+      finderChannels.delete(bridgeId);
+      activeFinderBridgeIds.delete(bridgeId);
       return updateExportHubStatus(cardId, "Print view was blocked. Allow pop-ups for MS2.0, then try again.");
     }
     window.setTimeout(() => URL.revokeObjectURL(printUrl), 60000);
@@ -4163,16 +4191,39 @@ function postFinderResult(query, source) {
   target.postMessage({ type: "ms20:finder-result", query: String(query || "").trim(), source }, window.location.origin);
 }
 
-window.addEventListener("message", (event) => {
-  if (event.origin !== window.location.origin || event.data?.type !== "ms20:finder-request" || !event.source) return;
-  activeFinderWindow = event.source;
-  if (event.data.action === "voice") {
-    startVoiceCapture((transcript) => postFinderResult(transcript, "shared_voice_capture"));
+function handleFinderRequest(data, reply) {
+  const send = (query = "", source = "", message = "") => reply({
+    type: "ms20:finder-result", query: String(query || "").trim(), source, message
+  });
+  if (data.action === "voice") {
+    send("", "shared_voice_capture", "Starting microphone in MS2.0…");
+    window.focus();
+    startVoiceCapture(
+      (transcript) => send(transcript, "shared_voice_capture", `Heard “${transcript}”.`),
+      (message) => send("", "shared_voice_capture", message)
+    );
     return;
   }
-  if (event.data.action === "barcode") {
-    void openLightweightCamera("barcode").catch(() => postFinderResult("", "barcode_camera_unavailable"));
+  if (data.action === "barcode") {
+    send("", "shared_barcode_capture", "Opening the shared scanner in MS2.0…");
+    window.focus();
+    activeFinderWindow = { closed: false, postMessage: (payload) => reply({ ...payload, bridgeId: data.bridgeId || "" }) };
+    void openLightweightCamera("barcode").then((opened) => {
+      if (!opened) send(
+        "", "barcode_camera_unavailable",
+        "Camera could not open. Allow camera access in browser settings, then try again."
+      );
+    });
   }
+}
+
+window.addEventListener("message", (event) => {
+  if (event.data?.type !== "ms20:finder-request" || !event.source) return;
+  if (!activeFinderBridgeIds.has(event.data.bridgeId)) return;
+  if (event.origin !== window.location.origin && event.origin !== "null") return;
+  handleFinderRequest(event.data, (payload) => event.source.postMessage(
+    { ...payload, bridgeId: event.data.bridgeId || "" }, event.origin === "null" ? "*" : event.origin
+  ));
 });
 
 window.addEventListener("online", () => { syncPendingStockCorrections(); render(); });
