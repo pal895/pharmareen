@@ -1,0 +1,36 @@
+{
+  "schema": "ms20.provenance-registry.v1",
+  "updated": "2026-07-25",
+  "entries": [
+    {
+      "name": "MS2.0 shared medicine finder",
+      "type": "original_source_code",
+      "source": "ms20-main-app/src/services/medicineFinder.js",
+      "version": "repository-main",
+      "licence": "MS2.0 project-owned source",
+      "commercial_use": true,
+      "modification": true,
+      "redistribution": "Controlled by the MS2.0 repository owner",
+      "attribution_or_notices": "None external",
+      "approved_use": "Pharmacy-isolated local catalog finding and Print preview adaptation",
+      "proof": "Repository git history and source review",
+      "review_status": "approved",
+      "owner": "MS2.0 repository owner"
+    },
+    {
+      "name": "Browser BarcodeDetector, MediaDevices and Web Speech interfaces",
+      "type": "standard_browser_capability",
+      "source": "End-user browser runtime; not bundled or redistributed by MS2.0",
+      "version": "runtime-provided",
+      "licence": "Not an incorporated third-party asset or dependency",
+      "commercial_use": true,
+      "modification": false,
+      "redistribution": "Not redistributed",
+      "attribution_or_notices": "None added; browser permission and availability rules apply",
+      "approved_use": "Reuse existing MS2.0 scanner and voice capture only after explicit owner action; matching remains local",
+      "proof": "No package or external asset added; implementation uses feature detection",
+      "review_status": "approved_with_runtime_availability_caveat",
+      "owner": "MS2.0 repository owner"
+    }
+  ]
+}

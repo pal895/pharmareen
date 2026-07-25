@@ -95,6 +95,7 @@ const CARD_FONT_SCALE_MAX = 1.25;
 let speechControl = { cardId: "", paused: false, segments: [], index: 0 };
 let speechRunId = 0;
 let activeReportRequest = null;
+let activeFinderWindow = null;
 const CARD_FONT_SCALE_STEP = 0.1;
 let activeStockFixScan = null;
 let pendingStockFixEvidenceSource = "photo";
@@ -1385,7 +1386,7 @@ function handleVoiceTranscript(text) {
   addCard(card);
 }
 
-function startVoiceCapture() {
+function startVoiceCapture(onTranscript = null) {
   if (state.voice.starting || state.voice.listening) return;
   if (navigator.onLine === false) {
     state.voice.status = "Voice needs internet on this phone. You can type while offline.";
@@ -1451,11 +1452,15 @@ function startVoiceCapture() {
     state.voice.status = `Heard: “${finalTranscript}”.`;
     activeRecognition = null;
     if (finalTranscript.trim()) {
-      const guidedStockFix = state.cards.some((card) => card.type === "StockCorrectionCard");
-      handleVoiceTranscript(finalTranscript);
-      const continuingCard = state.cards.find((card) => card.type === "StockCorrectionCard");
-      if (guidedStockFix && continuingCard && !continuingCard.ui?.reviewedSlides && !continuingCard.ui?.voiceAwaitingManualRetry) {
-        announceStockFixNextStep(continuingCard);
+      if (onTranscript) {
+        onTranscript(finalTranscript.trim());
+      } else {
+        const guidedStockFix = state.cards.some((card) => card.type === "StockCorrectionCard");
+        handleVoiceTranscript(finalTranscript);
+        const continuingCard = state.cards.find((card) => card.type === "StockCorrectionCard");
+        if (guidedStockFix && continuingCard && !continuingCard.ui?.reviewedSlides && !continuingCard.ui?.voiceAwaitingManualRetry) {
+          announceStockFixNextStep(continuingCard);
+        }
       }
     } else {
       render();
@@ -1891,6 +1896,10 @@ async function readBarcodeCapture(file) {
   const sourceCandidate = fixture ? sourceBrain.lookupMedicine(fixture.name) : null;
   const recognized = existing || (sourceCandidate?.status === "matched" ? fixture : null);
   const review = recognized ? normalizeMedicineReviewRow(recognized) : {};
+  if (activeFinderWindow) {
+    postFinderResult(review.name || barcode, barcode ? "barcode" : "barcode_not_read");
+    return;
+  }
   addCard(createEditableCard({
     type: "VisualScanCard",
     title: barcode ? "Check barcode" : "Barcode needs review",
@@ -4146,6 +4155,25 @@ function hideReplitBadge() {
     }
   });
 }
+
+function postFinderResult(query, source) {
+  const target = activeFinderWindow;
+  activeFinderWindow = null;
+  if (!target || target.closed) return;
+  target.postMessage({ type: "ms20:finder-result", query: String(query || "").trim(), source }, window.location.origin);
+}
+
+window.addEventListener("message", (event) => {
+  if (event.origin !== window.location.origin || event.data?.type !== "ms20:finder-request" || !event.source) return;
+  activeFinderWindow = event.source;
+  if (event.data.action === "voice") {
+    startVoiceCapture((transcript) => postFinderResult(transcript, "shared_voice_capture"));
+    return;
+  }
+  if (event.data.action === "barcode") {
+    void openLightweightCamera("barcode").catch(() => postFinderResult("", "barcode_camera_unavailable"));
+  }
+});
 
 window.addEventListener("online", () => { syncPendingStockCorrections(); render(); });
 window.addEventListener("offline", render);

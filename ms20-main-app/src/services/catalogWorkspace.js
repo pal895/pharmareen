@@ -84,14 +84,8 @@ export function applyApprovedCatalogEdit(catalog = [], originalId, draft = {}) {
 }
 
 export function catalogWorkspaceItems(catalog = [], query = "") {
-  const unique = new Map();
-  for (const item of catalog) {
-    const key = normalize(item.name || item.medicine);
-    if (key && !unique.has(key)) unique.set(key, item);
-  }
-  const items = [...unique.values()];
-  if (!normalize(query)) return items.sort((left, right) => String(left.name || left.medicine).localeCompare(String(right.name || right.medicine)));
-  return rankMedicineMatches(query, items, { limit: items.length, requireAllTerms: true }).map((entry) => entry.medicine);
+  const index = buildMedicineFinderIndex(catalog);
+  return searchMedicineFinder(index, query, { limit: index.length }).map((entry) => entry.item);
 }
 
 function searchableText(item) {
@@ -113,5 +107,6 @@ function searchableText(item) {
 function normalize(value) {
   return normalizeMedicineText(value);
 }
-import { rankMedicineMatches, normalizeMedicineText } from "./medicineMatcher.js";
+import { normalizeMedicineText } from "./medicineMatcher.js";
 import { CATALOG_MEDICINE_FIELD_KEYS, normalizeExpiryValue } from "./medicineFieldSchema.js";
+import { buildMedicineFinderIndex, searchMedicineFinder } from "./medicineFinder.js";

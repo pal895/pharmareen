@@ -5,6 +5,7 @@ import {
   EXPORT_FORMATS, buildCanonicalInventoryExport, buildInventoryCsv, buildInventoryDocx,
   buildInventoryPdf, buildInventoryPptx, buildInventoryXlsx, buildPrintHtml, exportFilename
 } from "../src/services/documentGenerator.js";
+import { buildMedicineFinderIndex, searchMedicineFinder } from "../src/services/medicineFinder.js";
 
 const pharmacy = { id: "pharmacy-a", name: "Zuri Pharmacy", branch: "Main", location: "Nairobi, Kenya" };
 const items = [
@@ -42,23 +43,64 @@ assert.match(outputs.html, /data-label="Medicine">Amoxicillin/);
 assert.match(outputs.html, /@media\(max-width:720px\)/);
 assert.match(outputs.html, /@media print/);
 assert.match(outputs.html, /Close view/);
-assert.match(outputs.html, /Find a medicine/);
-assert.match(outputs.html, /Name, supplier, barcode or shelf/);
-assert.match(outputs.html, /class="medicine-card"[^>]*data-search=/);
-assert.match(outputs.html, /35 medicines shown · Tap a medicine to view every field/);
-assert.match(outputs.html, /card\.hidden=!card\.dataset\.search\.includes\(query\)/);
+assert.match(outputs.html, /Fast medicine finder/);
+assert.match(outputs.html, /Scan barcode/);
+assert.match(outputs.html, /Speak medicine/);
+assert.match(outputs.html, /Type only if needed/);
+assert.match(outputs.html, /Name, alias, strength, form, unit, barcode, supplier, shelf or batch/);
+assert.match(outputs.html, /class="medicine-card"[^>]*data-finder-id=/);
+assert.match(outputs.html, /35 medicines shown/);
+assert.match(outputs.html, /ms20:finder-request/);
+assert.match(outputs.html, /event\.source!==window\.opener\|\|event\.origin!==location\.origin/);
 assert.equal(exportFilename(model, "xlsx"), "zuri-pharmacy-inventory-2026-07-19.xlsx");
 
+const finderFixture = [
+  { name: "Paracetamol", aliases: ["Panadol"], strength: "500 mg", forms: ["tablet"], units: ["tablet"], barcode: "616111", supplier: "EastCare Pharma", shelf: "D3", batches: [{ batch: "PAR-500C", expiry: "2026-09" }], stockLeft: 4, reorderLevel: 5 },
+  { name: "Ibuprofen", aliases: ["Brufen"], strength: "200 mg", forms: ["tablet"], units: ["tablet"], barcode: "616222", supplier: "AfyaLink", shelf: "C3", stockLeft: 0, reorderLevel: 5 }
+];
+const finderIndex = buildMedicineFinderIndex(finderFixture, { now: generatedAt });
+for (const query of ["Paracetamol", "Panadol", "Paracetmol", "500 mg", "616111", "EastCare", "D3", "PAR-500C"]) {
+  assert.equal(searchMedicineFinder(finderIndex, query)[0]?.name, "Paracetamol", `Finder failed for ${query}`);
+}
+assert.ok(searchMedicineFinder(finderIndex, "tablet").some((entry) => entry.name === "Paracetamol"));
+assert.deepEqual(searchMedicineFinder(finderIndex, "", { filter: "lowStock" }).map((entry) => entry.name), ["Ibuprofen", "Paracetamol"]);
+assert.deepEqual(searchMedicineFinder(finderIndex, "", { filter: "outOfStock" }).map((entry) => entry.name), ["Ibuprofen"]);
+assert.deepEqual(searchMedicineFinder(finderIndex, "", { filter: "expiringSoon" }).map((entry) => entry.name), ["Paracetamol"]);
+
+const scaleItems = Array.from({ length: 4200 }, (_, index) => ({
+  id: `scale-${index}`, name: `Scale Medicine ${index}`, aliases: [`SM${index}`], strength: `${index + 1} mg`,
+  forms: ["tablet"], units: ["tablet"], barcode: `900${String(index).padStart(9, "0")}`,
+  supplier: `Supplier ${index % 20}`, shelf: `S${index % 200}`, batches: [{ batch: `B${index}`, expiry: "2028-12" }],
+  stockLeft: index % 50, reorderLevel: 5
+}));
+const scaleStart = performance.now();
+const scaleIndex = buildMedicineFinderIndex(scaleItems, { now: generatedAt });
+const buildMs = performance.now() - scaleStart;
+const searchStart = performance.now();
+assert.equal(searchMedicineFinder(scaleIndex, "Scale Medicine 4199")[0]?.name, "Scale Medicine 4199");
+const searchMs = performance.now() - searchStart;
+assert.equal(scaleIndex.length, 4200);
+assert.ok(buildMs < 1000, `4,200-record index build took ${buildMs.toFixed(1)} ms`);
+assert.ok(searchMs < 150, `4,200-record search took ${searchMs.toFixed(1)} ms`);
+
 const source = await readFile(new URL("../src/services/documentGenerator.js", import.meta.url), "utf8");
-assert.doesNotMatch(source, /fetch\s*\(|OpenAI|chat\.completions|responses\.create/);
+const finderSource = await readFile(new URL("../src/services/medicineFinder.js", import.meta.url), "utf8");
+assert.doesNotMatch(`${source}\n${finderSource}`, /fetch\s*\(|OpenAI|chat\.completions|responses\.create/);
 const appSource = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
 const cssSource = await readFile(new URL("../src/styles.css", import.meta.url), "utf8");
+const provenance = JSON.parse(await readFile(new URL("../provenance-registry.json", import.meta.url), "utf8"));
+assert.equal(provenance.schema, "ms20.provenance-registry.v1");
+assert.ok(provenance.entries.some((entry) => entry.name === "MS2.0 shared medicine finder" && entry.review_status === "approved"));
+assert.ok(provenance.entries.every((entry) => entry.source && entry.licence && entry.approved_use && entry.proof && entry.owner));
 assert.match(appSource, /data-action="open-export-hub">Export Hub/);
 assert.match(appSource, /buildCanonicalInventoryExport\(\{ pharmacy: state\.pharmacy, items: pharmacyBrain\.catalog \}\)/);
 assert.match(appSource, /download-inventory-export/);
 assert.match(appSource, /card\.type === "CatalogWorkspaceCard" \|\| card\.type === "ExportHubCard"/);
 assert.match(appSource, /card\.type === "ExportHubCard"\) return "Choose a format to download\. No confirmation is required\."/);
 assert.match(appSource, /URL\.createObjectURL\(new Blob\(\[printHtml\]/);
+assert.match(appSource, /startVoiceCapture\(\(transcript\) => postFinderResult\(transcript, "shared_voice_capture"\)\)/);
+assert.match(appSource, /openLightweightCamera\("barcode"\)/);
+assert.match(appSource, /event\.origin !== window\.location\.origin/);
 assert.doesNotMatch(appSource, /printWindow\.document\.write/);
 assert.doesNotMatch(appSource, /Export Hub[\s\S]{0,1000}(OpenAI|fetch\s*\()/);
 assert.match(cssSource, /@media \(max-width: 520px\)[^{]*\{[^}]*\.export-format-grid/);
@@ -71,4 +113,4 @@ await Promise.all([
   writeFile(join(outputDir, "inventory.pdf"), outputs.pdf), writeFile(join(outputDir, "inventory.docx"), outputs.docx),
   writeFile(join(outputDir, "inventory.pptx"), outputs.pptx), writeFile(join(outputDir, "inventory-print.html"), outputs.html)
 ]);
-console.log(`Export Hub verification passed: canonical model, pharmacy isolation, six formats, deterministic zero-AI renderers. Artifacts: ${outputDir}`);
+console.log(`Export Hub verification passed: canonical model, pharmacy isolation, six formats, deterministic zero-AI renderers. 4,200-record finder index ${buildMs.toFixed(1)} ms; exact search ${searchMs.toFixed(1)} ms. Artifacts: ${outputDir}`);

@@ -43,6 +43,16 @@ No dependency install is required.
 - Technical status, route slots, totals, queue state, and contracts are moved behind hidden Settings/Diagnostics/Admin controls.
 - Offline app button remains available through Diagnostics and links to the existing live backend offline app route when the backend is running.
 - Conversation flow for low-typing text commands, browser speech capture, direct camera/photo upload, barcode placeholder, invoice review, reports, setup, and sync.
+
+## Permanent typing-last UX rule
+
+For every applicable workflow, MS2.0 first offers the fastest safe deterministic route: one-tap action, shared barcode/scanner, shared voice, appropriate camera/photo recognition, then recent/frequent/filtered/suggested choices. Complete typed entry remains available as the final fallback. Do not create clutter merely to expose every route, and do not duplicate scanner, voice, camera, catalog-match or filter logic inside individual screens.
+
+Medicine finding uses one pharmacy-scoped local index across applicable catalog and preview surfaces. Exact canonical and barcode matches rank first, then canonical prefixes, aliases, complete field matches and conservative spelling recovery. Supported searchable evidence includes name, aliases, strength, form, sale unit, barcode, supplier, shelf and batch. Low/out-of-stock and expiry filters use only saved canonical values. Screen filtering never silently changes a full export or print dataset.
+
+## Permanent lawful-technology rule
+
+Prefer original MS2.0 code, already verified project capabilities, standard browser/device functionality, and then properly licensed documented dependencies. Do not add an asset, SDK, API, library, design, icon, font, model, dataset or copied implementation without verified commercial/modification/redistribution rights, required notices, privacy/data-flow review, maintenance/security review and an approved machine-readable provenance entry. Unknown or incompatible rights fail closed. Never transmit pharmacy, medicine, customer, supplier or operational data without documented authorization, and never imply third-party or regulator endorsement.
 - Editable Card Workspace with reusable cards:
   - SaleCard
   - InvoiceCard
