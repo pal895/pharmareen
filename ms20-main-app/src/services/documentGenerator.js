@@ -68,19 +68,16 @@ export function buildInventoryCsv(model) {
 }
 
 export function buildInventoryXlsx(model) {
-  const rows = [
-    [model.title], ["Pharmacy", model.pharmacyName], ["Branch", model.branch],
-    ["Location", model.location], ["Generated (Africa/Nairobi)", model.generatedKenya], [],
-    COLUMNS.map(([, label]) => label), ...model.rows.map((row) => COLUMNS.map(([key]) => row[key]))
-  ];
-  const sheetRows = rows.map((row, r) => `<row r="${r + 1}" ht="${r === 0 ? 30 : r === 6 ? 32 : r > 6 ? 24 : 21}" customHeight="1">${row.map((value, c) => xlsxCell(value, r + 1, c + 1, r === 0 ? 1 : r === 6 ? 2 : numericColumnStyle(r, c))).join("")}</row>`).join("");
-  const widths = [24, 13, 12, 11, 18, 16, 11, 22, 18, 15, 14, 11];
+  const sheets = buildOwnerWorkbookSheets(model);
+  const sheetOverrides = sheets.map((_, index) => `<Override PartName="/xl/worksheets/sheet${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("");
+  const sheetNodes = sheets.map((sheet, index) => `<sheet name="${xml(sheet.name)}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`).join("");
+  const workbookRelationships = sheets.map((_, index) => [`rId${index + 1}`, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet", `worksheets/sheet${index + 1}.xml`]);
   return buildStoredZip([
-    ["[Content_Types].xml", `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`],
+    ["[Content_Types].xml", `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheetOverrides}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`],
     ["_rels/.rels", rels([["rId1", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument", "xl/workbook.xml"], ["rId2", "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties", "docProps/core.xml"], ["rId3", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties", "docProps/app.xml"]])],
-    ["xl/workbook.xml", `<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Inventory" sheetId="1" r:id="rId1"/></sheets></workbook>`],
-    ["xl/_rels/workbook.xml.rels", rels([["rId1", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet", "worksheets/sheet1.xml"], ["rId2", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles", "styles.xml"]])],
-    ["xl/worksheets/sheet1.xml", `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0" showGridLines="0"><pane ySplit="7" topLeftCell="A8" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${widths.map((width, i) => `<col min="${i + 1}" max="${i + 1}" width="${width}" customWidth="1"/>`).join("")}</cols><sheetData>${sheetRows}</sheetData><autoFilter ref="A7:L${Math.max(7, rows.length)}"/><printOptions horizontalCentered="1"/><pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/><pageSetup orientation="landscape" paperSize="9" fitToWidth="1" fitToHeight="0"/><rowBreaks count="0" manualBreakCount="0"/></worksheet>`],
+    ["xl/workbook.xml", `<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView activeTab="0"/></bookViews><sheets>${sheetNodes}</sheets><calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>`],
+    ["xl/_rels/workbook.xml.rels", rels([...workbookRelationships, [`rId${sheets.length + 1}`, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles", "styles.xml"]])],
+    ...sheets.map((sheet, index) => [`xl/worksheets/sheet${index + 1}.xml`, buildXlsxSheetXml(sheet)]),
     ["xl/styles.xml", xlsxStyles()], ["docProps/core.xml", coreProps(model)], ["docProps/app.xml", appProps("Microsoft Excel")]
   ].map(([name, contents]) => ({ name, contents })));
 }
@@ -177,10 +174,101 @@ export function downloadTextFile({ filename, contents, mime = "text/plain;charse
 export function buildBulkPasteTemplate() { return ["MS2.0 BULK PASTE TEMPLATE", "Enter one medicine per line.", "Format: medicine name form selling price", "Remove these instructions before pasting your medicine lines."].join("\n"); }
 export function buildDocumentCard({ title, document, format, itemCount = 0, status = "ready" }) { return { id: `card-document-${Date.now()}`, type: "DocumentExportCard", title, source: "MS2.0 documents", confidence: 1, status, aiRequired: false, fields: { document, format, items: String(itemCount), status: "Ready to download" }, validation: "Generated locally from canonical pharmacy records." }; }
 
+function buildOwnerWorkbookSheets(model) {
+  const stockNumber = (row) => typeof row.stock === "number" ? row.stock : Number(row.stock);
+  const finderFlags = new Map(model.finderIndex.map((entry) => [entry.id, entry.flags]));
+  const lowStock = model.rows.filter((row) => finderFlags.get(row.finderId)?.lowStock === true)
+    .sort((a, b) => stockNumber(a) - stockNumber(b) || a.medicine.localeCompare(b.medicine));
+  const expiryRows = model.rows.filter((row) => row.expiry)
+    .sort((a, b) => a.expiry.localeCompare(b.expiry) || a.medicine.localeCompare(b.medicine));
+  const suppliers = [...model.rows.reduce((map, row) => {
+    const name = row.supplier || "Not recorded";
+    const item = map.get(name) || { supplier: name, medicines: 0, stock: 0, retailValue: 0, costValue: 0 };
+    item.medicines += 1;
+    item.stock += Number(row.stock) || 0;
+    item.retailValue += (Number(row.sellingPrice) || 0) * (Number(row.stock) || 0);
+    item.costValue += (Number(row.costPrice) || 0) * (Number(row.stock) || 0);
+    map.set(name, item);
+    return map;
+  }, new Map()).values()].sort((a, b) => b.medicines - a.medicines || a.supplier.localeCompare(b.supplier));
+  const totalStock = model.rows.reduce((sum, row) => sum + (Number(row.stock) || 0), 0);
+  const retailValue = model.rows.reduce((sum, row) => sum + (Number(row.sellingPrice) || 0) * (Number(row.stock) || 0), 0);
+  const costValue = model.rows.reduce((sum, row) => sum + (Number(row.costPrice) || 0) * (Number(row.stock) || 0), 0);
+  const attentionRows = [...new Map([...lowStock, ...expiryRows.slice(0, 8)].map((row) => [row.finderId, row])).values()].slice(0, 10);
+  const commonMeta = [
+    [model.title], [`${model.pharmacyName} · ${model.branch} · ${model.location}`],
+    [`Generated ${model.generatedKenya} Africa/Nairobi · ${model.rows.length} canonical medicines`]
+  ];
+  const fullRows = [
+    [model.title], ["Pharmacy", model.pharmacyName], ["Branch", model.branch],
+    ["Location", model.location], ["Generated (Africa/Nairobi)", model.generatedKenya], [],
+    COLUMNS.map(([, label]) => label), ...model.rows.map((row) => COLUMNS.map(([key]) => row[key]))
+  ];
+  const overviewRows = [
+    ...commonMeta, [],
+    ["Total medicines", model.rows.length, "Total stock units", totalStock, "Low stock", lowStock.length],
+    ["Retail stock value (KES)", retailValue, "Cost stock value (KES)", costValue, "Suppliers", suppliers.length],
+    ["Attention required"], ["Medicine", "Stock", "Expiry", "Supplier", "Shelf", "Why it matters"],
+    ...attentionRows.map((row) => [row.medicine, row.stock, row.expiry, row.supplier, row.shelf, lowStock.includes(row) ? "Low stock" : "Earliest expiry"])
+  ];
+  const lowStockRows = [
+    ...commonMeta, ["Action list · at or below the saved reorder level"],
+    ["Medicine", "Strength", "Stock", "Selling KES", "Cost KES", "Supplier", "Expiry", "Shelf"],
+    ...(lowStock.length ? lowStock.map((row) => [row.medicine, row.strength, row.stock, row.sellingPrice, row.costPrice, row.supplier, row.expiry, row.shelf]) : [["No medicines are currently at or below their saved reorder level."]])
+  ];
+  const expiryTrackingRows = [
+    ...commonMeta, ["Sorted by earliest recorded expiry"],
+    ["Medicine", "Expiry", "Batch", "Stock", "Supplier", "Shelf"],
+    ...expiryRows.map((row) => [row.medicine, row.expiry, row.batch, row.stock, row.supplier, row.shelf])
+  ];
+  const supplierRows = [
+    ...commonMeta, ["Supplier concentration and stock value"],
+    ["Supplier", "Medicines", "Total stock", "Retail value (KES)", "Cost value (KES)"],
+    ...suppliers.map((row) => [row.supplier, row.medicines, row.stock, row.retailValue, row.costValue])
+  ];
+  return [
+    ownerSheet("Inventory Overview", overviewRows, { headerRow: 8, freezeRows: 8, freezeColumns: 1, merges: ["A1:F1", "A2:F2", "A3:F3", "A7:F7"], widths: [30, 16, 18, 30, 14, 22], overview: true }),
+    ownerSheet("Full Inventory", fullRows, { headerRow: 7, freezeRows: 7, freezeColumns: 1, widths: autoXlsxWidths(fullRows, [28, 16, 15, 14, 20, 18, 12, 30, 20, 16, 14, 12]) }),
+    ownerSheet("Low Stock", lowStockRows, { headerRow: 5, freezeRows: 5, freezeColumns: 1, merges: ["A1:H1", "A2:H2", "A3:H3", "A4:H4", ...(lowStock.length ? [] : ["A6:H6"])], widths: [28, 15, 12, 16, 14, 30, 14, 12], alert: true }),
+    ownerSheet("Expiry Tracking", expiryTrackingRows, { headerRow: 5, freezeRows: 5, freezeColumns: 1, merges: ["A1:F1", "A2:F2", "A3:F3", "A4:F4"], widths: [30, 16, 18, 12, 32, 12] }),
+    ownerSheet("Suppliers", supplierRows, { headerRow: 5, freezeRows: 5, freezeColumns: 1, merges: ["A1:E1", "A2:E2", "A3:E3", "A4:E4"], widths: [34, 14, 16, 22, 20] })
+  ];
+}
+function ownerSheet(name, rows, options) { return { name, rows, ...options }; }
+function autoXlsxWidths(rows, caps) {
+  return caps.map((cap, column) => Math.min(cap, Math.max(11, ...rows.map((row) => String(row[column] ?? "").length + 2))));
+}
+function buildXlsxSheetXml(sheet) {
+  const maxColumns = Math.max(...sheet.rows.map((row) => row.length));
+  const rowXml = sheet.rows.map((row, rowIndex) => {
+    const rowNumber = rowIndex + 1;
+    const isHeader = rowNumber === sheet.headerRow;
+    const isData = rowNumber > sheet.headerRow;
+    const height = rowNumber === 1 ? 32 : isHeader ? 30 : isData ? 25 : rowNumber <= 4 ? 22 : 24;
+    return `<row r="${rowNumber}" ht="${height}" customHeight="1">${row.map((value, columnIndex) => {
+      let style = 0;
+      if (rowNumber === 1) style = 1;
+      else if (isHeader) style = 2;
+      else if (sheet.overview && [5, 6].includes(rowNumber) && columnIndex % 2 === 0) style = 6;
+      else if (sheet.overview && [5, 6].includes(rowNumber) && columnIndex % 2 === 1) style = 7;
+      else if (sheet.overview && rowNumber === 7) style = 8;
+      else if (isData && sheet.alert) style = columnIndex === 2 ? 10 : (rowNumber - sheet.headerRow) % 2 === 0 ? 4 : 0;
+      else if (isData) style = (rowNumber - sheet.headerRow) % 2 === 0 ? 4 : 0;
+      if (typeof value === "number" && ![1, 2, 6, 7, 8, 10].includes(style)) style = style === 4 ? 5 : 3;
+      return xlsxCell(value, rowNumber, columnIndex + 1, style);
+    }).join("")}</row>`;
+  }).join("");
+  const widths = sheet.widths.map((width, index) => `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`).join("");
+  const topLeft = `${columnName(sheet.freezeColumns + 1)}${sheet.freezeRows + 1}`;
+  const pane = `<pane xSplit="${sheet.freezeColumns}" ySplit="${sheet.freezeRows}" topLeftCell="${topLeft}" activePane="bottomRight" state="frozen"/>`;
+  const mergeXml = sheet.merges?.length ? `<mergeCells count="${sheet.merges.length}">${sheet.merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("")}</mergeCells>` : "";
+  const lastRow = Math.max(sheet.headerRow, sheet.rows.length);
+  const filter = `<autoFilter ref="A${sheet.headerRow}:${columnName(maxColumns)}${lastRow}"/>`;
+  return `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0" showGridLines="0">${pane}<selection pane="bottomRight" activeCell="${topLeft}" sqref="${topLeft}"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="20"/><cols>${widths}</cols><sheetData>${rowXml}</sheetData>${mergeXml}${filter}<printOptions horizontalCentered="1"/><pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/><pageSetup orientation="landscape" paperSize="9" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+}
 function xlsxCell(value, row, column, style) { const ref = `${columnName(column)}${row}`; return typeof value === "number" ? `<c r="${ref}" s="${style}"><v>${value}</v></c>` : `<c r="${ref}" s="${style}" t="inlineStr"><is><t>${xml(value)}</t></is></c>`; }
-function numericColumnStyle(row, column) { return row > 6 && [4, 5, 6].includes(column) ? 3 : 0; }
 function columnName(value) { let result = ""; for (let n = value; n; n = Math.floor((n - 1) / 26)) result = String.fromCharCode(65 + ((n - 1) % 26)) + result; return result; }
-function xlsxStyles() { return `<?xml version="1.0"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts><fonts count="3"><font><sz val="10"/><name val="Aptos"/></font><font><b/><sz val="18"/><color rgb="FF086C5C"/><name val="Aptos Display"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Aptos"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF086C5C"/></patternFill></fill></fills><borders count="2"><border/><border><bottom style="thin"><color rgb="FFD9E5E1"/></bottom></border></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="4"><xf fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf fontId="1" fillId="0" borderId="0" xfId="0"/><xf fontId="2" fillId="2" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`; }
+function xlsxStyles() { return `<?xml version="1.0"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts><fonts count="5"><font><sz val="10"/><color rgb="FF19332F"/><name val="Aptos"/></font><font><b/><sz val="20"/><color rgb="FF086C5C"/><name val="Aptos Display"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Aptos"/></font><font><b/><sz val="10"/><color rgb="FF536B66"/><name val="Aptos"/></font><font><b/><sz val="15"/><color rgb="FF086C5C"/><name val="Aptos Display"/></font></fonts><fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF086C5C"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF1F7F5"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEDF7F4"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF3CD"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDFF1EC"/></patternFill></fill></fills><borders count="3"><border/><border><right style="thin"><color rgb="FFE5ECEA"/></right><bottom style="thin"><color rgb="FFD9E5E1"/></bottom></border><border><bottom style="medium"><color rgb="FF086C5C"/></bottom></border></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="11"><xf fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf fontId="1" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf><xf fontId="2" fillId="2" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="0" fillId="3" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="3" fillId="4" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="4" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="4" fillId="6" borderId="2" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf><xf fontId="0" fillId="5" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="3" fillId="5" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`; }
 function wordP(text, style) { return `<w:p><w:pPr><w:pStyle w:val="${style}"/></w:pPr><w:r><w:t>${xml(text)}</w:t></w:r></w:p>`; }
 function wordMedicineBlock(row) {
   const value = (key) => row[key] === "" ? "—" : row[key];

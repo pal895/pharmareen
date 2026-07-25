@@ -9,7 +9,7 @@ import { buildMedicineFinderIndex, searchMedicineFinder } from "../src/services/
 
 const pharmacy = { id: "pharmacy-a", name: "Zuri Pharmacy", branch: "Main", location: "Nairobi, Kenya" };
 const items = [
-  { name: "Amoxicillin", strength: "500 mg", forms: ["capsule"], units: ["capsule"], sellingPrice: 20, costPrice: 12, stockLeft: 40, supplier: "AfyaLink", barcode: "616000001", batches: [{ batch: "AMX-1", expiry: "2028-12" }], shelf: "A1" },
+  { name: "Amoxicillin", strength: "500 mg", forms: ["capsule"], units: ["capsule"], sellingPrice: 20, costPrice: 12, stockLeft: 40, reorderLevel: 50, supplier: "AfyaLink", barcode: "616000001", batches: [{ batch: "AMX-1", expiry: "2028-12" }], shelf: "A1" },
   { name: "Zinc Syrup", strength: "20 mg/5 ml", forms: ["syrup"], units: ["bottle"], sellingPrice: 70, costPrice: 45, stockLeft: 12, supplier: "Dawa Bora", barcode: "", batches: [{ batch: "ZIN-2", expiry: "2029-03" }], shelf: "B2" }
 ];
 for (let index = 3; index <= 35; index += 1) items.push({
@@ -64,6 +64,18 @@ assert.match(outputs.html, /finder-status/);
 assert.equal(exportFilename(model, "xlsx"), "zuri-pharmacy-inventory-2026-07-25-180032Z.xlsx");
 
 const decodedPackages = Object.fromEntries(["xlsx", "docx", "pptx"].map((format) => [format, new TextDecoder().decode(outputs[format])]));
+assert.equal((decodedPackages.xlsx.match(/<sheet name="/g) || []).length, 5);
+for (const sheetName of ["Inventory Overview", "Full Inventory", "Low Stock", "Expiry Tracking", "Suppliers"]) {
+  assert.match(decodedPackages.xlsx, new RegExp(`<sheet name="${sheetName}"`), `XLSX missing ${sheetName}`);
+}
+assert.match(decodedPackages.xlsx, /xSplit="1" ySplit="7" topLeftCell="B8"/);
+assert.match(decodedPackages.xlsx, /xSplit="1" ySplit="5" topLeftCell="B6"/);
+assert.match(decodedPackages.xlsx, /Low stock/);
+assert.match(decodedPackages.xlsx, /at or below the saved reorder level/);
+assert.match(decodedPackages.xlsx, /Retail stock value \(KES\)/);
+assert.match(decodedPackages.xlsx, /Supplier concentration and stock value/);
+assert.match(decodedPackages.xlsx, /fgColor rgb="FFF1F7F5"/);
+assert.match(decodedPackages.xlsx, /wrapText="1" vertical="center"/);
 for (const item of items) {
   assert.match(outputs.csv, new RegExp(item.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `CSV missing ${item.name}`);
   for (const format of ["xlsx", "docx", "pptx"]) {
