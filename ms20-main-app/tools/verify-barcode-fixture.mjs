@@ -29,5 +29,14 @@ for (const manifestUrl of manifestUrls) {
     if (String(fixture[field]) !== String(expected[field])) throw new Error(`${fixtureId} ${field} drifted`);
   }
   if (png.length < 10000 || png.subarray(1, 4).toString() !== "PNG") throw new Error(`${fixtureId} PNG artifact is missing or invalid`);
+  if (fixtureId === "barcode-losartan-50mg") {
+    const width = png.readUInt32BE(16);
+    const height = png.readUInt32BE(20);
+    const liveHtml = fs.readFileSync(new URL("../fixtures/barcode-losartan-50mg-live.html", import.meta.url), "utf8");
+    if (width < 2800 || height < 1400) throw new Error("Losartan downloadable barcode must remain large enough for cross-screen scanning");
+    if (!liveHtml.includes(`aria-label="EAN-13 barcode ${manifest.barcode}"`) || !liveHtml.includes("<svg")) {
+      throw new Error("Losartan full-screen live barcode page is missing or drifted");
+    }
+  }
 }
-console.log("Barcode fixture verification passed: valid EAN-13 assets, existing-catalog Losartan targeting, isolated mappings, and PNG artifacts.");
+console.log("Barcode fixture verification passed: valid EAN-13 assets, existing-catalog Losartan targeting, full-screen live display, large PNG, and isolated mappings.");

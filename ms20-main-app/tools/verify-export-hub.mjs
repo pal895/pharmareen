@@ -103,6 +103,8 @@ assert.match(appSource, /card\.type === "ExportHubCard"\) return "Choose a forma
 assert.match(appSource, /state\.printPreview = \{ model, bridgeId, query: "", message: "" \}/);
 assert.match(appSource, /printFrame\.srcdoc = buildPrintHtml/);
 assert.match(appSource, /window\.__ms20FinderRequest/);
+assert.match(appSource, /refreshPrintPreviewDom/);
+assert.match(appSource, /cameraOverlayIsRendered === state\.camera\.open/);
 assert.match(appSource, /startVoiceCapture\(/);
 assert.match(appSource, /shared_voice_capture/);
 assert.match(appSource, /openLightweightCamera\("barcode"\)/);

@@ -14,6 +14,7 @@
   "expiry": "2029-06",
   "catalog_status": "Existing canonical medicine in the verified 35-record Pharmacy Catalog",
   "expected_result": "Exactly one existing local Losartan result in Print Finder; no medicine creation or catalog write",
-  "live_url_path": "/main-app/fixtures/barcode-losartan-50mg.png",
+  "live_url_path": "/main-app/fixtures/barcode-losartan-50mg-live.html",
+  "download_image_path": "/main-app/fixtures/barcode-losartan-50mg.png",
   "ai_used": false
 }

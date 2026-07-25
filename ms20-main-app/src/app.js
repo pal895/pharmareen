@@ -196,6 +196,12 @@ const root = document.querySelector("#app");
 function render() {
   state.sync.online = navigator.onLine;
   state.sync.pending = queue.pendingCount();
+  const existingPrintFrame = root.querySelector("#ms20PrintPreview");
+  const cameraOverlayIsRendered = Boolean(root.querySelector(".camera-overlay"));
+  if (state.printPreview && existingPrintFrame && cameraOverlayIsRendered === state.camera.open) {
+    refreshPrintPreviewDom(existingPrintFrame);
+    return;
+  }
   root.innerHTML = `
     <main class="chat-app" style="--card-font-scale: ${state.cardFontScale};">
       ${state.ui.screen === "chat" ? chatScreenTemplate() : state.ui.screen === "payments" ? paymentQueueScreenTemplate() : chatHomeTemplate()}
@@ -214,6 +220,20 @@ function render() {
   hideReplitBadge();
   if (state.ui.screen === "payments") root.querySelector("#paymentQueueBody")?.scrollTo({ top: 0 });
   else scrollChatToBottom();
+}
+
+function refreshPrintPreviewDom(frame) {
+  const documentRoot = frame.contentDocument;
+  if (!documentRoot || !state.printPreview) return;
+  const input = documentRoot.querySelector("#medicine-search");
+  if (input && input.value !== state.printPreview.query) {
+    input.value = state.printPreview.query;
+    const filter = documentRoot.querySelector("#medicine-filter");
+    if (filter) filter.value = "all";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  const status = documentRoot.querySelector("#finder-status");
+  if (status) status.textContent = state.printPreview.message || "";
 }
 
 function chatHomeTemplate() {
