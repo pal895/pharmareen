@@ -3290,10 +3290,21 @@ function openExportHub() {
 }
 
 function exportHubTemplate(card) {
+  const formatButton = (format) => `<button type="button" data-action="download-inventory-export" data-format="${format.id}" data-card-id="${card.id}"><strong>${format.label}</strong><span>${format.help}</span></button>`;
+  const polishedFormats = EXPORT_FORMATS.filter((format) => format.group === "polished");
+  const dataFormats = EXPORT_FORMATS.filter((format) => format.group === "data");
   return `<section class="export-hub" aria-label="Export Hub">
     <div class="export-hub-summary"><strong>${pharmacyBrain.catalog.length} medicines</strong><span>${escapeHtml(state.pharmacy.name)} · ${escapeHtml(state.pharmacy.branch || "Main")}</span></div>
-    <p>Choose one owner-ready format. Every file uses the same saved Pharmacy Catalog values and Kenya generation time.</p>
-    <div class="export-format-grid">${EXPORT_FORMATS.map((format) => `<button type="button" data-action="download-inventory-export" data-format="${format.id}" data-card-id="${card.id}"><strong>${format.label}</strong><span>${format.help}</span></button>`).join("")}</div>
+    <p>Choose a polished format for viewing, sharing or printing. Every file uses the same saved Pharmacy Catalog values and Kenya generation time.</p>
+    <div class="export-format-section">
+      <h3>Polished owner copies</h3>
+      <div class="export-format-grid">${polishedFormats.map(formatButton).join("")}</div>
+    </div>
+    <div class="export-format-section export-data-section">
+      <h3>Technical data transfer</h3>
+      <p>CSV preserves the records for other systems, but it cannot carry colours, fonts, spacing or page design.</p>
+      <div class="export-format-grid">${dataFormats.map(formatButton).join("")}</div>
+    </div>
     <p class="export-hub-status" aria-live="polite">${escapeHtml(card.fields?.last_download || "None yet")}</p>
     <p class="export-hub-assurance">Generated locally · Pharmacy-isolated · Canonical data · Zero AI formatting</p>
   </section>`;
@@ -3949,7 +3960,7 @@ function ownerCardNote(card) {
   }
   if (card.type === "CatalogImportCard") return "Review the list, edit if needed, then approve.";
   if (card.type === "CatalogWorkspaceCard") return "This view uses the complete saved Pharmacy Catalog.";
-  if (card.type === "ExportHubCard") return "Choose a format to download. No confirmation is required.";
+  if (card.type === "ExportHubCard") return "Choose a polished owner copy, or use CSV only for technical data transfer. No confirmation is required.";
   if (card.type === "StockCorrectionCard") {
     if (card.photoEvidence && !String(card.fields?.medicine || "").trim() && card.validation) return card.validation;
     if (card.ui?.voiceGuided && card.validation) return card.validation;

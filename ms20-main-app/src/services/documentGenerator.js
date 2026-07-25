@@ -2,12 +2,12 @@ import { buildStoredZip, xml } from "./ooxmlPackage.js";
 import { buildMedicineFinderIndex, medicineFinderClientScript } from "./medicineFinder.js";
 
 export const EXPORT_FORMATS = Object.freeze([
-  { id: "csv", label: "CSV", help: "Machine-readable; best opened in Excel or Google Sheets" },
-  { id: "xlsx", label: "Excel", help: "Formatted workbook for sorting, filtering and review" },
-  { id: "pdf", label: "PDF", help: "Fixed, paginated owner copy" },
-  { id: "docx", label: "Word", help: "Editable professional document" },
-  { id: "pptx", label: "Presentation", help: "Landscape inventory briefing slides" },
-  { id: "print", label: "Print", help: "Print-ready browser layout" }
+  { id: "xlsx", group: "polished", label: "Excel", help: "Styled workbook for sorting, filtering and review" },
+  { id: "pdf", group: "polished", label: "PDF", help: "Elegant fixed, paginated owner copy" },
+  { id: "docx", group: "polished", label: "Word", help: "Editable professional document" },
+  { id: "pptx", group: "polished", label: "Presentation", help: "Landscape inventory briefing slides" },
+  { id: "print", group: "polished", label: "Print", help: "Print-ready browser layout" },
+  { id: "csv", group: "data", label: "CSV data file", help: "Plain data transfer for systems and imports — no visual styling" }
 ]);
 
 const COLUMNS = Object.freeze([

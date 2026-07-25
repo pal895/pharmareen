@@ -26,7 +26,10 @@ assert.equal(model.rows.length, 35);
 assert.equal(other.rows.length, 1);
 assert.notEqual(model.pharmacyId, other.pharmacyId);
 assert.equal(model.generatedKenya.includes("21:00:32"), true);
-assert.deepEqual(EXPORT_FORMATS.map((format) => format.id), ["csv", "xlsx", "pdf", "docx", "pptx", "print"]);
+assert.deepEqual(EXPORT_FORMATS.map((format) => format.id), ["xlsx", "pdf", "docx", "pptx", "print", "csv"]);
+assert.deepEqual(EXPORT_FORMATS.filter((format) => format.group === "polished").map((format) => format.id), ["xlsx", "pdf", "docx", "pptx", "print"]);
+assert.deepEqual(EXPORT_FORMATS.filter((format) => format.group === "data").map((format) => format.id), ["csv"]);
+assert.match(EXPORT_FORMATS.find((format) => format.id === "csv").help, /no visual styling/i);
 
 const outputs = {
   csv: buildInventoryCsv(model), xlsx: buildInventoryXlsx(model), pdf: buildInventoryPdf(model),
@@ -120,7 +123,11 @@ assert.match(appSource, /data-action="open-export-hub">Export Hub/);
 assert.match(appSource, /buildCanonicalInventoryExport\(\{ pharmacy: state\.pharmacy, items: pharmacyBrain\.catalog \}\)/);
 assert.match(appSource, /download-inventory-export/);
 assert.match(appSource, /card\.type === "CatalogWorkspaceCard" \|\| card\.type === "ExportHubCard"/);
-assert.match(appSource, /card\.type === "ExportHubCard"\) return "Choose a format to download\. No confirmation is required\."/);
+assert.match(appSource, /card\.type === "ExportHubCard"\) return "Choose a polished owner copy, or use CSV only for technical data transfer\. No confirmation is required\."/);
+assert.match(appSource, /<h3>Polished owner copies<\/h3>/);
+assert.match(appSource, /<h3>Technical data transfer<\/h3>/);
+assert.match(appSource, /CSV preserves the records for other systems, but it cannot carry colours, fonts, spacing or page design\./);
+assert.match(cssSource, /\.export-data-section/);
 assert.match(appSource, /state\.printPreview = \{ model, bridgeId, query: "", message: "" \}/);
 assert.match(appSource, /printFrame\.srcdoc = buildPrintHtml/);
 assert.match(appSource, /window\.__ms20FinderRequest/);
