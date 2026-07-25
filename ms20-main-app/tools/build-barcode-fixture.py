@@ -29,6 +29,6 @@ for index, bit in enumerate(bits):
         guard = index < 3 or 45 <= index < 50 or index >= 92
         draw.rectangle((start_x + index * module, top, start_x + (index + 1) * module - 1, top + bar_height + (35 if guard else 0)), fill="black")
 draw.text((500, 590), value, fill="black", font=bold)
-draw.text((70, 650), "Expected: unsaved editable review; do not approve during recognition test.", fill="black", font=regular)
-draw.text((70, 700), f'Fixture data: stock {manifest["stock"]} - buy {manifest["cost_price"]} - sell {manifest["selling_price"]} - batch {manifest["batch"]} - expiry {manifest["expiry"]}', fill="black", font=regular)
+draw.text((70, 650), "Expected: one existing local Losartan result; no medicine is created or changed.", fill="black", font=regular)
+draw.text((70, 700), "Identity fixture only. Current stock and commercial fields come from the saved Pharmacy Catalog.", fill="black", font=regular)
 image.save(manifest_path.with_suffix(".png"), optimize=True)

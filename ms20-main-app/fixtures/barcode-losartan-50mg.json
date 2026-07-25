@@ -1,5 +1,5 @@
 {
-  "fixture_id": "barcode-losartan-50mg",
+  "fixtureId": "barcode-losartan-50mg",
   "format": "EAN-13",
   "barcode": "6161109876546",
   "medicine": "Losartan",
@@ -7,10 +7,13 @@
   "form": "tablet",
   "unit": "tablet",
   "selling_price": 25,
-  "buying_price": 15,
-  "initial_stock": 40,
+  "cost_price": 15,
+  "stock": 40,
   "supplier": "Dawa Bora Wholesale Ltd",
   "batch": "LOS-50T",
   "expiry": "2029-06",
-  "expected_result": "A new unsaved Losartan review card populated from the controlled Source Brain fixture"
+  "catalog_status": "Existing canonical medicine in the verified 35-record Pharmacy Catalog",
+  "expected_result": "Exactly one existing local Losartan result in Print Finder; no medicine creation or catalog write",
+  "live_url_path": "/main-app/fixtures/barcode-losartan-50mg.png",
+  "ai_used": false
 }

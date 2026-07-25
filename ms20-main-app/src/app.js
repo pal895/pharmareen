@@ -96,8 +96,6 @@ let speechControl = { cardId: "", paused: false, segments: [], index: 0 };
 let speechRunId = 0;
 let activeReportRequest = null;
 let activeFinderWindow = null;
-const finderChannels = new Map();
-const activeFinderBridgeIds = new Set();
 const CARD_FONT_SCALE_STEP = 0.1;
 let activeStockFixScan = null;
 let pendingStockFixEvidenceSource = "photo";
@@ -169,12 +167,14 @@ const FIELD_LABELS = {
   items_text: "Medicine list"
 };
 let activeRecognition = null;
+let voiceCaptureAttempt = 0;
 let stockFixReading = null;
 let stockFixReadingSequence = 0;
 
 state.ui = { screen: "home", workspace: "operations" };
 state.voice = { starting: false, listening: false, status: "" };
 state.camera = { open: false, scanType: "medicine_photo", stream: null, status: "", lightAvailable: false, lightOn: false, capturedFile: null, capturedUrl: "", retryRequired: false };
+state.printPreview = null;
 state.shelfAcquisitionOpen = false;
 state.pendingScanType = "medicine_photo";
 state.stockFixPhotoCardId = "";
@@ -200,9 +200,16 @@ function render() {
     <main class="chat-app" style="--card-font-scale: ${state.cardFontScale};">
       ${state.ui.screen === "chat" ? chatScreenTemplate() : state.ui.screen === "payments" ? paymentQueueScreenTemplate() : chatHomeTemplate()}
       ${shelfAcquisitionTemplate()}
+      ${state.printPreview ? `<section class="print-preview-overlay" aria-label="Print preview"><iframe id="ms20PrintPreview" title="MS2.0 Pharmacy Inventory print preview"></iframe></section>` : ""}
       ${cameraOverlayTemplate()}
     </main>
   `;
+  const printFrame = root.querySelector("#ms20PrintPreview");
+  if (printFrame && state.printPreview) printFrame.srcdoc = buildPrintHtml(state.printPreview.model, {
+    bridgeId: state.printPreview.bridgeId,
+    initialQuery: state.printPreview.query,
+    initialMessage: state.printPreview.message
+  });
   bindEvents();
   hideReplitBadge();
   if (state.ui.screen === "payments") root.querySelector("#paymentQueueBody")?.scrollTo({ top: 0 });
@@ -1388,11 +1395,49 @@ function handleVoiceTranscript(text) {
   addCard(card);
 }
 
-function startVoiceCapture(onTranscript = null, onStatus = null) {
+async function startVoiceCapture(onTranscript = null, onStatus = null) {
   if (state.voice.starting || state.voice.listening) return;
+  const attempt = ++voiceCaptureAttempt;
   if (navigator.onLine === false) {
     state.voice.status = "Voice needs internet on this phone. You can type while offline.";
     onStatus?.("Voice needs internet on this phone. Connect, then tap Speak medicine again.");
+    render();
+    return;
+  }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    state.voice.status = "Microphone capture is unavailable in this browser.";
+    onStatus?.("Microphone capture is unavailable in this browser. Try a current version of Chrome.");
+    render();
+    return;
+  }
+  state.voice.starting = true;
+  state.voice.listening = false;
+  state.voice.status = "Requesting microphone permission…";
+  onStatus?.("Requesting microphone permission…");
+  render();
+  const permissionTimer = window.setTimeout(() => {
+    if (attempt !== voiceCaptureAttempt || !state.voice.starting) return;
+    state.voice.status = "Choose Allow or Block in the browser microphone prompt.";
+    onStatus?.(state.voice.status);
+    render();
+  }, 12000);
+  try {
+    const permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    clearTimeout(permissionTimer);
+    if (attempt !== voiceCaptureAttempt) {
+      permissionStream.getTracks().forEach((track) => track.stop());
+      return;
+    }
+    permissionStream.getTracks().forEach((track) => track.stop());
+  } catch (error) {
+    clearTimeout(permissionTimer);
+    if (attempt !== voiceCaptureAttempt) return;
+    state.voice.starting = false;
+    const denied = String(error?.name || "") === "NotAllowedError";
+    state.voice.status = denied
+      ? "Microphone access was denied. Allow it in browser settings, then tap Speak medicine again."
+      : "Microphone could not start. Check this phone's microphone and try again.";
+    onStatus?.(state.voice.status);
     render();
     return;
   }
@@ -1411,6 +1456,7 @@ function startVoiceCapture(onTranscript = null, onStatus = null) {
   let voiceError = false;
   let audioReady = false;
   let captureTimer = null;
+  let startupTimer = null;
   let latestTranscript = "";
   activeRecognition = recognition;
   state.voice.starting = true;
@@ -1420,11 +1466,13 @@ function startVoiceCapture(onTranscript = null, onStatus = null) {
   const markAudioReady = () => {
     if (audioReady) return;
     audioReady = true;
+    if (startupTimer) clearTimeout(startupTimer);
     state.voice.starting = false;
     state.voice.listening = true;
     const stockFixCard = state.cards.find((card) => card.type === "StockCorrectionCard");
     if (stockFixCard) state.voice.status = stockFixVoicePrompt(stockFixCard);
     else state.voice.status = "Speak now.";
+    onStatus?.("Listening… Say one saved medicine name.");
     render();
     captureTimer = setTimeout(() => {
       if (activeRecognition !== recognition) return;
@@ -1455,6 +1503,7 @@ function startVoiceCapture(onTranscript = null, onStatus = null) {
     state.voice.starting = false;
     state.voice.listening = false;
     state.voice.status = `Heard: “${finalTranscript}”.`;
+    onStatus?.("Processing spoken medicine locally…");
     activeRecognition = null;
     if (finalTranscript.trim()) {
       if (onTranscript) {
@@ -1480,6 +1529,7 @@ function startVoiceCapture(onTranscript = null, onStatus = null) {
   };
   recognition.onerror = (event) => {
     if (captureTimer) clearTimeout(captureTimer);
+    if (startupTimer) clearTimeout(startupTimer);
     voiceError = true;
     state.voice.starting = false;
     state.voice.listening = false;
@@ -1497,6 +1547,7 @@ function startVoiceCapture(onTranscript = null, onStatus = null) {
   };
   recognition.onend = () => {
     if (captureTimer) clearTimeout(captureTimer);
+    if (startupTimer) clearTimeout(startupTimer);
     activeRecognition = null;
     state.voice.starting = false;
     state.voice.listening = false;
@@ -1514,6 +1565,12 @@ function startVoiceCapture(onTranscript = null, onStatus = null) {
   };
   try {
     recognition.start();
+    startupTimer = window.setTimeout(() => {
+      if (activeRecognition !== recognition || audioReady) return;
+      state.voice.status = "Microphone did not start. Tap Speak medicine to retry.";
+      onStatus?.(state.voice.status);
+      try { recognition.abort(); } catch { /* already stopped */ }
+    }, 12000);
   } catch {
     activeRecognition = null;
     state.voice.starting = false;
@@ -1522,6 +1579,18 @@ function startVoiceCapture(onTranscript = null, onStatus = null) {
     onStatus?.("Voice could not start. Allow microphone access, check the internet, then try again.");
     render();
   }
+}
+
+function stopActiveVoiceCapture() {
+  voiceCaptureAttempt += 1;
+  const recognition = activeRecognition;
+  activeRecognition = null;
+  if (recognition) {
+    try { recognition.abort(); } catch { /* already stopped */ }
+  }
+  state.voice.starting = false;
+  state.voice.listening = false;
+  state.voice.status = "";
 }
 
 function buildCommandCard(text) {
@@ -1772,6 +1841,7 @@ async function openLightweightCamera(scanType = "medicine_photo") {
 }
 
 function closeLightweightCamera() {
+  const finderWasActive = Boolean(activeFinderWindow);
   closeCameraStream();
   clearCapturedCameraPhoto();
   state.camera.open = false;
@@ -1779,6 +1849,7 @@ function closeLightweightCamera() {
   state.camera.lightAvailable = false;
   state.camera.lightOn = false;
   render();
+  if (finderWasActive) postFinderResult("", "barcode_cancelled", "Scanner cancelled. Tap Scan barcode to retry.");
 }
 
 function clearCapturedCameraPhoto() {
@@ -1907,7 +1978,15 @@ async function readBarcodeCapture(file) {
   const recognized = existing || (sourceCandidate?.status === "matched" ? fixture : null);
   const review = recognized ? normalizeMedicineReviewRow(recognized) : {};
   if (activeFinderWindow) {
-    postFinderResult(review.name || barcode, barcode ? "barcode" : "barcode_not_read");
+    postFinderResult(
+      review.name || barcode,
+      barcode ? "barcode" : "barcode_not_read",
+      recognized
+        ? `Barcode matched ${review.name} in this Pharmacy Catalog.`
+        : barcode
+          ? "Barcode captured, but it has no match in this Pharmacy Catalog."
+          : "No barcode was read. Tap Scan barcode to retry."
+    );
     return;
   }
   addCard(createEditableCard({
@@ -3211,32 +3290,9 @@ function downloadInventoryExport(format, cardId = "") {
   };
   if (format === "print") {
     const bridgeId = globalThis.crypto?.randomUUID?.() || `finder-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    activeFinderBridgeIds.add(bridgeId);
-    const finderChannel = "BroadcastChannel" in window ? new BroadcastChannel(`ms20-finder-${bridgeId}`) : null;
-    if (finderChannel) {
-      finderChannels.set(bridgeId, finderChannel);
-      finderChannel.addEventListener("message", (event) => {
-        if (event.data?.type !== "ms20:finder-request" || event.data.bridgeId !== bridgeId) return;
-        handleFinderRequest(event.data, (payload) => finderChannel.postMessage({ ...payload, bridgeId }));
-      });
-      window.setTimeout(() => {
-        finderChannels.get(bridgeId)?.close();
-        finderChannels.delete(bridgeId);
-        activeFinderBridgeIds.delete(bridgeId);
-      }, 15 * 60 * 1000);
-    }
-    const printHtml = buildPrintHtml(model, { bridgeId });
-    const printUrl = URL.createObjectURL(new Blob([printHtml], { type: "text/html;charset=utf-8" }));
-    const printWindow = window.open(printUrl, "_blank");
-    if (!printWindow) {
-      URL.revokeObjectURL(printUrl);
-      finderChannel?.close();
-      finderChannels.delete(bridgeId);
-      activeFinderBridgeIds.delete(bridgeId);
-      return updateExportHubStatus(cardId, "Print view was blocked. Allow pop-ups for MS2.0, then try again.");
-    }
-    window.setTimeout(() => URL.revokeObjectURL(printUrl), 60000);
-    return updateExportHubStatus(cardId, `Print-ready inventory opened for ${model.rows.length} medicines.`);
+    state.printPreview = { model, bridgeId, query: "", message: "" };
+    updateExportHubStatus(cardId, `Print-ready inventory opened for ${model.rows.length} medicines.`);
+    return;
   }
   const selected = formats[format];
   if (!selected) return updateExportHubStatus(cardId, "That export format is not supported.");
@@ -4184,22 +4240,39 @@ function hideReplitBadge() {
   });
 }
 
-function postFinderResult(query, source) {
+function postFinderResult(query, source, message = "") {
   const target = activeFinderWindow;
   activeFinderWindow = null;
   if (!target || target.closed) return;
-  target.postMessage({ type: "ms20:finder-result", query: String(query || "").trim(), source }, window.location.origin);
+  target.postMessage({ type: "ms20:finder-result", query: String(query || "").trim(), source, message }, window.location.origin);
 }
 
 function handleFinderRequest(data, reply) {
   const send = (query = "", source = "", message = "") => reply({
     type: "ms20:finder-result", query: String(query || "").trim(), source, message
   });
+  if (data.action === "close") {
+    stopActiveVoiceCapture();
+    closeCameraStream();
+    state.printPreview = null;
+    render();
+    return;
+  }
   if (data.action === "voice") {
     send("", "shared_voice_capture", "Starting microphone in MS2.0…");
     window.focus();
     startVoiceCapture(
-      (transcript) => send(transcript, "shared_voice_capture", `Heard “${transcript}”.`),
+      (transcript) => {
+        const localMatch = matchMedicine(transcript, pharmacyBrain.catalog);
+        const matched = localMatch.status === "matched" ? localMatch.matches[0] : null;
+        send(
+          matched?.name || transcript,
+          "shared_voice_capture",
+          matched
+            ? `Matched ${matched.name} in this Pharmacy Catalog.`
+            : `Heard “${transcript}”, but no single local medicine matched. Tap Speak medicine to retry.`
+        );
+      },
       (message) => send("", "shared_voice_capture", message)
     );
     return;
@@ -4217,14 +4290,15 @@ function handleFinderRequest(data, reply) {
   }
 }
 
-window.addEventListener("message", (event) => {
-  if (event.data?.type !== "ms20:finder-request" || !event.source) return;
-  if (!activeFinderBridgeIds.has(event.data.bridgeId)) return;
-  if (event.origin !== window.location.origin && event.origin !== "null") return;
-  handleFinderRequest(event.data, (payload) => event.source.postMessage(
-    { ...payload, bridgeId: event.data.bridgeId || "" }, event.origin === "null" ? "*" : event.origin
-  ));
-});
+window.__ms20FinderRequest = (data) => {
+  if (!state.printPreview || data?.bridgeId !== state.printPreview.bridgeId) return;
+  handleFinderRequest(data, (payload) => {
+    if (!state.printPreview) return;
+    if (payload.query) state.printPreview.query = payload.query;
+    if (payload.message !== undefined) state.printPreview.message = payload.message;
+    if (!state.camera.open) render();
+  });
+};
 
 window.addEventListener("online", () => { syncPendingStockCorrections(); render(); });
 window.addEventListener("offline", render);

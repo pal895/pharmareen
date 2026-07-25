@@ -21,10 +21,13 @@ for (const manifestUrl of manifestUrls) {
   if (!fixture || fixture.fixtureId !== fixtureId) throw new Error(`${fixtureId} registry lookup failed`);
   if (source.status !== "matched" || source.name !== manifest.medicine) throw new Error(`${fixtureId} must resolve through Source Brain`);
   if (fixtureId !== "barcode-losartan-50mg" && knownCatalog.includes(manifest.medicine)) throw new Error(`${fixtureId} must not duplicate the known 26-item live catalog`);
+  if (fixtureId === "barcode-losartan-50mg" && (!knownCatalog.includes(manifest.medicine) || !manifest.catalog_status?.includes("Existing canonical medicine"))) {
+    throw new Error("Losartan live fixture must target the existing canonical catalog medicine");
+  }
   const expected = { ...manifest, stock: manifest.stock ?? manifest.initial_stock, cost_price: manifest.cost_price ?? manifest.buying_price };
   for (const field of ["strength", "barcode", "expiry", "stock", "cost_price", "selling_price", "batch"]) {
     if (String(fixture[field]) !== String(expected[field])) throw new Error(`${fixtureId} ${field} drifted`);
   }
   if (png.length < 10000 || png.subarray(1, 4).toString() !== "PNG") throw new Error(`${fixtureId} PNG artifact is missing or invalid`);
 }
-console.log("Barcode fixture verification passed: two valid EAN-13 fixtures, Source Brain matches, isolated mappings, non-duplicate new medicine, and PNG artifacts.");
+console.log("Barcode fixture verification passed: valid EAN-13 assets, existing-catalog Losartan targeting, isolated mappings, and PNG artifacts.");

@@ -100,16 +100,21 @@ assert.match(appSource, /buildCanonicalInventoryExport\(\{ pharmacy: state\.phar
 assert.match(appSource, /download-inventory-export/);
 assert.match(appSource, /card\.type === "CatalogWorkspaceCard" \|\| card\.type === "ExportHubCard"/);
 assert.match(appSource, /card\.type === "ExportHubCard"\) return "Choose a format to download\. No confirmation is required\."/);
-assert.match(appSource, /URL\.createObjectURL\(new Blob\(\[printHtml\]/);
-assert.match(appSource, /startVoiceCapture\([\s\S]{0,250}shared_voice_capture/);
+assert.match(appSource, /state\.printPreview = \{ model, bridgeId, query: "", message: "" \}/);
+assert.match(appSource, /printFrame\.srcdoc = buildPrintHtml/);
+assert.match(appSource, /window\.__ms20FinderRequest/);
+assert.match(appSource, /startVoiceCapture\(/);
+assert.match(appSource, /shared_voice_capture/);
 assert.match(appSource, /openLightweightCamera\("barcode"\)/);
-assert.match(appSource, /new BroadcastChannel\(`ms20-finder-\$\{bridgeId\}`\)/);
 assert.match(appSource, /handleFinderRequest/);
 assert.match(appSource, /Camera could not open\. Allow camera access in browser settings/);
-assert.match(appSource, /Microphone access is off\. Allow it in your browser settings/);
+assert.match(appSource, /getUserMedia\(\{ audio: true, video: false \}\)/);
+assert.match(appSource, /Microphone access was denied\. Allow it in browser settings/);
+assert.match(appSource, /Microphone did not start\. Tap Speak medicine to retry/);
 assert.doesNotMatch(appSource, /printWindow\.document\.write/);
 assert.doesNotMatch(appSource, /Export Hub[\s\S]{0,1000}(OpenAI|fetch\s*\()/);
 assert.match(cssSource, /@media \(max-width: 520px\)[^{]*\{[^}]*\.export-format-grid/);
+assert.match(cssSource, /\.print-preview-overlay/);
 
 const outputDir = join(process.cwd(), ".export-hub-verification");
 await rm(outputDir, { recursive: true, force: true });
