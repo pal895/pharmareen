@@ -2,8 +2,8 @@ import { buildStoredZip, xml } from "./ooxmlPackage.js";
 import { buildMedicineFinderIndex, medicineFinderClientScript } from "./medicineFinder.js";
 
 export const EXPORT_FORMATS = Object.freeze([
-  { id: "xlsx", group: "polished", label: "Excel", help: "Styled workbook for sorting, filtering and review" },
-  { id: "pdf", group: "polished", label: "PDF", help: "Elegant fixed, paginated owner copy" },
+  { id: "xlsx", group: "polished", label: "Excel", help: "Search, filter, edit or analyze your complete inventory" },
+  { id: "pdf", group: "polished", label: "PDF", help: "Easiest phone reading, sharing and printing" },
   { id: "docx", group: "polished", label: "Word", help: "Editable professional document" },
   { id: "pptx", group: "polished", label: "Presentation", help: "Landscape inventory briefing slides" },
   { id: "print", group: "polished", label: "Print", help: "Print-ready browser layout" },
@@ -25,7 +25,7 @@ const PRINT_COLUMNS = Object.freeze([
   ["sellingPrice", "Sell KES"], ["costPrice", "Cost KES"], ["stock", "Stock"], ["supplier", "Supplier"]
 ]);
 const PRINT_RECORDS_PER_PAGE = 9;
-const PDF_RECORDS_PER_PAGE = 7;
+const PDF_RECORDS_PER_PAGE = 5;
 const OFFICE_RECORDS_PER_PAGE = 5;
 
 export function buildCanonicalInventoryExport({ pharmacy, items, generatedAt = new Date() }) {
@@ -162,18 +162,18 @@ export function buildInventoryPptx(model) {
 }
 
 export function buildInventoryPdf(model) {
-  const pages = balancedChunks(model.rows, PDF_RECORDS_PER_PAGE);
-  if (!pages.length) pages.push([]);
+  validateInventoryExportSnapshot(model);
+  const inventoryPages = balancedChunks(model.rows, PDF_RECORDS_PER_PAGE);
+  const pageStreams = [pdfOverviewPage(model), ...inventoryPages.map((rows, index) => pdfInventoryPage(model, rows, index + 1, inventoryPages.length))];
   const objects = [null];
   const add = (value) => (objects.push(value), objects.length - 1);
   const font = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
   const bold = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
   const pageIds = [];
   const pagesId = add("");
-  pages.forEach((rows, pageIndex) => {
-    const stream = pdfPage(model, rows, pageIndex + 1, pages.length);
+  pageStreams.forEach((stream) => {
     const content = add(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
-    pageIds.push(add(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 ${font} 0 R /F2 ${bold} 0 R >> >> /Contents ${content} 0 R >>`));
+    pageIds.push(add(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${font} 0 R /F2 ${bold} 0 R >> >> /Contents ${content} 0 R >>`));
   });
   objects[pagesId] = `<< /Type /Pages /Count ${pageIds.length} /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] >>`;
   const catalog = add(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
@@ -494,27 +494,62 @@ function shapeText(id, text, x, y, cx, cy, size, bold, color, fill = "FFFFFF") {
 function slideMaster() { return `<?xml version="1.0"?><p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld><p:sldLayoutIdLst><p:sldLayoutId id="1" r:id="rId1"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle/><p:bodyStyle/><p:otherStyle/></p:txStyles></p:sldMaster>`; }
 function slideLayout() { return `<?xml version="1.0"?><p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" type="blank"><p:cSld name="Blank"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld></p:sldLayout>`; }
 function pptTheme() { return `<?xml version="1.0"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="MS2.0"><a:themeElements><a:clrScheme name="MS2.0"><a:dk1><a:srgbClr val="19332F"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="536B66"/></a:dk2><a:lt2><a:srgbClr val="F1F7F5"/></a:lt2><a:accent1><a:srgbClr val="086C5C"/></a:accent1><a:accent2><a:srgbClr val="C9D8D4"/></a:accent2><a:accent3><a:srgbClr val="58A696"/></a:accent3><a:accent4><a:srgbClr val="D3A229"/></a:accent4><a:accent5><a:srgbClr val="7E9B95"/></a:accent5><a:accent6><a:srgbClr val="B7CDC8"/></a:accent6><a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme><a:fontScheme name="MS2.0"><a:majorFont><a:latin typeface="Aptos Display"/></a:majorFont><a:minorFont><a:latin typeface="Aptos"/></a:minorFont></a:fontScheme><a:fmtScheme name="MS2.0"><a:fillStyleLst/><a:lnStyleLst/><a:effectStyleLst/><a:bgFillStyleLst/></a:fmtScheme></a:themeElements></a:theme>`; }
-function pdfPage(model, rows, page, total) {
+function pdfOverviewPage(model) {
   const lines = [];
-  const t = (x, y, size, text, bold = false) => lines.push(`BT /F${bold ? 2 : 1} ${size} Tf ${x} ${y} Td (${pdfEscape(text)}) Tj ET`);
-  const rule = (y) => lines.push(`0.72 0.82 0.80 RG 0.8 w 36 ${y} m 806 ${y} l S`);
-  t(36, 557, 20, model.title, true);
-  t(36, 536, 10, `${model.pharmacyName} | ${model.branch} | ${model.location}`);
-  t(36, 520, 9, `Generated ${model.generatedKenya} Africa/Nairobi | Page ${page} of ${total}`);
-  t(742, 557, 9, `${model.rows.length} medicines`, true);
-  rows.forEach((row, index) => {
-    const y = 483 - index * 65;
-    rule(y + 17);
-    t(42, y, 11, row.medicine || "Unnamed medicine", true);
-    t(220, y, 9, `${row.strength || "—"} | ${row.form || "—"} | ${row.unit || "—"}`);
-    t(510, y, 9, `Sell KES ${row.sellingPrice === "" ? "—" : row.sellingPrice} | Cost KES ${row.costPrice === "" ? "—" : row.costPrice} | Stock ${row.stock === "" ? "—" : row.stock}`, true);
-    t(42, y - 18, 9, `Supplier: ${truncate(row.supplier || "—", 40)}`);
-    t(360, y - 18, 9, `Barcode: ${row.barcode || "—"} | Batch: ${row.batch || "—"}`);
-    t(650, y - 18, 9, `Expiry: ${row.expiry || "—"} | Shelf: ${row.shelf || "—"}`);
+  const t = (x, y, size, text, bold = false) => lines.push(`0.10 0.20 0.18 rg BT /F${bold ? 2 : 1} ${size} Tf ${x} ${y} Td (${pdfEscape(text)}) Tj ET`);
+  const panel = (x, y, width, height) => lines.push(`0.94 0.97 0.96 rg ${x} ${y} ${width} ${height} re f`);
+  t(36, 786, 24, "Pharmacy Overview", true);
+  t(36, 760, 12, `${model.pharmacyName} | ${model.branch} | ${model.location}`);
+  t(36, 741, 9, `Generated ${model.generatedKenya} Africa/Nairobi`);
+  lines.push("0.03 0.42 0.36 RG 1.2 w 36 724 m 559 724 l S");
+  t(36, 694, 15, "At a glance", true);
+  const metrics = [
+    ["Total medicines", model.summary.medicineCount],
+    ["Total units in stock", model.summary.totalStock],
+    ["Retail stock value", `KES ${formatPdfNumber(model.summary.retailStockValue)}`],
+    ["Cost stock value", `KES ${formatPdfNumber(model.summary.costStockValue)}`],
+    ["Potential gross margin", `KES ${formatPdfNumber(model.summary.potentialGrossMargin)}`],
+    ["Low stock", model.summary.lowStockCount],
+    ["Expiring soon", model.summary.expiringSoonCount]
+  ];
+  metrics.forEach(([label, value], index) => {
+    const y = 642 - index * 58;
+    panel(36, y, 523, 46);
+    t(50, y + 17, 11, label, true);
+    t(430, y + 15, 16, value, true);
   });
-  t(36, 24, 8, `${model.rows.length} canonical medicine records | Pharmacy-isolated | Generated locally by MS2.0 with zero AI formatting.`);
+  t(36, 196, 15, "Complete inventory", true);
+  t(36, 172, 11, `${model.rows.length} medicines follow in clear, phone-friendly record cards.`);
+  t(36, 150, 10, "Each card includes identity, stock, prices, supplier, expiry and traceability.");
+  t(36, 44, 8, "Pharmacy-isolated canonical data | Generated locally by MS2.0 | Zero AI formatting");
   return lines.join("\n");
 }
+function pdfInventoryPage(model, rows, page, total) {
+  const lines = [];
+  const t = (x, y, size, text, bold = false) => lines.push(`0.10 0.20 0.18 rg BT /F${bold ? 2 : 1} ${size} Tf ${x} ${y} Td (${pdfEscape(text)}) Tj ET`);
+  const card = (y, alternate) => lines.push(`${alternate ? "0.94 0.97 0.96" : "1 1 1"} rg 36 ${y - 98} 523 112 re f 0.78 0.86 0.84 RG 0.7 w 36 ${y - 98} 523 112 re S`);
+  const first = (page - 1) * PDF_RECORDS_PER_PAGE + 1;
+  const last = first + rows.length - 1;
+  t(36, 793, 21, "Pharmacy Inventory", true);
+  t(36, 769, 10, `${model.pharmacyName} | ${model.branch} | ${model.location}`);
+  t(36, 751, 9, `Medicines ${first}-${last} of ${model.rows.length} | Page ${page} of ${total}`);
+  lines.push("0.03 0.42 0.36 RG 1.2 w 36 733 m 559 733 l S");
+  rows.forEach((row, index) => {
+    const y = 695 - index * 132;
+    const missing = "-";
+    card(y, index % 2 === 1);
+    t(48, y - 8, 13, truncate(row.medicine || "Unnamed medicine", 48), true);
+    t(465, y - 8, 11, `Stock ${row.stock === "" ? missing : row.stock}`, true);
+    t(48, y - 29, 10, `${row.strength || missing} | ${row.form || missing} | ${row.unit || missing}`);
+    t(48, y - 50, 10, `Selling KES ${row.sellingPrice === "" ? missing : formatPdfNumber(row.sellingPrice)} | Cost KES ${row.costPrice === "" ? missing : formatPdfNumber(row.costPrice)}`, true);
+    t(48, y - 71, 9, `Supplier: ${truncate(row.supplier || missing, 54)}`);
+    t(48, y - 89, 9, `Expiry: ${row.expiry || missing} | Batch: ${truncate(row.batch || missing, 20)} | Shelf: ${row.shelf || missing}`);
+    t(350, y - 89, 9, `Barcode: ${truncate(row.barcode || missing, 24)}`);
+  });
+  t(36, 35, 8, `Generated ${model.generatedKenya} Africa/Nairobi | Canonical pharmacy inventory | Zero AI formatting`);
+  return lines.join("\n");
+}
+function formatPdfNumber(value) { return Number(value).toLocaleString("en-US", { maximumFractionDigits: 2 }); }
 function rels(values) { return `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${values.map(([id, type, target]) => `<Relationship Id="${id}" Type="${type}" Target="${target}"/>`).join("")}</Relationships>`; }
 function coreProps(model) { return `<?xml version="1.0"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${xml(model.title)}</dc:title><dc:creator>MS2.0</dc:creator><cp:lastModifiedBy>MS2.0</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">${model.generatedIso}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${model.generatedIso}</dcterms:modified></cp:coreProperties>`; }
 function appProps(application, sheetNames = []) {

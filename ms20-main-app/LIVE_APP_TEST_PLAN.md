@@ -738,3 +738,15 @@ After pulling and restarting the latest build, download one completely fresh wor
 5. Confirm Full Inventory still contains all 35 medicines.
 
 Do not discover or use the viewer's `1/5` page controls for this checkpoint. Do not edit, print, share or upload. If the standard internal links work, pass Excel and proceed automatically to PDF. If taps do nothing or the viewer remains on Overview, record that exact viewer compatibility limitation, preserve the desktop-compatible Excel workbook, and proceed to PDF as the phone-first owner copy without another broad XLSX redesign.
+
+## PDF Owner Copy live validation
+
+Excel is passed with the third-party viewer limitation documented. Do not redesign or repeat Excel.
+
+After pulling and restarting the latest build, open Export Hub and download one fresh PDF. Open it in the phone's PDF reader and confirm only:
+
+1. Page 1 shows the complete Pharmacy Overview and all summary values without sideways scrolling.
+2. Page 2 shows five clear medicine cards with readable stock, prices, supplier and traceability details.
+3. The final page shows Medicines 31–35 and nothing is clipped.
+
+Do not edit, print, share or upload the file. If these three views are clear, mark PDF Owner Copy passed and continue automatically to Word. If one view fails, report that page and the exact clipped, missing or unreadable item.

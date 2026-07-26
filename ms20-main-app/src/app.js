@@ -3295,7 +3295,7 @@ function exportHubTemplate(card) {
   const dataFormats = EXPORT_FORMATS.filter((format) => format.group === "data");
   return `<section class="export-hub" aria-label="Export Hub">
     <div class="export-hub-summary"><strong>${pharmacyBrain.catalog.length} medicines</strong><span>${escapeHtml(state.pharmacy.name)} · ${escapeHtml(state.pharmacy.branch || "Main")}</span></div>
-    <p>Choose a polished format for viewing, sharing or printing. Every file uses the same saved Pharmacy Catalog values and Kenya generation time.</p>
+    <p>Choose Excel when you want to search, filter, edit or analyze your complete pharmacy inventory. For the easiest phone reading and sharing experience, choose PDF.</p>
     <div class="export-format-section">
       <h3>Polished owner copies</h3>
       <div class="export-format-grid">${polishedFormats.map(formatButton).join("")}</div>
@@ -3329,7 +3329,8 @@ function downloadInventoryExport(format, cardId = "") {
   if (!selected) return updateExportHubStatus(cardId, "That export format is not supported.");
   const [builder, extension, mime] = selected;
   downloadBlobFile({ filename: exportFilename(model, extension), contents: builder(model), mime });
-  updateExportHubStatus(cardId, `${extension.toUpperCase()} downloaded for ${model.rows.length} medicines at ${model.generatedKenya} Africa/Nairobi.`);
+  const guidance = extension === "xlsx" ? " For the best experience, open this file in Microsoft Excel or Google Sheets." : "";
+  updateExportHubStatus(cardId, `${extension.toUpperCase()} downloaded for ${model.rows.length} medicines at ${model.generatedKenya} Africa/Nairobi.${guidance}`);
 }
 
 function updateExportHubStatus(cardId, message) {
@@ -3960,7 +3961,7 @@ function ownerCardNote(card) {
   }
   if (card.type === "CatalogImportCard") return "Review the list, edit if needed, then approve.";
   if (card.type === "CatalogWorkspaceCard") return "This view uses the complete saved Pharmacy Catalog.";
-  if (card.type === "ExportHubCard") return "Choose a polished owner copy, or use CSV only for technical data transfer. No confirmation is required.";
+  if (card.type === "ExportHubCard") return "Choose Excel for editing and analysis, or PDF for the easiest phone reading and sharing. No confirmation is required.";
   if (card.type === "StockCorrectionCard") {
     if (card.photoEvidence && !String(card.fields?.medicine || "").trim() && card.validation) return card.validation;
     if (card.ui?.voiceGuided && card.validation) return card.validation;

@@ -54,6 +54,11 @@ assert.deepEqual(
   outputs.xlsx,
   "Identical immutable input must produce deterministic XLSX bytes"
 );
+assert.deepEqual(
+  buildInventoryPdf(buildCanonicalInventoryExport({ pharmacy, items, generatedAt })),
+  outputs.pdf,
+  "Identical immutable input must produce deterministic PDF bytes"
+);
 assert.match(outputs.csv, /^\ufeffMS2\.0 Pharmacy Inventory/);
 assert.match(outputs.csv, /Amoxicillin,500 mg,capsule,capsule,20,12,40/);
 assert.equal(new TextDecoder().decode(outputs.pdf.slice(0, 8)), "%PDF-1.4");
@@ -83,6 +88,7 @@ assert.match(outputs.html, /finder-status/);
 assert.equal(exportFilename(model, "xlsx"), "zuri-pharmacy-inventory-2026-07-25-180032Z.xlsx");
 
 const decodedPackages = Object.fromEntries(["xlsx", "docx", "pptx"].map((format) => [format, new TextDecoder().decode(outputs[format])]));
+const decodedPdf = new TextDecoder().decode(outputs.pdf);
 const ownerSheets = buildOwnerWorkbookSheets(model);
 assert.ok(ownerSheets.every((sheet) => sheet.sourceCount === 35), "Every worksheet must reference the same 35-medicine snapshot");
 assert.ok(ownerSheets.every((sheet) => sheet.rows.some((row) => row.some((value) => String(value).includes("35 canonical medicines")))), "Every worksheet must visibly declare the same source count");
@@ -160,11 +166,17 @@ for (const item of items) {
   for (const format of ["xlsx", "docx", "pptx"]) {
     assert.match(decodedPackages[format], new RegExp(item.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${format.toUpperCase()} missing ${item.name}`);
   }
+  assert.match(decodedPdf, new RegExp(item.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `PDF missing ${item.name}`);
   assert.match(outputs.html, new RegExp(`class="record-main"[\\s\\S]*?${item.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), `Print missing ${item.name}`);
 }
 assert.equal((decodedPackages.pptx.match(/<p:sldId /g) || []).length, 8);
 assert.equal((decodedPackages.docx.match(/w:type="page"/g) || []).length, 6);
-assert.equal((new TextDecoder().decode(outputs.pdf).match(/\/Type \/Page\b/g) || []).length, 5);
+assert.equal((decodedPdf.match(/\/Type \/Page\b/g) || []).length, 8);
+assert.equal((decodedPdf.match(/\/MediaBox \[0 0 595 842\]/g) || []).length, 8);
+assert.match(decodedPdf, /Pharmacy Overview/);
+assert.match(decodedPdf, /At a glance/);
+assert.match(decodedPdf, /Medicines 1-5 of 35/);
+assert.match(decodedPdf, /Medicines 31-35 of 35/);
 for (const match of decodedPackages.pptx.matchAll(/<a:off x="(\d+)" y="(\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"\/>/g)) {
   const [, x, y, width, height] = match.map(Number);
   assert.ok(x + width <= 12192000, `PPTX shape overflows horizontally: ${x + width}`);
@@ -214,7 +226,9 @@ assert.match(appSource, /data-action="open-export-hub">Export Hub/);
 assert.match(appSource, /buildCanonicalInventoryExport\(\{ pharmacy: state\.pharmacy, items: pharmacyBrain\.catalog \}\)/);
 assert.match(appSource, /download-inventory-export/);
 assert.match(appSource, /card\.type === "CatalogWorkspaceCard" \|\| card\.type === "ExportHubCard"/);
-assert.match(appSource, /card\.type === "ExportHubCard"\) return "Choose a polished owner copy, or use CSV only for technical data transfer\. No confirmation is required\."/);
+assert.match(appSource, /Choose Excel for editing and analysis, or PDF for the easiest phone reading and sharing\. No confirmation is required\./);
+assert.match(appSource, /Choose Excel when you want to search, filter, edit or analyze your complete pharmacy inventory\. For the easiest phone reading and sharing experience, choose PDF\./);
+assert.match(appSource, /For the best experience, open this file in Microsoft Excel or Google Sheets\./);
 assert.match(appSource, /<h3>Polished owner copies<\/h3>/);
 assert.match(appSource, /<h3>Technical data transfer<\/h3>/);
 assert.match(appSource, /CSV preserves the records for other systems, but it cannot carry colours, fonts, spacing or page design\./);
