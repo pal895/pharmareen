@@ -27,6 +27,7 @@ const PRINT_COLUMNS = Object.freeze([
 const PRINT_RECORDS_PER_PAGE = 9;
 const PDF_RECORDS_PER_PAGE = 5;
 const OFFICE_RECORDS_PER_PAGE = 5;
+const WORD_RECORDS_PER_PAGE = 4;
 
 export function buildCanonicalInventoryExport({ pharmacy, items, generatedAt = new Date() }) {
   const pharmacyId = clean(pharmacy?.id);
@@ -125,16 +126,28 @@ export function buildInventoryXlsx(model) {
 
 export function buildInventoryDocx(model) {
   validateInventoryExportSnapshot(model);
-  const pages = balancedChunks(model.rows, OFFICE_RECORDS_PER_PAGE);
-  const body = pages.map((rows, pageIndex) => [
+  const pages = balancedChunks(model.rows, WORD_RECORDS_PER_PAGE);
+  const totalPages = pages.length + 1;
+  const overview = [
     wordP("Editable Pharmacy Inventory", "Title"),
     wordP(`${model.pharmacyName} | ${model.branch} | ${model.location}`, "Subtitle"),
-    wordP(`Generated ${model.generatedKenya} Africa/Nairobi | Page ${pageIndex + 1} of ${pages.length}`, "Meta"),
-    wordP(pageIndex === 0 ? `${model.rows.length} medicines | Add notes or make owner-reviewed changes in Microsoft Word or Google Docs.` : `${model.rows.length} medicines | Editable working copy`, "Summary"),
-    ...rows.map(wordMedicineBlock),
-    pageIndex < pages.length - 1 ? '<w:p><w:r><w:br w:type="page"/></w:r></w:p>' : ""
+    wordP(`Generated ${model.generatedKenya} Africa/Nairobi | Page 1 of ${totalPages}`, "Meta"),
+    wordP("Owner review copy", "Heading1"),
+    wordP("Use this document to review inventory, record corrections and add working notes. Open it in Microsoft Word or Google Docs to edit.", "Body"),
+    wordSummaryTable(model),
+    wordP("General owner notes / corrections", "Heading1"),
+    wordNotesBox("Add pharmacy-wide notes, follow-ups or corrections here.", 7),
+    wordP("The complete editable medicine record follows on the next page.", "Meta"),
+    wordPageBreak()
+  ].join("");
+  const inventory = pages.map((rows, pageIndex) => [
+    wordP("Inventory review", "PageTitle"),
+    wordP(`${model.pharmacyName} | ${model.branch} | ${model.location}`, "Subtitle"),
+    wordP(`Medicines ${pageIndex * WORD_RECORDS_PER_PAGE + 1}-${pageIndex * WORD_RECORDS_PER_PAGE + rows.length} of ${model.rows.length} | Page ${pageIndex + 2} of ${totalPages}`, "Meta"),
+    ...rows.map((row, rowIndex) => wordMedicineCard(row, rowIndex)),
+    pageIndex < pages.length - 1 ? wordPageBreak() : ""
   ].join("")).join("");
-  const document = `<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="576" w:right="720" w:bottom="576" w:left="720" w:header="360" w:footer="360"/></w:sectPr></w:body></w:document>`;
+  const document = `<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${overview}${inventory}<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1080" w:right="1440" w:bottom="1080" w:left="1440" w:header="708" w:footer="708"/></w:sectPr></w:body></w:document>`;
   return buildStoredZip([
     entry("[Content_Types].xml", `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`),
     entry("_rels/.rels", rels([["rId1", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument", "word/document.xml"], ["rId2", "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties", "docProps/core.xml"], ["rId3", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties", "docProps/app.xml"]])),
@@ -462,24 +475,92 @@ function xlsxCell(value, row, column, style) { const ref = `${columnName(column)
 function columnName(value) { let result = ""; for (let n = value; n; n = Math.floor((n - 1) / 26)) result = String.fromCharCode(65 + ((n - 1) % 26)) + result; return result; }
 function columnNumber(ref) { return [...String(ref).match(/^[A-Z]+/)?.[0] || ""].reduce((value, character) => value * 26 + character.charCodeAt(0) - 64, 0); }
 function xlsxStyles() { return `<?xml version="1.0"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts><fonts count="6"><font><sz val="10"/><color rgb="FF19332F"/><name val="Aptos"/></font><font><b/><sz val="20"/><color rgb="FF086C5C"/><name val="Aptos Display"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Aptos"/></font><font><b/><sz val="10"/><color rgb="FF536B66"/><name val="Aptos"/></font><font><b/><sz val="15"/><color rgb="FF086C5C"/><name val="Aptos Display"/></font><font><b/><u/><sz val="10"/><color rgb="FF086C5C"/><name val="Aptos"/></font></fonts><fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF086C5C"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF1F7F5"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEDF7F4"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF3CD"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDFF1EC"/></patternFill></fill></fills><borders count="3"><border/><border><right style="thin"><color rgb="FFE5ECEA"/></right><bottom style="thin"><color rgb="FFD9E5E1"/></bottom></border><border><bottom style="medium"><color rgb="FF086C5C"/></bottom></border></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="13"><xf fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf fontId="1" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf><xf fontId="2" fillId="2" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="0" fillId="3" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="3" fillId="4" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="4" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="4" fillId="6" borderId="2" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf><xf fontId="0" fillId="5" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="3" fillId="5" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="5" fillId="4" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" wrapText="1" vertical="center"/></xf><xf fontId="2" fillId="2" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" wrapText="1" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`; }
-function wordP(text, style) { return `<w:p><w:pPr><w:pStyle w:val="${style}"/></w:pPr><w:r><w:t>${xml(text)}</w:t></w:r></w:p>`; }
-function wordMedicineBlock(row) {
+function wordP(text, style) { return `<w:p><w:pPr><w:pStyle w:val="${style}"/></w:pPr><w:r><w:t xml:space="preserve">${xml(text)}</w:t></w:r></w:p>`; }
+function wordPageBreak() { return '<w:p><w:r><w:br w:type="page"/></w:r></w:p>'; }
+function wordOwnerRecord(row) {
   const important = (key) => recordedValue(row[key]) ? row[key] : "Not recorded";
-  const identity = [row.strength, row.form, row.unit].filter(recordedValue).join(" | ");
-  const trace = [
-    `Expiry ${important("expiry")}`,
-    recordedValue(row.batch) ? `Batch ${row.batch}` : "",
-    recordedValue(row.shelf) ? `Shelf ${row.shelf}` : "",
-    recordedValue(row.barcode) ? `Barcode ${row.barcode}` : ""
-  ].filter(Boolean).join(" | ");
-  return [
-    wordP(`${row.medicine}${identity ? ` | ${identity}` : ""}`, "Medicine"),
-    wordP(`Stock ${important("stock")} | Selling price KES ${important("sellingPrice")} | Cost price KES ${important("costPrice")}`, "Detail"),
-    recordedValue(row.supplier) ? wordP(`Supplier ${row.supplier}`, "Trace") : "",
-    wordP(trace, "Trace")
-  ].join("");
+  return Object.freeze({
+    medicine: row.medicine,
+    identity: [row.strength, row.form, row.unit].filter(recordedValue).join(" | ") || "Strength / form / unit not recorded",
+    stock: important("stock"),
+    prices: `Selling KES ${important("sellingPrice")} | Cost KES ${important("costPrice")}`,
+    supplier: recordedValue(row.supplier) ? `Supplier: ${row.supplier}` : "Supplier: Not recorded",
+    trace: [
+      `Expiry: ${important("expiry")}`,
+      recordedValue(row.batch) ? `Batch: ${row.batch}` : "",
+      recordedValue(row.shelf) ? `Shelf: ${row.shelf}` : "",
+      recordedValue(row.barcode) ? `Barcode: ${row.barcode}` : ""
+    ].filter(Boolean).join(" | ")
+  });
 }
-function wordStyles() { return `<?xml version="1.0"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:pPr><w:spacing w:after="80"/></w:pPr><w:rPr><w:rFonts w:ascii="Aptos"/><w:sz w:val="21"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:pPr><w:spacing w:after="100"/></w:pPr><w:rPr><w:b/><w:color w:val="086C5C"/><w:sz w:val="40"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Subtitle"><w:name w:val="Subtitle"/><w:pPr><w:spacing w:after="50"/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Meta"><w:name w:val="Meta"/><w:pPr><w:spacing w:after="80"/></w:pPr><w:rPr><w:color w:val="536B66"/><w:sz w:val="18"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Summary"><w:name w:val="Summary"/><w:pPr><w:spacing w:after="140"/></w:pPr><w:rPr><w:b/><w:color w:val="086C5C"/><w:sz w:val="19"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Medicine"><w:name w:val="Medicine"/><w:pPr><w:keepNext/><w:spacing w:before="110" w:after="35"/><w:pBdr><w:top w:val="single" w:sz="8" w:color="B7CDC8"/></w:pBdr></w:pPr><w:rPr><w:b/><w:color w:val="19332F"/><w:sz w:val="23"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Detail"><w:name w:val="Detail"/><w:pPr><w:keepNext/><w:spacing w:after="30"/></w:pPr><w:rPr><w:sz w:val="20"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Trace"><w:name w:val="Trace"/><w:pPr><w:spacing w:after="70"/></w:pPr><w:rPr><w:color w:val="536B66"/><w:sz w:val="18"/></w:rPr></w:style></w:styles>`; }
+function wordMedicineCard(row, index) {
+  const record = wordOwnerRecord(row);
+  const fill = index % 2 ? "F1F7F5" : "FFFFFF";
+  const left = [
+    wordP(record.medicine, "Medicine"),
+    wordP(record.identity, "Detail"),
+    wordP(record.prices, "Price"),
+    wordP(record.supplier, "Trace"),
+    wordP(record.trace, "Trace")
+  ].join("");
+  const right = [
+    wordP("STOCK", "StockLabel"),
+    wordP(String(record.stock), "StockValue"),
+    wordP("OWNER NOTES / CORRECTIONS", "NotesLabel"),
+    wordP(" ", "NotesLine"),
+    wordP(" ", "NotesLine"),
+    wordP(" ", "NotesLine")
+  ].join("");
+  return `${wordTable([[wordCell(left, 6240, fill), wordCell(right, 3120, "EDF7F4")]], [6240, 3120], { cantSplit: true })}${wordP("", "CardGap")}`;
+}
+function wordSummaryTable(model) {
+  const rows = [
+    ["Total medicines", model.summary.medicineCount],
+    ["Total units in stock", model.summary.totalStock],
+    ["Retail stock value", `KES ${formatPdfNumber(model.summary.retailStockValue)}`],
+    ["Cost stock value", `KES ${formatPdfNumber(model.summary.costStockValue)}`],
+    ["Potential gross margin", `KES ${formatPdfNumber(model.summary.potentialGrossMargin)}`],
+    ["Low stock", model.summary.lowStockCount],
+    ["Expiring soon", model.summary.expiringSoonCount]
+  ].map(([label, value]) => [wordCell(wordP(label, "MetricLabel"), 6240, "F1F7F5"), wordCell(wordP(String(value), "MetricValue"), 3120, "EDF7F4")]);
+  return `${wordTable(rows, [6240, 3120])}${wordP("", "SectionGap")}`;
+}
+function wordNotesBox(prompt, lines = 3) {
+  const content = [wordP(prompt, "NotesPrompt"), ...Array.from({ length: lines }, () => wordP(" ", "NotesLine"))].join("");
+  return `${wordTable([[wordCell(content, 9360, "FAFCFB")]], [9360])}${wordP("", "SectionGap")}`;
+}
+function wordTable(rows, widths, options = {}) {
+  const width = widths.reduce((sum, value) => sum + value, 0);
+  const border = '<w:tblBorders><w:top w:val="single" w:sz="8" w:color="B7CDC8"/><w:left w:val="single" w:sz="8" w:color="B7CDC8"/><w:bottom w:val="single" w:sz="8" w:color="B7CDC8"/><w:right w:val="single" w:sz="8" w:color="B7CDC8"/><w:insideH w:val="single" w:sz="6" w:color="D9E5E1"/><w:insideV w:val="single" w:sz="6" w:color="D9E5E1"/></w:tblBorders>';
+  const margins = '<w:tblCellMar><w:top w:w="140" w:type="dxa"/><w:start w:w="120" w:type="dxa"/><w:bottom w:w="140" w:type="dxa"/><w:end w:w="120" w:type="dxa"/></w:tblCellMar>';
+  const rowXml = rows.map((cells) => `<w:tr>${options.cantSplit ? "<w:trPr><w:cantSplit/></w:trPr>" : ""}${cells.join("")}</w:tr>`).join("");
+  return `<w:tbl><w:tblPr><w:tblW w:w="${width}" w:type="dxa"/><w:tblInd w:w="120" w:type="dxa"/><w:tblLayout w:type="fixed"/>${border}${margins}</w:tblPr><w:tblGrid>${widths.map((value) => `<w:gridCol w:w="${value}"/>`).join("")}</w:tblGrid>${rowXml}</w:tbl>`;
+}
+function wordCell(content, width, fill) {
+  return `<w:tc><w:tcPr><w:tcW w:w="${width}" w:type="dxa"/>${fill ? `<w:shd w:val="clear" w:color="auto" w:fill="${fill}"/>` : ""}<w:vAlign w:val="center"/></w:tcPr>${content}</w:tc>`;
+}
+function wordStyles() { return `<?xml version="1.0"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:pPr><w:spacing w:after="120" w:line="300" w:lineRule="auto"/></w:pPr><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:sz w:val="22"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:pPr><w:spacing w:after="160"/></w:pPr><w:rPr><w:rFonts w:ascii="Aptos Display"/><w:b/><w:color w:val="086C5C"/><w:sz w:val="52"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="PageTitle"><w:name w:val="Page title"/><w:pPr><w:keepNext/><w:spacing w:after="80"/></w:pPr><w:rPr><w:rFonts w:ascii="Aptos Display"/><w:b/><w:color w:val="086C5C"/><w:sz w:val="40"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Subtitle"><w:name w:val="Subtitle"/><w:pPr><w:keepNext/><w:spacing w:after="60"/></w:pPr><w:rPr><w:b/><w:color w:val="19332F"/><w:sz w:val="26"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Meta"><w:name w:val="Meta"/><w:pPr><w:spacing w:after="120"/></w:pPr><w:rPr><w:color w:val="536B66"/><w:sz w:val="19"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="Heading 1"/><w:pPr><w:keepNext/><w:spacing w:before="280" w:after="140"/></w:pPr><w:rPr><w:b/><w:color w:val="086C5C"/><w:sz w:val="32"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Body"><w:name w:val="Body"/><w:pPr><w:spacing w:after="160" w:line="300" w:lineRule="auto"/></w:pPr><w:rPr><w:sz w:val="23"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Medicine"><w:name w:val="Medicine"/><w:pPr><w:keepNext/><w:spacing w:after="50"/></w:pPr><w:rPr><w:b/><w:color w:val="19332F"/><w:sz w:val="32"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Detail"><w:name w:val="Detail"/><w:pPr><w:keepNext/><w:spacing w:after="45" w:line="280" w:lineRule="auto"/></w:pPr><w:rPr><w:sz w:val="23"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Price"><w:name w:val="Price"/><w:pPr><w:keepNext/><w:spacing w:after="55"/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Trace"><w:name w:val="Trace"/><w:pPr><w:spacing w:after="35" w:line="280" w:lineRule="auto"/></w:pPr><w:rPr><w:color w:val="536B66"/><w:sz w:val="21"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="StockLabel"><w:name w:val="Stock label"/><w:pPr><w:spacing w:after="20"/><w:jc w:val="center"/></w:pPr><w:rPr><w:b/><w:color w:val="536B66"/><w:sz w:val="19"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="StockValue"><w:name w:val="Stock value"/><w:pPr><w:spacing w:after="100"/><w:jc w:val="center"/></w:pPr><w:rPr><w:b/><w:color w:val="086C5C"/><w:sz w:val="34"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="NotesLabel"><w:name w:val="Notes label"/><w:pPr><w:spacing w:after="40"/><w:jc w:val="center"/></w:pPr><w:rPr><w:b/><w:color w:val="536B66"/><w:sz w:val="18"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="NotesPrompt"><w:name w:val="Notes prompt"/><w:pPr><w:spacing w:after="80"/></w:pPr><w:rPr><w:color w:val="536B66"/><w:sz w:val="21"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="NotesLine"><w:name w:val="Notes line"/><w:pPr><w:spacing w:after="80" w:line="280" w:lineRule="auto"/><w:pBdr><w:bottom w:val="single" w:sz="4" w:color="B7CDC8"/></w:pBdr></w:pPr><w:rPr><w:sz w:val="21"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="MetricLabel"><w:name w:val="Metric label"/><w:pPr><w:spacing w:after="0"/></w:pPr><w:rPr><w:b/><w:color w:val="19332F"/><w:sz w:val="23"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="MetricValue"><w:name w:val="Metric value"/><w:pPr><w:spacing w:after="0"/><w:jc w:val="right"/></w:pPr><w:rPr><w:b/><w:color w:val="086C5C"/><w:sz w:val="26"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="CardGap"><w:name w:val="Card gap"/><w:pPr><w:spacing w:after="90"/></w:pPr><w:rPr><w:sz w:val="4"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="SectionGap"><w:name w:val="Section gap"/><w:pPr><w:spacing w:after="100"/></w:pPr><w:rPr><w:sz w:val="4"/></w:rPr></w:style>
+</w:styles>`; }
 function titleSlide(model) { return slideXml([shapeText(1, model.title, 700000, 1150000, 10800000, 900000, 5000, true, "086C5C"), shapeText(2, `${model.pharmacyName}\n${model.branch} | ${model.location}`, 700000, 2500000, 10800000, 1200000, 2400, false, "19332F"), shapeText(3, `${model.rows.length} medicines\nGenerated ${model.generatedKenya} Africa/Nairobi`, 700000, 4300000, 10800000, 1000000, 1800, false, "536B66")]); }
 function tableSlide(model, rows, index, total) {
   const headers = ["Medicine", "Identity", "Prices", "Stock", "Supplier", "Traceability", "Expiry / shelf"];

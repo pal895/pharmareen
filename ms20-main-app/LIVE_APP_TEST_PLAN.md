@@ -759,8 +759,8 @@ Choose Word when the owner wants an editable document for notes, corrections or 
 
 After pulling and restarting the latest build, open Export Hub and download one fresh Word file. Open it in Microsoft Word or Google Docs and confirm only:
 
-1. The title reads `Editable Pharmacy Inventory` and the first page explains that notes or owner-reviewed changes can be added.
-2. The document contains readable medicine groups with stock and prices prominent and secondary supplier/traceability details below.
-3. Scroll to the final page and confirm the last medicine is present; tap once in ordinary text and confirm the document is editable, but do not save or change the pharmacy data.
+1. Page 1 is portrait, comfortably readable without excessive zoom, shows the reconciled owner summary and provides a large general notes/corrections area.
+2. Page 2 shows four clearly separated medicine cards. Confirm medicine name, stock and prices are prominent; supplier/traceability are secondary; each card has editable owner notes/corrections lines.
+3. Scroll to page 10 and confirm medicines 33-35 are present with no clipping. Tap once in a notes area and confirm the document is editable, but do not save or change pharmacy data.
 
 If those three checks pass, mark Word Owner Document passed and continue automatically to Presentation. Report only a file-open failure, missing medicine, clipping, broken page flow or inability to edit.
