@@ -714,3 +714,15 @@ Final Excel presentation retest after the pane-free repair:
 5. Confirm calm typography, wrapping, banding, number formatting and readable widths on phone and desktop.
 
 Return screenshots of Overview, the five-tab list, Full Inventory at the top and after horizontal/vertical movement, Low Stock, Expiry Tracking and Suppliers. If every condition passes, mark Excel Owner Workbook passed and advance automatically to the PDF owner-copy live validation. If any condition fails, stop on Excel and repair only the observed shared XLSX presentation defect.
+
+## Final Excel worksheet-identity retest
+
+Use one newly generated workbook only. The Android viewer's `1/5` page indicator is not sufficient proof of navigation.
+
+1. Open the workbook's sheet/tab selector and verify exactly: `Overview`, `Full Inventory`, `Low Stock`, `Expiry Tracking`, `Suppliers`.
+2. Open each named tab directly and verify A1 reads respectively: `Pharmacy Overview`, `Full Inventory`, `Low Stock`, `Expiry Tracking`, `Suppliers`.
+3. Confirm Overview contains Workbook contents, the seven owner metrics and Attention required, entirely within columns A–D.
+4. Confirm Full Inventory contains 35 medicine rows and its 13 defined working columns through Retail stock value, Batch and Barcode.
+5. Confirm Low Stock shows its six-column reorder table or the exact healthy empty message; Expiry Tracking shows 35 rows and seven expiry/action columns; Suppliers shows 35 rows and five supplier/medicine columns.
+6. Confirm selecting any working tab never shows Overview content, a wide blank canvas, a frozen column, a split pane, or a second printable page created by empty cells.
+7. Do not edit, print, share or upload. If all checks pass, mark Excel Owner Workbook passed and proceed automatically to PDF. Otherwise stop at the first exact tab/content mismatch and keep PDF blocked.

@@ -119,7 +119,7 @@ export function buildInventoryXlsx(model) {
     ["xl/workbook.xml", `<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView activeTab="0"/></bookViews><sheets>${sheetNodes}</sheets><calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>`],
     ["xl/_rels/workbook.xml.rels", rels([...workbookRelationships, [`rId${sheets.length + 1}`, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles", "styles.xml"]])],
     ...sheets.map((sheet, index) => [`xl/worksheets/sheet${index + 1}.xml`, buildXlsxSheetXml(sheet)]),
-    ["xl/styles.xml", xlsxStyles()], ["docProps/core.xml", coreProps(model)], ["docProps/app.xml", appProps("Microsoft Excel")]
+    ["xl/styles.xml", xlsxStyles()], ["docProps/core.xml", coreProps(model)], ["docProps/app.xml", appProps("Microsoft Excel", sheets.map((sheet) => sheet.name))]
   ].map(([name, contents]) => ({ name, contents })));
 }
 
@@ -221,8 +221,8 @@ export function buildOwnerWorkbookSheets(model) {
   const finderFlags = new Map(model.finderIndex.map((entry) => [entry.id, entry.flags]));
   const lowStock = model.rows.filter((row) => finderFlags.get(row.finderId)?.lowStock === true)
     .sort((a, b) => stockNumber(a) - stockNumber(b) || a.medicine.localeCompare(b.medicine));
-  const expiryRows = [...model.rows]
-    .sort((a, b) => (a.expiry ? 0 : 1) - (b.expiry ? 0 : 1) || a.expiry.localeCompare(b.expiry) || a.medicine.localeCompare(b.medicine));
+  const expiryRows = [...model.rows].map((row) => ({ row, ...expiryStatus(row.expiry, model.generatedIso) }))
+    .sort((a, b) => (a.row.expiry ? 0 : 1) - (b.row.expiry ? 0 : 1) || a.row.expiry.localeCompare(b.row.expiry) || a.row.medicine.localeCompare(b.row.medicine));
   const supplierRowsSorted = [...model.rows]
     .sort((a, b) => (a.supplier || "Not recorded").localeCompare(b.supplier || "Not recorded") || a.medicine.localeCompare(b.medicine));
   const attentionRows = model.rows.map((row) => {
@@ -231,19 +231,34 @@ export function buildOwnerWorkbookSheets(model) {
     return { row, reason: reasons.join(" and ") };
   }).filter((entry) => entry.reason)
     .sort((a, b) => a.reason.localeCompare(b.reason) || stockNumber(a.row) - stockNumber(b.row) || a.row.medicine.localeCompare(b.row.medicine));
-  const commonMeta = [
-    [model.title], [`${model.pharmacyName} · ${model.branch} · ${model.location}`],
-    [`Generated ${model.generatedKenya} Africa/Nairobi · ${model.summary.medicineCount} canonical medicines`]
-  ];
+  const identity = `${model.pharmacyName} · ${model.branch} · ${model.location}`;
+  const generated = `Generated ${model.generatedKenya} Africa/Nairobi · ${model.summary.medicineCount} canonical medicines`;
   const fullRows = [
-    [model.title], ["Pharmacy", model.pharmacyName], ["Branch", model.branch],
-    ["Location", model.location], ["Generated (Africa/Nairobi)", `${model.generatedKenya} · ${model.summary.medicineCount} canonical medicines`], [],
-    XLSX_FULL_COLUMNS.map(([, label]) => label), ...model.rows.map((row) => XLSX_FULL_COLUMNS.map(([key]) => row[key]))
+    ["Full Inventory"], [identity], [generated],
+    XLSX_FULL_COLUMNS.map(([, label]) => label),
+    ...model.rows.map((row) => [
+      row.medicine, row.strength, row.form, row.unit, row.stock, row.sellingPrice, row.costPrice,
+      (Number(row.sellingPrice) || 0) * (Number(row.stock) || 0),
+      row.expiry, row.supplier, row.shelf, row.batch, row.barcode
+    ])
+  ];
+  fullRows[3] = [
+    "Medicine", "Strength", "Form", "Unit", "Stock", "Selling price (KES)", "Cost price (KES)",
+    "Retail stock value (KES)", "Expiry", "Supplier", "Shelf", "Batch", "Barcode"
   ];
   const overviewRows = [
-    ...commonMeta, [],
+    ["Pharmacy Overview"], [identity], [generated],
+    ["Workbook contents"],
+    ["1. Overview — quick pharmacy summary"],
+    ["2. Full Inventory — all medicines and editable details"],
+    ["3. Low Stock — medicines that need restocking"],
+    ["4. Expiry Tracking — medicines ordered by expiry"],
+    ["5. Suppliers — supplier information"], [],
     ["Total medicines", model.summary.medicineCount],
+    ["Total units in stock", model.summary.totalStock],
     ["Total stock value (KES)", model.summary.retailStockValue],
+    ["Cost stock value (KES)", model.summary.costStockValue],
+    ["Potential gross margin (KES)", model.summary.potentialGrossMargin],
     ["Low stock count", model.summary.lowStockCount],
     ["Expiring soon count", model.summary.expiringSoonCount],
     ["Attention required"], ["Medicine", "Stock", "Expiry", "Reason"],
@@ -252,26 +267,47 @@ export function buildOwnerWorkbookSheets(model) {
       : [["No medicines currently require attention.", "", "", ""]])
   ];
   const lowStockRows = [
-    ...commonMeta, ["Action list · at or below the saved reorder level"],
-    ["Medicine", "Stock", "Reorder level", "Expiry", "Reason"],
-    ...(lowStock.length ? lowStock.map((row) => [row.medicine, row.stock, row.reorderLevel, row.expiry, "At or below reorder level"]) : [["No medicines are currently at or below their saved reorder level."]])
+    ["Low Stock"], [identity], [generated],
+    ["Medicine", "Current stock", "Reorder level", "Suggested reorder quantity", "Supplier", "Reason"],
+    ...(lowStock.length ? lowStock.map((row) => [
+      row.medicine, row.stock, row.reorderLevel,
+      row.reorderLevel === "" || row.stock === "" ? "" : Math.max(0, row.reorderLevel - row.stock),
+      row.supplier, "At or below reorder level"
+    ]) : [["No medicines are currently below their reorder level."]])
   ];
   const expiryTrackingRows = [
-    ...commonMeta, ["All medicines · recorded expiries first"],
-    ["Medicine", "Expiry", "Batch", "Stock"],
-    ...expiryRows.map((row) => [row.medicine, row.expiry, row.batch, row.stock])
+    ["Expiry Tracking"], [identity], [generated],
+    ["Medicine", "Expiry date", "Urgency", "Stock", "Batch", "Supplier", "Recommended action"],
+    ...expiryRows.map(({ row, urgency, action }) => [row.medicine, row.expiry, urgency, row.stock, row.batch, row.supplier, action])
   ];
   const supplierRows = [
-    ...commonMeta, ["Supplier and shelf responsibility"],
-    ["Supplier", "Medicine", "Stock", "Shelf"],
-    ...supplierRowsSorted.map((row) => [row.supplier || "Not recorded", row.medicine, row.stock, row.shelf])
+    ["Suppliers"], [identity], [generated],
+    ["Supplier", "Medicine", "Stock", "Cost price (KES)", "Last known batch"],
+    ...supplierRowsSorted.map((row) => [row.supplier || "Not recorded", row.medicine, row.stock, row.costPrice, row.batch])
   ];
   const sheets = [
-    ownerSheet("Inventory Overview", overviewRows, { sourceCount: model.summary.medicineCount, projectionCount: attentionRows.length, headerRow: 10, merges: ["A1:D1", "A2:D2", "A3:D3", "A9:D9", ...(attentionRows.length ? [] : ["A11:D11"])], widths: [15, 10, 9, 12], overview: true }),
-    ownerSheet("Full Inventory", fullRows, { sourceCount: model.summary.medicineCount, projectionCount: model.rows.length, headerRow: 7, merges: ["B5:D5"], widths: autoXlsxWidths(fullRows, [24, 13, 12, 11, 10, 17, 16, 13, 24, 10, 14, 18]) }),
-    ownerSheet("Low Stock", lowStockRows, { sourceCount: model.summary.medicineCount, projectionCount: lowStock.length, headerRow: 5, merges: ["A1:E1", "A2:E2", "A3:E3", "A4:E4", ...(lowStock.length ? [] : ["A6:E6"])], widths: [22, 10, 14, 13, 22], alert: true }),
-    ownerSheet("Expiry Tracking", expiryTrackingRows, { sourceCount: model.summary.medicineCount, projectionCount: expiryRows.length, headerRow: 5, merges: ["A1:D1", "A2:D2", "A3:D3", "A4:D4"], widths: [22, 13, 15, 10] }),
-    ownerSheet("Suppliers", supplierRows, { sourceCount: model.summary.medicineCount, projectionCount: supplierRowsSorted.length, headerRow: 5, merges: ["A1:D1", "A2:D2", "A3:D3", "A4:D4"], widths: [24, 22, 10, 10] })
+    ownerSheet("Overview", overviewRows, {
+      title: "Pharmacy Overview", sourceCount: model.summary.medicineCount, projectionCount: attentionRows.length,
+      headerRow: 19, filter: false, merges: ["A1:D1", "A2:D2", "A3:D3", "A4:D4", "A5:D5", "A6:D6", "A7:D7", "A8:D8", "A9:D9", "A18:D18", ...(attentionRows.length ? [] : ["A20:D20"])],
+      widths: [15, 10, 9, 12], overview: true
+    }),
+    ownerSheet("Full Inventory", fullRows, {
+      title: "Full Inventory", sourceCount: model.summary.medicineCount, projectionCount: model.rows.length,
+      headerRow: 4, merges: ["A1:M1", "A2:M2", "A3:M3"], widths: autoXlsxWidths(fullRows, [24, 13, 12, 11, 10, 17, 16, 20, 13, 24, 10, 14, 18])
+    }),
+    ownerSheet("Low Stock", lowStockRows, {
+      title: "Low Stock", sourceCount: model.summary.medicineCount, projectionCount: lowStock.length,
+      headerRow: 4, merges: ["A1:F1", "A2:F2", "A3:F3", ...(lowStock.length ? [] : ["A5:F5"])],
+      widths: [22, 13, 14, 20, 24, 22], alert: true
+    }),
+    ownerSheet("Expiry Tracking", expiryTrackingRows, {
+      title: "Expiry Tracking", sourceCount: model.summary.medicineCount, projectionCount: expiryRows.length,
+      headerRow: 4, merges: ["A1:G1", "A2:G2", "A3:G3"], widths: [22, 13, 22, 10, 15, 24, 22]
+    }),
+    ownerSheet("Suppliers", supplierRows, {
+      title: "Suppliers", sourceCount: model.summary.medicineCount, projectionCount: supplierRowsSorted.length,
+      headerRow: 4, merges: ["A1:E1", "A2:E2", "A3:E3"], widths: [24, 22, 10, 16, 18]
+    })
   ];
   validateOwnerWorkbookSheets(model, sheets);
   return sheets;
@@ -283,29 +319,58 @@ function inventorySummary(rows, finderIndex) {
     medicineCount: rows.length,
     totalStock: rows.reduce((sum, row) => sum + (Number(row.stock) || 0), 0),
     retailStockValue: rows.reduce((sum, row) => sum + (Number(row.sellingPrice) || 0) * (Number(row.stock) || 0), 0),
+    costStockValue: rows.reduce((sum, row) => sum + (Number(row.costPrice) || 0) * (Number(row.stock) || 0), 0),
+    potentialGrossMargin: rows.reduce((sum, row) => sum + ((Number(row.sellingPrice) || 0) - (Number(row.costPrice) || 0)) * (Number(row.stock) || 0), 0),
     lowStockCount: rows.filter((row) => flagsById.get(row.finderId)?.lowStock === true).length,
     expiringSoonCount: rows.filter((row) => flagsById.get(row.finderId)?.expiringSoon === true).length
   };
 }
+function expiryStatus(value, generatedIso) {
+  const expiry = clean(value);
+  if (!expiry) return { urgency: "Expiry not recorded", action: "Record expiry" };
+  const match = expiry.match(/^(\d{4})-(\d{2})(?:-(\d{2}))?$/);
+  if (!match) return { urgency: "Expiry needs review", action: "Check recorded expiry" };
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = match[3] ? Number(match[3]) : new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const expiryTime = Date.UTC(year, month - 1, day, 23, 59, 59);
+  const generatedTime = new Date(generatedIso).getTime();
+  const days = Math.ceil((expiryTime - generatedTime) / 86400000);
+  if (days < 0) return { urgency: "Expired", action: "Remove from sale and review" };
+  if (days <= 30) return { urgency: "Expiring within 30 days", action: "Review now" };
+  if (days <= 90) return { urgency: "Expiring within 90 days", action: "Plan use or return" };
+  return { urgency: "Later expiry", action: "Monitor" };
+}
 function validateOwnerWorkbookSheets(model, sheets) {
-  const expectedNames = ["Inventory Overview", "Full Inventory", "Low Stock", "Expiry Tracking", "Suppliers"];
+  const expectedNames = ["Overview", "Full Inventory", "Low Stock", "Expiry Tracking", "Suppliers"];
   if (sheets.length !== expectedNames.length || sheets.some((sheet, index) => sheet.name !== expectedNames[index])) {
     throw new Error("Owner workbook reconciliation failed: worksheet responsibilities changed.");
   }
+  const visibleTitles = new Set();
   for (const sheet of sheets) {
     if (sheet.sourceCount !== model.summary.medicineCount) {
       throw new Error(`Owner workbook reconciliation failed: ${sheet.name} uses a different medicine snapshot.`);
     }
+    if (sheet.rows[0]?.[0] !== sheet.title || visibleTitles.has(sheet.title)) {
+      throw new Error(`Owner workbook reconciliation failed: ${sheet.name} does not have a distinct visible title.`);
+    }
+    visibleTitles.add(sheet.title);
     const header = sheet.rows[sheet.headerRow - 1] || [];
     if (!header.length || header.some((value) => !clean(value))) {
       throw new Error(`Owner workbook reconciliation failed: ${sheet.name} has a blank mandatory header.`);
     }
+    if (sheet.rows.some((row) => row.length > sheet.widths.length)) {
+      throw new Error(`Owner workbook reconciliation failed: ${sheet.name} extends beyond its intended used columns.`);
+    }
   }
   const overview = sheets[0];
-  const summaryPairs = new Map(overview.rows.slice(4, 8).map((row) => [row[0], row[1]]));
+  const summaryPairs = new Map(overview.rows.slice(10, 17).map((row) => [row[0], row[1]]));
   const expectedSummary = new Map([
     ["Total medicines", model.summary.medicineCount],
+    ["Total units in stock", model.summary.totalStock],
     ["Total stock value (KES)", model.summary.retailStockValue],
+    ["Cost stock value (KES)", model.summary.costStockValue],
+    ["Potential gross margin (KES)", model.summary.potentialGrossMargin],
     ["Low stock count", model.summary.lowStockCount],
     ["Expiring soon count", model.summary.expiringSoonCount]
   ]);
@@ -313,13 +378,18 @@ function validateOwnerWorkbookSheets(model, sheets) {
     if (summaryPairs.get(label) !== value) throw new Error(`Owner workbook reconciliation failed: ${label} does not match the export snapshot.`);
   }
   const canonicalNames = model.rows.map((row) => row.medicine).sort();
-  const fullNames = sheets[1].rows.slice(sheets[1].headerRow).map((row) => row[0]).sort();
+  const fullRows = sheets[1].rows.slice(sheets[1].headerRow);
+  const fullNames = fullRows.map((row) => row[0]).sort();
   const expiryNames = sheets[3].rows.slice(sheets[3].headerRow).map((row) => row[0]).sort();
   const supplierNames = sheets[4].rows.slice(sheets[4].headerRow).map((row) => row[1]).sort();
   for (const [sheetName, names] of [["Full Inventory", fullNames], ["Expiry Tracking", expiryNames], ["Suppliers", supplierNames]]) {
     if (names.length !== canonicalNames.length || names.some((name, index) => name !== canonicalNames[index])) {
       throw new Error(`Owner workbook reconciliation failed: ${sheetName} is missing or duplicating medicines.`);
     }
+  }
+  const fullRetailValue = fullRows.reduce((sum, row) => sum + (Number(row[7]) || 0), 0);
+  if (fullRetailValue !== model.summary.retailStockValue) {
+    throw new Error("Owner workbook reconciliation failed: Full Inventory retail value does not match Overview.");
   }
   const sourceNames = new Set(canonicalNames);
   const lowStockNames = sheets[2].projectionCount ? sheets[2].rows.slice(sheets[2].headerRow).map((row) => row[0]) : [];
@@ -341,14 +411,14 @@ function buildXlsxSheetXml(sheet) {
     const rowNumber = rowIndex + 1;
     const isHeader = rowNumber === sheet.headerRow;
     const isData = rowNumber > sheet.headerRow;
-    const height = rowNumber === 1 ? 34 : rowNumber === 3 || (sheet.name === "Full Inventory" && rowNumber === 5) ? 38 : isHeader ? (sheet.overview ? 40 : 32) : isData ? 27 : rowNumber <= 4 ? 24 : 26;
+    const height = rowNumber === 1 ? 34 : rowNumber === 3 ? 38 : isHeader ? 34 : isData ? 27 : rowNumber <= 4 ? 26 : 25;
     return `<row r="${rowNumber}" ht="${height}" customHeight="1">${row.map((value, columnIndex) => {
       let style = 0;
       if (rowNumber === 1) style = 1;
       else if (isHeader) style = 2;
-      else if (sheet.overview && rowNumber >= 5 && rowNumber <= 8 && columnIndex === 0) style = 6;
-      else if (sheet.overview && rowNumber >= 5 && rowNumber <= 8 && columnIndex === 1) style = 7;
-      else if (sheet.overview && rowNumber === 9) style = 8;
+      else if (sheet.overview && rowNumber >= 11 && rowNumber <= 17 && columnIndex === 0) style = 6;
+      else if (sheet.overview && rowNumber >= 11 && rowNumber <= 17 && columnIndex === 1) style = 7;
+      else if (sheet.overview && rowNumber === 18) style = 8;
       else if (isData && sheet.alert) style = columnIndex === 2 ? 10 : (rowNumber - sheet.headerRow) % 2 === 0 ? 4 : 0;
       else if (isData) style = (rowNumber - sheet.headerRow) % 2 === 0 ? 4 : 0;
       if (typeof value === "number" && ![1, 2, 6, 7, 8, 10].includes(style)) style = style === 4 ? 5 : 3;
@@ -358,8 +428,9 @@ function buildXlsxSheetXml(sheet) {
   const widths = sheet.widths.map((width, index) => `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`).join("");
   const mergeXml = sheet.merges?.length ? `<mergeCells count="${sheet.merges.length}">${sheet.merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("")}</mergeCells>` : "";
   const lastRow = Math.max(sheet.headerRow, sheet.rows.length);
-  const filter = `<autoFilter ref="A${sheet.headerRow}:${columnName(maxColumns)}${lastRow}"/>`;
-  return `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0" showGridLines="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="20"/><cols>${widths}</cols><sheetData>${rowXml}</sheetData>${mergeXml}${filter}<printOptions horizontalCentered="1"/><pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/><pageSetup orientation="landscape" paperSize="9" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  const lastColumn = columnName(maxColumns);
+  const filter = sheet.filter === false ? "" : `<autoFilter ref="A${sheet.headerRow}:${lastColumn}${lastRow}"/>`;
+  return `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${lastColumn}${lastRow}"/><sheetViews><sheetView workbookViewId="0" showGridLines="0" topLeftCell="A1"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="20"/><cols>${widths}</cols><sheetData>${rowXml}</sheetData>${mergeXml}${filter}</worksheet>`;
 }
 function xlsxCell(value, row, column, style) { const ref = `${columnName(column)}${row}`; return typeof value === "number" ? `<c r="${ref}" s="${style}"><v>${value}</v></c>` : `<c r="${ref}" s="${style}" t="inlineStr"><is><t>${xml(value)}</t></is></c>`; }
 function columnName(value) { let result = ""; for (let n = value; n; n = Math.floor((n - 1) / 26)) result = String.fromCharCode(65 + ((n - 1) % 26)) + result; return result; }
@@ -420,7 +491,10 @@ function pdfPage(model, rows, page, total) {
 }
 function rels(values) { return `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${values.map(([id, type, target]) => `<Relationship Id="${id}" Type="${type}" Target="${target}"/>`).join("")}</Relationships>`; }
 function coreProps(model) { return `<?xml version="1.0"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${xml(model.title)}</dc:title><dc:creator>MS2.0</dc:creator><cp:lastModifiedBy>MS2.0</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">${model.generatedIso}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${model.generatedIso}</dcterms:modified></cp:coreProperties>`; }
-function appProps(application) { return `<?xml version="1.0"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>${application}</Application><AppVersion>1.0</AppVersion></Properties>`; }
+function appProps(application, sheetNames = []) {
+  const workbookParts = sheetNames.length ? `<HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>${sheetNames.length}</vt:i4></vt:variant></vt:vector></HeadingPairs><TitlesOfParts><vt:vector size="${sheetNames.length}" baseType="lpstr">${sheetNames.map((name) => `<vt:lpstr>${xml(name)}</vt:lpstr>`).join("")}</vt:vector></TitlesOfParts>` : "";
+  return `<?xml version="1.0"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>${application}</Application><AppVersion>1.0</AppVersion>${workbookParts}</Properties>`;
+}
 function entry(name, contents) { return { name, contents }; }
 function chunk(values, size) { const result = []; for (let i = 0; i < values.length; i += size) result.push(values.slice(i, i + size)); return result; }
 function balancedChunks(values, maximum) {

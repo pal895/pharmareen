@@ -40,10 +40,10 @@ assert.throws(() => buildCanonicalInventoryExport({ pharmacy, items: [{ ...items
 assert.throws(() => buildCanonicalInventoryExport({ pharmacy, items: [items[0], { ...items[0] }], generatedAt }), /duplicate medicine identity/);
 assert.throws(() => validateInventoryExportSnapshot({ ...model, summary: { ...model.summary, medicineCount: 714 } }), /medicineCount/);
 const healthySheets = buildOwnerWorkbookSheets(healthyModel);
-assert.ok(healthySheets[0].merges.includes("A11:D11"));
-assert.match(healthySheets[0].rows[10][0], /No medicines currently require attention/);
-assert.ok(healthySheets[2].merges.includes("A6:E6"));
-assert.match(healthySheets[2].rows[5][0], /No medicines are currently at or below/);
+assert.ok(healthySheets[0].merges.includes("A20:D20"));
+assert.match(healthySheets[0].rows[19][0], /No medicines currently require attention/);
+assert.ok(healthySheets[2].merges.includes("A5:F5"));
+assert.match(healthySheets[2].rows[4][0], /No medicines are currently below/);
 
 const outputs = {
   csv: buildInventoryCsv(model), xlsx: buildInventoryXlsx(model), pdf: buildInventoryPdf(model),
@@ -89,37 +89,62 @@ assert.ok(ownerSheets.every((sheet) => sheet.rows.some((row) => row.some((value)
 assert.equal(ownerSheets.find((sheet) => sheet.name === "Full Inventory").projectionCount, 35);
 assert.equal(ownerSheets.find((sheet) => sheet.name === "Expiry Tracking").projectionCount, 35);
 assert.equal(ownerSheets.find((sheet) => sheet.name === "Suppliers").projectionCount, 35);
-assert.deepEqual(ownerSheets[0].rows.slice(4, 8), [
+assert.deepEqual(ownerSheets.map((sheet) => sheet.name), ["Overview", "Full Inventory", "Low Stock", "Expiry Tracking", "Suppliers"]);
+assert.deepEqual(ownerSheets.map((sheet) => sheet.rows[0][0]), ["Pharmacy Overview", "Full Inventory", "Low Stock", "Expiry Tracking", "Suppliers"]);
+assert.equal(new Set(ownerSheets.map((sheet) => sheet.rows[0][0])).size, 5);
+assert.deepEqual(ownerSheets[0].rows.slice(10, 17), [
   ["Total medicines", model.summary.medicineCount],
+  ["Total units in stock", model.summary.totalStock],
   ["Total stock value (KES)", model.summary.retailStockValue],
+  ["Cost stock value (KES)", model.summary.costStockValue],
+  ["Potential gross margin (KES)", model.summary.potentialGrossMargin],
   ["Low stock count", model.summary.lowStockCount],
   ["Expiring soon count", model.summary.expiringSoonCount]
 ]);
-assert.deepEqual(ownerSheets[0].rows[9], ["Medicine", "Stock", "Expiry", "Reason"]);
+assert.deepEqual(ownerSheets[0].rows.slice(4, 9).map((row) => row[0]), [
+  "1. Overview — quick pharmacy summary",
+  "2. Full Inventory — all medicines and editable details",
+  "3. Low Stock — medicines that need restocking",
+  "4. Expiry Tracking — medicines ordered by expiry",
+  "5. Suppliers — supplier information"
+]);
+assert.deepEqual(ownerSheets[0].rows[18], ["Medicine", "Stock", "Expiry", "Reason"]);
 assert.ok(ownerSheets[0].widths.reduce((sum, width) => sum + width, 0) <= 46, "Overview must fit a compact phone viewport");
 assert.equal(ownerSheets[0].rows.some((row) => row.includes("Supplier") || row.includes("Shelf")), false);
-assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Full Inventory").rows[6], [
+assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Full Inventory").rows[3], [
   "Medicine", "Strength", "Form", "Unit", "Stock", "Selling price (KES)", "Cost price (KES)",
-  "Expiry", "Supplier", "Shelf", "Batch", "Barcode"
+  "Retail stock value (KES)", "Expiry", "Supplier", "Shelf", "Batch", "Barcode"
 ]);
-assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Low Stock").rows[4], ["Medicine", "Stock", "Reorder level", "Expiry", "Reason"]);
-assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Expiry Tracking").rows[4], ["Medicine", "Expiry", "Batch", "Stock"]);
-assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Suppliers").rows[4], ["Supplier", "Medicine", "Stock", "Shelf"]);
+assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Low Stock").rows[3], ["Medicine", "Current stock", "Reorder level", "Suggested reorder quantity", "Supplier", "Reason"]);
+assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Expiry Tracking").rows[3], ["Medicine", "Expiry date", "Urgency", "Stock", "Batch", "Supplier", "Recommended action"]);
+assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Suppliers").rows[3], ["Supplier", "Medicine", "Stock", "Cost price (KES)", "Last known batch"]);
 for (const sheet of ownerSheets) {
   assert.ok(sheet.rows[sheet.headerRow - 1].every((value) => String(value).trim()), `${sheet.name} contains a blank mandatory header`);
 }
 assert.equal((decodedPackages.xlsx.match(/<sheet name="/g) || []).length, 5);
-for (const sheetName of ["Inventory Overview", "Full Inventory", "Low Stock", "Expiry Tracking", "Suppliers"]) {
+for (const sheetName of ["Overview", "Full Inventory", "Low Stock", "Expiry Tracking", "Suppliers"]) {
   assert.match(decodedPackages.xlsx, new RegExp(`<sheet name="${sheetName}"`), `XLSX missing ${sheetName}`);
 }
+for (const title of ["Pharmacy Overview", "Full Inventory", "Low Stock", "Expiry Tracking", "Suppliers"]) {
+  assert.match(decodedPackages.xlsx, new RegExp(`>${title}<`), `XLSX missing visible title ${title}`);
+}
 assert.doesNotMatch(decodedPackages.xlsx, /<pane\b|xSplit=|ySplit=/, "No worksheet may contain a frozen column or split pane");
-assert.equal((decodedPackages.xlsx.match(/<autoFilter ref=/g) || []).length, 5, "Every worksheet must retain filters");
-assert.match(decodedPackages.xlsx, /<mergeCell ref="B5:D5"\/>/, "Full Inventory generation metadata must have enough wrapped width");
+assert.equal((decodedPackages.xlsx.match(/<autoFilter ref=/g) || []).length, 4, "Every working data sheet must retain filters");
+assert.match(decodedPackages.xlsx, /<dimension ref="A1:D20"\/>/);
+assert.match(decodedPackages.xlsx, /<dimension ref="A1:M39"\/>/);
+assert.match(decodedPackages.xlsx, /<dimension ref="A1:F5"\/>/);
+assert.match(decodedPackages.xlsx, /<dimension ref="A1:G39"\/>/);
+assert.match(decodedPackages.xlsx, /<dimension ref="A1:E39"\/>/);
+assert.doesNotMatch(decodedPackages.xlsx, /<pageSetup\b|<printOptions\b|<pageMargins\b/);
+assert.match(decodedPackages.xlsx, /<TitlesOfParts>/);
+for (const sheetName of ["Overview", "Full Inventory", "Low Stock", "Expiry Tracking", "Suppliers"]) {
+  assert.match(decodedPackages.xlsx, new RegExp(`<vt:lpstr>${sheetName}</vt:lpstr>`), `Workbook metadata missing ${sheetName}`);
+}
 assert.match(decodedPackages.xlsx, /Low stock/);
-assert.match(decodedPackages.xlsx, /at or below the saved reorder level/);
+assert.match(decodedPackages.xlsx, /At or below reorder level/);
 assert.match(decodedPackages.xlsx, /Total stock value \(KES\)/);
 assert.match(decodedPackages.xlsx, /Expiring soon count/);
-assert.match(decodedPackages.xlsx, /Supplier and shelf responsibility/);
+assert.match(decodedPackages.xlsx, /Last known batch/);
 assert.match(decodedPackages.xlsx, /fgColor rgb="FFF1F7F5"/);
 assert.match(decodedPackages.xlsx, /wrapText="1" vertical="center"/);
 for (const item of items) {
