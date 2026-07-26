@@ -42,8 +42,8 @@ assert.throws(() => validateInventoryExportSnapshot({ ...model, summary: { ...mo
 const healthySheets = buildOwnerWorkbookSheets(healthyModel);
 assert.ok(healthySheets[0].merges.includes("A20:D20"));
 assert.match(healthySheets[0].rows[19][0], /No medicines currently require attention/);
-assert.ok(healthySheets[2].merges.includes("A5:F5"));
-assert.match(healthySheets[2].rows[4][0], /No medicines are currently below/);
+assert.ok(healthySheets[2].merges.includes("A6:F6"));
+assert.match(healthySheets[2].rows[5][0], /No medicines are currently below/);
 
 const outputs = {
   csv: buildInventoryCsv(model), xlsx: buildInventoryXlsx(model), pdf: buildInventoryPdf(model),
@@ -101,25 +101,23 @@ assert.deepEqual(ownerSheets[0].rows.slice(10, 17), [
   ["Low stock count", model.summary.lowStockCount],
   ["Expiring soon count", model.summary.expiringSoonCount]
 ]);
-assert.deepEqual(ownerSheets[0].rows.slice(4, 9).map((row) => row[0]), [
-  "1. Overview — quick pharmacy summary",
-  "2. Full Inventory — all medicines and editable details",
-  "3. Low Stock — medicines that need restocking",
-  "4. Expiry Tracking — medicines ordered by expiry",
-  "5. Suppliers — supplier information"
-]);
+assert.deepEqual(ownerSheets[0].rows.slice(4, 9).map((row) => row[0]), ["Overview", "Full Inventory", "Low Stock", "Expiry Tracking", "Suppliers"]);
 assert.deepEqual(ownerSheets[0].rows[18], ["Medicine", "Stock", "Expiry", "Reason"]);
 assert.ok(ownerSheets[0].widths.reduce((sum, width) => sum + width, 0) <= 46, "Overview must fit a compact phone viewport");
 assert.equal(ownerSheets[0].rows.some((row) => row.includes("Supplier") || row.includes("Shelf")), false);
-assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Full Inventory").rows[3], [
+assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Full Inventory").rows[4], [
   "Medicine", "Strength", "Form", "Unit", "Stock", "Selling price (KES)", "Cost price (KES)",
   "Retail stock value (KES)", "Expiry", "Supplier", "Shelf", "Batch", "Barcode"
 ]);
-assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Low Stock").rows[3], ["Medicine", "Current stock", "Reorder level", "Suggested reorder quantity", "Supplier", "Reason"]);
-assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Expiry Tracking").rows[3], ["Medicine", "Expiry date", "Urgency", "Stock", "Batch", "Supplier", "Recommended action"]);
-assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Suppliers").rows[3], ["Supplier", "Medicine", "Stock", "Cost price (KES)", "Last known batch"]);
+assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Low Stock").rows[4], ["Medicine", "Current stock", "Reorder level", "Suggested reorder quantity", "Supplier", "Reason"]);
+assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Expiry Tracking").rows[4], ["Medicine", "Expiry date", "Urgency", "Stock", "Batch", "Supplier", "Recommended action"]);
+assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Suppliers").rows[4], ["Supplier", "Medicine", "Stock", "Cost price (KES)", "Last known batch"]);
 for (const sheet of ownerSheets) {
   assert.ok(sheet.rows[sheet.headerRow - 1].every((value) => String(value).trim()), `${sheet.name} contains a blank mandatory header`);
+  const targets = new Set(sheet.hyperlinks.map((link) => link.location));
+  for (const target of ["Overview", "Full Inventory", "Low Stock", "Expiry Tracking", "Suppliers"]) {
+    assert.ok(targets.has(`'${target}'!A1`), `${sheet.name} must link to ${target}!A1`);
+  }
 }
 assert.equal((decodedPackages.xlsx.match(/<sheet name="/g) || []).length, 5);
 for (const sheetName of ["Overview", "Full Inventory", "Low Stock", "Expiry Tracking", "Suppliers"]) {
@@ -129,12 +127,22 @@ for (const title of ["Pharmacy Overview", "Full Inventory", "Low Stock", "Expiry
   assert.match(decodedPackages.xlsx, new RegExp(`>${title}<`), `XLSX missing visible title ${title}`);
 }
 assert.doesNotMatch(decodedPackages.xlsx, /<pane\b|xSplit=|ySplit=/, "No worksheet may contain a frozen column or split pane");
+assert.equal((decodedPackages.xlsx.match(/showGridLines="0"/g) || []).length, 5);
+assert.equal((decodedPackages.xlsx.match(/showRowColHeaders="0"/g) || []).length, 5);
+assert.equal((decodedPackages.xlsx.match(/topLeftCell="A1"/g) || []).length, 5);
+assert.equal((decodedPackages.xlsx.match(/activeCell="A1" sqref="A1"/g) || []).length, 5);
+assert.equal((decodedPackages.xlsx.match(/zoomScale="90"/g) || []).length, 5);
+assert.equal((decodedPackages.xlsx.match(/<hyperlink /g) || []).length, 29, "Overview needs five links and every detail sheet needs six");
+for (const target of ["Overview", "Full Inventory", "Low Stock", "Expiry Tracking", "Suppliers"]) {
+  assert.match(decodedPackages.xlsx, new RegExp(`location="&apos;${target}&apos;!A1"`), `XLSX missing internal link to ${target}!A1`);
+}
+assert.doesNotMatch(decodedPackages.xlsx, /r:id="[^"]+"[^>]*location=/, "Internal worksheet links must not become external relationships");
 assert.equal((decodedPackages.xlsx.match(/<autoFilter ref=/g) || []).length, 4, "Every working data sheet must retain filters");
 assert.match(decodedPackages.xlsx, /<dimension ref="A1:D20"\/>/);
-assert.match(decodedPackages.xlsx, /<dimension ref="A1:M39"\/>/);
-assert.match(decodedPackages.xlsx, /<dimension ref="A1:F5"\/>/);
-assert.match(decodedPackages.xlsx, /<dimension ref="A1:G39"\/>/);
-assert.match(decodedPackages.xlsx, /<dimension ref="A1:E39"\/>/);
+assert.match(decodedPackages.xlsx, /<dimension ref="A1:M40"\/>/);
+assert.match(decodedPackages.xlsx, /<dimension ref="A1:F6"\/>/);
+assert.match(decodedPackages.xlsx, /<dimension ref="A1:G40"\/>/);
+assert.match(decodedPackages.xlsx, /<dimension ref="A1:E40"\/>/);
 assert.doesNotMatch(decodedPackages.xlsx, /<pageSetup\b|<printOptions\b|<pageMargins\b/);
 assert.match(decodedPackages.xlsx, /<TitlesOfParts>/);
 for (const sheetName of ["Overview", "Full Inventory", "Low Stock", "Expiry Tracking", "Suppliers"]) {

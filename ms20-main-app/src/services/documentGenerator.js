@@ -233,8 +233,14 @@ export function buildOwnerWorkbookSheets(model) {
     .sort((a, b) => a.reason.localeCompare(b.reason) || stockNumber(a.row) - stockNumber(b.row) || a.row.medicine.localeCompare(b.row.medicine));
   const identity = `${model.pharmacyName} · ${model.branch} · ${model.location}`;
   const generated = `Generated ${model.generatedKenya} Africa/Nairobi · ${model.summary.medicineCount} canonical medicines`;
+  const navigationLabels = ["Overview", "Full Inventory", "Low Stock", "Expiry Tracking", "Suppliers"];
+  const navigationLinks = (row, activeSheet) => navigationLabels.map((target, index) => ({
+    ref: `${columnName(index + 1)}${row}`,
+    location: `'${target}'!A1`,
+    active: target === activeSheet
+  }));
   const fullRows = [
-    ["Full Inventory"], [identity], [generated],
+    ["Full Inventory"], ["← Back to Overview", identity], [generated], navigationLabels,
     XLSX_FULL_COLUMNS.map(([, label]) => label),
     ...model.rows.map((row) => [
       row.medicine, row.strength, row.form, row.unit, row.stock, row.sellingPrice, row.costPrice,
@@ -242,18 +248,18 @@ export function buildOwnerWorkbookSheets(model) {
       row.expiry, row.supplier, row.shelf, row.batch, row.barcode
     ])
   ];
-  fullRows[3] = [
+  fullRows[4] = [
     "Medicine", "Strength", "Form", "Unit", "Stock", "Selling price (KES)", "Cost price (KES)",
     "Retail stock value (KES)", "Expiry", "Supplier", "Shelf", "Batch", "Barcode"
   ];
   const overviewRows = [
     ["Pharmacy Overview"], [identity], [generated],
     ["Workbook contents"],
-    ["1. Overview — quick pharmacy summary"],
-    ["2. Full Inventory — all medicines and editable details"],
-    ["3. Low Stock — medicines that need restocking"],
-    ["4. Expiry Tracking — medicines ordered by expiry"],
-    ["5. Suppliers — supplier information"], [],
+    ["Overview"],
+    ["Full Inventory"],
+    ["Low Stock"],
+    ["Expiry Tracking"],
+    ["Suppliers"], [],
     ["Total medicines", model.summary.medicineCount],
     ["Total units in stock", model.summary.totalStock],
     ["Total stock value (KES)", model.summary.retailStockValue],
@@ -267,7 +273,7 @@ export function buildOwnerWorkbookSheets(model) {
       : [["No medicines currently require attention.", "", "", ""]])
   ];
   const lowStockRows = [
-    ["Low Stock"], [identity], [generated],
+    ["Low Stock"], ["← Back to Overview", identity], [generated], navigationLabels,
     ["Medicine", "Current stock", "Reorder level", "Suggested reorder quantity", "Supplier", "Reason"],
     ...(lowStock.length ? lowStock.map((row) => [
       row.medicine, row.stock, row.reorderLevel,
@@ -276,12 +282,12 @@ export function buildOwnerWorkbookSheets(model) {
     ]) : [["No medicines are currently below their reorder level."]])
   ];
   const expiryTrackingRows = [
-    ["Expiry Tracking"], [identity], [generated],
+    ["Expiry Tracking"], ["← Back to Overview", identity], [generated], navigationLabels,
     ["Medicine", "Expiry date", "Urgency", "Stock", "Batch", "Supplier", "Recommended action"],
     ...expiryRows.map(({ row, urgency, action }) => [row.medicine, row.expiry, urgency, row.stock, row.batch, row.supplier, action])
   ];
   const supplierRows = [
-    ["Suppliers"], [identity], [generated],
+    ["Suppliers"], ["← Back to Overview", identity], [generated], navigationLabels,
     ["Supplier", "Medicine", "Stock", "Cost price (KES)", "Last known batch"],
     ...supplierRowsSorted.map((row) => [row.supplier || "Not recorded", row.medicine, row.stock, row.costPrice, row.batch])
   ];
@@ -289,24 +295,29 @@ export function buildOwnerWorkbookSheets(model) {
     ownerSheet("Overview", overviewRows, {
       title: "Pharmacy Overview", sourceCount: model.summary.medicineCount, projectionCount: attentionRows.length,
       headerRow: 19, filter: false, merges: ["A1:D1", "A2:D2", "A3:D3", "A4:D4", "A5:D5", "A6:D6", "A7:D7", "A8:D8", "A9:D9", "A18:D18", ...(attentionRows.length ? [] : ["A20:D20"])],
-      widths: [15, 10, 9, 12], overview: true
+      widths: [15, 10, 9, 12], overview: true,
+      hyperlinks: navigationLabels.map((target, index) => ({ ref: `A${index + 5}`, location: `'${target}'!A1`, active: target === "Overview" }))
     }),
     ownerSheet("Full Inventory", fullRows, {
       title: "Full Inventory", sourceCount: model.summary.medicineCount, projectionCount: model.rows.length,
-      headerRow: 4, merges: ["A1:M1", "A2:M2", "A3:M3"], widths: autoXlsxWidths(fullRows, [24, 13, 12, 11, 10, 17, 16, 20, 13, 24, 10, 14, 18])
+      headerRow: 5, merges: ["A1:M1", "B2:M2", "A3:M3"], hyperlinks: [{ ref: "A2", location: "'Overview'!A1" }, ...navigationLinks(4, "Full Inventory")],
+      widths: autoXlsxWidths(fullRows, [24, 13, 12, 11, 10, 17, 16, 20, 13, 24, 10, 14, 18])
     }),
     ownerSheet("Low Stock", lowStockRows, {
       title: "Low Stock", sourceCount: model.summary.medicineCount, projectionCount: lowStock.length,
-      headerRow: 4, merges: ["A1:F1", "A2:F2", "A3:F3", ...(lowStock.length ? [] : ["A5:F5"])],
+      headerRow: 5, merges: ["A1:F1", "B2:F2", "A3:F3", ...(lowStock.length ? [] : ["A6:F6"])],
+      hyperlinks: [{ ref: "A2", location: "'Overview'!A1" }, ...navigationLinks(4, "Low Stock")],
       widths: [22, 13, 14, 20, 24, 22], alert: true
     }),
     ownerSheet("Expiry Tracking", expiryTrackingRows, {
       title: "Expiry Tracking", sourceCount: model.summary.medicineCount, projectionCount: expiryRows.length,
-      headerRow: 4, merges: ["A1:G1", "A2:G2", "A3:G3"], widths: [22, 13, 22, 10, 15, 24, 22]
+      headerRow: 5, merges: ["A1:G1", "B2:G2", "A3:G3"], hyperlinks: [{ ref: "A2", location: "'Overview'!A1" }, ...navigationLinks(4, "Expiry Tracking")],
+      widths: [22, 13, 22, 10, 15, 24, 22]
     }),
     ownerSheet("Suppliers", supplierRows, {
       title: "Suppliers", sourceCount: model.summary.medicineCount, projectionCount: supplierRowsSorted.length,
-      headerRow: 4, merges: ["A1:E1", "A2:E2", "A3:E3"], widths: [24, 22, 10, 16, 18]
+      headerRow: 5, merges: ["A1:E1", "B2:E2", "A3:E3"], hyperlinks: [{ ref: "A2", location: "'Overview'!A1" }, ...navigationLinks(4, "Suppliers")],
+      widths: [24, 22, 10, 16, 18]
     })
   ];
   validateOwnerWorkbookSheets(model, sheets);
@@ -347,6 +358,7 @@ function validateOwnerWorkbookSheets(model, sheets) {
     throw new Error("Owner workbook reconciliation failed: worksheet responsibilities changed.");
   }
   const visibleTitles = new Set();
+  const existingSheetNames = new Set(expectedNames);
   for (const sheet of sheets) {
     if (sheet.sourceCount !== model.summary.medicineCount) {
       throw new Error(`Owner workbook reconciliation failed: ${sheet.name} uses a different medicine snapshot.`);
@@ -361,6 +373,16 @@ function validateOwnerWorkbookSheets(model, sheets) {
     }
     if (sheet.rows.some((row) => row.length > sheet.widths.length)) {
       throw new Error(`Owner workbook reconciliation failed: ${sheet.name} extends beyond its intended used columns.`);
+    }
+    for (const link of sheet.hyperlinks || []) {
+      const match = link.location.match(/^'([^']+)'!A1$/);
+      if (!match || !existingSheetNames.has(match[1])) {
+        throw new Error(`Owner workbook reconciliation failed: ${sheet.name} contains an invalid worksheet link.`);
+      }
+    }
+    const linkedSheets = new Set((sheet.hyperlinks || []).map((link) => link.location.match(/^'([^']+)'!A1$/)?.[1]));
+    if (expectedNames.some((name) => !linkedSheets.has(name))) {
+      throw new Error(`Owner workbook reconciliation failed: ${sheet.name} does not link to every worksheet.`);
     }
   }
   const overview = sheets[0];
@@ -407,6 +429,7 @@ function autoXlsxWidths(rows, caps) {
 }
 function buildXlsxSheetXml(sheet) {
   const maxColumns = Math.max(...sheet.rows.map((row) => row.length));
+  const hyperlinks = new Map((sheet.hyperlinks || []).map((link) => [link.ref, link]));
   const rowXml = sheet.rows.map((row, rowIndex) => {
     const rowNumber = rowIndex + 1;
     const isHeader = rowNumber === sheet.headerRow;
@@ -419,6 +442,7 @@ function buildXlsxSheetXml(sheet) {
       else if (sheet.overview && rowNumber >= 11 && rowNumber <= 17 && columnIndex === 0) style = 6;
       else if (sheet.overview && rowNumber >= 11 && rowNumber <= 17 && columnIndex === 1) style = 7;
       else if (sheet.overview && rowNumber === 18) style = 8;
+      else if (hyperlinks.has(`${columnName(columnIndex + 1)}${rowNumber}`)) style = hyperlinks.get(`${columnName(columnIndex + 1)}${rowNumber}`).active ? 12 : 11;
       else if (isData && sheet.alert) style = columnIndex === 2 ? 10 : (rowNumber - sheet.headerRow) % 2 === 0 ? 4 : 0;
       else if (isData) style = (rowNumber - sheet.headerRow) % 2 === 0 ? 4 : 0;
       if (typeof value === "number" && ![1, 2, 6, 7, 8, 10].includes(style)) style = style === 4 ? 5 : 3;
@@ -430,11 +454,13 @@ function buildXlsxSheetXml(sheet) {
   const lastRow = Math.max(sheet.headerRow, sheet.rows.length);
   const lastColumn = columnName(maxColumns);
   const filter = sheet.filter === false ? "" : `<autoFilter ref="A${sheet.headerRow}:${lastColumn}${lastRow}"/>`;
-  return `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${lastColumn}${lastRow}"/><sheetViews><sheetView workbookViewId="0" showGridLines="0" topLeftCell="A1"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="20"/><cols>${widths}</cols><sheetData>${rowXml}</sheetData>${mergeXml}${filter}</worksheet>`;
+  const hyperlinkXml = sheet.hyperlinks?.length ? `<hyperlinks>${sheet.hyperlinks.map(({ ref, location }) => `<hyperlink ref="${ref}" location="${xml(location)}" display="${xml(sheet.rows[Number(ref.match(/\d+/)?.[0]) - 1]?.[columnNumber(ref) - 1] || "")}"/>`).join("")}</hyperlinks>` : "";
+  return `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${lastColumn}${lastRow}"/><sheetViews><sheetView workbookViewId="0" showGridLines="0" showRowColHeaders="0" topLeftCell="A1" zoomScale="90" zoomScaleNormal="90"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="20"/><cols>${widths}</cols><sheetData>${rowXml}</sheetData>${mergeXml}${hyperlinkXml}${filter}</worksheet>`;
 }
 function xlsxCell(value, row, column, style) { const ref = `${columnName(column)}${row}`; return typeof value === "number" ? `<c r="${ref}" s="${style}"><v>${value}</v></c>` : `<c r="${ref}" s="${style}" t="inlineStr"><is><t>${xml(value)}</t></is></c>`; }
 function columnName(value) { let result = ""; for (let n = value; n; n = Math.floor((n - 1) / 26)) result = String.fromCharCode(65 + ((n - 1) % 26)) + result; return result; }
-function xlsxStyles() { return `<?xml version="1.0"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts><fonts count="5"><font><sz val="10"/><color rgb="FF19332F"/><name val="Aptos"/></font><font><b/><sz val="20"/><color rgb="FF086C5C"/><name val="Aptos Display"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Aptos"/></font><font><b/><sz val="10"/><color rgb="FF536B66"/><name val="Aptos"/></font><font><b/><sz val="15"/><color rgb="FF086C5C"/><name val="Aptos Display"/></font></fonts><fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF086C5C"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF1F7F5"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEDF7F4"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF3CD"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDFF1EC"/></patternFill></fill></fills><borders count="3"><border/><border><right style="thin"><color rgb="FFE5ECEA"/></right><bottom style="thin"><color rgb="FFD9E5E1"/></bottom></border><border><bottom style="medium"><color rgb="FF086C5C"/></bottom></border></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="11"><xf fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf fontId="1" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf><xf fontId="2" fillId="2" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="0" fillId="3" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="3" fillId="4" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="4" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="4" fillId="6" borderId="2" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf><xf fontId="0" fillId="5" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="3" fillId="5" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`; }
+function columnNumber(ref) { return [...String(ref).match(/^[A-Z]+/)?.[0] || ""].reduce((value, character) => value * 26 + character.charCodeAt(0) - 64, 0); }
+function xlsxStyles() { return `<?xml version="1.0"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts><fonts count="6"><font><sz val="10"/><color rgb="FF19332F"/><name val="Aptos"/></font><font><b/><sz val="20"/><color rgb="FF086C5C"/><name val="Aptos Display"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Aptos"/></font><font><b/><sz val="10"/><color rgb="FF536B66"/><name val="Aptos"/></font><font><b/><sz val="15"/><color rgb="FF086C5C"/><name val="Aptos Display"/></font><font><b/><u/><sz val="10"/><color rgb="FF086C5C"/><name val="Aptos"/></font></fonts><fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF086C5C"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF1F7F5"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEDF7F4"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF3CD"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDFF1EC"/></patternFill></fill></fills><borders count="3"><border/><border><right style="thin"><color rgb="FFE5ECEA"/></right><bottom style="thin"><color rgb="FFD9E5E1"/></bottom></border><border><bottom style="medium"><color rgb="FF086C5C"/></bottom></border></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="13"><xf fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf fontId="1" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf><xf fontId="2" fillId="2" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="0" fillId="3" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="3" fillId="4" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="4" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="4" fillId="6" borderId="2" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf><xf fontId="0" fillId="5" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="3" fillId="5" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="5" fillId="4" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" wrapText="1" vertical="center"/></xf><xf fontId="2" fillId="2" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" wrapText="1" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`; }
 function wordP(text, style) { return `<w:p><w:pPr><w:pStyle w:val="${style}"/></w:pPr><w:r><w:t>${xml(text)}</w:t></w:r></w:p>`; }
 function wordMedicineBlock(row) {
   const value = (key) => row[key] === "" ? "—" : row[key];

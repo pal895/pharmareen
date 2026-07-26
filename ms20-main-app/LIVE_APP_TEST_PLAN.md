@@ -726,3 +726,15 @@ Use one newly generated workbook only. The Android viewer's `1/5` page indicator
 5. Confirm Low Stock shows its six-column reorder table or the exact healthy empty message; Expiry Tracking shows 35 rows and seven expiry/action columns; Suppliers shows 35 rows and five supplier/medicine columns.
 6. Confirm selecting any working tab never shows Overview content, a wide blank canvas, a frozen column, a split pane, or a second printable page created by empty cells.
 7. Do not edit, print, share or upload. If all checks pass, mark Excel Owner Workbook passed and proceed automatically to PDF. Otherwise stop at the first exact tab/content mismatch and keep PDF blocked.
+
+## Excel internal-link compatibility retest
+
+After pulling and restarting the latest build, download one completely fresh workbook:
+
+1. Open the workbook.
+2. Tap `Full Inventory` on Overview and confirm the `Full Inventory` worksheet opens at its title.
+3. Use the visible strip to tap `Low Stock`, `Expiry Tracking`, and `Suppliers`; confirm each opens the correctly titled worksheet.
+4. Tap `← Back to Overview` and confirm it returns to `Pharmacy Overview`.
+5. Confirm Full Inventory still contains all 35 medicines.
+
+Do not discover or use the viewer's `1/5` page controls for this checkpoint. Do not edit, print, share or upload. If the standard internal links work, pass Excel and proceed automatically to PDF. If taps do nothing or the viewer remains on Overview, record that exact viewer compatibility limitation, preserve the desktop-compatible Excel workbook, and proceed to PDF as the phone-first owner copy without another broad XLSX redesign.
