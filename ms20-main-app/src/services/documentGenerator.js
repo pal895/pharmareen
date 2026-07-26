@@ -15,6 +15,11 @@ const COLUMNS = Object.freeze([
   ["sellingPrice", "Selling price (KES)"], ["costPrice", "Cost price (KES)"], ["stock", "Stock"],
   ["supplier", "Supplier"], ["barcode", "Barcode"], ["batch", "Batch"], ["expiry", "Expiry"], ["shelf", "Shelf"]
 ]);
+const XLSX_FULL_COLUMNS = Object.freeze([
+  ["medicine", "Medicine"], ["strength", "Strength"], ["form", "Form"], ["unit", "Unit"],
+  ["stock", "Stock"], ["sellingPrice", "Selling price (KES)"], ["costPrice", "Cost price (KES)"],
+  ["expiry", "Expiry"], ["supplier", "Supplier"], ["shelf", "Shelf"], ["batch", "Batch"], ["barcode", "Barcode"]
+]);
 const PRINT_COLUMNS = Object.freeze([
   ["medicine", "Medicine"], ["strength", "Strength"], ["form", "Form"], ["unit", "Unit"],
   ["sellingPrice", "Sell KES"], ["costPrice", "Cost KES"], ["stock", "Stock"], ["supplier", "Supplier"]
@@ -233,7 +238,7 @@ export function buildOwnerWorkbookSheets(model) {
   const fullRows = [
     [model.title], ["Pharmacy", model.pharmacyName], ["Branch", model.branch],
     ["Location", model.location], ["Generated (Africa/Nairobi)", `${model.generatedKenya} · ${model.summary.medicineCount} canonical medicines`], [],
-    COLUMNS.map(([, label]) => label), ...model.rows.map((row) => COLUMNS.map(([key]) => row[key]))
+    XLSX_FULL_COLUMNS.map(([, label]) => label), ...model.rows.map((row) => XLSX_FULL_COLUMNS.map(([key]) => row[key]))
   ];
   const overviewRows = [
     ...commonMeta, [],
@@ -262,11 +267,11 @@ export function buildOwnerWorkbookSheets(model) {
     ...supplierRowsSorted.map((row) => [row.supplier || "Not recorded", row.medicine, row.stock, row.shelf])
   ];
   const sheets = [
-    ownerSheet("Inventory Overview", overviewRows, { sourceCount: model.summary.medicineCount, projectionCount: attentionRows.length, headerRow: 10, freezeRows: 10, freezeColumns: 1, merges: ["A1:D1", "A2:D2", "A3:D3", "A9:D9"], widths: [28, 18, 18, 24], overview: true }),
-    ownerSheet("Full Inventory", fullRows, { sourceCount: model.summary.medicineCount, projectionCount: model.rows.length, headerRow: 7, freezeRows: 7, freezeColumns: 1, widths: autoXlsxWidths(fullRows, [26, 14, 13, 12, 17, 16, 11, 24, 18, 14, 13, 10]) }),
-    ownerSheet("Low Stock", lowStockRows, { sourceCount: model.summary.medicineCount, projectionCount: lowStock.length, headerRow: 5, freezeRows: 5, freezeColumns: 1, merges: ["A1:E1", "A2:E2", "A3:E3", "A4:E4", ...(lowStock.length ? [] : ["A6:E6"])], widths: [26, 12, 16, 15, 25], alert: true }),
-    ownerSheet("Expiry Tracking", expiryTrackingRows, { sourceCount: model.summary.medicineCount, projectionCount: expiryRows.length, headerRow: 5, freezeRows: 5, freezeColumns: 1, merges: ["A1:D1", "A2:D2", "A3:D3", "A4:D4"], widths: [26, 16, 18, 12] }),
-    ownerSheet("Suppliers", supplierRows, { sourceCount: model.summary.medicineCount, projectionCount: supplierRowsSorted.length, headerRow: 5, freezeRows: 5, freezeColumns: 1, merges: ["A1:D1", "A2:D2", "A3:D3", "A4:D4"], widths: [28, 26, 12, 12] })
+    ownerSheet("Inventory Overview", overviewRows, { sourceCount: model.summary.medicineCount, projectionCount: attentionRows.length, headerRow: 10, merges: ["A1:D1", "A2:D2", "A3:D3", "A9:D9", ...(attentionRows.length ? [] : ["A11:D11"])], widths: [15, 10, 9, 12], overview: true }),
+    ownerSheet("Full Inventory", fullRows, { sourceCount: model.summary.medicineCount, projectionCount: model.rows.length, headerRow: 7, merges: ["B5:D5"], widths: autoXlsxWidths(fullRows, [24, 13, 12, 11, 10, 17, 16, 13, 24, 10, 14, 18]) }),
+    ownerSheet("Low Stock", lowStockRows, { sourceCount: model.summary.medicineCount, projectionCount: lowStock.length, headerRow: 5, merges: ["A1:E1", "A2:E2", "A3:E3", "A4:E4", ...(lowStock.length ? [] : ["A6:E6"])], widths: [22, 10, 14, 13, 22], alert: true }),
+    ownerSheet("Expiry Tracking", expiryTrackingRows, { sourceCount: model.summary.medicineCount, projectionCount: expiryRows.length, headerRow: 5, merges: ["A1:D1", "A2:D2", "A3:D3", "A4:D4"], widths: [22, 13, 15, 10] }),
+    ownerSheet("Suppliers", supplierRows, { sourceCount: model.summary.medicineCount, projectionCount: supplierRowsSorted.length, headerRow: 5, merges: ["A1:D1", "A2:D2", "A3:D3", "A4:D4"], widths: [24, 22, 10, 10] })
   ];
   validateOwnerWorkbookSheets(model, sheets);
   return sheets;
@@ -336,7 +341,7 @@ function buildXlsxSheetXml(sheet) {
     const rowNumber = rowIndex + 1;
     const isHeader = rowNumber === sheet.headerRow;
     const isData = rowNumber > sheet.headerRow;
-    const height = rowNumber === 1 ? 32 : isHeader ? 30 : isData ? 25 : rowNumber <= 4 ? 22 : 24;
+    const height = rowNumber === 1 ? 34 : rowNumber === 3 || (sheet.name === "Full Inventory" && rowNumber === 5) ? 38 : isHeader ? (sheet.overview ? 40 : 32) : isData ? 27 : rowNumber <= 4 ? 24 : 26;
     return `<row r="${rowNumber}" ht="${height}" customHeight="1">${row.map((value, columnIndex) => {
       let style = 0;
       if (rowNumber === 1) style = 1;
@@ -351,12 +356,10 @@ function buildXlsxSheetXml(sheet) {
     }).join("")}</row>`;
   }).join("");
   const widths = sheet.widths.map((width, index) => `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`).join("");
-  const topLeft = `${columnName(sheet.freezeColumns + 1)}${sheet.freezeRows + 1}`;
-  const pane = `<pane xSplit="${sheet.freezeColumns}" ySplit="${sheet.freezeRows}" topLeftCell="${topLeft}" activePane="bottomRight" state="frozen"/>`;
   const mergeXml = sheet.merges?.length ? `<mergeCells count="${sheet.merges.length}">${sheet.merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("")}</mergeCells>` : "";
   const lastRow = Math.max(sheet.headerRow, sheet.rows.length);
   const filter = `<autoFilter ref="A${sheet.headerRow}:${columnName(maxColumns)}${lastRow}"/>`;
-  return `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0" showGridLines="0">${pane}<selection pane="bottomRight" activeCell="${topLeft}" sqref="${topLeft}"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="20"/><cols>${widths}</cols><sheetData>${rowXml}</sheetData>${mergeXml}${filter}<printOptions horizontalCentered="1"/><pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/><pageSetup orientation="landscape" paperSize="9" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  return `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0" showGridLines="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="20"/><cols>${widths}</cols><sheetData>${rowXml}</sheetData>${mergeXml}${filter}<printOptions horizontalCentered="1"/><pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/><pageSetup orientation="landscape" paperSize="9" fitToWidth="1" fitToHeight="0"/></worksheet>`;
 }
 function xlsxCell(value, row, column, style) { const ref = `${columnName(column)}${row}`; return typeof value === "number" ? `<c r="${ref}" s="${style}"><v>${value}</v></c>` : `<c r="${ref}" s="${style}" t="inlineStr"><is><t>${xml(value)}</t></is></c>`; }
 function columnName(value) { let result = ""; for (let n = value; n; n = Math.floor((n - 1) / 26)) result = String.fromCharCode(65 + ((n - 1) % 26)) + result; return result; }

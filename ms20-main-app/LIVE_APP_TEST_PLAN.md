@@ -704,3 +704,13 @@ The 2026-07-26 owner workbook evidence failed because the wide overview could pa
 7. Headers stay visible, the primary column remains visible where applicable, long values wrap, and no phone scroll can visually pair one KPI label with another KPI's value.
 
 Send fresh screenshots of the overview, tab list, Full Inventory after vertical and horizontal scrolling, Low Stock, Expiry Tracking and Suppliers. Do not begin PDF unless every Excel condition passes.
+
+Final Excel presentation retest after the pane-free repair:
+
+1. Pull the latest commit and download one newly generated workbook.
+2. Confirm Overview opens as one natural page with no frozen column or split-screen effect; all four KPI labels and values, complete generated metadata, Attention Required headings and empty/message rows remain visible without horizontal movement.
+3. Confirm Full Inventory has 35 medicines in the owner-priority order: Medicine, Strength, Form, Unit, Stock, Selling price, Cost price, Expiry, Supplier, Shelf, Batch, Barcode. Scroll normally in both directions; no medicine column stays pinned and no heading/value is clipped.
+4. Confirm Low Stock, Expiry Tracking and Suppliers scroll normally with no frozen columns or split panes, have filters and compact purposeful columns, and show full-width plain guidance when empty.
+5. Confirm calm typography, wrapping, banding, number formatting and readable widths on phone and desktop.
+
+Return screenshots of Overview, the five-tab list, Full Inventory at the top and after horizontal/vertical movement, Low Stock, Expiry Tracking and Suppliers. If every condition passes, mark Excel Owner Workbook passed and advance automatically to the PDF owner-copy live validation. If any condition fails, stop on Excel and repair only the observed shared XLSX presentation defect.

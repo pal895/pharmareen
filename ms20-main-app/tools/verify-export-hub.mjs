@@ -21,6 +21,7 @@ for (let index = 3; index <= 35; index += 1) items.push({
 const generatedAt = new Date("2026-07-25T18:00:32.000Z");
 const model = buildCanonicalInventoryExport({ pharmacy, items, generatedAt });
 const other = buildCanonicalInventoryExport({ pharmacy: { ...pharmacy, id: "pharmacy-b", name: "Other Pharmacy" }, items: [items[0]], generatedAt });
+const healthyModel = buildCanonicalInventoryExport({ pharmacy, items: [items[1]], generatedAt });
 
 assert.equal(model.pharmacyId, "pharmacy-a");
 assert.equal(model.rows.length, 35);
@@ -38,6 +39,11 @@ assert.match(EXPORT_FORMATS.find((format) => format.id === "csv").help, /no visu
 assert.throws(() => buildCanonicalInventoryExport({ pharmacy, items: [{ ...items[0], name: "" }], generatedAt }), /mandatory medicine name/);
 assert.throws(() => buildCanonicalInventoryExport({ pharmacy, items: [items[0], { ...items[0] }], generatedAt }), /duplicate medicine identity/);
 assert.throws(() => validateInventoryExportSnapshot({ ...model, summary: { ...model.summary, medicineCount: 714 } }), /medicineCount/);
+const healthySheets = buildOwnerWorkbookSheets(healthyModel);
+assert.ok(healthySheets[0].merges.includes("A11:D11"));
+assert.match(healthySheets[0].rows[10][0], /No medicines currently require attention/);
+assert.ok(healthySheets[2].merges.includes("A6:E6"));
+assert.match(healthySheets[2].rows[5][0], /No medicines are currently at or below/);
 
 const outputs = {
   csv: buildInventoryCsv(model), xlsx: buildInventoryXlsx(model), pdf: buildInventoryPdf(model),
@@ -90,7 +96,12 @@ assert.deepEqual(ownerSheets[0].rows.slice(4, 8), [
   ["Expiring soon count", model.summary.expiringSoonCount]
 ]);
 assert.deepEqual(ownerSheets[0].rows[9], ["Medicine", "Stock", "Expiry", "Reason"]);
+assert.ok(ownerSheets[0].widths.reduce((sum, width) => sum + width, 0) <= 46, "Overview must fit a compact phone viewport");
 assert.equal(ownerSheets[0].rows.some((row) => row.includes("Supplier") || row.includes("Shelf")), false);
+assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Full Inventory").rows[6], [
+  "Medicine", "Strength", "Form", "Unit", "Stock", "Selling price (KES)", "Cost price (KES)",
+  "Expiry", "Supplier", "Shelf", "Batch", "Barcode"
+]);
 assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Low Stock").rows[4], ["Medicine", "Stock", "Reorder level", "Expiry", "Reason"]);
 assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Expiry Tracking").rows[4], ["Medicine", "Expiry", "Batch", "Stock"]);
 assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Suppliers").rows[4], ["Supplier", "Medicine", "Stock", "Shelf"]);
@@ -101,8 +112,9 @@ assert.equal((decodedPackages.xlsx.match(/<sheet name="/g) || []).length, 5);
 for (const sheetName of ["Inventory Overview", "Full Inventory", "Low Stock", "Expiry Tracking", "Suppliers"]) {
   assert.match(decodedPackages.xlsx, new RegExp(`<sheet name="${sheetName}"`), `XLSX missing ${sheetName}`);
 }
-assert.match(decodedPackages.xlsx, /xSplit="1" ySplit="10" topLeftCell="B11"/);
-assert.match(decodedPackages.xlsx, /xSplit="1" ySplit="5" topLeftCell="B6"/);
+assert.doesNotMatch(decodedPackages.xlsx, /<pane\b|xSplit=|ySplit=/, "No worksheet may contain a frozen column or split pane");
+assert.equal((decodedPackages.xlsx.match(/<autoFilter ref=/g) || []).length, 5, "Every worksheet must retain filters");
+assert.match(decodedPackages.xlsx, /<mergeCell ref="B5:D5"\/>/, "Full Inventory generation metadata must have enough wrapped width");
 assert.match(decodedPackages.xlsx, /Low stock/);
 assert.match(decodedPackages.xlsx, /at or below the saved reorder level/);
 assert.match(decodedPackages.xlsx, /Total stock value \(KES\)/);
