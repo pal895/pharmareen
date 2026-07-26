@@ -40,18 +40,52 @@ export function buildCanonicalInventoryExport({ pharmacy, items, generatedAt = n
       sellingPrice: numberOrBlank(item?.sellingPrice ?? item?.selling_price),
       costPrice: numberOrBlank(item?.costPrice ?? item?.cost_price),
       stock: numberOrBlank(item?.stockLeft ?? item?.stock ?? item?.current_stock),
+      reorderLevel: numberOrBlank(item?.reorderLevel ?? item?.reorder_level),
       supplier: clean(item?.supplier || batch.supplier), barcode: clean(item?.barcode),
       batch: clean(batch.batch || item?.batch), expiry: clean(batch.expiry || item?.expiry),
       shelf: clean(item?.shelf || item?.location)
     });
   });
-  return Object.freeze({
+  const frozenRows = Object.freeze(rows);
+  const frozenFinderIndex = Object.freeze(finderIndex.map((entry) => Object.freeze({
+    ...entry,
+    flags: Object.freeze({ ...(entry.flags || {}) })
+  })));
+  const summary = Object.freeze(inventorySummary(frozenRows, frozenFinderIndex));
+  const snapshot = Object.freeze({
     schema: "ms20.inventory-export.v1", pharmacyId,
     pharmacyName: clean(pharmacy?.name) || "Pharmacy",
     branch: clean(pharmacy?.branch) || "Main", location: clean(pharmacy?.location) || "Kenya",
     generatedIso: instant.toISOString(), generatedKenya: kenyaTime(instant),
-    title: "Pharmacy Inventory", columns: COLUMNS, rows: Object.freeze(rows), finderIndex
+    title: "Pharmacy Inventory", columns: COLUMNS, rows: frozenRows,
+    finderIndex: frozenFinderIndex, summary
   });
+  validateInventoryExportSnapshot(snapshot);
+  return snapshot;
+}
+
+export function validateInventoryExportSnapshot(model) {
+  if (!model || model.schema !== "ms20.inventory-export.v1") throw new Error("The inventory export snapshot is invalid.");
+  if (!clean(model.pharmacyId) || !clean(model.pharmacyName)) throw new Error("The inventory export snapshot is missing pharmacy identity.");
+  if (!Array.isArray(model.rows) || !Array.isArray(model.finderIndex)) throw new Error("The inventory export snapshot is incomplete.");
+  const identities = new Set();
+  model.rows.forEach((row, index) => {
+    if (!clean(row?.medicine)) throw new Error(`Inventory export row ${index + 1} is missing the mandatory medicine name.`);
+    const identity = clean(row.medicine).toLocaleLowerCase("en");
+    if (identities.has(identity)) throw new Error(`Inventory export contains duplicate medicine identity: ${row.medicine}.`);
+    identities.add(identity);
+    for (const field of ["sellingPrice", "costPrice", "stock", "reorderLevel"]) {
+      if (row[field] !== "" && (!Number.isFinite(row[field]) || row[field] < 0)) {
+        throw new Error(`Inventory export row ${index + 1} has an invalid ${field} value.`);
+      }
+    }
+  });
+  if (model.rows.length !== model.finderIndex.length) throw new Error("Inventory export reconciliation failed: finder and medicine counts differ.");
+  const expected = inventorySummary(model.rows, model.finderIndex);
+  for (const key of Object.keys(expected)) {
+    if (model.summary?.[key] !== expected[key]) throw new Error(`Inventory export reconciliation failed for ${key}.`);
+  }
+  return true;
 }
 
 export function buildCatalogCsv(items = []) {
@@ -68,7 +102,9 @@ export function buildInventoryCsv(model) {
 }
 
 export function buildInventoryXlsx(model) {
+  validateInventoryExportSnapshot(model);
   const sheets = buildOwnerWorkbookSheets(model);
+  validateOwnerWorkbookSheets(model, sheets);
   const sheetOverrides = sheets.map((_, index) => `<Override PartName="/xl/worksheets/sheet${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("");
   const sheetNodes = sheets.map((sheet, index) => `<sheet name="${xml(sheet.name)}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`).join("");
   const workbookRelationships = sheets.map((_, index) => [`rId${index + 1}`, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet", `worksheets/sheet${index + 1}.xml`]);
@@ -174,67 +210,123 @@ export function downloadTextFile({ filename, contents, mime = "text/plain;charse
 export function buildBulkPasteTemplate() { return ["MS2.0 BULK PASTE TEMPLATE", "Enter one medicine per line.", "Format: medicine name form selling price", "Remove these instructions before pasting your medicine lines."].join("\n"); }
 export function buildDocumentCard({ title, document, format, itemCount = 0, status = "ready" }) { return { id: `card-document-${Date.now()}`, type: "DocumentExportCard", title, source: "MS2.0 documents", confidence: 1, status, aiRequired: false, fields: { document, format, items: String(itemCount), status: "Ready to download" }, validation: "Generated locally from canonical pharmacy records." }; }
 
-function buildOwnerWorkbookSheets(model) {
+export function buildOwnerWorkbookSheets(model) {
+  validateInventoryExportSnapshot(model);
   const stockNumber = (row) => typeof row.stock === "number" ? row.stock : Number(row.stock);
   const finderFlags = new Map(model.finderIndex.map((entry) => [entry.id, entry.flags]));
   const lowStock = model.rows.filter((row) => finderFlags.get(row.finderId)?.lowStock === true)
     .sort((a, b) => stockNumber(a) - stockNumber(b) || a.medicine.localeCompare(b.medicine));
-  const expiryRows = model.rows.filter((row) => row.expiry)
-    .sort((a, b) => a.expiry.localeCompare(b.expiry) || a.medicine.localeCompare(b.medicine));
-  const suppliers = [...model.rows.reduce((map, row) => {
-    const name = row.supplier || "Not recorded";
-    const item = map.get(name) || { supplier: name, medicines: 0, stock: 0, retailValue: 0, costValue: 0 };
-    item.medicines += 1;
-    item.stock += Number(row.stock) || 0;
-    item.retailValue += (Number(row.sellingPrice) || 0) * (Number(row.stock) || 0);
-    item.costValue += (Number(row.costPrice) || 0) * (Number(row.stock) || 0);
-    map.set(name, item);
-    return map;
-  }, new Map()).values()].sort((a, b) => b.medicines - a.medicines || a.supplier.localeCompare(b.supplier));
-  const totalStock = model.rows.reduce((sum, row) => sum + (Number(row.stock) || 0), 0);
-  const retailValue = model.rows.reduce((sum, row) => sum + (Number(row.sellingPrice) || 0) * (Number(row.stock) || 0), 0);
-  const costValue = model.rows.reduce((sum, row) => sum + (Number(row.costPrice) || 0) * (Number(row.stock) || 0), 0);
-  const attentionRows = [...new Map([...lowStock, ...expiryRows.slice(0, 8)].map((row) => [row.finderId, row])).values()].slice(0, 10);
+  const expiryRows = [...model.rows]
+    .sort((a, b) => (a.expiry ? 0 : 1) - (b.expiry ? 0 : 1) || a.expiry.localeCompare(b.expiry) || a.medicine.localeCompare(b.medicine));
+  const supplierRowsSorted = [...model.rows]
+    .sort((a, b) => (a.supplier || "Not recorded").localeCompare(b.supplier || "Not recorded") || a.medicine.localeCompare(b.medicine));
+  const attentionRows = model.rows.map((row) => {
+    const flags = finderFlags.get(row.finderId) || {};
+    const reasons = [flags.lowStock ? "Low stock" : "", flags.expiringSoon ? "Expiring soon" : ""].filter(Boolean);
+    return { row, reason: reasons.join(" and ") };
+  }).filter((entry) => entry.reason)
+    .sort((a, b) => a.reason.localeCompare(b.reason) || stockNumber(a.row) - stockNumber(b.row) || a.row.medicine.localeCompare(b.row.medicine));
   const commonMeta = [
     [model.title], [`${model.pharmacyName} · ${model.branch} · ${model.location}`],
-    [`Generated ${model.generatedKenya} Africa/Nairobi · ${model.rows.length} canonical medicines`]
+    [`Generated ${model.generatedKenya} Africa/Nairobi · ${model.summary.medicineCount} canonical medicines`]
   ];
   const fullRows = [
     [model.title], ["Pharmacy", model.pharmacyName], ["Branch", model.branch],
-    ["Location", model.location], ["Generated (Africa/Nairobi)", model.generatedKenya], [],
+    ["Location", model.location], ["Generated (Africa/Nairobi)", `${model.generatedKenya} · ${model.summary.medicineCount} canonical medicines`], [],
     COLUMNS.map(([, label]) => label), ...model.rows.map((row) => COLUMNS.map(([key]) => row[key]))
   ];
   const overviewRows = [
     ...commonMeta, [],
-    ["Total medicines", model.rows.length, "Total stock units", totalStock, "Low stock", lowStock.length],
-    ["Retail stock value (KES)", retailValue, "Cost stock value (KES)", costValue, "Suppliers", suppliers.length],
-    ["Attention required"], ["Medicine", "Stock", "Expiry", "Supplier", "Shelf", "Why it matters"],
-    ...attentionRows.map((row) => [row.medicine, row.stock, row.expiry, row.supplier, row.shelf, lowStock.includes(row) ? "Low stock" : "Earliest expiry"])
+    ["Total medicines", model.summary.medicineCount],
+    ["Total stock value (KES)", model.summary.retailStockValue],
+    ["Low stock count", model.summary.lowStockCount],
+    ["Expiring soon count", model.summary.expiringSoonCount],
+    ["Attention required"], ["Medicine", "Stock", "Expiry", "Reason"],
+    ...(attentionRows.length
+      ? attentionRows.map(({ row, reason }) => [row.medicine, row.stock, row.expiry, reason])
+      : [["No medicines currently require attention.", "", "", ""]])
   ];
   const lowStockRows = [
     ...commonMeta, ["Action list · at or below the saved reorder level"],
-    ["Medicine", "Strength", "Stock", "Selling KES", "Cost KES", "Supplier", "Expiry", "Shelf"],
-    ...(lowStock.length ? lowStock.map((row) => [row.medicine, row.strength, row.stock, row.sellingPrice, row.costPrice, row.supplier, row.expiry, row.shelf]) : [["No medicines are currently at or below their saved reorder level."]])
+    ["Medicine", "Stock", "Reorder level", "Expiry", "Reason"],
+    ...(lowStock.length ? lowStock.map((row) => [row.medicine, row.stock, row.reorderLevel, row.expiry, "At or below reorder level"]) : [["No medicines are currently at or below their saved reorder level."]])
   ];
   const expiryTrackingRows = [
-    ...commonMeta, ["Sorted by earliest recorded expiry"],
-    ["Medicine", "Expiry", "Batch", "Stock", "Supplier", "Shelf"],
-    ...expiryRows.map((row) => [row.medicine, row.expiry, row.batch, row.stock, row.supplier, row.shelf])
+    ...commonMeta, ["All medicines · recorded expiries first"],
+    ["Medicine", "Expiry", "Batch", "Stock"],
+    ...expiryRows.map((row) => [row.medicine, row.expiry, row.batch, row.stock])
   ];
   const supplierRows = [
-    ...commonMeta, ["Supplier concentration and stock value"],
-    ["Supplier", "Medicines", "Total stock", "Retail value (KES)", "Cost value (KES)"],
-    ...suppliers.map((row) => [row.supplier, row.medicines, row.stock, row.retailValue, row.costValue])
+    ...commonMeta, ["Supplier and shelf responsibility"],
+    ["Supplier", "Medicine", "Stock", "Shelf"],
+    ...supplierRowsSorted.map((row) => [row.supplier || "Not recorded", row.medicine, row.stock, row.shelf])
   ];
-  return [
-    ownerSheet("Inventory Overview", overviewRows, { headerRow: 8, freezeRows: 8, freezeColumns: 1, merges: ["A1:F1", "A2:F2", "A3:F3", "A7:F7"], widths: [30, 16, 18, 30, 14, 22], overview: true }),
-    ownerSheet("Full Inventory", fullRows, { headerRow: 7, freezeRows: 7, freezeColumns: 1, widths: autoXlsxWidths(fullRows, [28, 16, 15, 14, 20, 18, 12, 30, 20, 16, 14, 12]) }),
-    ownerSheet("Low Stock", lowStockRows, { headerRow: 5, freezeRows: 5, freezeColumns: 1, merges: ["A1:H1", "A2:H2", "A3:H3", "A4:H4", ...(lowStock.length ? [] : ["A6:H6"])], widths: [28, 15, 12, 16, 14, 30, 14, 12], alert: true }),
-    ownerSheet("Expiry Tracking", expiryTrackingRows, { headerRow: 5, freezeRows: 5, freezeColumns: 1, merges: ["A1:F1", "A2:F2", "A3:F3", "A4:F4"], widths: [30, 16, 18, 12, 32, 12] }),
-    ownerSheet("Suppliers", supplierRows, { headerRow: 5, freezeRows: 5, freezeColumns: 1, merges: ["A1:E1", "A2:E2", "A3:E3", "A4:E4"], widths: [34, 14, 16, 22, 20] })
+  const sheets = [
+    ownerSheet("Inventory Overview", overviewRows, { sourceCount: model.summary.medicineCount, projectionCount: attentionRows.length, headerRow: 10, freezeRows: 10, freezeColumns: 1, merges: ["A1:D1", "A2:D2", "A3:D3", "A9:D9"], widths: [28, 18, 18, 24], overview: true }),
+    ownerSheet("Full Inventory", fullRows, { sourceCount: model.summary.medicineCount, projectionCount: model.rows.length, headerRow: 7, freezeRows: 7, freezeColumns: 1, widths: autoXlsxWidths(fullRows, [26, 14, 13, 12, 17, 16, 11, 24, 18, 14, 13, 10]) }),
+    ownerSheet("Low Stock", lowStockRows, { sourceCount: model.summary.medicineCount, projectionCount: lowStock.length, headerRow: 5, freezeRows: 5, freezeColumns: 1, merges: ["A1:E1", "A2:E2", "A3:E3", "A4:E4", ...(lowStock.length ? [] : ["A6:E6"])], widths: [26, 12, 16, 15, 25], alert: true }),
+    ownerSheet("Expiry Tracking", expiryTrackingRows, { sourceCount: model.summary.medicineCount, projectionCount: expiryRows.length, headerRow: 5, freezeRows: 5, freezeColumns: 1, merges: ["A1:D1", "A2:D2", "A3:D3", "A4:D4"], widths: [26, 16, 18, 12] }),
+    ownerSheet("Suppliers", supplierRows, { sourceCount: model.summary.medicineCount, projectionCount: supplierRowsSorted.length, headerRow: 5, freezeRows: 5, freezeColumns: 1, merges: ["A1:D1", "A2:D2", "A3:D3", "A4:D4"], widths: [28, 26, 12, 12] })
   ];
+  validateOwnerWorkbookSheets(model, sheets);
+  return sheets;
 }
 function ownerSheet(name, rows, options) { return { name, rows, ...options }; }
+function inventorySummary(rows, finderIndex) {
+  const flagsById = new Map(finderIndex.map((entry) => [entry.id, entry.flags || {}]));
+  return {
+    medicineCount: rows.length,
+    totalStock: rows.reduce((sum, row) => sum + (Number(row.stock) || 0), 0),
+    retailStockValue: rows.reduce((sum, row) => sum + (Number(row.sellingPrice) || 0) * (Number(row.stock) || 0), 0),
+    lowStockCount: rows.filter((row) => flagsById.get(row.finderId)?.lowStock === true).length,
+    expiringSoonCount: rows.filter((row) => flagsById.get(row.finderId)?.expiringSoon === true).length
+  };
+}
+function validateOwnerWorkbookSheets(model, sheets) {
+  const expectedNames = ["Inventory Overview", "Full Inventory", "Low Stock", "Expiry Tracking", "Suppliers"];
+  if (sheets.length !== expectedNames.length || sheets.some((sheet, index) => sheet.name !== expectedNames[index])) {
+    throw new Error("Owner workbook reconciliation failed: worksheet responsibilities changed.");
+  }
+  for (const sheet of sheets) {
+    if (sheet.sourceCount !== model.summary.medicineCount) {
+      throw new Error(`Owner workbook reconciliation failed: ${sheet.name} uses a different medicine snapshot.`);
+    }
+    const header = sheet.rows[sheet.headerRow - 1] || [];
+    if (!header.length || header.some((value) => !clean(value))) {
+      throw new Error(`Owner workbook reconciliation failed: ${sheet.name} has a blank mandatory header.`);
+    }
+  }
+  const overview = sheets[0];
+  const summaryPairs = new Map(overview.rows.slice(4, 8).map((row) => [row[0], row[1]]));
+  const expectedSummary = new Map([
+    ["Total medicines", model.summary.medicineCount],
+    ["Total stock value (KES)", model.summary.retailStockValue],
+    ["Low stock count", model.summary.lowStockCount],
+    ["Expiring soon count", model.summary.expiringSoonCount]
+  ]);
+  for (const [label, value] of expectedSummary) {
+    if (summaryPairs.get(label) !== value) throw new Error(`Owner workbook reconciliation failed: ${label} does not match the export snapshot.`);
+  }
+  const canonicalNames = model.rows.map((row) => row.medicine).sort();
+  const fullNames = sheets[1].rows.slice(sheets[1].headerRow).map((row) => row[0]).sort();
+  const expiryNames = sheets[3].rows.slice(sheets[3].headerRow).map((row) => row[0]).sort();
+  const supplierNames = sheets[4].rows.slice(sheets[4].headerRow).map((row) => row[1]).sort();
+  for (const [sheetName, names] of [["Full Inventory", fullNames], ["Expiry Tracking", expiryNames], ["Suppliers", supplierNames]]) {
+    if (names.length !== canonicalNames.length || names.some((name, index) => name !== canonicalNames[index])) {
+      throw new Error(`Owner workbook reconciliation failed: ${sheetName} is missing or duplicating medicines.`);
+    }
+  }
+  const sourceNames = new Set(canonicalNames);
+  const lowStockNames = sheets[2].projectionCount ? sheets[2].rows.slice(sheets[2].headerRow).map((row) => row[0]) : [];
+  const attentionNames = overview.projectionCount ? overview.rows.slice(overview.headerRow).map((row) => row[0]) : [];
+  if ([...lowStockNames, ...attentionNames].some((name) => !sourceNames.has(name))) {
+    throw new Error("Owner workbook reconciliation failed: an attention sheet contains a medicine outside the export snapshot.");
+  }
+  if (sheets[2].projectionCount !== model.summary.lowStockCount) {
+    throw new Error("Owner workbook reconciliation failed: low-stock count does not match the export snapshot.");
+  }
+  return true;
+}
 function autoXlsxWidths(rows, caps) {
   return caps.map((cap, column) => Math.min(cap, Math.max(11, ...rows.map((row) => String(row[column] ?? "").length + 2))));
 }
@@ -249,9 +341,9 @@ function buildXlsxSheetXml(sheet) {
       let style = 0;
       if (rowNumber === 1) style = 1;
       else if (isHeader) style = 2;
-      else if (sheet.overview && [5, 6].includes(rowNumber) && columnIndex % 2 === 0) style = 6;
-      else if (sheet.overview && [5, 6].includes(rowNumber) && columnIndex % 2 === 1) style = 7;
-      else if (sheet.overview && rowNumber === 7) style = 8;
+      else if (sheet.overview && rowNumber >= 5 && rowNumber <= 8 && columnIndex === 0) style = 6;
+      else if (sheet.overview && rowNumber >= 5 && rowNumber <= 8 && columnIndex === 1) style = 7;
+      else if (sheet.overview && rowNumber === 9) style = 8;
       else if (isData && sheet.alert) style = columnIndex === 2 ? 10 : (rowNumber - sheet.headerRow) % 2 === 0 ? 4 : 0;
       else if (isData) style = (rowNumber - sheet.headerRow) % 2 === 0 ? 4 : 0;
       if (typeof value === "number" && ![1, 2, 6, 7, 8, 10].includes(style)) style = style === 4 ? 5 : 3;

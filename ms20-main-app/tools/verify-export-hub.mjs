@@ -3,7 +3,8 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   EXPORT_FORMATS, buildCanonicalInventoryExport, buildInventoryCsv, buildInventoryDocx,
-  buildInventoryPdf, buildInventoryPptx, buildInventoryXlsx, buildPrintHtml, exportFilename
+  buildInventoryPdf, buildInventoryPptx, buildInventoryXlsx, buildOwnerWorkbookSheets,
+  buildPrintHtml, exportFilename, validateInventoryExportSnapshot
 } from "../src/services/documentGenerator.js";
 import { buildMedicineFinderIndex, searchMedicineFinder } from "../src/services/medicineFinder.js";
 
@@ -23,6 +24,10 @@ const other = buildCanonicalInventoryExport({ pharmacy: { ...pharmacy, id: "phar
 
 assert.equal(model.pharmacyId, "pharmacy-a");
 assert.equal(model.rows.length, 35);
+assert.equal(model.summary.medicineCount, 35);
+assert.equal(model.summary.retailStockValue, items.reduce((sum, item) => sum + item.sellingPrice * item.stockLeft, 0));
+assert.equal(validateInventoryExportSnapshot(model), true);
+assert.ok(Object.isFrozen(model) && Object.isFrozen(model.rows) && model.rows.every(Object.isFrozen));
 assert.equal(other.rows.length, 1);
 assert.notEqual(model.pharmacyId, other.pharmacyId);
 assert.equal(model.generatedKenya.includes("21:00:32"), true);
@@ -30,11 +35,19 @@ assert.deepEqual(EXPORT_FORMATS.map((format) => format.id), ["xlsx", "pdf", "doc
 assert.deepEqual(EXPORT_FORMATS.filter((format) => format.group === "polished").map((format) => format.id), ["xlsx", "pdf", "docx", "pptx", "print"]);
 assert.deepEqual(EXPORT_FORMATS.filter((format) => format.group === "data").map((format) => format.id), ["csv"]);
 assert.match(EXPORT_FORMATS.find((format) => format.id === "csv").help, /no visual styling/i);
+assert.throws(() => buildCanonicalInventoryExport({ pharmacy, items: [{ ...items[0], name: "" }], generatedAt }), /mandatory medicine name/);
+assert.throws(() => buildCanonicalInventoryExport({ pharmacy, items: [items[0], { ...items[0] }], generatedAt }), /duplicate medicine identity/);
+assert.throws(() => validateInventoryExportSnapshot({ ...model, summary: { ...model.summary, medicineCount: 714 } }), /medicineCount/);
 
 const outputs = {
   csv: buildInventoryCsv(model), xlsx: buildInventoryXlsx(model), pdf: buildInventoryPdf(model),
   docx: buildInventoryDocx(model), pptx: buildInventoryPptx(model), html: buildPrintHtml(model)
 };
+assert.deepEqual(
+  buildInventoryXlsx(buildCanonicalInventoryExport({ pharmacy, items, generatedAt })),
+  outputs.xlsx,
+  "Identical immutable input must produce deterministic XLSX bytes"
+);
 assert.match(outputs.csv, /^\ufeffMS2\.0 Pharmacy Inventory/);
 assert.match(outputs.csv, /Amoxicillin,500 mg,capsule,capsule,20,12,40/);
 assert.equal(new TextDecoder().decode(outputs.pdf.slice(0, 8)), "%PDF-1.4");
@@ -64,16 +77,37 @@ assert.match(outputs.html, /finder-status/);
 assert.equal(exportFilename(model, "xlsx"), "zuri-pharmacy-inventory-2026-07-25-180032Z.xlsx");
 
 const decodedPackages = Object.fromEntries(["xlsx", "docx", "pptx"].map((format) => [format, new TextDecoder().decode(outputs[format])]));
+const ownerSheets = buildOwnerWorkbookSheets(model);
+assert.ok(ownerSheets.every((sheet) => sheet.sourceCount === 35), "Every worksheet must reference the same 35-medicine snapshot");
+assert.ok(ownerSheets.every((sheet) => sheet.rows.some((row) => row.some((value) => String(value).includes("35 canonical medicines")))), "Every worksheet must visibly declare the same source count");
+assert.equal(ownerSheets.find((sheet) => sheet.name === "Full Inventory").projectionCount, 35);
+assert.equal(ownerSheets.find((sheet) => sheet.name === "Expiry Tracking").projectionCount, 35);
+assert.equal(ownerSheets.find((sheet) => sheet.name === "Suppliers").projectionCount, 35);
+assert.deepEqual(ownerSheets[0].rows.slice(4, 8), [
+  ["Total medicines", model.summary.medicineCount],
+  ["Total stock value (KES)", model.summary.retailStockValue],
+  ["Low stock count", model.summary.lowStockCount],
+  ["Expiring soon count", model.summary.expiringSoonCount]
+]);
+assert.deepEqual(ownerSheets[0].rows[9], ["Medicine", "Stock", "Expiry", "Reason"]);
+assert.equal(ownerSheets[0].rows.some((row) => row.includes("Supplier") || row.includes("Shelf")), false);
+assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Low Stock").rows[4], ["Medicine", "Stock", "Reorder level", "Expiry", "Reason"]);
+assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Expiry Tracking").rows[4], ["Medicine", "Expiry", "Batch", "Stock"]);
+assert.deepEqual(ownerSheets.find((sheet) => sheet.name === "Suppliers").rows[4], ["Supplier", "Medicine", "Stock", "Shelf"]);
+for (const sheet of ownerSheets) {
+  assert.ok(sheet.rows[sheet.headerRow - 1].every((value) => String(value).trim()), `${sheet.name} contains a blank mandatory header`);
+}
 assert.equal((decodedPackages.xlsx.match(/<sheet name="/g) || []).length, 5);
 for (const sheetName of ["Inventory Overview", "Full Inventory", "Low Stock", "Expiry Tracking", "Suppliers"]) {
   assert.match(decodedPackages.xlsx, new RegExp(`<sheet name="${sheetName}"`), `XLSX missing ${sheetName}`);
 }
-assert.match(decodedPackages.xlsx, /xSplit="1" ySplit="7" topLeftCell="B8"/);
+assert.match(decodedPackages.xlsx, /xSplit="1" ySplit="10" topLeftCell="B11"/);
 assert.match(decodedPackages.xlsx, /xSplit="1" ySplit="5" topLeftCell="B6"/);
 assert.match(decodedPackages.xlsx, /Low stock/);
 assert.match(decodedPackages.xlsx, /at or below the saved reorder level/);
-assert.match(decodedPackages.xlsx, /Retail stock value \(KES\)/);
-assert.match(decodedPackages.xlsx, /Supplier concentration and stock value/);
+assert.match(decodedPackages.xlsx, /Total stock value \(KES\)/);
+assert.match(decodedPackages.xlsx, /Expiring soon count/);
+assert.match(decodedPackages.xlsx, /Supplier and shelf responsibility/);
 assert.match(decodedPackages.xlsx, /fgColor rgb="FFF1F7F5"/);
 assert.match(decodedPackages.xlsx, /wrapText="1" vertical="center"/);
 for (const item of items) {
