@@ -750,3 +750,17 @@ After pulling and restarting the latest build, open Export Hub and download one 
 3. The final page shows Medicines 31–35 and nothing is clipped.
 
 Do not edit, print, share or upload the file. If these three views are clear, mark PDF Owner Copy passed and continue automatically to Word. If one view fails, report that page and the exact clipped, missing or unreadable item.
+
+Passed from authoritative Android screenshots. PDF opened as eight portrait pages, required no sideways scrolling, showed the reconciled Overview, retained five intact medicine cards per inventory page and ended with medicines 31–35. Focused empty-value/footer polish is automated and visually verified locally; do not repeat PDF without regression evidence.
+
+## Word Owner Document live validation
+
+Choose Word when the owner wants an editable document for notes, corrections or review. Use Excel for inventory analysis, PDF for easiest phone reading and sharing, and CSV only for system data transfer.
+
+After pulling and restarting the latest build, open Export Hub and download one fresh Word file. Open it in Microsoft Word or Google Docs and confirm only:
+
+1. The title reads `Editable Pharmacy Inventory` and the first page explains that notes or owner-reviewed changes can be added.
+2. The document contains readable medicine groups with stock and prices prominent and secondary supplier/traceability details below.
+3. Scroll to the final page and confirm the last medicine is present; tap once in ordinary text and confirm the document is editable, but do not save or change the pharmacy data.
+
+If those three checks pass, mark Word Owner Document passed and continue automatically to Presentation. Report only a file-open failure, missing medicine, clipping, broken page flow or inability to edit.

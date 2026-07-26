@@ -3329,7 +3329,11 @@ function downloadInventoryExport(format, cardId = "") {
   if (!selected) return updateExportHubStatus(cardId, "That export format is not supported.");
   const [builder, extension, mime] = selected;
   downloadBlobFile({ filename: exportFilename(model, extension), contents: builder(model), mime });
-  const guidance = extension === "xlsx" ? " For the best experience, open this file in Microsoft Excel or Google Sheets." : "";
+  const guidance = extension === "xlsx"
+    ? " For the best experience, open this file in Microsoft Excel or Google Sheets."
+    : extension === "docx"
+      ? " Open this editable copy in Microsoft Word or Google Docs when you want to add notes or make owner-reviewed changes."
+      : "";
   updateExportHubStatus(cardId, `${extension.toUpperCase()} downloaded for ${model.rows.length} medicines at ${model.generatedKenya} Africa/Nairobi.${guidance}`);
 }
 
@@ -3961,7 +3965,7 @@ function ownerCardNote(card) {
   }
   if (card.type === "CatalogImportCard") return "Review the list, edit if needed, then approve.";
   if (card.type === "CatalogWorkspaceCard") return "This view uses the complete saved Pharmacy Catalog.";
-  if (card.type === "ExportHubCard") return "Choose Excel for editing and analysis, or PDF for the easiest phone reading and sharing. No confirmation is required.";
+  if (card.type === "ExportHubCard") return "Choose Excel for inventory analysis, PDF for easy phone reading, or Word when you want an editable document with notes. No confirmation is required.";
   if (card.type === "StockCorrectionCard") {
     if (card.photoEvidence && !String(card.fields?.medicine || "").trim() && card.validation) return card.validation;
     if (card.ui?.voiceGuided && card.validation) return card.validation;

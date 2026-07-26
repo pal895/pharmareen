@@ -4,7 +4,7 @@ import { buildMedicineFinderIndex, medicineFinderClientScript } from "./medicine
 export const EXPORT_FORMATS = Object.freeze([
   { id: "xlsx", group: "polished", label: "Excel", help: "Search, filter, edit or analyze your complete inventory" },
   { id: "pdf", group: "polished", label: "PDF", help: "Easiest phone reading, sharing and printing" },
-  { id: "docx", group: "polished", label: "Word", help: "Editable professional document" },
+  { id: "docx", group: "polished", label: "Word", help: "Editable working document for notes, corrections and review" },
   { id: "pptx", group: "polished", label: "Presentation", help: "Landscape inventory briefing slides" },
   { id: "print", group: "polished", label: "Print", help: "Print-ready browser layout" },
   { id: "csv", group: "data", label: "CSV data file", help: "Plain data transfer for systems and imports — no visual styling" }
@@ -124,12 +124,13 @@ export function buildInventoryXlsx(model) {
 }
 
 export function buildInventoryDocx(model) {
+  validateInventoryExportSnapshot(model);
   const pages = balancedChunks(model.rows, OFFICE_RECORDS_PER_PAGE);
   const body = pages.map((rows, pageIndex) => [
-    wordP(model.title, "Title"),
+    wordP("Editable Pharmacy Inventory", "Title"),
     wordP(`${model.pharmacyName} | ${model.branch} | ${model.location}`, "Subtitle"),
     wordP(`Generated ${model.generatedKenya} Africa/Nairobi | Page ${pageIndex + 1} of ${pages.length}`, "Meta"),
-    wordP(`${model.rows.length} canonical medicine records | Pharmacy-isolated | Generated locally with zero AI formatting`, "Summary"),
+    wordP(pageIndex === 0 ? `${model.rows.length} medicines | Add notes or make owner-reviewed changes in Microsoft Word or Google Docs.` : `${model.rows.length} medicines | Editable working copy`, "Summary"),
     ...rows.map(wordMedicineBlock),
     pageIndex < pages.length - 1 ? '<w:p><w:r><w:br w:type="page"/></w:r></w:p>' : ""
   ].join("")).join("");
@@ -463,11 +464,19 @@ function columnNumber(ref) { return [...String(ref).match(/^[A-Z]+/)?.[0] || ""]
 function xlsxStyles() { return `<?xml version="1.0"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts><fonts count="6"><font><sz val="10"/><color rgb="FF19332F"/><name val="Aptos"/></font><font><b/><sz val="20"/><color rgb="FF086C5C"/><name val="Aptos Display"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Aptos"/></font><font><b/><sz val="10"/><color rgb="FF536B66"/><name val="Aptos"/></font><font><b/><sz val="15"/><color rgb="FF086C5C"/><name val="Aptos Display"/></font><font><b/><u/><sz val="10"/><color rgb="FF086C5C"/><name val="Aptos"/></font></fonts><fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF086C5C"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF1F7F5"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEDF7F4"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF3CD"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDFF1EC"/></patternFill></fill></fills><borders count="3"><border/><border><right style="thin"><color rgb="FFE5ECEA"/></right><bottom style="thin"><color rgb="FFD9E5E1"/></bottom></border><border><bottom style="medium"><color rgb="FF086C5C"/></bottom></border></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="13"><xf fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf fontId="1" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf><xf fontId="2" fillId="2" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="0" fillId="3" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="3" fillId="4" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="4" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="4" fillId="6" borderId="2" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf><xf fontId="0" fillId="5" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="164" fontId="3" fillId="5" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="5" fillId="4" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" wrapText="1" vertical="center"/></xf><xf fontId="2" fillId="2" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" wrapText="1" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`; }
 function wordP(text, style) { return `<w:p><w:pPr><w:pStyle w:val="${style}"/></w:pPr><w:r><w:t>${xml(text)}</w:t></w:r></w:p>`; }
 function wordMedicineBlock(row) {
-  const value = (key) => row[key] === "" ? "—" : row[key];
+  const important = (key) => recordedValue(row[key]) ? row[key] : "Not recorded";
+  const identity = [row.strength, row.form, row.unit].filter(recordedValue).join(" | ");
+  const trace = [
+    `Expiry ${important("expiry")}`,
+    recordedValue(row.batch) ? `Batch ${row.batch}` : "",
+    recordedValue(row.shelf) ? `Shelf ${row.shelf}` : "",
+    recordedValue(row.barcode) ? `Barcode ${row.barcode}` : ""
+  ].filter(Boolean).join(" | ");
   return [
-    wordP(`${value("medicine")} | ${value("strength")} | ${value("form")} | ${value("unit")}`, "Medicine"),
-    wordP(`Selling price KES ${value("sellingPrice")} | Cost price KES ${value("costPrice")} | Stock ${value("stock")} | Supplier ${value("supplier")}`, "Detail"),
-    wordP(`Barcode ${value("barcode")} | Batch ${value("batch")} | Expiry ${value("expiry")} | Shelf ${value("shelf")}`, "Trace")
+    wordP(`${row.medicine}${identity ? ` | ${identity}` : ""}`, "Medicine"),
+    wordP(`Stock ${important("stock")} | Selling price KES ${important("sellingPrice")} | Cost price KES ${important("costPrice")}`, "Detail"),
+    recordedValue(row.supplier) ? wordP(`Supplier ${row.supplier}`, "Trace") : "",
+    wordP(trace, "Trace")
   ].join("");
 }
 function wordStyles() { return `<?xml version="1.0"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:pPr><w:spacing w:after="80"/></w:pPr><w:rPr><w:rFonts w:ascii="Aptos"/><w:sz w:val="21"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:pPr><w:spacing w:after="100"/></w:pPr><w:rPr><w:b/><w:color w:val="086C5C"/><w:sz w:val="40"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Subtitle"><w:name w:val="Subtitle"/><w:pPr><w:spacing w:after="50"/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Meta"><w:name w:val="Meta"/><w:pPr><w:spacing w:after="80"/></w:pPr><w:rPr><w:color w:val="536B66"/><w:sz w:val="18"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Summary"><w:name w:val="Summary"/><w:pPr><w:spacing w:after="140"/></w:pPr><w:rPr><w:b/><w:color w:val="086C5C"/><w:sz w:val="19"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Medicine"><w:name w:val="Medicine"/><w:pPr><w:keepNext/><w:spacing w:before="110" w:after="35"/><w:pBdr><w:top w:val="single" w:sz="8" w:color="B7CDC8"/></w:pBdr></w:pPr><w:rPr><w:b/><w:color w:val="19332F"/><w:sz w:val="23"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Detail"><w:name w:val="Detail"/><w:pPr><w:keepNext/><w:spacing w:after="30"/></w:pPr><w:rPr><w:sz w:val="20"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Trace"><w:name w:val="Trace"/><w:pPr><w:spacing w:after="70"/></w:pPr><w:rPr><w:color w:val="536B66"/><w:sz w:val="18"/></w:rPr></w:style></w:styles>`; }
@@ -518,10 +527,10 @@ function pdfOverviewPage(model) {
     t(50, y + 17, 11, label, true);
     t(430, y + 15, 16, value, true);
   });
-  t(36, 196, 15, "Complete inventory", true);
-  t(36, 172, 11, `${model.rows.length} medicines follow in clear, phone-friendly record cards.`);
-  t(36, 150, 10, "Each card includes identity, stock, prices, supplier, expiry and traceability.");
-  t(36, 44, 8, "Pharmacy-isolated canonical data | Generated locally by MS2.0 | Zero AI formatting");
+  t(36, 240, 15, "Complete inventory", true);
+  t(36, 216, 11, `${model.rows.length} medicines follow in clear, phone-friendly record cards.`);
+  t(36, 194, 10, "Each card includes identity, stock, prices, supplier, expiry and traceability.");
+  t(36, 44, 8, `Generated by MS2.0 | Pharmacy inventory | ${model.generatedKenya}`);
   return lines.join("\n");
 }
 function pdfInventoryPage(model, rows, page, total) {
@@ -536,20 +545,27 @@ function pdfInventoryPage(model, rows, page, total) {
   lines.push("0.03 0.42 0.36 RG 1.2 w 36 733 m 559 733 l S");
   rows.forEach((row, index) => {
     const y = 695 - index * 132;
-    const missing = "-";
     card(y, index % 2 === 1);
     t(48, y - 8, 13, truncate(row.medicine || "Unnamed medicine", 48), true);
-    t(465, y - 8, 11, `Stock ${row.stock === "" ? missing : row.stock}`, true);
-    t(48, y - 29, 10, `${row.strength || missing} | ${row.form || missing} | ${row.unit || missing}`);
-    t(48, y - 50, 10, `Selling KES ${row.sellingPrice === "" ? missing : formatPdfNumber(row.sellingPrice)} | Cost KES ${row.costPrice === "" ? missing : formatPdfNumber(row.costPrice)}`, true);
-    t(48, y - 71, 9, `Supplier: ${truncate(row.supplier || missing, 54)}`);
-    t(48, y - 89, 9, `Expiry: ${row.expiry || missing} | Batch: ${truncate(row.batch || missing, 20)} | Shelf: ${row.shelf || missing}`);
-    t(350, y - 89, 9, `Barcode: ${truncate(row.barcode || missing, 24)}`);
+    t(442, y - 8, 11, `Stock ${pdfImportant(row.stock)}`, true);
+    const identity = [row.strength, row.form, row.unit].filter(recordedValue).join(" | ");
+    if (identity) t(48, y - 29, 10, identity);
+    t(48, y - 50, 10, `Selling KES ${pdfImportant(row.sellingPrice)} | Cost KES ${pdfImportant(row.costPrice)}`, true);
+    if (recordedValue(row.supplier)) t(48, y - 71, 9, `Supplier: ${truncate(row.supplier, 54)}`);
+    const trace = [
+      `Expiry: ${recordedValue(row.expiry) ? row.expiry : "Not recorded"}`,
+      recordedValue(row.batch) ? `Batch: ${truncate(row.batch, 20)}` : "",
+      recordedValue(row.shelf) ? `Shelf: ${row.shelf}` : ""
+    ].filter(Boolean).join(" | ");
+    t(48, y - 89, 9, trace);
+    if (recordedValue(row.barcode)) t(390, y - 89, 9, `Barcode: ${truncate(row.barcode, 24)}`);
   });
-  t(36, 35, 8, `Generated ${model.generatedKenya} Africa/Nairobi | Canonical pharmacy inventory | Zero AI formatting`);
+  t(36, 35, 8, `Generated by MS2.0 | Pharmacy inventory | ${model.generatedKenya}`);
   return lines.join("\n");
 }
 function formatPdfNumber(value) { return Number(value).toLocaleString("en-US", { maximumFractionDigits: 2 }); }
+function recordedValue(value) { return value !== "" && value !== null && value !== undefined; }
+function pdfImportant(value) { return recordedValue(value) ? formatPdfNumber(value) : "Not recorded"; }
 function rels(values) { return `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${values.map(([id, type, target]) => `<Relationship Id="${id}" Type="${type}" Target="${target}"/>`).join("")}</Relationships>`; }
 function coreProps(model) { return `<?xml version="1.0"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${xml(model.title)}</dc:title><dc:creator>MS2.0</dc:creator><cp:lastModifiedBy>MS2.0</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">${model.generatedIso}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${model.generatedIso}</dcterms:modified></cp:coreProperties>`; }
 function appProps(application, sheetNames = []) {
