@@ -7,6 +7,7 @@ const app = fs.readFileSync(path.join(root, "src/app.js"), "utf8");
 const css = fs.readFileSync(path.join(root, "src/styles.css"), "utf8");
 const {
   applyApprovedCatalogEdit,
+  applyCatalogEditVoice,
   catalogEditPresentation,
   catalogWorkspaceItems,
   createCatalogEditDraft,
@@ -55,6 +56,19 @@ const approved = applyApprovedCatalogEdit(original, "med-1", draft);
 assert(approved.valid && approved.catalog.length === 2 && approved.updated.sellingPrice === "130", "Approved edit must update the existing medicine");
 assert(JSON.parse(JSON.stringify(approved.catalog))[0].sellingPrice === "130", "Approved edit must survive persisted-data reload");
 assert(original[0].sellingPrice === "120", "A cancelled/unapproved draft must leave stored data unchanged");
+
+const voiceSource = createCatalogEditDraft(original[0]);
+const voiceStock = applyCatalogEditVoice(voiceSource, "five", "stock");
+assert(voiceStock.applied && voiceStock.draft.stock === "5", "Focused Catalog voice editing must apply a spoken stock value");
+assert(voiceSource.stock === "8", "Voice editing must not mutate the saved/source draft");
+const explicitStock = applyCatalogEditVoice(voiceStock.draft, "current stock twenty two");
+assert(explicitStock.applied && explicitStock.draft.stock === "22", "Catalog voice editing must detect an explicit field and spoken compound number");
+const voicePrice = applyCatalogEditVoice(explicitStock.draft, "selling price 130");
+assert(voicePrice.applied && voicePrice.draft.selling_price === "130", "Catalog voice editing must use the same draft path for commercial fields");
+const rejectedVoice = applyCatalogEditVoice(voicePrice.draft, "many", "stock");
+assert(!rejectedVoice.applied && rejectedVoice.draft.stock === "22", "Invalid numeric voice input must leave the draft unchanged");
+assert(app.includes('data-action="catalog-edit-voice"') && app.includes("startCatalogEditVoice"), "Catalog Medicine Action Cards must expose the shared Mic controller");
+assert(app.includes("startVoiceCapture(") && app.includes("selectCatalogVoiceField"), "Catalog voice editing must reuse shared capture and focused-field selection");
 
 const collisionDraft = createCatalogEditDraft(original[0]);
 collisionDraft.name = "Metformin";

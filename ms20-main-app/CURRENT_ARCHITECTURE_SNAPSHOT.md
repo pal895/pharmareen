@@ -1,5 +1,11 @@
 # MS2.0 Current Architecture Snapshot
 
+## Notification and Catalog voice architecture (2026-07-28)
+
+Low-stock notification lifecycle is owner-validated and protected. `buildDeterministicNotifications()` projects alerts from the current pharmacy-scoped catalog with deterministic IDs; `mergeNotifications()` prevents duplicates, preserves read state for an unchanged fact, resets one materially changed alert to unread using a content fingerprint, and removes generated alerts when their source condition clears. Refresh/restart rebuilds the same projection from persisted catalog and card state.
+
+The Catalog Medicine Action Card uses the existing shared `startVoiceCapture()` boundary. A focused editable field supplies intent, explicit phrases such as `current stock twenty two` are also accepted, and deterministic local parsing updates the same draft used by typing. Validation, change review, approval, persistence and notification refresh remain unchanged; no second microphone service or AI parsing path exists.
+
 ## Shared Export Hub architecture (2026-07-27)
 
 `src/services/exportFormatMetadata.js` is the single format registry. Excel serves operational analysis; PDF professional read-only sharing; Word corrections and working notes; Presentation management decisions; Print a browser-generated physical working register; CSV machine interoperability. Reject a new format unless its distinct owner workflow is justified.

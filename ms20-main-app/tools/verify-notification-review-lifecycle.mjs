@@ -56,6 +56,24 @@ const informational = notificationToCard({
 });
 assert(informational.notificationAction === null, "Informational notifications must not gain false action buttons");
 
+const healthyCatalog = [{ id: "cefixime", name: "Cefixime", stockLeft: 22 }];
+const lowCatalog = [{ ...healthyCatalog[0], stockLeft: 5 }];
+const lowerCatalog = [{ ...healthyCatalog[0], stockLeft: 4 }];
+const lowGenerated = buildDeterministicNotifications({ catalog: lowCatalog, pendingCards: [] });
+assert(lowGenerated.length === 1 && lowGenerated[0].id === "inventory-low-cefixime", "Low stock must project one deterministic alert");
+const lowRepeated = mergeNotifications(lowGenerated, buildDeterministicNotifications({ catalog: lowCatalog, pendingCards: [] }));
+assert(lowRepeated.length === 1, "Repeated low-stock refresh must not duplicate unread counts");
+const readLow = [{ ...lowRepeated[0], status: "read" }];
+assert(mergeNotifications(readLow, buildDeterministicNotifications({ catalog: lowCatalog }))[0].status === "read", "Unchanged low-stock refresh must preserve owner read state");
+const changedLow = mergeNotifications(readLow, buildDeterministicNotifications({ catalog: lowerCatalog }));
+assert(changedLow.length === 1 && changedLow[0].status === "unread" && changedLow[0].message.includes("4 left"), "A material stock change must refresh and re-alert the same deterministic notification");
+assert(mergeNotifications(changedLow, buildDeterministicNotifications({ catalog: healthyCatalog })).length === 0, "Restoring healthy stock must remove the generated alert");
+const outGenerated = buildDeterministicNotifications({ catalog: [{ ...healthyCatalog[0], stockLeft: 0 }] });
+assert(outGenerated.length === 1 && outGenerated[0].id === "inventory-out-cefixime", "Out-of-stock must project one distinct deterministic alert");
+assert(outGenerated[0].title === "Cefixime is out of stock" && outGenerated[0].message === "Prepare an order or correct stock if the count is wrong.", "Out-of-stock content must remain canonical");
+assert(mergeNotifications(outGenerated, buildDeterministicNotifications({ catalog: [{ ...healthyCatalog[0], stockLeft: 0 }] })).length === 1, "Out-of-stock refresh must remain duplicate-safe");
+assert(mergeNotifications(outGenerated, buildDeterministicNotifications({ catalog: healthyCatalog })).length === 0, "Restoring healthy stock must clear out-of-stock");
+
 assert(appSource.includes("function reviewPasteList(cardId)"), "Review list must retain one shared parsing boundary");
 assert(appSource.includes("applyCatalogPasteReview(card, newItems"), "Review list must enter the shared review transition");
 assert(appSource.includes("function openNotificationAction(cardId)"), "Review import must retain one shared action router");

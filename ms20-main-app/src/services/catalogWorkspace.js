@@ -7,8 +7,36 @@ export function createCatalogWorkspaceCard(itemCount = 0) {
     confidence: 1,
     status: "ready",
     aiRequired: false,
-    fields: { item_count: String(itemCount), query: "", selected_id: "", edit_draft: "" },
+    fields: { item_count: String(itemCount), query: "", selected_id: "", edit_draft: "", voice_field: "", voice_feedback: "" },
     validation: "Loaded directly from the saved Pharmacy Catalog. No medicines are recreated by this view."
+  };
+}
+
+export function applyCatalogEditVoice(draft = {}, transcript = "", preferredField = "") {
+  const spoken = String(transcript || "").trim();
+  if (!spoken) return { applied: false, draft, field: "", value: "", feedback: "No words were heard. Tap Mic and try again." };
+  const detected = detectSpokenField(spoken);
+  const field = CATALOG_EDIT_FIELDS.includes(preferredField) ? preferredField : detected.field;
+  if (!field) {
+    return {
+      applied: false,
+      draft,
+      field: "",
+      value: "",
+      feedback: "Tap the field you want to change, then tap Mic and speak its value."
+    };
+  }
+  const rawValue = detected.field === field ? detected.value : spoken;
+  const value = normalizeSpokenCatalogValue(field, rawValue);
+  if (value === null) {
+    return { applied: false, draft, field, value: "", feedback: `${fieldLabelForVoice(field)} needs a number. Nothing changed.` };
+  }
+  return {
+    applied: true,
+    draft: { ...draft, [field]: value },
+    field,
+    value,
+    feedback: `Heard “${spoken}”. ${fieldLabelForVoice(field)} is now ${value === "" ? "blank" : value}. Review before saving.`
   };
 }
 
@@ -106,6 +134,84 @@ function searchableText(item) {
 
 function normalize(value) {
   return normalizeMedicineText(value);
+}
+
+const VOICE_FIELD_ALIASES = [
+  ["reorder_level", ["reorder level", "minimum stock"]],
+  ["selling_price", ["selling price", "sale price"]],
+  ["cost_price", ["buying price", "cost price"]],
+  ["pack_size", ["pack size"]],
+  ["stock", ["current stock", "stock"]],
+  ["expiry", ["expiry month", "expiry"]],
+  ["supplier", ["supplier"]],
+  ["barcode", ["barcode"]],
+  ["batch", ["batch"]],
+  ["shelf", ["shelf"]],
+  ["strength", ["strength"]],
+  ["form", ["form"]],
+  ["unit", ["unit"]],
+  ["aliases", ["aliases", "alias"]],
+  ["name", ["medicine name", "medicine", "name"]]
+];
+
+function detectSpokenField(spoken) {
+  const normalized = String(spoken).trim().toLowerCase();
+  for (const [field, aliases] of VOICE_FIELD_ALIASES) {
+    for (const alias of aliases) {
+      const match = normalized.match(new RegExp(`^${alias.replace(/\s+/g, "\\s+")}(?:\\s+(?:is|to))?\\s*(.*)$`, "i"));
+      if (match) return { field, value: String(match[1] || "").trim() };
+    }
+  }
+  return { field: "", value: spoken };
+}
+
+function normalizeSpokenCatalogValue(field, rawValue) {
+  let value = String(rawValue || "").trim();
+  if (/^(?:blank|empty|clear|remove|not set)$/i.test(value)) value = "";
+  if (["stock", "selling_price", "cost_price", "reorder_level"].includes(field)) {
+    if (value === "") return "";
+    const number = value.match(/-?\d+(?:\.\d+)?/)?.[0] ?? spokenNumber(value);
+    return number === undefined ? null : number;
+  }
+  if (field === "expiry") {
+    const month = value.match(/\b(20\d{2})[\s/-](0?[1-9]|1[0-2])\b/);
+    if (month) return `${month[1]}-${String(month[2]).padStart(2, "0")}`;
+  }
+  return value;
+}
+
+function spokenNumber(value) {
+  const tokens = String(value).toLowerCase().replaceAll("-", " ").match(/[a-z]+/g) || [];
+  const small = {
+    zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
+    ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
+    seventeen: 17, eighteen: 18, nineteen: 19
+  };
+  const tens = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+  let total = 0;
+  let recognized = false;
+  for (const token of tokens) {
+    if (token === "and") continue;
+    if (Object.hasOwn(small, token)) {
+      total += small[token];
+      recognized = true;
+    } else if (Object.hasOwn(tens, token)) {
+      total += tens[token];
+      recognized = true;
+    } else if (token === "hundred") {
+      total = (total || 1) * 100;
+      recognized = true;
+    }
+  }
+  return recognized ? String(total) : undefined;
+}
+
+function fieldLabelForVoice(field) {
+  return {
+    name: "Medicine", stock: "Current stock", selling_price: "Selling price",
+    cost_price: "Buying price", reorder_level: "Reorder level", pack_size: "Pack size",
+    expiry: "Expiry month"
+  }[field] || field.replaceAll("_", " ").replace(/^\w/, (letter) => letter.toUpperCase());
 }
 import { normalizeMedicineText } from "./medicineMatcher.js";
 import { CATALOG_MEDICINE_FIELD_KEYS, normalizeExpiryValue } from "./medicineFieldSchema.js";

@@ -90,17 +90,28 @@ export function mergeNotifications(existing = [], generated = []) {
   const merged = [];
   for (const item of generated) {
     const previous = byId.get(item.id);
+    const materiallyChanged = previous && notificationFingerprint(previous) !== notificationFingerprint(item);
     merged.push({
       ...item,
-      createdAt: previous?.createdAt || item.createdAt,
-      status: previous?.status || "unread",
-      completedAt: previous?.completedAt
+      createdAt: materiallyChanged ? item.createdAt : previous?.createdAt || item.createdAt,
+      status: materiallyChanged ? "unread" : previous?.status || "unread",
+      completedAt: materiallyChanged ? undefined : previous?.completedAt
     });
   }
   for (const item of existing) {
     if (!generated.some((generatedItem) => generatedItem.id === item.id) && item.origin === "transaction") merged.push(item);
   }
   return merged.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+}
+
+export function notificationFingerprint(notification = {}) {
+  return [
+    notification.category,
+    notification.title,
+    notification.message,
+    notification.action,
+    notification.actionTarget
+  ].map((value) => String(value || "").trim()).join("|");
 }
 
 export function notificationToCard(notification) {

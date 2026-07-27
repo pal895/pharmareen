@@ -1,6 +1,8 @@
 # MS2.0 Live Main App Test Plan
 
-## Current checkpoint — Notifications Low-Stock Alert
+## Historical checkpoint — Notifications Low-Stock Alert
+
+<!-- Superseded low-stock checkpoint retained as historical evidence.
 
 Excel, PDF, Word, Presentation, CSV and Print are owner-validated, permanently passed and protected. Do not retest or polish them without regression evidence. The one-card status/history architecture is approved.
 
@@ -26,6 +28,24 @@ Test only the next distinct responsibility:
 8. Return Home and confirm Notifications is again `0`, `Quiet`, `No urgent alerts`. Open Notifications and confirm no alert card remains.
 
 Expected: the shared deterministic notification projection creates one low-stock alert at stock `5`, removes it after restoration, preserves 35 canonical medicines, and uses no sale, payment, import, export, API request or AI token. Do not test stock `0`, expiry, payment failure or another medicine yet.
+
+-->
+
+## Authoritative current checkpoint — Notifications Out-of-Stock Alert via Catalog Mic
+
+Low-Stock Alert is owner-validated, passed and protected. Evidence proves one deterministic unread Cefixime alert at stock `5`, exact Inventory content, automatic removal after restoring `22`, 35 medicines and quiet-state restoration.
+
+1. Start on Home and confirm Notifications is `0`, `Quiet`, `No urgent alerts`.
+2. Open Assistant → Menu → Catalog. Search `Cefixime`, tap `Open & edit`, and confirm Current stock is `22`.
+3. Tap `Current stock`, tap `Mic` inside the Medicine Action Card, and say `zero`. Confirm truthful voice feedback, Current stock `0`, and one unsaved Current stock change. Leave every other field unchanged.
+4. Tap `Approve & save` once. Reopen Catalog and confirm Cefixime stock `0` and 35 medicines.
+5. Return Home. Confirm exactly `1 unread`, previewing `Cefixime is out of stock`.
+6. Open Notifications. Confirm one alert titled `Cefixime is out of stock`, Category `Inventory`, Note `Prepare an order or correct stock if the count is wrong.`, Status `unread`, and no Operations composer.
+7. Refresh once while active. Confirm exactly one alert and never `2 unread`.
+8. Return to Catalog, open Cefixime, tap Current stock, tap Mic, say `twenty two`, confirm `22`, then tap `Approve & save` once.
+9. Refresh once. Confirm `Showing 35 of 35`, Cefixime `22`, Home `0`, `Quiet`, `No urgent alerts`, and no notification card.
+
+Expected: shared Mic updates the typed-edit draft; one out-of-stock alert survives refresh without duplication; restoration removes it; no sale, payment, import, export, API request or AI token occurs. Do not test expiry or payment failure yet.
 
 This plan is for Main App live product testing only. Do not return to WhatsApp live testing in this phase.
 

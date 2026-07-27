@@ -29,6 +29,7 @@ import {
 import { EXPORT_FORMATS, exportCompletionSummary, exportFormat } from "./services/exportFormatMetadata.js";
 import {
   CATALOG_EDIT_FIELDS,
+  applyCatalogEditVoice,
   applyApprovedCatalogEdit,
   catalogItemId,
   createCatalogEditDraft,
@@ -733,6 +734,10 @@ function catalogMedicineEditorTemplate(card) {
       <button class="catalog-back" type="button" data-action="cancel-catalog-edit" data-card-id="${card.id}">&larr; Back to catalog</button>
       <div class="catalog-editor-heading"><div><small>Medicine Action Card</small><h3>${escapeHtml(draft.name || "Medicine")}</h3></div><span data-catalog-edit-status data-state="${presentation.state}">${presentation.status}</span></div>
       <p data-catalog-edit-description>${presentation.description}</p>
+      <div class="catalog-edit-voice">
+        <button type="button" data-action="catalog-edit-voice" data-card-id="${card.id}" ${state.voice.starting || state.voice.listening ? "disabled" : ""}>${state.voice.starting || state.voice.listening ? "Listening…" : "Mic"}</button>
+        <p role="status">${escapeHtml(card.fields?.voice_feedback || (card.fields?.voice_field ? `${fieldLabel(card.fields.voice_field)} selected. Tap Mic and speak the new value.` : "Tap a field, then Mic, and speak the new value."))}</p>
+      </div>
       <div class="catalog-edit-grid">${fields(false)}</div>
       <details class="catalog-advanced-fields"><summary>Packaging, supplier and other details</summary><div class="catalog-edit-grid">${fields(true)}</div></details>
       ${review.error ? `<p class="catalog-edit-warning" role="alert">${escapeHtml(review.error)}</p>` : review.changes?.length ? `<p class="catalog-change-summary">Review: ${review.changes.length} field${review.changes.length === 1 ? "" : "s"} changed — ${review.changes.map(fieldLabel).join(", ")}.</p>` : '<p class="catalog-change-summary">No changes yet.</p>'}
@@ -1128,6 +1133,7 @@ function bindEvents() {
   }));
   root.querySelectorAll("[data-catalog-edit-field]").forEach((input) => {
     input.addEventListener("input", () => updateCatalogEditDraft(input.dataset.cardId, input.dataset.catalogEditField, input.value));
+    input.addEventListener("focus", () => selectCatalogVoiceField(input.dataset.cardId, input.dataset.catalogEditField));
   });
 }
 
@@ -1179,6 +1185,7 @@ function handleAction(dataset) {
   if (action === "open-catalog-medicine") openCatalogMedicine(dataset.medicineId);
   if (action === "cancel-catalog-edit") cancelCatalogEdit(dataset.cardId);
   if (action === "approve-catalog-edit") approveCatalogEdit(dataset.cardId);
+  if (action === "catalog-edit-voice") startCatalogEditVoice(dataset.cardId);
   if (action === "back-home") {
     state.ui.screen = "home";
     render();
@@ -3198,6 +3205,8 @@ function openCatalogMedicine(medicineId) {
   if (!card || !medicine) return;
   card.fields.selected_id = catalogItemId(medicine);
   card.fields.edit_draft = JSON.stringify(createCatalogEditDraft(medicine));
+  card.fields.voice_field = "";
+  card.fields.voice_feedback = "";
   persistActiveCards();
   render();
 }
@@ -3227,11 +3236,42 @@ function updateCatalogEditDraft(cardId, field, value) {
   if (approve) approve.disabled = !review.valid || !review.changes?.length;
 }
 
+function selectCatalogVoiceField(cardId, field) {
+  const card = state.cards.find((item) => item.id === cardId && item.type === "CatalogWorkspaceCard");
+  if (!card || !CATALOG_EDIT_FIELDS.includes(field)) return;
+  card.fields.voice_field = field;
+  card.fields.voice_feedback = "";
+  persistActiveCards();
+}
+
+function startCatalogEditVoice(cardId) {
+  const card = state.cards.find((item) => item.id === cardId && item.type === "CatalogWorkspaceCard");
+  if (!card?.fields?.selected_id) return;
+  startVoiceCapture(
+    (transcript) => {
+      const result = applyCatalogEditVoice(catalogEditDraft(card), transcript, card.fields.voice_field);
+      card.fields.voice_feedback = result.feedback;
+      if (result.applied) {
+        card.fields.voice_field = result.field;
+        card.fields.edit_draft = JSON.stringify(result.draft);
+      }
+      persistActiveCards();
+      render();
+    },
+    (message) => {
+      card.fields.voice_feedback = message;
+      persistActiveCards();
+    }
+  );
+}
+
 function cancelCatalogEdit(cardId) {
   const card = state.cards.find((item) => item.id === cardId && item.type === "CatalogWorkspaceCard");
   if (!card) return;
   card.fields.selected_id = "";
   card.fields.edit_draft = "";
+  card.fields.voice_field = "";
+  card.fields.voice_feedback = "";
   persistActiveCards();
   render();
 }
@@ -3248,6 +3288,8 @@ function approveCatalogEdit(cardId) {
   addFeed("system", `${result.updated.name} updated in the Pharmacy Catalog.`);
   card.fields.selected_id = "";
   card.fields.edit_draft = "";
+  card.fields.voice_field = "";
+  card.fields.voice_feedback = "";
   card.fields.item_count = String(pharmacyBrain.catalog.length);
   persistActiveCards();
   refreshNotifications();
