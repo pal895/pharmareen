@@ -2,12 +2,12 @@ import { buildStoredZip, xml } from "./ooxmlPackage.js";
 import { buildMedicineFinderIndex, medicineFinderClientScript } from "./medicineFinder.js";
 
 export const EXPORT_FORMATS = Object.freeze([
-  { id: "xlsx", group: "polished", label: "Excel", help: "Search, filter, edit or analyze your complete inventory" },
-  { id: "pdf", group: "polished", label: "PDF", help: "Easiest phone reading, sharing and printing" },
-  { id: "docx", group: "polished", label: "Word", help: "Editable working document for notes, corrections and review" },
-  { id: "pptx", group: "polished", label: "Presentation", help: "Large-screen briefing for owners, staff or suppliers" },
-  { id: "print", group: "polished", label: "Print", help: "Print-ready browser layout" },
-  { id: "csv", group: "data", label: "CSV data file", help: "Plain data transfer for systems and imports — no visual styling" }
+  { id: "xlsx", group: "polished", label: "Excel", help: "Analyze, filter, reconcile, calculate and plan purchasing", purpose: "Inventory analysis and pharmacy operations" },
+  { id: "pdf", group: "polished", label: "PDF", help: "Professional read-only phone sharing, printing and formal hand-offs", purpose: "Read-only sharing and formal distribution" },
+  { id: "docx", group: "polished", label: "Word", help: "Review, correct, approve and add typed or handwritten notes", purpose: "Editable owner review and correction" },
+  { id: "pptx", group: "polished", label: "Presentation", help: "Brief management, staff, suppliers, investors or lenders on a large screen", purpose: "Business and management briefing" },
+  { id: "print", group: "polished", label: "Print", help: "Produce a physical working inventory directly from the browser", purpose: "Immediate physical working copy" },
+  { id: "csv", group: "data", label: "CSV data file", help: "Exchange canonical data with other systems and import workflows", purpose: "Machine-to-machine data exchange" }
 ]);
 
 const COLUMNS = Object.freeze([

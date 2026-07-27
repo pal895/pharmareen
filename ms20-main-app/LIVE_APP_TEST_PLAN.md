@@ -767,6 +767,10 @@ If those three checks pass, mark Word Owner Document passed and continue automat
 
 Passed from authoritative owner-device screenshots after Replit pulled `5567f92`. The fresh DOCX is ten portrait pages: one readable owner overview and nine review pages with four intact medicine cards per full page, all 35 medicines, and medicines 33–35 on page 10. Focused final polish makes missing stock a smaller `Stock not recorded` label, preserves numeric zero, and adds `Add note or correction here` with restrained writing lines to every card. Microsoft Word rendered the exact production DOCX as ten pages. A typed-note save/reopen round-trip preserved every medicine exactly once and confirmed ordinary editable OOXML with no document protection, macros or flattened pages. Word Owner Copy is passed and protected.
 
+Final owner-device evidence after `c561003` confirms the protected polish in the fresh 104.43 KB download across all ten pages: missing stock is calm, real stock remains prominent, note prompts and working areas are visible, all 35 medicines remain present, and no card is clipped or broken. Word Owner Copy is permanently passed. Do not repeat it without genuine regression evidence.
+
+Permanent gate for every current or future Export Hub format: first state why a pharmacy owner deliberately chooses it instead of every alternative. The shared format registry must carry a unique operational purpose and direct owner-facing explanation. Do not approve duplicate-purpose formats. Preserve the common immutable snapshot, deterministic generation, pharmacy isolation, zero-AI formatting, maintainability and provenance/legal safeguards while designing each renderer for its distinct workflow.
+
 ## Presentation Owner Briefing live validation
 
 Choose Presentation when the pharmacy owner needs to brief staff, partners or suppliers on a large screen. Use Word for editable notes and Excel for inventory analysis.

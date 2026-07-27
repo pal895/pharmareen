@@ -26,6 +26,12 @@ The Main App uses real browser voice capture from the Mic button, direct camera/
 
 WhatsApp/Baileys remains preserved in this repo as an optional external channel for later. Do not use WhatsApp live testing as proof of Main App readiness.
 
+## Permanent Export Hub Format-Purpose Principle
+
+Before implementing, redesigning or approving an export, answer: **Why would a pharmacy owner deliberately choose this format instead of every other available export?**
+
+Every format must own a distinct pharmacy workflow, state that purpose directly in the Export Hub, and derive its data from the same immutable pharmacy-scoped snapshot. Excel is for analysis and operations; PDF is for professional read-only sharing; Word is for editable owner review and corrections; CSV is for machine data exchange; Presentation is for business and management briefings; Print is for an immediate physical working copy. A format whose distinct owner purpose cannot be stated and protected must be redesigned or rejected. See `docs/engineering-memory/export-format-purpose.md`.
+
 ## Replit Main App Live Testing
 
 After pulling this update into Replit, verify the Main App:
