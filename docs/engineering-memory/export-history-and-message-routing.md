@@ -11,3 +11,7 @@ Office exports must be validated before download. PPTX validation checks the ZIP
 The latest card renders status and next action as separate fields. Status is concise and internally derived from the newest history record, for example `CSV completed — 35 medicines`; the opening guidance appears once below it. Resumed legacy records are normalized through the shared metadata registry so a stale `Ready to generate an export` label cannot be paired with an earlier export timestamp or application guidance.
 
 CSV owner evidence passes the one-card update, newest-first 35-medicine history entry and absence of a new export feed message. The generic Android reader opening failure does not change these passed routing behaviors.
+
+Print owner evidence passes the same shared routing boundary: one compact Print history entry, one latest card updated in place and no export feed message. Native Android rendered four complete preview pages for all 35 medicines without a selected printer. The status remains truthful: dialog opening is not physical-print proof.
+
+Shared-root review after the six format passes confirms that current and future formats must inherit pharmacy-scoped history, concise status/next action, deduplication, regeneration, single-card persistence and zero chat-feed generation through the common Export Hub roots. Do not add route-specific copies.

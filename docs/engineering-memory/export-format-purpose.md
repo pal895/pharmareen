@@ -40,7 +40,9 @@ Before download, the production path validates the PPTX container, required OOXM
 - Word Owner Copy: passed and protected.
 - Presentation Owner Briefing: passed and protected.
 - CSV Technical Data Transfer: passed and protected.
-- Print Working Inventory: exact next live checkpoint.
+- Print Working Inventory: passed and protected.
+
+All six current formats are owner-validated. Before any future format or cross-format behavior is implemented, review the shared roots first: `exportFormatMetadata.js`, the immutable canonical export snapshot, `ensureExportHubCard()`, pharmacy-keyed history, `recordExportEvent()` and the common download/Print dispatch. Shared behavior belongs there unless a documented format-specific constraint requires an exception.
 
 ## CSV compatibility checkpoint
 

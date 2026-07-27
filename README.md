@@ -2,11 +2,13 @@
 
 ## Export Hub protected checkpoint (2026-07-27)
 
-Excel Operations Workbook, PDF Professional Report, Word Owner Copy, Presentation Owner Briefing and CSV Technical Data Transfer are owner-validated, permanently passed and regression-protected. Print Working Inventory is the exact next live checkpoint.
+Excel Operations Workbook, PDF Professional Report, Word Owner Copy, Presentation Owner Briefing, CSV Technical Data Transfer and Print Working Inventory are owner-validated, permanently passed and regression-protected. The six-format Export Hub live-validation sequence is complete.
 
 Every export must answer: **Why would a pharmacy owner deliberately choose this format instead of every other available export?** A format is accepted only for a distinct operational workflow. All surfaces consume the shared `exportFormatMetadata.js` registry, and activity updates one persistent pharmacy-scoped Export Hub status card instead of adding chat-feed messages.
 
 Owner evidence confirms the canonical UTF-8-without-BOM CSV opens in Google Sheets as a genuine 35-medicine, 12-column spreadsheet, begins with the exact `Medicine` header, and preserves aligned values and blanks. It is frozen and regression-protected; the unsupported generic Android document reader is outside the compatibility target. See `docs/engineering-memory/csv-compatibility-rules.md`.
+
+Owner evidence confirms Print opens the complete 35-medicine working inventory and Android produces four readable native preview pages without requiring a printer. Opening the dialog is recorded truthfully and never treated as proof of physical printing.
 
 ## Current Product Direction
 
