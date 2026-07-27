@@ -14,12 +14,18 @@ Notifications Pending Review Unread State is owner-validated, passed and protect
 
 Test only the next distinct responsibility:
 
-1. Create one unapproved Paste List review with `Notification Action Test 10 mg tablet 1`. Do not approve it.
-2. Return Home, open the single unread Notifications alert, and visually confirm `Review import` is now one clear compact tappable button rather than a large field-like value.
-3. Tap `Review import` once.
-4. Confirm MS2.0 returns to the exact existing `Notification Action Test` editable review card, with no duplicate review card and no saved medicine.
-5. Cancel/close that draft, open the catalog and confirm `Showing 35 of 35`.
-6. Return Home and confirm Notifications is quiet at zero unread.
+Owner evidence after `9afd4e4` visually passes the compact `Review import` button, catalog cancellation integrity and quiet-state restoration. Routing remains unpassed because the earlier wording did not explicitly say when raw input becomes a review. Repository contract: Mic/typing fills only `paste_input`; no notification is valid yet. Tapping `Review list` performs local parsing, changes that same card to the editable `review` state and creates its one linked unread notification.
+
+1. Open Assistant → `+` → `Paste List`.
+2. Enter `Notification Action Retest 10 mg tablet 1` by Mic or typing.
+3. Confirm the words are visible, then tap the exact `Review list` button once.
+4. Confirm the screen now shows the editable row headed `Notification Action Retest`. Do not approve it.
+5. Tap the top-left back arrow once to return Home. Only now must Home show exactly `1 unread`.
+6. Open Notifications and confirm one compact `Review import` button.
+7. Tap the compact `Review import` button once.
+8. Confirm MS2.0 returns directly to the same existing editable `Notification Action Retest` review card. There must be one review card, not a second copy.
+9. Tap `Cancel` on that editable review, open Catalog and confirm `Showing 35 of 35`.
+10. Return Home and confirm Notifications is `0`, `Quiet`, `No urgent alerts`.
 
 Expected: one shared compact action routes to the existing review, no duplicate card, no catalog/stock save, no sale/payment, no API request and no AI token use. Do not test inventory, expiry or payment-failure alerts yet.
 
