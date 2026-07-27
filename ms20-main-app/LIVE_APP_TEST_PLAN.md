@@ -1,6 +1,6 @@
 # MS2.0 Live Main App Test Plan
 
-## Export Hub format validation complete
+## Current checkpoint — Notifications Quiet State
 
 Excel, PDF, Word, Presentation, CSV and Print are owner-validated, permanently passed and protected. Do not retest or polish them without regression evidence. The one-card status/history architecture is approved.
 
@@ -8,7 +8,15 @@ Print owner evidence confirms the complete 35-medicine view and four readable An
 
 The shared-root review is complete. Common behavior remains centralized in the canonical snapshot, format metadata registry, one pharmacy-scoped Export Hub card, pharmacy-keyed history/event routing and common dispatch. Future formats or shared behavior must extend those roots rather than create route-specific copies.
 
-No owner action is currently required. The six-format Export Hub sequence is closed. Wait for the next repository-defined product checkpoint; do not repeat a passed export or begin a new export format without that checkpoint.
+The next repository-defined stage is Notifications. Test only its healthy quiet state:
+
+1. From MS2.0 Home, capture Notifications showing `0 unread`, `Quiet` and `No urgent alerts.`
+2. Open Notifications once.
+3. Confirm the header says `Notifications`, shows `0 unread`, and the workspace says notifications stay separate from daily sales.
+4. Confirm no notification alert card and no Operations message composer are present; only the Notifications controls remain.
+5. Tap Back once and confirm Home is unchanged.
+
+Do not tap Mark read, create a sale/import/payment, edit stock/catalog data, open Export Hub or trigger an alert. Expected: no new message, draft, notification, catalog/stock mutation, payment, API request or AI token use.
 
 This plan is for Main App live product testing only. Do not return to WhatsApp live testing in this phase.
 

@@ -4,6 +4,8 @@
 
 Excel Operations Workbook, PDF Professional Report, Word Owner Copy, Presentation Owner Briefing, CSV Technical Data Transfer and Print Working Inventory are owner-validated, permanently passed and regression-protected. The six-format Export Hub live-validation sequence is complete.
 
+The next repository-defined live stage is Notifications. Begin with the quiet-state checkpoint only: a healthy catalog with no current deterministic alert must show `0 unread`, remain separate from Operations, and create no message or mutation.
+
 Every export must answer: **Why would a pharmacy owner deliberately choose this format instead of every other available export?** A format is accepted only for a distinct operational workflow. All surfaces consume the shared `exportFormatMetadata.js` registry, and activity updates one persistent pharmacy-scoped Export Hub status card instead of adding chat-feed messages.
 
 Owner evidence confirms the canonical UTF-8-without-BOM CSV opens in Google Sheets as a genuine 35-medicine, 12-column spreadsheet, begins with the exact `Medicine` header, and preserves aligned values and blanks. It is frozen and regression-protected; the unsupported generic Android document reader is outside the compatibility target. See `docs/engineering-memory/csv-compatibility-rules.md`.
