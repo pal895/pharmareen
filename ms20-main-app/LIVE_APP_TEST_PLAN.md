@@ -6,11 +6,11 @@ Excel, PDF, Word and Presentation are owner-validated, permanently passed and pr
 
 Exact next checkpoint: **CSV Technical Data Transfer retest**.
 
-Owner evidence already passes CSV generation, one-file download, the newest 35-medicine history record, the single concise status card, removal of duplicate guidance and no new permanent export message. The repaired header-first CSV still stalls in the tested generic Android document reader, while Microsoft Word shows expected raw CSV text rather than spreadsheet columns. Repository parsers and a spreadsheet-engine round trip pass, so do not alter the canonical file for these non-spreadsheet viewers. Rows/columns remain owner-unverified and CSV is not passed.
+Google Sheets owner evidence passes genuine spreadsheet opening, 35 medicines, one row per medicine, the full aligned 12-column structure and preserved blanks. Download/history, the single concise status card, removed duplicate guidance and clean sales conversation remain passed. The one remaining defect is the visible BOM text `ï»¿` before `Medicine`; the shared generator now emits UTF-8 without BOM.
 
-No Replit pull/restart is required for the next attempt because no product code changed after the deployed compatibility repair. Open only the newest existing CSV in Microsoft Excel, Google Sheets, LibreOffice Calc or another genuine spreadsheet application. Show the canonical header and several medicine rows; confirm headings occupy separate columns, each medicine occupies one row, and price, stock, supplier, barcode, batch and expiry values remain under their headings. Do not use Word or a generic document reader, do not generate another file, and do not test Print.
+After pulling/restarting, generate exactly one fresh CSV and open it in Google Sheets. Confirm only that cell A1 reads exactly `Medicine`, with no characters before it. Do not repeat the already-passed row/column inspection, do not use the generic document reader, and do not test Print.
 
-Expected production shape: the first row is `Medicine, Strength, Form, Unit, Selling price (KES), Cost price (KES), Stock, Supplier, Barcode, Batch, Expiry, Shelf`; 35 medicine rows follow with 12 fields each. The file is UTF-8 with BOM, comma-delimited, CRLF-terminated, safely quoted, formula-protected and downloaded as `text/csv; charset=utf-8` with one `.csv` filename.
+Expected production shape: the first row is `Medicine, Strength, Form, Unit, Selling price (KES), Cost price (KES), Stock, Supplier, Barcode, Batch, Expiry, Shelf`; 35 medicine rows follow with 12 fields each. The file is UTF-8 without BOM, comma-delimited, CRLF-terminated, safely quoted, formula-protected and downloaded as `text/csv; charset=utf-8` with one `.csv` filename.
 
 This plan is for Main App live product testing only. Do not return to WhatsApp live testing in this phase.
 

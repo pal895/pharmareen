@@ -91,7 +91,7 @@ function parseCsv(text) {
   let row = [];
   let cell = "";
   let quoted = false;
-  const source = text.replace(/^\ufeff/, "");
+  const source = text;
   for (let index = 0; index < source.length; index += 1) {
     const character = source[index];
     if (quoted) {
@@ -136,7 +136,9 @@ assert.equal(parsedSecuredCsv[1][1], "5 mg extended");
 assert.equal(parsedSecuredCsv[1][7], 'Dawa "Bora", Nairobi');
 assert.equal(parsedSecuredCsv[1][8], "'001234567890");
 assert.equal(parsedSecuredCsv[2][8], "'000000000007");
-assert.ok(securedCsv.startsWith("\ufeffMedicine,Strength,Form,Unit,Selling price (KES),Cost price (KES),Stock,Supplier,Barcode,Batch,Expiry,Shelf\r\n"));
+assert.ok(securedCsv.startsWith("Medicine,Strength,Form,Unit,Selling price (KES),Cost price (KES),Stock,Supplier,Barcode,Batch,Expiry,Shelf\r\n"));
+assert.equal(securedCsv.charCodeAt(0), "M".charCodeAt(0));
+assert.equal(securedCsv.includes("\ufeff"), false);
 assert.equal(securedCsv.endsWith("\r\n"), true);
 assert.equal(securedCsv.includes("\0"), false);
 assert.equal(securedCsv.replaceAll("\r\n", "").includes("\n"), false);
@@ -200,7 +202,8 @@ assert.doesNotMatch(zeroAndMissingDocx, /<w:pStyle w:val="StockValue"\/>[\s\S]*?
 assert.match(zeroAndMissingDocx, /Expiry: Not recorded/);
 assert.match(zeroAndMissingDocx, /Supplier: Not recorded/);
 assert.doesNotMatch(zeroAndMissingDocx, /Batch:|Shelf:|Barcode:/);
-assert.match(outputs.csv, /^\ufeffMedicine,Strength,Form,Unit,Selling price \(KES\),Cost price \(KES\),Stock,Supplier,Barcode,Batch,Expiry,Shelf\r\n/);
+assert.match(outputs.csv, /^Medicine,Strength,Form,Unit,Selling price \(KES\),Cost price \(KES\),Stock,Supplier,Barcode,Batch,Expiry,Shelf\r\n/);
+assert.equal(outputs.csv.includes("\ufeff"), false);
 assert.match(outputs.csv, /Amoxicillin,500 mg,capsule,capsule,20,12,40/);
 assert.equal(new TextDecoder().decode(outputs.pdf.slice(0, 8)), "%PDF-1.4");
 for (const format of ["xlsx", "docx", "pptx"]) assert.equal(new TextDecoder().decode(outputs[format].slice(0, 2)), "PK");

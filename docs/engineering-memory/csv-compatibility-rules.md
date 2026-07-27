@@ -14,7 +14,7 @@ The one production CSV has:
 
 ## Encoding and serialization
 
-- Encoding: UTF-8 with BOM, retained for broad Microsoft Excel and Unicode recognition.
+- Encoding: UTF-8 without BOM. Owner evidence showed Google Sheets importing the BOM as visible `ï»¿` text before the first header.
 - Delimiter: comma.
 - Record ending: CRLF, including the final record.
 - Quoting: fields containing comma or double quote use RFC-style double-quote wrapping; internal double quotes are doubled.
@@ -34,4 +34,4 @@ Recommended opening applications are Microsoft Excel, Google Sheets and LibreOff
 
 Evidence on 2026-07-27 passes generation, one-file download, the 35-medicine newest history entry, the single concise Export Hub card, removal of duplicate guidance and no new permanent export message. The repaired header-first CSV still stalled indefinitely in the tested generic Android document reader. Microsoft Word displayed the expected raw comma-separated text because Word is a document/text viewer for this route, not a spreadsheet renderer.
 
-The production artifact continues to pass the repository's 35-row/12-column parser assertions, formula/Unicode/escaping fixtures and a spreadsheet-engine import round trip. No further standards-safe CSV change is indicated. The remaining observed failure is application support, not malformed CSV. CSV remains open until a genuine spreadsheet application shows the header and medicine rows in separate aligned columns. Print remains excluded.
+Google Sheets owner evidence confirms the file opens as a genuine spreadsheet with 35 medicines, one medicine per row, 12 separated and aligned columns, and blank values that do not shift later fields. The only remaining CSV defect was a visibly decoded BOM before `Medicine`; the shared generator now omits the BOM while preserving UTF-8, CRLF and every structural/security rule. The generic Android document reader remains unsupported. CSV remains open only for one focused confirmation that the newest file begins with the exact visible header `Medicine`. Print remains excluded.

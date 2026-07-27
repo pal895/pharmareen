@@ -6,7 +6,7 @@ Excel Operations Workbook, PDF Professional Report, Word Owner Copy, and Present
 
 Every export must answer: **Why would a pharmacy owner deliberately choose this format instead of every other available export?** A format is accepted only for a distinct operational workflow. All surfaces consume the shared `exportFormatMetadata.js` registry, and activity updates one persistent pharmacy-scoped Export Hub status card instead of adding chat-feed messages.
 
-Owner evidence confirms CSV generation, one-file download, the newest 35-medicine history entry, the single updated Export Hub card and no new chat-feed message. A generic Android document reader stalled before showing spreadsheet columns, so CSV remains open. The canonical CSV now starts immediately with its 12-column header, contains exactly one medicine per later row, uses UTF-8 BOM plus CRLF, ends with CRLF, replaces embedded record line breaks with spaces, and retains RFC-style quoting, formula-injection protection and leading-zero barcode preservation. See `docs/engineering-memory/csv-compatibility-rules.md`.
+Owner evidence confirms Google Sheets opens the CSV as a genuine 35-medicine, 12-column spreadsheet with aligned values and blanks. Google Sheets exposed the UTF-8 BOM as visible `ï»¿` text before `Medicine`, so the canonical export now uses UTF-8 without BOM. It starts immediately with the exact header, uses CRLF including the final record, replaces embedded record line breaks with spaces, and retains standards quoting, formula-injection protection and leading-zero barcode preservation. The unsupported generic Android document reader remains outside the compatibility target. See `docs/engineering-memory/csv-compatibility-rules.md`.
 
 ## Current Product Direction
 

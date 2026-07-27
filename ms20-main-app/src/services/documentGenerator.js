@@ -94,7 +94,7 @@ export function buildCatalogCsv(items = []) {
 export function buildInventoryCsv(model) {
   validateInventoryExportSnapshot(model);
   const rows = [COLUMNS.map(([, label]) => label), ...model.rows.map((row) => COLUMNS.map(([key]) => csvFieldValue(key, row[key])))];
-  return `\ufeff${rows.map((row) => row.map(csvCell).join(",")).join("\r\n")}\r\n`;
+  return `${rows.map((row) => row.map(csvCell).join(",")).join("\r\n")}\r\n`;
 }
 
 export function buildInventoryXlsx(model) {
