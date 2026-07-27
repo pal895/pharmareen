@@ -10,15 +10,17 @@ The shared-root review is complete. Common behavior remains centralized in the c
 
 Notifications Quiet State is owner-validated, passed and protected. Evidence confirms Home and the separate Notifications workspace both showed zero unread, no alert card or Operations composer appeared, returning Home was unchanged, and no operational mutation occurred. Do not repeat it without regression evidence.
 
-Test only the next deterministic Notifications responsibility:
+The first owner attempt after `b9558ff` remains failed: the editable review appeared but the notification projection was not refreshed, so the expected unread alert never existed. The shared lifecycle repair is implemented and protected. Repeat this same checkpoint only:
 
 1. From Home, open MS2.0 Assistant, tap `+`, then `Paste List`.
-2. Paste `Notification Test Medicine 10 mg tablet 1` and continue only until one editable import review is visible. Do not approve or save it.
-3. Return Home. Confirm Notifications shows exactly `1 unread` and a non-quiet pending-review preview.
-4. Open Notifications once. Confirm the header shows `1 unread` and exactly one `Medicine import needs approval` alert whose action is `Review import`.
-5. Confirm the alert remains separate from daily sales and no Operations composer appears.
-6. Capture the Home unread state and the complete Notifications alert. Do not tap `Mark read`.
-7. Return to Operations and cancel/close the unapproved test draft. Confirm the saved catalog remains 35 medicines.
+2. Confirm compact `Mic`, `Camera` and `Photo` controls are visible in the Paste List card.
+3. Tap `Mic` and say `Notification Test Medicine 10 mg tablet 1`. Confirm the words appear in the medicine-list field. If browser voice is unavailable, capture its truthful unavailable state and type the same line.
+4. Tap `Review list` once and confirm one editable import review appears. Do not approve or save it.
+5. Return Home. Confirm Notifications shows exactly `1 unread` and a non-quiet pending-review preview.
+6. Open Notifications once. Confirm the header shows `1 unread` and exactly one `Medicine import needs approval` alert whose action is `Review import`.
+7. Confirm the alert remains separate from daily sales and no Operations composer appears.
+8. Capture the Paste List controls, Home unread state and complete Notifications alert. Do not tap `Mark read`.
+9. Return to Operations and cancel/close the unapproved test draft. Confirm the saved catalog remains 35 medicines.
 
 Expected: one deterministic local pending-review notification, no catalog/stock save, no sale/payment, no API request and no AI token use. This is one Notifications test; do not test inventory, expiry, payment-failure or read-state behavior yet.
 

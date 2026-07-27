@@ -68,7 +68,7 @@ export function buildDeterministicNotifications({ catalog = [], pendingCards = [
         action: "Open review"
       }));
     }
-    if (card.type === "CatalogImportCard") {
+    if (card.type === "CatalogImportCard" && card.fields?.entry_mode === "review") {
       notifications.push(createNotification({
         category: "Learning",
         key: `import-${card.id}`,

@@ -183,6 +183,7 @@ state.printPreview = null;
 state.shelfAcquisitionOpen = false;
 state.pendingScanType = "medicine_photo";
 state.stockFixPhotoCardId = "";
+state.catalogPasteCaptureCardId = "";
 state.cardFontScale = readCardFontScale();
 hydrateResumeState();
 state.notifications = readNotifications();
@@ -619,6 +620,7 @@ function cardBodyTemplate(card, displayed) {
     return `
       <div class="catalog-paste-input">
         ${fieldTemplate(card, "items_text")}
+        ${catalogPasteAcquisitionTemplate(card)}
         <p>Paste one medicine per line. Nothing is saved until you review and approve the parsed rows.</p>
       </div>
     `;
@@ -816,6 +818,7 @@ function catalogImportTableTemplate(card) {
     .join(" ");
   return `
     <div class="catalog-import-editor">
+      ${card.fields?.method === "bulk paste" ? catalogPasteAcquisitionTemplate(card) : ""}
       ${invoiceMode ? invoiceSummaryTemplate(card) : ""}
       <div class="catalog-table-wrap" style="--catalog-columns: ${columnTemplate};">
         <table class="catalog-import-table" aria-label="Medicine catalog review">
@@ -839,6 +842,17 @@ function catalogImportTableTemplate(card) {
         : invoiceMode
           ? "Check every field against the invoice. If repeated scans differ, edit the fields to match the invoice, then approve."
           : "Edit each medicine, then approve. Empty medicine names are ignored."}</p>
+    </div>
+  `;
+}
+
+function catalogPasteAcquisitionTemplate(card) {
+  const voiceBusy = state.voice.starting || state.voice.listening;
+  return `
+    <div class="card-actions catalog-paste-acquisition" aria-label="Add medicines without typing">
+      <button type="button" data-action="catalog-paste-voice" data-card-id="${card.id}" ${voiceBusy ? "disabled" : ""}>${voiceBusy ? "Listening…" : "Mic"}</button>
+      <button type="button" data-action="catalog-paste-camera" data-card-id="${card.id}">Camera</button>
+      <button type="button" data-action="catalog-paste-photo" data-card-id="${card.id}">Photo</button>
     </div>
   `;
 }
@@ -1230,6 +1244,9 @@ function handleAction(dataset) {
     render();
   }
   if (action === "review-paste-list") reviewPasteList(dataset.cardId);
+  if (action === "catalog-paste-voice") startCatalogPasteVoice(dataset.cardId);
+  if (action === "catalog-paste-camera") startCatalogPastePhoto(dataset.cardId, true);
+  if (action === "catalog-paste-photo") startCatalogPastePhoto(dataset.cardId, false);
   if (action === "add-catalog-row") addCatalogImportRow(dataset.cardId);
   if (action === "move-catalog-row") moveCatalogImportRow(dataset.cardId, dataset.rowIndex, dataset.direction);
   if (action === "start-catalog-file") {
@@ -1748,6 +1765,19 @@ async function addPhotoCards(fileOrName, scanType, knownFixture) {
   if (shelfFixture) {
     const recognizedItems = shelfFixture.items.filter((item) => sourceBrain.lookupMedicine(item.name).status === "matched");
     if (recognizedItems.length === shelfFixture.items.length) {
+      const targetedPasteCard = state.cards.find((item) =>
+        item.id === state.catalogPasteCaptureCardId
+        && item.type === "CatalogImportCard"
+      );
+      if (targetedPasteCard) {
+        state.catalogPasteCaptureCardId = "";
+        applyCatalogPasteReview(targetedPasteCard, recognizedItems, {
+          method: "shelf photo",
+          source: fileName,
+          feedback: "Read locally from the selected photo. Check every medicine and field. Nothing is saved until approval."
+        });
+        return true;
+      }
       const card = createPasteImportCard(catalogItemsToText(recognizedItems));
       card.title = "Review shelf medicines";
       card.source = fileName;
@@ -2997,18 +3027,59 @@ function reviewPasteList(cardId) {
     render();
     return;
   }
+  applyCatalogPasteReview(card, newItems, {
+    existing,
+    unclearCount: parsed.unclear.length
+  });
+}
+
+function applyCatalogPasteReview(card, newItems, {
+  existing = [],
+  unclearCount = 0,
+  method = "bulk paste",
+  source = "",
+  feedback = ""
+} = {}) {
   card.fields.entry_mode = "review";
+  card.fields.method = method;
   card.fields.catalog_rows = JSON.stringify(newItems);
   card.fields.items_text = catalogItemsToText(newItems);
   card.fields.existing_medicines_ignored = existing.map((item) => item.name).join(", ");
-  card.validation = [
+  if (source) card.source = source;
+  card.validation = feedback || [
     `${newItems.length} new medicine(s) ready for review.`,
     existing.length ? `${existing.length} existing medicine(s) were not added again: ${existing.map((item) => item.name).join(", ")}.` : "No existing catalog medicines were repeated.",
-    parsed.unclear.length ? `${parsed.unclear.length} line(s) need correction.` : "Check every field, then approve."
+    unclearCount ? `${unclearCount} line(s) need correction.` : "Check every field, then approve."
   ].join(" ");
   card.fields.review_feedback = card.validation;
   persistActiveCards();
+  refreshNotifications();
   render();
+  focusCard(card.id);
+}
+
+function startCatalogPasteVoice(cardId) {
+  const card = state.cards.find((item) => item.id === cardId && item.type === "CatalogImportCard");
+  if (!card) return;
+  startVoiceCapture((transcript) => {
+    const current = String(card.fields?.items_text || "").trim();
+    card.fields.items_text = [current, String(transcript || "").trim()].filter(Boolean).join("\n");
+    card.fields.entry_mode = "paste_input";
+    card.validation = "Voice added to the medicine list. Check the words, then tap Review list.";
+    card.fields.review_feedback = card.validation;
+    persistActiveCards();
+    render();
+    focusCard(card.id);
+  });
+}
+
+function startCatalogPastePhoto(cardId, camera) {
+  const card = state.cards.find((item) => item.id === cardId && item.type === "CatalogImportCard");
+  if (!card) return;
+  state.catalogPasteCaptureCardId = card.id;
+  state.pendingScanType = "shelf_photo";
+  if (camera) void openLightweightCamera("shelf_photo");
+  else root.querySelector("#photoInput")?.click();
 }
 
 function confirmCard(cardId) {

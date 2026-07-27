@@ -89,6 +89,10 @@ assert(appSource.includes("catalog-import-editor"), "Catalog import card must us
 assert(appSource.includes("catalog-import-table"), "Catalog import card must expose column editing");
 assert(appSource.includes("catalogImportMobileRowTemplate"), "Catalog import card must expose mobile medicine rows");
 assert(appSource.includes("catalog-mobile-rows"), "Catalog import card must render mobile-friendly rows");
+assert(appSource.includes('data-action="catalog-paste-voice"'), "Paste List must reuse the shared microphone lifecycle");
+assert(appSource.includes('data-action="catalog-paste-camera"'), "Paste List must reuse the shared camera lifecycle");
+assert(appSource.includes('data-action="catalog-paste-photo"'), "Paste List must reuse the shared photo picker");
+assert(appSource.includes("applyCatalogPasteReview") && appSource.includes("refreshNotifications();"), "A review-ready Paste List must refresh Notifications");
 assert(appSource.includes("data-catalog-field"), "Catalog table cells must be editable");
 assert(appSource.includes("updateCatalogImportCell"), "Catalog table edits must update the approved payload");
 assert(appSource.includes("pruneCatalogOnboardingCards"), "Saved catalog must prune stale onboarding cards");
@@ -298,6 +302,10 @@ assert(notifications.some((item) => item.category === "Inventory"), "Low-stock n
 assert(notifications.some((item) => item.category === "Expiry"), "Expiry notification missing");
 const blankStockNotifications = buildDeterministicNotifications({ catalog: [{ name: "Zinc", stockLeft: "" }] });
 assert(!blankStockNotifications.some((item) => item.category === "Inventory"), "Blank stock must not create out-of-stock notifications");
+const pasteInputNotifications = buildDeterministicNotifications({ catalog: [{ name: "Zinc" }], pendingCards: [{ id: "paste-input", type: "CatalogImportCard", fields: { entry_mode: "paste_input" } }] });
+assert(!pasteInputNotifications.some((item) => item.id === "learning-import-paste-input"), "An input-only Paste List must not create a pending-review notification");
+const pasteReviewNotifications = buildDeterministicNotifications({ catalog: [{ name: "Zinc" }], pendingCards: [{ id: "paste-review", type: "CatalogImportCard", fields: { entry_mode: "review" } }] });
+assert(pasteReviewNotifications.some((item) => item.id === "learning-import-paste-review" && item.title === "Medicine import needs approval"), "A review-ready Paste List must create one truthful unread notification");
 const setupNotifications = buildDeterministicNotifications({ catalog: [], catalogRequired: false });
 assert(!setupNotifications.some((item) => item.id === "learning-catalog-empty"), "Catalog notification must wait until setup is complete");
 const prunedNotifications = mergeNotifications(
