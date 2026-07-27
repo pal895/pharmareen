@@ -36,6 +36,7 @@ assert.deepEqual(EXPORT_FORMATS.map((format) => format.id), ["xlsx", "pdf", "doc
 assert.deepEqual(EXPORT_FORMATS.filter((format) => format.group === "polished").map((format) => format.id), ["xlsx", "pdf", "docx", "pptx", "print"]);
 assert.deepEqual(EXPORT_FORMATS.filter((format) => format.group === "data").map((format) => format.id), ["csv"]);
 assert.match(EXPORT_FORMATS.find((format) => format.id === "csv").help, /no visual styling/i);
+assert.match(EXPORT_FORMATS.find((format) => format.id === "pptx").help, /Large-screen briefing for owners, staff or suppliers/);
 assert.throws(() => buildCanonicalInventoryExport({ pharmacy, items: [{ ...items[0], name: "" }], generatedAt }), /mandatory medicine name/);
 assert.throws(() => buildCanonicalInventoryExport({ pharmacy, items: [items[0], { ...items[0] }], generatedAt }), /duplicate medicine identity/);
 assert.throws(() => validateInventoryExportSnapshot({ ...model, summary: { ...model.summary, medicineCount: 714 } }), /medicineCount/);
@@ -74,12 +75,20 @@ const zeroAndMissingDocx = new TextDecoder().decode(buildInventoryDocx(buildCano
   items: [{ name: "Zero Stock Example", stockLeft: 0, sellingPrice: 0, costPrice: "", supplier: "", barcode: "", batches: [], shelf: "" }],
   generatedAt
 })));
+const missingStockDocx = new TextDecoder().decode(buildInventoryDocx(buildCanonicalInventoryExport({
+  pharmacy,
+  items: [{ name: "Missing Stock Example", stockLeft: "", sellingPrice: 10, costPrice: 5, supplier: "", barcode: "", batches: [], shelf: "" }],
+  generatedAt
+})));
 assert.match(zeroAndMissingPdf, /Stock 0/);
 assert.match(zeroAndMissingPdf, /Selling KES 0 \| Cost KES Not recorded/);
 assert.match(zeroAndMissingPdf, /Expiry: Not recorded/);
 assert.doesNotMatch(zeroAndMissingPdf, /Supplier:|Batch:|Shelf:|Barcode:/);
 assert.match(zeroAndMissingDocx, /Selling KES 0 \| Cost KES Not recorded/);
 assert.match(zeroAndMissingDocx, /<w:pStyle w:val="StockValue"\/>[\s\S]*?>0</);
+assert.match(missingStockDocx, /<w:pStyle w:val="StockMissing"\/>[\s\S]*?>Stock not recorded</);
+assert.doesNotMatch(missingStockDocx, /<w:pStyle w:val="StockValue"\/>/);
+assert.doesNotMatch(zeroAndMissingDocx, /<w:pStyle w:val="StockValue"\/>[\s\S]*?>Not recorded</);
 assert.match(zeroAndMissingDocx, /Expiry: Not recorded/);
 assert.match(zeroAndMissingDocx, /Supplier: Not recorded/);
 assert.doesNotMatch(zeroAndMissingDocx, /Batch:|Shelf:|Barcode:/);
@@ -194,7 +203,13 @@ for (const item of items) {
   assert.equal((decodedPdf.match(new RegExp(item.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length, 1, `PDF must contain ${item.name} exactly once in the inventory section`);
   assert.match(outputs.html, new RegExp(`class="record-main"[\\s\\S]*?${item.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), `Print missing ${item.name}`);
 }
-assert.equal((decodedPackages.pptx.match(/<p:sldId /g) || []).length, 8);
+assert.equal((decodedPackages.pptx.match(/<p:sldId /g) || []).length, 9);
+assert.match(decodedPackages.pptx, /Pharmacy inventory briefing/);
+assert.match(decodedPackages.pptx, /Inventory overview/);
+assert.match(decodedPackages.pptx, /Choose Presentation for a clear staff, owner or supplier briefing on a large screen\./);
+assert.match(decodedPackages.pptx, /Medicines 1-5 of 35/);
+assert.match(decodedPackages.pptx, /Medicines 31-35 of 35/);
+assert.equal((decodedPackages.pptx.match(/Inventory review \| [1-7] of 7/g) || []).length, 7);
 assert.equal((decodedPackages.docx.match(/w:type="page"/g) || []).length, 9);
 assert.equal((decodedPdf.match(/\/Type \/Page\b/g) || []).length, 8);
 assert.equal((decodedPdf.match(/\/MediaBox \[0 0 595 842\]/g) || []).length, 8);
@@ -208,6 +223,10 @@ assert.match(decodedPackages.docx, /Editable Pharmacy Inventory/);
 assert.match(decodedPackages.docx, /Use this document to review inventory, record corrections and add working notes\./);
 assert.match(decodedPackages.docx, /General owner notes \/ corrections/);
 assert.equal((decodedPackages.docx.match(/OWNER NOTES \/ CORRECTIONS/g) || []).length, 35);
+assert.equal((decodedPackages.docx.match(/Add note or correction here/g) || []).length, 35);
+assert.match(decodedPackages.docx, /ms20\.word-owner-copy\.v2/);
+assert.doesNotMatch(decodedPackages.docx, /w:documentProtection|vbaProject|<w:drawing/);
+assert.match(decodedPackages.docx, /<w:t xml:space="preserve"> <\/w:t>/);
 assert.equal((decodedPackages.docx.match(/<w:tbl>/g) || []).length, 37);
 assert.match(decodedPackages.docx, /<w:pgSz w:w="12240" w:h="15840"\/>/);
 assert.doesNotMatch(decodedPackages.docx, /w:orient="landscape"/);
@@ -215,6 +234,10 @@ assert.equal((decodedPackages.docx.match(/<w:tblW w:w="9360" w:type="dxa"\/>/g) 
 assert.equal((decodedPackages.docx.match(/<w:tblInd w:w="120" w:type="dxa"\/>/g) || []).length, 37);
 assert.match(decodedPackages.docx, /Medicines 1-4 of 35 \| Page 2 of 10/);
 assert.match(decodedPackages.docx, /Medicines 33-35 of 35 \| Page 10 of 10/);
+for (const item of items) {
+  const escaped = item.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  assert.equal((decodedPackages.docx.match(new RegExp(`>${escaped}<`, "g")) || []).length, 1, `DOCX must contain ${item.name} exactly once`);
+}
 for (const match of decodedPackages.pptx.matchAll(/<a:off x="(\d+)" y="(\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"\/>/g)) {
   const [, x, y, width, height] = match.map(Number);
   assert.ok(x + width <= 12192000, `PPTX shape overflows horizontally: ${x + width}`);

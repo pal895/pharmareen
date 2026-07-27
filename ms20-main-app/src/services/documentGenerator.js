@@ -5,7 +5,7 @@ export const EXPORT_FORMATS = Object.freeze([
   { id: "xlsx", group: "polished", label: "Excel", help: "Search, filter, edit or analyze your complete inventory" },
   { id: "pdf", group: "polished", label: "PDF", help: "Easiest phone reading, sharing and printing" },
   { id: "docx", group: "polished", label: "Word", help: "Editable working document for notes, corrections and review" },
-  { id: "pptx", group: "polished", label: "Presentation", help: "Landscape inventory briefing slides" },
+  { id: "pptx", group: "polished", label: "Presentation", help: "Large-screen briefing for owners, staff or suppliers" },
   { id: "print", group: "polished", label: "Print", help: "Print-ready browser layout" },
   { id: "csv", group: "data", label: "CSV data file", help: "Plain data transfer for systems and imports — no visual styling" }
 ]);
@@ -28,6 +28,7 @@ const PRINT_RECORDS_PER_PAGE = 9;
 const PDF_RECORDS_PER_PAGE = 5;
 const OFFICE_RECORDS_PER_PAGE = 5;
 const WORD_RECORDS_PER_PAGE = 4;
+const WORD_LAYOUT_VERSION = "ms20.word-owner-copy.v2";
 
 export function buildCanonicalInventoryExport({ pharmacy, items, generatedAt = new Date() }) {
   const pharmacyId = clean(pharmacy?.id);
@@ -152,13 +153,18 @@ export function buildInventoryDocx(model) {
     entry("[Content_Types].xml", `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`),
     entry("_rels/.rels", rels([["rId1", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument", "word/document.xml"], ["rId2", "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties", "docProps/core.xml"], ["rId3", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties", "docProps/app.xml"]])),
     entry("word/document.xml", document), entry("word/_rels/document.xml.rels", rels([["rId1", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles", "styles.xml"]])),
-    entry("word/styles.xml", wordStyles()), entry("docProps/core.xml", coreProps(model)), entry("docProps/app.xml", appProps("Microsoft Word"))
+    entry("word/styles.xml", wordStyles()), entry("docProps/core.xml", coreProps(model, WORD_LAYOUT_VERSION)), entry("docProps/app.xml", appProps("Microsoft Word"))
   ]);
 }
 
 export function buildInventoryPptx(model) {
+  validateInventoryExportSnapshot(model);
   const chunks = balancedChunks(model.rows, OFFICE_RECORDS_PER_PAGE);
-  const slides = [titleSlide(model), ...chunks.map((rows, index) => tableSlide(model, rows, index + 1, chunks.length))];
+  const slides = [
+    titleSlide(model),
+    presentationOverviewSlide(model),
+    ...chunks.map((rows, index) => presentationInventorySlide(model, rows, index + 1, chunks.length))
+  ];
   const overrides = slides.map((_, i) => `<Override PartName="/ppt/slides/slide${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`).join("");
   const slideIds = slides.map((_, i) => `<p:sldId id="${256 + i}" r:id="rId${i + 2}"/>`).join("");
   const slideRels = slides.map((_, i) => [`rId${i + 2}`, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide", `slides/slide${i + 1}.xml`]);
@@ -482,7 +488,7 @@ function wordOwnerRecord(row) {
   return Object.freeze({
     medicine: row.medicine,
     identity: [row.strength, row.form, row.unit].filter(recordedValue).join(" | ") || "Strength / form / unit not recorded",
-    stock: important("stock"),
+    stock: recordedValue(row.stock) ? row.stock : "",
     prices: `Selling KES ${important("sellingPrice")} | Cost KES ${important("costPrice")}`,
     supplier: recordedValue(row.supplier) ? `Supplier: ${row.supplier}` : "Supplier: Not recorded",
     trace: [
@@ -504,9 +510,11 @@ function wordMedicineCard(row, index) {
     wordP(record.trace, "Trace")
   ].join("");
   const right = [
-    wordP("STOCK", "StockLabel"),
-    wordP(String(record.stock), "StockValue"),
+    record.stock === ""
+      ? wordP("Stock not recorded", "StockMissing")
+      : `${wordP("STOCK", "StockLabel")}${wordP(String(record.stock), "StockValue")}`,
     wordP("OWNER NOTES / CORRECTIONS", "NotesLabel"),
+    wordP("Add note or correction here", "CardNotesPrompt"),
     wordP(" ", "NotesLine"),
     wordP(" ", "NotesLine"),
     wordP(" ", "NotesLine")
@@ -553,7 +561,9 @@ function wordStyles() { return `<?xml version="1.0"?><w:styles xmlns:w="http://s
 <w:style w:type="paragraph" w:styleId="Trace"><w:name w:val="Trace"/><w:pPr><w:spacing w:after="35" w:line="280" w:lineRule="auto"/></w:pPr><w:rPr><w:color w:val="536B66"/><w:sz w:val="21"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="StockLabel"><w:name w:val="Stock label"/><w:pPr><w:spacing w:after="20"/><w:jc w:val="center"/></w:pPr><w:rPr><w:b/><w:color w:val="536B66"/><w:sz w:val="19"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="StockValue"><w:name w:val="Stock value"/><w:pPr><w:spacing w:after="100"/><w:jc w:val="center"/></w:pPr><w:rPr><w:b/><w:color w:val="086C5C"/><w:sz w:val="34"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="StockMissing"><w:name w:val="Stock missing"/><w:pPr><w:spacing w:after="100"/><w:jc w:val="center"/></w:pPr><w:rPr><w:color w:val="536B66"/><w:sz w:val="22"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="NotesLabel"><w:name w:val="Notes label"/><w:pPr><w:spacing w:after="40"/><w:jc w:val="center"/></w:pPr><w:rPr><w:b/><w:color w:val="536B66"/><w:sz w:val="18"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="CardNotesPrompt"><w:name w:val="Card notes prompt"/><w:pPr><w:spacing w:after="45"/><w:jc w:val="center"/></w:pPr><w:rPr><w:color w:val="7E9B95"/><w:sz w:val="18"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="NotesPrompt"><w:name w:val="Notes prompt"/><w:pPr><w:spacing w:after="80"/></w:pPr><w:rPr><w:color w:val="536B66"/><w:sz w:val="21"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="NotesLine"><w:name w:val="Notes line"/><w:pPr><w:spacing w:after="80" w:line="280" w:lineRule="auto"/><w:pBdr><w:bottom w:val="single" w:sz="4" w:color="B7CDC8"/></w:pBdr></w:pPr><w:rPr><w:sz w:val="21"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="MetricLabel"><w:name w:val="Metric label"/><w:pPr><w:spacing w:after="0"/></w:pPr><w:rPr><w:b/><w:color w:val="19332F"/><w:sz w:val="23"/></w:rPr></w:style>
@@ -561,7 +571,57 @@ function wordStyles() { return `<?xml version="1.0"?><w:styles xmlns:w="http://s
 <w:style w:type="paragraph" w:styleId="CardGap"><w:name w:val="Card gap"/><w:pPr><w:spacing w:after="90"/></w:pPr><w:rPr><w:sz w:val="4"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="SectionGap"><w:name w:val="Section gap"/><w:pPr><w:spacing w:after="100"/></w:pPr><w:rPr><w:sz w:val="4"/></w:rPr></w:style>
 </w:styles>`; }
-function titleSlide(model) { return slideXml([shapeText(1, model.title, 700000, 1150000, 10800000, 900000, 5000, true, "086C5C"), shapeText(2, `${model.pharmacyName}\n${model.branch} | ${model.location}`, 700000, 2500000, 10800000, 1200000, 2400, false, "19332F"), shapeText(3, `${model.rows.length} medicines\nGenerated ${model.generatedKenya} Africa/Nairobi`, 700000, 4300000, 10800000, 1000000, 1800, false, "536B66")]); }
+function titleSlide(model) { return slideXml([shapeText(1, "Pharmacy inventory briefing", 700000, 1050000, 10800000, 900000, 5000, true, "086C5C"), shapeText(2, `${model.pharmacyName}\n${model.branch} | ${model.location}`, 700000, 2350000, 10800000, 1200000, 2600, false, "19332F"), shapeText(3, `${model.rows.length} medicines\nPrepared ${model.generatedKenya} Africa/Nairobi`, 700000, 4200000, 10800000, 1000000, 2000, false, "536B66")]); }
+function presentationOverviewSlide(model) {
+  const metrics = [
+    ["Medicines", model.summary.medicineCount], ["Units in stock", model.summary.totalStock],
+    ["Retail stock value", `KES ${formatPdfNumber(model.summary.retailStockValue)}`],
+    ["Cost stock value", `KES ${formatPdfNumber(model.summary.costStockValue)}`],
+    ["Potential margin", `KES ${formatPdfNumber(model.summary.potentialGrossMargin)}`],
+    ["Low stock", model.summary.lowStockCount], ["Expiring soon", model.summary.expiringSoonCount]
+  ];
+  const shapes = [
+    shapeText(1, "Inventory overview", 600000, 260000, 10800000, 650000, 3500, true, "086C5C"),
+    shapeText(2, `${model.pharmacyName} | ${model.branch} | ${model.location}`, 600000, 880000, 10800000, 420000, 1800, false, "536B66")
+  ];
+  metrics.forEach(([label, value], index) => {
+    const column = index % 2;
+    const row = Math.floor(index / 2);
+    const x = 600000 + column * 5700000;
+    const y = 1450000 + row * 1120000;
+    shapes.push(shapeText(3 + index * 2, label, x, y, 3300000, 760000, 2000, true, "19332F", row % 2 ? "F1F7F5" : "FFFFFF"));
+    shapes.push(shapeText(4 + index * 2, String(value), x + 3300000, y, 2000000, 760000, 2400, true, "086C5C", "EDF7F4"));
+  });
+  shapes.push(shapeText(30, "Choose Presentation for a clear staff, owner or supplier briefing on a large screen. Use Word for editable notes and Excel for analysis.", 600000, 5950000, 10800000, 520000, 1600, false, "536B66"));
+  return slideXml(shapes);
+}
+function presentationInventorySlide(model, rows, index, total) {
+  const shapes = [
+    shapeText(1, `Inventory review | ${index} of ${total}`, 500000, 220000, 7800000, 600000, 3500, true, "086C5C"),
+    shapeText(2, `Medicines ${(index - 1) * OFFICE_RECORDS_PER_PAGE + 1}-${(index - 1) * OFFICE_RECORDS_PER_PAGE + rows.length} of ${model.rows.length}`, 8700000, 300000, 3000000, 420000, 1800, false, "536B66")
+  ];
+  let id = 3;
+  rows.forEach((row, rowIndex) => {
+    const y = 1050000 + rowIndex * 1010000;
+    const fill = rowIndex % 2 ? "F1F7F5" : "FFFFFF";
+    const identity = [row.strength, row.form, row.unit].filter(recordedValue).join(" | ") || "Identity not recorded";
+    const prices = `Selling KES ${recordedValue(row.sellingPrice) ? row.sellingPrice : "Not recorded"} | Cost KES ${recordedValue(row.costPrice) ? row.costPrice : "Not recorded"}`;
+    const supplier = recordedValue(row.supplier) ? `Supplier: ${row.supplier}` : "Supplier: Not recorded";
+    const trace = [
+      recordedValue(row.expiry) ? `Expiry ${row.expiry}` : "Expiry Not recorded",
+      recordedValue(row.batch) ? `Batch ${row.batch}` : "",
+      recordedValue(row.shelf) ? `Shelf ${row.shelf}` : "",
+      recordedValue(row.barcode) ? `Barcode ${row.barcode}` : ""
+    ].filter(Boolean).join(" | ");
+    shapes.push(shapeText(id++, row.medicine, 500000, y, 3000000, 420000, 2000, true, "19332F", fill));
+    shapes.push(shapeText(id++, identity, 3500000, y, 4200000, 420000, 1600, false, "19332F", fill));
+    shapes.push(shapeText(id++, prices, 500000, y + 420000, 4200000, 420000, 1600, true, "19332F", fill));
+    shapes.push(shapeText(id++, `${supplier}\n${trace}`, 4700000, y + 420000, 5000000, 500000, 1600, false, "536B66", fill));
+    shapes.push(shapeText(id++, row.stock === "" ? "Stock\nNot recorded" : `STOCK\n${row.stock}`, 9700000, y, 2000000, 920000, row.stock === "" ? 1800 : 2400, true, row.stock === "" ? "536B66" : "086C5C", "EDF7F4"));
+  });
+  shapes.push(shapeText(id, `${model.pharmacyName} | ${model.branch} | Generated ${model.generatedKenya}`, 500000, 6350000, 11200000, 280000, 1600, false, "536B66"));
+  return slideXml(shapes);
+}
 function tableSlide(model, rows, index, total) {
   const headers = ["Medicine", "Identity", "Prices", "Stock", "Supplier", "Traceability", "Expiry / shelf"];
   const widths = [1900000, 1800000, 1250000, 800000, 1800000, 2250000, 1700000];
@@ -648,7 +708,7 @@ function formatPdfNumber(value) { return Number(value).toLocaleString("en-US", {
 function recordedValue(value) { return value !== "" && value !== null && value !== undefined; }
 function pdfImportant(value) { return recordedValue(value) ? formatPdfNumber(value) : "Not recorded"; }
 function rels(values) { return `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${values.map(([id, type, target]) => `<Relationship Id="${id}" Type="${type}" Target="${target}"/>`).join("")}</Relationships>`; }
-function coreProps(model) { return `<?xml version="1.0"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${xml(model.title)}</dc:title><dc:creator>MS2.0</dc:creator><cp:lastModifiedBy>MS2.0</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">${model.generatedIso}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${model.generatedIso}</dcterms:modified></cp:coreProperties>`; }
+function coreProps(model, keywords = "") { return `<?xml version="1.0"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${xml(model.title)}</dc:title><dc:creator>MS2.0</dc:creator><cp:lastModifiedBy>MS2.0</cp:lastModifiedBy>${keywords ? `<cp:keywords>${xml(keywords)}</cp:keywords>` : ""}<dcterms:created xsi:type="dcterms:W3CDTF">${model.generatedIso}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${model.generatedIso}</dcterms:modified></cp:coreProperties>`; }
 function appProps(application, sheetNames = []) {
   const workbookParts = sheetNames.length ? `<HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>${sheetNames.length}</vt:i4></vt:variant></vt:vector></HeadingPairs><TitlesOfParts><vt:vector size="${sheetNames.length}" baseType="lpstr">${sheetNames.map((name) => `<vt:lpstr>${xml(name)}</vt:lpstr>`).join("")}</vt:vector></TitlesOfParts>` : "";
   return `<?xml version="1.0"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>${application}</Application><AppVersion>1.0</AppVersion>${workbookParts}</Properties>`;

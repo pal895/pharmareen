@@ -764,3 +764,19 @@ After pulling and restarting the latest build, open Export Hub and download one 
 3. Scroll to page 10 and confirm medicines 33-35 are present with no clipping. Tap once in a notes area and confirm the document is editable, but do not save or change pharmacy data.
 
 If those three checks pass, mark Word Owner Document passed and continue automatically to Presentation. Report only a file-open failure, missing medicine, clipping, broken page flow or inability to edit.
+
+Passed from authoritative owner-device screenshots after Replit pulled `5567f92`. The fresh DOCX is ten portrait pages: one readable owner overview and nine review pages with four intact medicine cards per full page, all 35 medicines, and medicines 33–35 on page 10. Focused final polish makes missing stock a smaller `Stock not recorded` label, preserves numeric zero, and adds `Add note or correction here` with restrained writing lines to every card. Microsoft Word rendered the exact production DOCX as ten pages. A typed-note save/reopen round-trip preserved every medicine exactly once and confirmed ordinary editable OOXML with no document protection, macros or flattened pages. Word Owner Copy is passed and protected.
+
+## Presentation Owner Briefing live validation
+
+Choose Presentation when the pharmacy owner needs to brief staff, partners or suppliers on a large screen. Use Word for editable notes and Excel for inventory analysis.
+
+After pulling and restarting the latest build, open Export Hub and download one completely fresh Presentation:
+
+1. Open the PPTX in Microsoft PowerPoint, Google Slides or another presentation application.
+2. Confirm slide 1 is a clear `Pharmacy inventory briefing` title with the correct pharmacy identity.
+3. Confirm slide 2 is a readable Inventory overview with the reconciled totals.
+4. Confirm slide 3 shows medicines 1–5 with medicine names, stock and prices easy to scan and supplier/traceability secondary.
+5. Confirm slide 9 shows medicines 31–35, with no missing row, overlap or clipping.
+
+Do not edit, present, print, share or upload the deck. If these four views are clear, mark Presentation Owner Briefing passed and advance to the next repository-defined checkpoint. Report only an open failure, wrong pharmacy identity, missing medicine/value, unreadable text, overlap or clipping.
