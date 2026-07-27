@@ -1,6 +1,6 @@
 # MS2.0 Live Main App Test Plan
 
-## Current checkpoint — Notifications Review Import Action Routing
+## Current checkpoint — Notifications Low-Stock Alert
 
 Excel, PDF, Word, Presentation, CSV and Print are owner-validated, permanently passed and protected. Do not retest or polish them without regression evidence. The one-card status/history architecture is approved.
 
@@ -12,22 +12,20 @@ Notifications Quiet State is owner-validated, passed and protected. Evidence con
 
 Notifications Pending Review Unread State is owner-validated, passed and protected after `c63f687`. Evidence proves Mic input, correct editable parsing, one unread local Learning alert, workspace isolation, cancellation integrity, mark-read and quiet-state restoration. Do not repeat those responsibilities without regression evidence.
 
+Notifications Review Import Action Routing is owner-validated, passed and protected. Evidence proves `Review list` creates the editable draft and its linked unread alert together; the compact `Review import` button reopens that exact existing draft without duplication; cancellation preserves `Showing 35 of 35` and restores `0`, `Quiet`, `No urgent alerts`. Do not repeat or refactor this lifecycle without regression evidence.
+
 Test only the next distinct responsibility:
 
-Owner evidence after `9afd4e4` visually passes the compact `Review import` button, catalog cancellation integrity and quiet-state restoration. Routing remains unpassed because the earlier wording did not explicitly say when raw input becomes a review. Repository contract: Mic/typing fills only `paste_input`; no notification is valid yet. Tapping `Review list` performs local parsing, changes that same card to the editable `review` state and creates its one linked unread notification.
+1. Start on Home and confirm Notifications is `0`, `Quiet`, `No urgent alerts`.
+2. Open Assistant → Menu → Catalog. Search `Cefixime`, tap `Open & edit`, and take a screenshot of its current `Current stock` value. This recorded value is the restoration baseline.
+3. Change only `Current stock` to `5`. Leave every other field unchanged, then tap `Approve & save` once.
+4. Return Home. Confirm Notifications shows exactly `1 unread` and previews `Cefixime is low`.
+5. Open Notifications. Confirm exactly one local alert titled `Cefixime is low`, Category `Inventory`, Note `Cefixime has 5 left. Prepare a restock if needed.`, and Status `unread`. No Operations composer should appear.
+6. Return to Catalog, search `Cefixime`, open it, restore `Current stock` to the exact baseline recorded in step 2, and tap `Approve & save` once.
+7. Reopen Catalog and confirm `Showing 35 of 35` and Cefixime shows the restored stock.
+8. Return Home and confirm Notifications is again `0`, `Quiet`, `No urgent alerts`. Open Notifications and confirm no alert card remains.
 
-1. Open Assistant → `+` → `Paste List`.
-2. Enter `Notification Action Retest 10 mg tablet 1` by Mic or typing.
-3. Confirm the words are visible, then tap the exact `Review list` button once.
-4. Confirm the screen now shows the editable row headed `Notification Action Retest`. Do not approve it.
-5. Tap the top-left back arrow once to return Home. Only now must Home show exactly `1 unread`.
-6. Open Notifications and confirm one compact `Review import` button.
-7. Tap the compact `Review import` button once.
-8. Confirm MS2.0 returns directly to the same existing editable `Notification Action Retest` review card. There must be one review card, not a second copy.
-9. Tap `Cancel` on that editable review, open Catalog and confirm `Showing 35 of 35`.
-10. Return Home and confirm Notifications is `0`, `Quiet`, `No urgent alerts`.
-
-Expected: one shared compact action routes to the existing review, no duplicate card, no catalog/stock save, no sale/payment, no API request and no AI token use. Do not test inventory, expiry or payment-failure alerts yet.
+Expected: the shared deterministic notification projection creates one low-stock alert at stock `5`, removes it after restoration, preserves 35 canonical medicines, and uses no sale, payment, import, export, API request or AI token. Do not test stock `0`, expiry, payment failure or another medicine yet.
 
 This plan is for Main App live product testing only. Do not return to WhatsApp live testing in this phase.
 
