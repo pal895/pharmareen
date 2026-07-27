@@ -2,11 +2,11 @@
 
 ## Export Hub protected checkpoint (2026-07-27)
 
-Excel Operations Workbook, PDF Professional Report, Word Owner Copy, and Presentation Owner Briefing are owner-validated, permanently passed and regression-protected. CSV Technical Data Transfer is the exact next live checkpoint; Print is engineering-prepared and pending live validation.
+Excel Operations Workbook, PDF Professional Report, Word Owner Copy, Presentation Owner Briefing and CSV Technical Data Transfer are owner-validated, permanently passed and regression-protected. Print Working Inventory is the exact next live checkpoint.
 
 Every export must answer: **Why would a pharmacy owner deliberately choose this format instead of every other available export?** A format is accepted only for a distinct operational workflow. All surfaces consume the shared `exportFormatMetadata.js` registry, and activity updates one persistent pharmacy-scoped Export Hub status card instead of adding chat-feed messages.
 
-Owner evidence confirms Google Sheets opens the CSV as a genuine 35-medicine, 12-column spreadsheet with aligned values and blanks. Google Sheets exposed the UTF-8 BOM as visible `ï»¿` text before `Medicine`, so the canonical export now uses UTF-8 without BOM. It starts immediately with the exact header, uses CRLF including the final record, replaces embedded record line breaks with spaces, and retains standards quoting, formula-injection protection and leading-zero barcode preservation. The unsupported generic Android document reader remains outside the compatibility target. See `docs/engineering-memory/csv-compatibility-rules.md`.
+Owner evidence confirms the canonical UTF-8-without-BOM CSV opens in Google Sheets as a genuine 35-medicine, 12-column spreadsheet, begins with the exact `Medicine` header, and preserves aligned values and blanks. It is frozen and regression-protected; the unsupported generic Android document reader is outside the compatibility target. See `docs/engineering-memory/csv-compatibility-rules.md`.
 
 ## Current Product Direction
 

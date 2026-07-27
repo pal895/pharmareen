@@ -8,7 +8,7 @@
 
 `documentGenerator.js` is deterministic, pharmacy-isolated and zero-AI. CSV starts with the canonical 12-column header, then one CRLF-terminated physical row per medicine. It uses UTF-8 without BOM because Google Sheets owner evidence rendered the BOM visibly, plus comma delimiters, standards quoting, embedded-line-break normalization, spreadsheet formula protection and leading-zero barcode preservation. Pharmacy metadata stays in the safe filename and pharmacy-scoped Export History rather than non-tabular pre-header rows. The browser creates a `text/csv; charset=utf-8` Blob and downloads it through one safe `.csv` anchor filename; there is no CSV HTTP response or `Content-Disposition` header in this local generation path. Print reports only preparation/dialog/failure states because browsers cannot prove completion or cancellation.
 
-Protected owner-validated formats: XLSX, PDF, DOCX and nine-slide PPTX. CSV generation/download/history/one-card routing passed owner evidence, but a generic Android reader stalled and genuine spreadsheet rows/columns remain unverified. Next: CSV retest in a genuine spreadsheet application. Print: prepared, pending live validation.
+Protected owner-validated formats: XLSX, PDF, DOCX, nine-slide PPTX and canonical UTF-8-without-BOM CSV. Final Google Sheets evidence confirms A1 exactly `Medicine`, 35 medicines and the aligned 12-column schema. Next: Print Working Inventory live validation.
 
 Snapshot date: 2026-07-10
 

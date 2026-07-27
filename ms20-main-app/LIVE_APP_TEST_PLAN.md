@@ -1,16 +1,16 @@
 # MS2.0 Live Main App Test Plan
 
-## Current Export Hub checkpoint — CSV only
+## Current Export Hub checkpoint — Print only
 
-Excel, PDF, Word and Presentation are owner-validated, permanently passed and protected. Do not retest or polish them without regression evidence. The one-card status/history architecture is approved. Print is prepared but pending because browsers cannot reliably report physical completion or cancellation.
+Excel, PDF, Word, Presentation and CSV are owner-validated, permanently passed and protected. Do not retest or polish them without regression evidence. The one-card status/history architecture is approved. Print is prepared but pending because browsers cannot reliably report physical completion or cancellation.
 
-Exact next checkpoint: **CSV Technical Data Transfer retest**.
+Exact next checkpoint: **Print Working Inventory**.
 
-Google Sheets owner evidence passes genuine spreadsheet opening, 35 medicines, one row per medicine, the full aligned 12-column structure and preserved blanks. Download/history, the single concise status card, removed duplicate guidance and clean sales conversation remain passed. The one remaining defect is the visible BOM text `ï»¿` before `Medicine`; the shared generator now emits UTF-8 without BOM.
+CSV is OWNER-VALIDATED PASS. Final Google Sheets evidence shows A1 exactly `Medicine`, 35 medicines, one row per medicine, the full aligned 12-column structure and preserved blanks. Freeze it.
 
-After pulling/restarting, generate exactly one fresh CSV and open it in Google Sheets. Confirm only that cell A1 reads exactly `Medicine`, with no characters before it. Do not repeat the already-passed row/column inspection, do not use the generic document reader, and do not test Print.
+Open Export Hub and tap **Print** once. Confirm the Print view shows the correct pharmacy identity, Africa/Nairobi generation time, 35 canonical medicines and visible Print/Close controls. Tap **Print inventory** once and inspect the native system preview only: confirm the first and final medicine pages are readable and no row is clipped. Do not select a printer, save a PDF or claim physical printing. Return to MS2.0 and confirm one newest Print history entry with truthful `Print view ready`/dialog guidance, the single latest card updated in place, and no new permanent chat message.
 
-Expected production shape: the first row is `Medicine, Strength, Form, Unit, Selling price (KES), Cost price (KES), Stock, Supplier, Barcode, Batch, Expiry, Shelf`; 35 medicine rows follow with 12 fields each. The file is UTF-8 without BOM, comma-delimited, CRLF-terminated, safely quoted, formula-protected and downloaded as `text/csv; charset=utf-8` with one `.csv` filename.
+Expected: a complete readable 35-medicine print preview, truthful preparation/dialog state only, pharmacy-isolated deterministic data, one updated status card/history entry, and zero AI/API formatting. Browser dialog behavior is not proof of physical printing or cancellation.
 
 This plan is for Main App live product testing only. Do not return to WhatsApp live testing in this phase.
 
