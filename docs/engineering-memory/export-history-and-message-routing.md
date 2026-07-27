@@ -7,3 +7,7 @@ Each `ms20.export-history.v1` record contains a deterministic identifier, format
 Statuses include `completed`, `failed` and `unavailable`, plus truthful Print states `print_view_ready`, `print_dialog_opened` and `print_preparation_failed`. Browser APIs cannot prove a physical print completed or reliably distinguish cancellation, so MS2.0 claims neither. Failed and unavailable records expose regeneration. Files stay in device Downloads; only the 50 newest metadata records per pharmacy are retained.
 
 Office exports must be validated before download. PPTX validation checks the ZIP end record, required OOXML parts, content types, internal relationships and the nine-slide briefing contract. PowerPoint is recommended; Google Slides and standards-compatible readers are valid fallbacks. Owner evidence on 2026-07-27 validated all nine slides in an Android compatible reader, permanently passing Presentation.
+
+The latest card renders status and next action as separate fields. Status is concise and internally derived from the newest history record, for example `CSV completed — 35 medicines`; the opening guidance appears once below it. Resumed legacy records are normalized through the shared metadata registry so a stale `Ready to generate an export` label cannot be paired with an earlier export timestamp or application guidance.
+
+CSV owner evidence passes the one-card update, newest-first 35-medicine history entry and absence of a new export feed message. The generic Android reader opening failure does not change these passed routing behaviors.

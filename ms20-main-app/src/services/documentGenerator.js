@@ -92,12 +92,9 @@ export function buildCatalogCsv(items = []) {
 }
 
 export function buildInventoryCsv(model) {
-  const metadata = [
-    ["MS2.0 Pharmacy Inventory"], ["Pharmacy", model.pharmacyName], ["Branch", model.branch],
-    ["Location", model.location], ["Generated (Africa/Nairobi)", model.generatedKenya], []
-  ];
+  validateInventoryExportSnapshot(model);
   const rows = [COLUMNS.map(([, label]) => label), ...model.rows.map((row) => COLUMNS.map(([key]) => csvFieldValue(key, row[key])))];
-  return `\ufeff${[...metadata, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n")}`;
+  return `\ufeff${rows.map((row) => row.map(csvCell).join(",")).join("\r\n")}\r\n`;
 }
 
 export function buildInventoryXlsx(model) {
@@ -281,7 +278,9 @@ export function exportFilename(model, extension) {
 export function downloadBlobFile({ filename, contents, mime }) {
   const blob = contents instanceof Blob ? contents : new Blob([contents], { type: mime });
   const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename;
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
   document.body.appendChild(anchor); anchor.click(); anchor.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -842,7 +841,7 @@ function first(value) { return Array.isArray(value) ? value[0] || "" : ""; }
 function clean(value) { return String(value ?? "").trim(); }
 function numberOrBlank(value) { if (value === "" || value == null) return ""; const number = Number(value); return Number.isFinite(number) ? number : clean(value); }
 export function protectCsvSpreadsheetText(value) {
-  const text = String(value ?? "").replace(/\r\n|\r|\n/g, "\r\n");
+  const text = String(value ?? "").replace(/\r\n|\r|\n/g, " ");
   return /^[\t ]*[=+\-@]/.test(text) ? `'${text}` : text;
 }
 function csvFieldValue(key, value) {

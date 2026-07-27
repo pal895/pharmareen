@@ -41,3 +41,9 @@ Before download, the production path validates the PPTX container, required OOXM
 - Presentation Owner Briefing: passed and protected.
 - CSV Technical Data Transfer: exact next live checkpoint.
 - Print Working Inventory: engineering-prepared; live validation pending.
+
+## CSV compatibility checkpoint
+
+CSV is the import/interchange copy, not a styled report. Its first row is the canonical field header and every later physical row is one medicine with the same 12-column shape. Pharmacy identity remains in the safe pharmacy-derived filename and pharmacy-scoped Export History instead of decorative pre-header rows that weaken automatic import detection. The production Blob is `text/csv; charset=utf-8`; the browser download attribute supplies one safe `.csv` filename. Microsoft Excel, Google Sheets and LibreOffice Calc are recommended; generic document readers are not compatibility authorities.
+
+Owner evidence on 2026-07-27 passes generation, download, history, the one-card update and no message pileup. The tested generic Android reader stalled, so spreadsheet structure is not owner-validated and CSV remains open.

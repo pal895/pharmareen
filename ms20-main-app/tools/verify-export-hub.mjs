@@ -49,8 +49,9 @@ assert.match(EXPORT_FORMATS.find((format) => format.id === "pdf").purpose, /read
 assert.match(EXPORT_FORMATS.find((format) => format.id === "docx").purpose, /Review, correct, approve/i);
 assert.match(EXPORT_FORMATS.find((format) => format.id === "pptx").cardHelp, /management, staff, suppliers, investors or lenders/i);
 assert.match(EXPORT_FORMATS.find((format) => format.id === "csv").purpose, /another system or import workflow/i);
-assert.match(exportCompletionSummary("pptx", "completed"), /Microsoft PowerPoint/);
-assert.match(exportCompletionSummary("print", "print_dialog_opened"), /does not prove|Choose an available printer/i);
+assert.equal(exportCompletionSummary("pptx", "completed", 35), "Presentation completed — 35 medicines");
+assert.equal(exportCompletionSummary("csv", "completed", 35), "CSV completed — 35 medicines");
+assert.equal(exportCompletionSummary("print", "print_dialog_opened"), "Print dialog opened");
 assert.equal(protectCsvSpreadsheetText("=1+1"), "'=1+1");
 assert.equal(protectCsvSpreadsheetText(" @SUM(A1:A2)"), "' @SUM(A1:A2)");
 assert.equal(protectCsvSpreadsheetText("001234"), "001234");
@@ -85,11 +86,62 @@ const csvSecurityModel = buildCanonicalInventoryExport({
   generatedAt
 });
 const securedCsv = buildInventoryCsv(csvSecurityModel);
-assert.ok(securedCsv.startsWith("\ufeffMS2.0 Pharmacy Inventory\r\n"));
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+  const source = text.replace(/^\ufeff/, "");
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+    if (quoted) {
+      if (character === '"' && source[index + 1] === '"') {
+        cell += '"';
+        index += 1;
+      } else if (character === '"') {
+        quoted = false;
+      } else {
+        cell += character;
+      }
+    } else if (character === '"') {
+      quoted = true;
+    } else if (character === ",") {
+      row.push(cell);
+      cell = "";
+    } else if (character === "\r" && source[index + 1] === "\n") {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+      index += 1;
+    } else {
+      cell += character;
+    }
+  }
+  assert.equal(quoted, false, "CSV contains an unmatched quote");
+  assert.equal(row.length, 0, "CSV must end with CRLF and no partial record");
+  return rows;
+}
+const parsedCsv = parseCsv(outputs.csv);
+const parsedSecuredCsv = parseCsv(securedCsv);
+const canonicalHeader = ["Medicine", "Strength", "Form", "Unit", "Selling price (KES)", "Cost price (KES)", "Stock", "Supplier", "Barcode", "Batch", "Expiry", "Shelf"];
+assert.deepEqual(parsedCsv[0], canonicalHeader);
+assert.equal(parsedCsv.length, 36);
+assert.ok(parsedCsv.every((row) => row.length === canonicalHeader.length));
+assert.deepEqual(parsedCsv[1], ["Amoxicillin", "500 mg", "capsule", "capsule", "20", "12", "40", "AfyaLink", "616000001", "AMX-1", "2028-12", "A1"]);
+assert.equal(parsedSecuredCsv.length, 3);
+assert.ok(parsedSecuredCsv.every((row) => row.length === canonicalHeader.length));
+assert.equal(parsedSecuredCsv[1][0], '\'=HYPERLINK("https://invalid.example","Dawa")');
+assert.equal(parsedSecuredCsv[1][1], "5 mg extended");
+assert.equal(parsedSecuredCsv[1][7], 'Dawa "Bora", Nairobi');
+assert.equal(parsedSecuredCsv[1][8], "'001234567890");
+assert.equal(parsedSecuredCsv[2][8], "'000000000007");
+assert.ok(securedCsv.startsWith("\ufeffMedicine,Strength,Form,Unit,Selling price (KES),Cost price (KES),Stock,Supplier,Barcode,Batch,Expiry,Shelf\r\n"));
+assert.equal(securedCsv.endsWith("\r\n"), true);
 assert.equal(securedCsv.includes("\0"), false);
 assert.equal(securedCsv.replaceAll("\r\n", "").includes("\n"), false);
 assert.match(securedCsv, /"'=HYPERLINK\(""https:\/\/invalid\.example"",""Dawa""\)"/);
-assert.match(securedCsv, /"5 mg\r\nextended"/);
+assert.match(securedCsv, /5 mg extended/);
 assert.match(securedCsv, /"Dawa ""Bora"", Nairobi"/);
 assert.match(securedCsv, /,'\+CMD,/);
 assert.match(securedCsv, /,'@A-01/);
@@ -148,7 +200,7 @@ assert.doesNotMatch(zeroAndMissingDocx, /<w:pStyle w:val="StockValue"\/>[\s\S]*?
 assert.match(zeroAndMissingDocx, /Expiry: Not recorded/);
 assert.match(zeroAndMissingDocx, /Supplier: Not recorded/);
 assert.doesNotMatch(zeroAndMissingDocx, /Batch:|Shelf:|Barcode:/);
-assert.match(outputs.csv, /^\ufeffMS2\.0 Pharmacy Inventory/);
+assert.match(outputs.csv, /^\ufeffMedicine,Strength,Form,Unit,Selling price \(KES\),Cost price \(KES\),Stock,Supplier,Barcode,Batch,Expiry,Shelf\r\n/);
 assert.match(outputs.csv, /Amoxicillin,500 mg,capsule,capsule,20,12,40/);
 assert.equal(new TextDecoder().decode(outputs.pdf.slice(0, 8)), "%PDF-1.4");
 for (const format of ["xlsx", "docx", "pptx"]) assert.equal(new TextDecoder().decode(outputs[format].slice(0, 2)), "PK");
@@ -175,6 +227,8 @@ assert.match(outputs.html, /result=>wanted\?result\.value>=54:result\.value>0/);
 assert.match(outputs.html, /BroadcastChannel/);
 assert.match(outputs.html, /finder-status/);
 assert.equal(exportFilename(model, "xlsx"), "zuri-pharmacy-inventory-2026-07-25-180032Z.xlsx");
+assert.equal(exportFilename(model, "csv"), "zuri-pharmacy-inventory-2026-07-25-180032Z.csv");
+assert.equal(exportFormat("csv").mime, "text/csv; charset=utf-8");
 
 const decodedPackages = Object.fromEntries(["xlsx", "docx", "pptx"].map((format) => [format, new TextDecoder().decode(outputs[format])]));
 const decodedPdf = new TextDecoder().decode(outputs.pdf);
@@ -347,13 +401,15 @@ assert.ok(provenance.entries.every((entry) => entry.source && entry.licence && e
 assert.match(appSource, /data-action="open-export-hub">Export Hub/);
 assert.match(appSource, /buildCanonicalInventoryExport\(\{ pharmacy: state\.pharmacy, items: pharmacyBrain\.catalog \}\)/);
 assert.match(appSource, /download-inventory-export/);
+assert.match(source, /anchor\.download = filename/);
 assert.match(appSource, /card\.type === "CatalogWorkspaceCard" \|\| card\.type === "ExportHubCard"/);
 assert.match(appSource, /Choose Excel for calculations and reconciliation, PDF for read-only sharing and phone viewing/);
 assert.match(metadataSource, /Open the downloaded workbook in Excel or another compatible spreadsheet application\./);
 assert.match(metadataSource, /Open the editable file in Microsoft Word or another compatible document editor\./);
 assert.match(metadataSource, /Open the downloaded presentation in Microsoft PowerPoint for the best experience\./);
 assert.match(metadataSource, /Use browser Print and choose an available printer\./);
-assert.match(metadataSource, /Open it in Excel or Google Sheets to inspect the rows, or import it into another compatible system\./);
+assert.match(metadataSource, /Open in Microsoft Excel, Google Sheets or LibreOffice Calc to inspect the rows, or import it into another compatible system\./);
+assert.match(metadataSource, /text\/csv; charset=utf-8/);
 assert.match(appSource, /ms20\.export-history\.v1/);
 assert.match(appSource, /previous\.filter\(\(item\) => item\.id !== record\.id\)/);
 assert.match(appSource, /EXPORT_HISTORY_KEY_PREFIX.*state\.pharmacy\.id/s);
@@ -361,6 +417,9 @@ assert.doesNotMatch(appSource, /function recordExportEvent[\s\S]{0,1200}addFeed\
 assert.match(appSource, /function ensureExportHubCard\(\)/);
 assert.match(appSource, /state\.cards = state\.cards\.filter\(\(item\) => item\.type !== "ExportHubCard" \|\| item === card\)/);
 assert.match(appSource, /card\.fields\.last_download = record\.summary/);
+assert.match(appSource, /summary: exportCompletionSummary\(item\.format, item\.status, item\.medicineCount\)/);
+assert.match(appSource, /summary: exportCompletionSummary\(format, recordStatus, model\.rows\.length\)/);
+assert.doesNotMatch(exportCompletionSummary("csv", "completed", 35), /Open in|inspect the rows|import it/i);
 assert.match(appSource, /data-action="open-export-hub" data-history="true"/);
 assert.match(appSource, /Files stay in your device Downloads\. History keeps metadata only\./);
 assert.match(appSource, /<h3>Polished owner copies<\/h3>/);

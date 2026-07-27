@@ -2479,7 +2479,10 @@ function hydrateResumeState() {
 }
 
 function reconcileResumeState() {
-  const resumedExportCards = state.cards.filter((card) => card.type === "ExportHubCard");
+  const resumedExportCards = state.cards.filter((card) =>
+    card.type === "ExportHubCard"
+    && (!card.fields?.pharmacy_id || card.fields.pharmacy_id === state.pharmacy.id)
+  );
   if (resumedExportCards.length) {
     const keeper = resumedExportCards[0];
     keeper.id = `card-export-hub-${state.pharmacy.id}`;
@@ -2490,8 +2493,12 @@ function reconcileResumeState() {
       history_open: false,
       history: readExportHistory()
     };
-    keeper.fields.last_download = keeper.fields.history[0]?.summary || keeper.fields.last_download || "Ready to generate an export.";
-    state.cards = state.cards.filter((card) => card.type !== "ExportHubCard" || card === keeper);
+    keeper.fields.last_download = keeper.fields.history[0]?.summary || "Ready to generate an export.";
+    state.cards = state.cards.filter((card) =>
+      card.type !== "ExportHubCard"
+      || card === keeper
+      || (card.fields?.pharmacy_id && card.fields.pharmacy_id !== state.pharmacy.id)
+    );
   }
   if (state.onboarding.completed) {
     removeCardsByType(["OnboardingCard"]);
@@ -3414,7 +3421,10 @@ function exportHistoryKey() {
 function readExportHistory() {
   try {
     const history = JSON.parse(safeLocalStorage()?.getItem(exportHistoryKey()) || "[]");
-    return Array.isArray(history) ? history.slice(0, EXPORT_HISTORY_LIMIT) : [];
+    return Array.isArray(history) ? history.slice(0, EXPORT_HISTORY_LIMIT).map((item) => ({
+      ...item,
+      summary: exportCompletionSummary(item.format, item.status, item.medicineCount)
+    })) : [];
   } catch {
     return [];
   }
@@ -3439,7 +3449,7 @@ function exportHistoryRecord({ model, format, status, filename = "" }) {
     openGuidance: definition?.nextAction || "Try generating this export again.",
     status: recordStatus,
     extension: definition?.extension || "",
-    summary: exportCompletionSummary(format, recordStatus)
+    summary: exportCompletionSummary(format, recordStatus, model.rows.length)
   };
 }
 

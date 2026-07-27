@@ -64,11 +64,11 @@ const formats = [
     expiryBehavior: "Open a new print view from the current canonical inventory snapshot."
   },
   {
-    id: "csv", group: "data", label: "CSV data file", extension: "csv", mime: "text/csv;charset=utf-8",
+    id: "csv", group: "data", label: "CSV data file", extension: "csv", mime: "text/csv; charset=utf-8",
     purpose: "Exchange canonical records with another system or import workflow.",
     recommendedApplication: "Microsoft Excel",
     fallbackApplications: ["Google Sheets", "LibreOffice Calc", "Compatible pharmacy, inventory, accounting or data system"],
-    nextAction: "Open it in Excel or Google Sheets to inspect the rows, or import it into another compatible system.",
+    nextAction: "Open in Microsoft Excel, Google Sheets or LibreOffice Calc to inspect the rows, or import it into another compatible system.",
     cardHelp: "Exchange canonical data with other systems and import workflows",
     historyDescription: "Canonical data rows for system exchange and import workflows.",
     completionWording: "CSV completed.", regenerationWording: "Download CSV again",
@@ -88,13 +88,16 @@ export function exportFormat(formatId) {
   return EXPORT_FORMATS.find((format) => format.id === formatId) || null;
 }
 
-export function exportCompletionSummary(formatId, status) {
+export function exportCompletionSummary(formatId, status, medicineCount = 0) {
   const format = exportFormat(formatId);
   if (!format) return `Export ${status}.`;
   if (formatId === "print") {
-    if (status === "print_dialog_opened") return "Print dialog opened. Choose an available printer using the browser or device controls.";
-    if (status === "print_preparation_failed") return "Print preparation failed. Open the print view and try again.";
-    return `${format.completionWording} ${format.nextAction}`;
+    if (status === "print_dialog_opened") return "Print dialog opened";
+    if (status === "print_preparation_failed") return "Print preparation failed";
+    return format.completionWording;
   }
-  return `${format.completionWording} ${format.nextAction}`;
+  if (status === "failed") return `${format.label} generation failed`;
+  if (status === "unavailable") return `${format.label} unavailable`;
+  const count = Number(medicineCount);
+  return count > 0 ? `${format.completionWording.replace(/\.$/, "")} — ${count} medicines` : format.completionWording;
 }

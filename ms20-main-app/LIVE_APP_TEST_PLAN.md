@@ -4,11 +4,13 @@
 
 Excel, PDF, Word and Presentation are owner-validated, permanently passed and protected. Do not retest or polish them without regression evidence. The one-card status/history architecture is approved. Print is prepared but pending because browsers cannot reliably report physical completion or cancellation.
 
-Exact next checkpoint: **CSV Technical Data Transfer**.
+Exact next checkpoint: **CSV Technical Data Transfer retest**.
 
-Pull/restart the latest app, open **Export Hub**, tap **CSV data file**, then open the downloaded `.csv` in a phone spreadsheet app. Confirm the headers and all 35 medicines are readable, including any leading-zero barcode. Do not edit, import or approve anything.
+Owner evidence already passes CSV generation, one-file download, the newest 35-medicine history record, the single updated status card and no new permanent export message. Raw data exists. The tested generic Android document reader stalled and never displayed a spreadsheet, so rows/columns remain unverified and CSV is not passed.
 
-Expected: one CSV download; the same compact status card updates; history gains one newest CSV record; no export chat message; catalog stays 35; zero AI/API formatting.
+After pulling/restarting the repaired build, open **Export Hub** and tap **CSV data file** exactly once. Open only the newest file in Microsoft Excel, Google Sheets, LibreOffice Calc or another genuine spreadsheet application. Show the canonical header and several medicine rows; confirm headings occupy separate columns, each medicine occupies one row, and price, stock, supplier, barcode, batch and expiry values remain under their headings. Return to Export Hub; require exactly one newest CSV history entry, a concise `CSV completed — 35 medicines` latest status with one guidance line, and no new permanent export chat message. Do not edit, import, approve or test Print.
+
+Expected production shape: the first row is `Medicine, Strength, Form, Unit, Selling price (KES), Cost price (KES), Stock, Supplier, Barcode, Batch, Expiry, Shelf`; 35 medicine rows follow with 12 fields each. The file is UTF-8 with BOM, comma-delimited, CRLF-terminated, safely quoted, formula-protected and downloaded as `text/csv; charset=utf-8` with one `.csv` filename.
 
 This plan is for Main App live product testing only. Do not return to WhatsApp live testing in this phase.
 
