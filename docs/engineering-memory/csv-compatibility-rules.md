@@ -32,4 +32,6 @@ Recommended opening applications are Microsoft Excel, Google Sheets and LibreOff
 
 ## Current owner checkpoint
 
-Evidence on 2026-07-27 passes generation, one-file download, the 35-medicine newest history entry, the single updated Export Hub card and no new permanent export message. The tested generic Android document reader stalled, leaving spreadsheet rows and columns unverified. CSV remains open until a genuine spreadsheet application shows the header and medicine rows in separate aligned columns. Print remains excluded.
+Evidence on 2026-07-27 passes generation, one-file download, the 35-medicine newest history entry, the single concise Export Hub card, removal of duplicate guidance and no new permanent export message. The repaired header-first CSV still stalled indefinitely in the tested generic Android document reader. Microsoft Word displayed the expected raw comma-separated text because Word is a document/text viewer for this route, not a spreadsheet renderer.
+
+The production artifact continues to pass the repository's 35-row/12-column parser assertions, formula/Unicode/escaping fixtures and a spreadsheet-engine import round trip. No further standards-safe CSV change is indicated. The remaining observed failure is application support, not malformed CSV. CSV remains open until a genuine spreadsheet application shows the header and medicine rows in separate aligned columns. Print remains excluded.

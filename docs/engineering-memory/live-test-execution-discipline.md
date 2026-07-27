@@ -6,21 +6,18 @@ These rules are permanent for every MS2.0 live-validation cycle.
 
 Every response must give the exact command, route, link, fixture filename, and ordered owner action required for the next checkpoint. Never write only “pull and restart,” “run again,” “download the fixture,” or similar shorthand. When Replit must pull and restart, provide the complete copy-paste command in that response. If no pull or restart is needed, explicitly say so.
 
-Use this response structure consistently:
+Keep routine completion reports lightweight because the repository is permanent engineering memory. Unless an error or material safety issue requires more detail, report only:
 
-1. Result analyzed
-2. Friction found
-3. Root cause
-4. Fix applied
-5. Regression protection
-6. Commit and push
-7. REPLIT COMMAND
-8. LIVE TEST
-9. Expected result
-10. Exact approval/save instruction
-11. Next action after evidence
+1. Repository verified.
+2. One-sentence root cause.
+3. Files changed (count only unless a filename is important).
+4. Tests passed.
+5. Commit hash.
+6. Push confirmation.
+7. Whether Replit restart is required, with the complete copy-paste command only when required.
+8. The exact next owner live test.
 
-Before sending, confirm that the response includes the executable command, exact fixture, exact owner action, approval boundary, expected result, preserved catalog baseline, and requested next evidence.
+Keep implementation details, evidence interpretation and checkpoint history in Project Brain/Engineering Memory rather than repeating them in chat. The compact response must still be operationally complete: include the exact owner action, approval boundary, expected result and requested next evidence when relevant.
 
 ## Speed with accuracy
 
