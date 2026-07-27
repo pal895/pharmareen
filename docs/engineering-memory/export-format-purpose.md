@@ -31,7 +31,7 @@ Shared canonical parity does not mean identical design. Each format must priorit
 
 Presentation exists for owner and management decisions, not for reproducing the inventory register. Its deterministic nine-slide sequence is title, baseline overview, inventory position, stock/value summary, low-stock attention, expiry outlook, supplier overview, owner actions and closing decision path. Detailed reconciliation remains in Excel and record corrections remain in Word.
 
-Before download, the production path validates the PPTX container, required OOXML parts, content types, relationships and slide count. Owner evidence on 2026-07-27 confirmed download, detection and all nine readable slides in an Android standards-compatible reader. PowerPoint remains recommended; Google Slides and compatible readers are legitimate fallbacks. Presentation is OWNER-VALIDATED PASS.
+Before download, the production path validates the PPTX container, required OOXML parts, content types, relationships and slide count. Owner evidence on 2026-07-27 confirmed download, detection and all nine readable slides in an Android standards-compatible reader, resolving the original Android `Error (4)` blocker. PowerPoint remains recommended; Google Slides and compatible readers are legitimate fallbacks. Presentation is OWNER-VALIDATED PASS.
 
 ## Current sequence
 

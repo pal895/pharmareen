@@ -2,7 +2,7 @@
 
 ## Export Hub checkpoint — 2026-07-27
 
-- Owner evidence makes Excel, PDF, Word and the nine-slide Presentation **OWNER-VALIDATED PASS** and regression-protected. Presentation downloaded, was detected correctly, opened in an Android standards-compatible reader, and displayed all nine readable slides without corruption. PowerPoint is recommended, not required.
+- Owner evidence makes Excel, PDF, Word and the nine-slide Presentation **OWNER-VALIDATED PASS** and regression-protected. Presentation downloaded, was detected correctly, opened in an Android standards-compatible reader, and displayed all nine readable slides without corruption. The original Android `Error (4)` blocker is resolved. PowerPoint is recommended, not required.
 - Exactly one persistent compact `ExportHubCard` exists per pharmacy. It updates in place; full newest-first deduplicated history stays inside Export Hub; ordinary chat-feed export messages are prohibited.
 - `exportFormatMetadata.js` is authoritative for purpose, applications/fallbacks, next action, completion/regeneration wording, icon, MIME/extension, behavior, safety, accessibility and expiry.
 - CSV Technical Data Transfer is the exact next live checkpoint. It is UTF-8 BOM/CRLF, quoted, formula-injection protected, leading-zero preserving, pharmacy-isolated and edge-case tested.
