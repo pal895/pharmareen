@@ -1,6 +1,6 @@
 # MS2.0 Live Main App Test Plan
 
-## Current checkpoint — Notifications Quiet State
+## Current checkpoint — Notifications Pending Review Unread State
 
 Excel, PDF, Word, Presentation, CSV and Print are owner-validated, permanently passed and protected. Do not retest or polish them without regression evidence. The one-card status/history architecture is approved.
 
@@ -8,15 +8,19 @@ Print owner evidence confirms the complete 35-medicine view and four readable An
 
 The shared-root review is complete. Common behavior remains centralized in the canonical snapshot, format metadata registry, one pharmacy-scoped Export Hub card, pharmacy-keyed history/event routing and common dispatch. Future formats or shared behavior must extend those roots rather than create route-specific copies.
 
-The next repository-defined stage is Notifications. Test only its healthy quiet state:
+Notifications Quiet State is owner-validated, passed and protected. Evidence confirms Home and the separate Notifications workspace both showed zero unread, no alert card or Operations composer appeared, returning Home was unchanged, and no operational mutation occurred. Do not repeat it without regression evidence.
 
-1. From MS2.0 Home, capture Notifications showing `0 unread`, `Quiet` and `No urgent alerts.`
-2. Open Notifications once.
-3. Confirm the header says `Notifications`, shows `0 unread`, and the workspace says notifications stay separate from daily sales.
-4. Confirm no notification alert card and no Operations message composer are present; only the Notifications controls remain.
-5. Tap Back once and confirm Home is unchanged.
+Test only the next deterministic Notifications responsibility:
 
-Do not tap Mark read, create a sale/import/payment, edit stock/catalog data, open Export Hub or trigger an alert. Expected: no new message, draft, notification, catalog/stock mutation, payment, API request or AI token use.
+1. From Home, open MS2.0 Assistant, tap `+`, then `Paste List`.
+2. Paste `Notification Test Medicine 10 mg tablet 1` and continue only until one editable import review is visible. Do not approve or save it.
+3. Return Home. Confirm Notifications shows exactly `1 unread` and a non-quiet pending-review preview.
+4. Open Notifications once. Confirm the header shows `1 unread` and exactly one `Medicine import needs approval` alert whose action is `Review import`.
+5. Confirm the alert remains separate from daily sales and no Operations composer appears.
+6. Capture the Home unread state and the complete Notifications alert. Do not tap `Mark read`.
+7. Return to Operations and cancel/close the unapproved test draft. Confirm the saved catalog remains 35 medicines.
+
+Expected: one deterministic local pending-review notification, no catalog/stock save, no sale/payment, no API request and no AI token use. This is one Notifications test; do not test inventory, expiry, payment-failure or read-state behavior yet.
 
 This plan is for Main App live product testing only. Do not return to WhatsApp live testing in this phase.
 

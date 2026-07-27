@@ -4,7 +4,7 @@
 
 Excel Operations Workbook, PDF Professional Report, Word Owner Copy, Presentation Owner Briefing, CSV Technical Data Transfer and Print Working Inventory are owner-validated, permanently passed and regression-protected. The six-format Export Hub live-validation sequence is complete.
 
-The next repository-defined live stage is Notifications. Begin with the quiet-state checkpoint only: a healthy catalog with no current deterministic alert must show `0 unread`, remain separate from Operations, and create no message or mutation.
+Notifications Quiet State is owner-validated, passed and regression-protected: a healthy catalog with no current deterministic alert shows `0 unread`, remains separate from Operations, and creates no message or mutation. The next isolated Notifications checkpoint is one pending-review unread alert created from an unapproved Paste List draft; it must not save or change catalog stock.
 
 Every export must answer: **Why would a pharmacy owner deliberately choose this format instead of every other available export?** A format is accepted only for a distinct operational workflow. All surfaces consume the shared `exportFormatMetadata.js` registry, and activity updates one persistent pharmacy-scoped Export Hub status card instead of adding chat-feed messages.
 
