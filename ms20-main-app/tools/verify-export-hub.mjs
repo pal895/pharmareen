@@ -4,7 +4,7 @@ import { join } from "node:path";
 import {
   EXPORT_FORMATS, buildCanonicalInventoryExport, buildInventoryCsv, buildInventoryDocx,
   buildInventoryPdf, buildInventoryPptx, buildInventoryXlsx, buildOwnerWorkbookSheets,
-  buildPrintHtml, exportFilename, validateInventoryExportSnapshot
+  buildPrintHtml, exportFilename, validateInventoryExportSnapshot, validateInventoryPptxPackage
 } from "../src/services/documentGenerator.js";
 import { buildMedicineFinderIndex, searchMedicineFinder } from "../src/services/medicineFinder.js";
 
@@ -70,6 +70,13 @@ assert.deepEqual(
   outputs.docx,
   "Identical immutable input must produce deterministic DOCX bytes"
 );
+assert.deepEqual(
+  buildInventoryPptx(buildCanonicalInventoryExport({ pharmacy, items, generatedAt })),
+  outputs.pptx,
+  "Identical immutable input must produce deterministic PPTX bytes"
+);
+assert.deepEqual(validateInventoryPptxPackage(outputs.pptx), { valid: true, entryCount: 29, slideCount: 9 });
+assert.throws(() => validateInventoryPptxPackage(outputs.pptx.slice(0, -8)), /end record is missing or truncated/);
 const zeroAndMissingPdf = new TextDecoder().decode(buildInventoryPdf(buildCanonicalInventoryExport({
   pharmacy,
   items: [{ name: "Zero Stock Example", stockLeft: 0, sellingPrice: 0, costPrice: "", supplier: "", barcode: "", batches: [], shelf: "" }],
@@ -201,7 +208,7 @@ assert.match(decodedPackages.xlsx, /fgColor rgb="FFF1F7F5"/);
 assert.match(decodedPackages.xlsx, /wrapText="1" vertical="center"/);
 for (const item of items) {
   assert.match(outputs.csv, new RegExp(item.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `CSV missing ${item.name}`);
-  for (const format of ["xlsx", "docx", "pptx"]) {
+  for (const format of ["xlsx", "docx"]) {
     assert.match(decodedPackages[format], new RegExp(item.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${format.toUpperCase()} missing ${item.name}`);
   }
   assert.match(decodedPdf, new RegExp(item.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `PDF missing ${item.name}`);
@@ -209,12 +216,16 @@ for (const item of items) {
   assert.match(outputs.html, new RegExp(`class="record-main"[\\s\\S]*?${item.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), `Print missing ${item.name}`);
 }
 assert.equal((decodedPackages.pptx.match(/<p:sldId /g) || []).length, 9);
-assert.match(decodedPackages.pptx, /Pharmacy inventory briefing/);
-assert.match(decodedPackages.pptx, /Inventory overview/);
-assert.match(decodedPackages.pptx, /Choose Presentation for a clear staff, owner or supplier briefing on a large screen\./);
-assert.match(decodedPackages.pptx, /Medicines 1-5 of 35/);
-assert.match(decodedPackages.pptx, /Medicines 31-35 of 35/);
-assert.equal((decodedPackages.pptx.match(/Inventory review \| [1-7] of 7/g) || []).length, 7);
+assert.match(decodedPackages.pptx, /Pharmacy owner briefing/);
+assert.match(decodedPackages.pptx, /The pharmacy has a clear inventory baseline/);
+assert.match(decodedPackages.pptx, /The strongest next step is completing missing operating data/);
+assert.match(decodedPackages.pptx, /Recorded inventory carries measurable working capital/);
+assert.match(decodedPackages.pptx, /Low-stock items require a purchasing decision/);
+assert.match(decodedPackages.pptx, /No near-term expiry is flagged/);
+assert.match(decodedPackages.pptx, /Supplier concentration shapes purchasing resilience/);
+assert.match(decodedPackages.pptx, /Keep the next inventory cycle decision-ready/);
+assert.match(decodedPackages.pptx, /Make the inventory decisions that matter/);
+assert.doesNotMatch(decodedPackages.pptx, /Inventory review \|/);
 assert.equal((decodedPackages.docx.match(/w:type="page"/g) || []).length, 9);
 assert.equal((decodedPdf.match(/\/Type \/Page\b/g) || []).length, 8);
 assert.equal((decodedPdf.match(/\/MediaBox \[0 0 595 842\]/g) || []).length, 8);
@@ -292,10 +303,15 @@ assert.match(appSource, /data-action="open-export-hub">Export Hub/);
 assert.match(appSource, /buildCanonicalInventoryExport\(\{ pharmacy: state\.pharmacy, items: pharmacyBrain\.catalog \}\)/);
 assert.match(appSource, /download-inventory-export/);
 assert.match(appSource, /card\.type === "CatalogWorkspaceCard" \|\| card\.type === "ExportHubCard"/);
-assert.match(appSource, /Choose Excel for inventory analysis, PDF for easy phone reading, or Word when you want an editable document with notes\. No confirmation is required\./);
-assert.match(appSource, /Choose Excel when you want to search, filter, edit or analyze your complete pharmacy inventory\. For the easiest phone reading and sharing experience, choose PDF\./);
-assert.match(appSource, /For the best experience, open this file in Microsoft Excel or Google Sheets\./);
-assert.match(appSource, /Open this editable copy in Microsoft Word or Google Docs when you want to add notes or make owner-reviewed changes\./);
+assert.match(appSource, /Choose Excel for calculations and reconciliation, PDF for read-only sharing and phone viewing/);
+assert.match(appSource, /Open in Microsoft Excel or Google Sheets\./);
+assert.match(appSource, /Open in Microsoft Word or Google Docs to edit notes and corrections\./);
+assert.match(appSource, /Open in Microsoft PowerPoint\. If a generic phone viewer rejects it/);
+assert.match(appSource, /ms20\.export-history\.v1/);
+assert.match(appSource, /previous\.filter\(\(item\) => item\.id !== record\.id\)/);
+assert.match(appSource, /EXPORT_HISTORY_KEY_PREFIX.*state\.pharmacy\.id/s);
+assert.doesNotMatch(appSource, /function recordExportEvent[\s\S]{0,1200}addFeed\(/);
+assert.match(appSource, /Generate again/);
 assert.match(appSource, /<h3>Polished owner copies<\/h3>/);
 assert.match(appSource, /<h3>Technical data transfer<\/h3>/);
 assert.match(appSource, /CSV preserves the records for other systems, but it cannot carry colours, fonts, spacing or page design\./);

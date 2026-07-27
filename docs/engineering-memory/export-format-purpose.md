@@ -26,3 +26,9 @@ A format is justified only when it solves a distinct real pharmacy workflow. Mul
 - **Print:** an immediate physical working inventory produced from the browser.
 
 Shared canonical parity does not mean identical design. Each format must prioritize the information and interaction needed for its own job.
+
+## Presentation Owner Briefing
+
+Presentation exists for owner and management decisions, not for reproducing the inventory register. Its deterministic nine-slide sequence is title, baseline overview, inventory position, stock/value summary, low-stock attention, expiry outlook, supplier overview, owner actions and closing decision path. Detailed reconciliation remains in Excel and record corrections remain in Word.
+
+Before download, the production path validates the PPTX container, required OOXML parts, content types, relationships and slide count. The exact generated file is tested in Microsoft PowerPoint; generic ad-supported phone viewers are not compatibility authorities.

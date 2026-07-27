@@ -784,3 +784,17 @@ After pulling and restarting the latest build, open Export Hub and download one 
 5. Confirm slide 9 shows medicines 31–35, with no missing row, overlap or clipping.
 
 Do not edit, present, print, share or upload the deck. If these four views are clear, mark Presentation Owner Briefing passed and advance to the next repository-defined checkpoint. Report only an open failure, wrong pharmacy identity, missing medicine/value, unreadable text, overlap or clipping.
+
+### Corrective retest — pending
+
+The prior generic ad-supported Android Office app is not a compatibility authority; it returned error (4) for a PPTX that opens in Microsoft PowerPoint. Presentation Owner Briefing remains **PENDING / NOT PASSED**.
+
+1. Pull and restart the protected commit.
+2. Open Export Hub and download Presentation.
+3. Confirm the main sales chat shows one updated Export Hub card rather than a new export message.
+4. Expand Export history and confirm the newest PPTX record shows pharmacy, filename, time, count, purpose, opening guidance and `completed`.
+5. Open the file in Microsoft PowerPoint or another standards-compatible presentation application.
+6. Confirm nine slides: title, baseline overview, inventory position, value summary, low stock, expiry, suppliers, owner actions and closing decisions.
+7. Confirm no clipping, blank slide, broken text, invented claim or medicine-by-medicine dump.
+
+Pass only after owner-device evidence shows the file opens in a compatible presentation app and the one-card/history behavior is correct.

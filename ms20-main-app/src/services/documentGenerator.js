@@ -159,11 +159,16 @@ export function buildInventoryDocx(model) {
 
 export function buildInventoryPptx(model) {
   validateInventoryExportSnapshot(model);
-  const chunks = balancedChunks(model.rows, OFFICE_RECORDS_PER_PAGE);
   const slides = [
     titleSlide(model),
     presentationOverviewSlide(model),
-    ...chunks.map((rows, index) => presentationInventorySlide(model, rows, index + 1, chunks.length))
+    presentationPositionSlide(model),
+    presentationValueSlide(model),
+    presentationLowStockSlide(model),
+    presentationExpirySlide(model),
+    presentationSupplierSlide(model),
+    presentationActionsSlide(model),
+    presentationClosingSlide(model)
   ];
   const overrides = slides.map((_, i) => `<Override PartName="/ppt/slides/slide${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`).join("");
   const slideIds = slides.map((_, i) => `<p:sldId id="${256 + i}" r:id="rId${i + 2}"/>`).join("");
@@ -179,6 +184,64 @@ export function buildInventoryPptx(model) {
     ...slides.flatMap((contents, i) => [entry(`ppt/slides/slide${i + 1}.xml`, contents), entry(`ppt/slides/_rels/slide${i + 1}.xml.rels`, rels([["rId1", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout", "../slideLayouts/slideLayout1.xml"]]))])
   ];
   return buildStoredZip(entries);
+}
+
+export function validateInventoryPptxPackage(contents) {
+  const bytes = contents instanceof Uint8Array ? contents : new Uint8Array(contents);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (bytes.length < 22 || view.getUint32(bytes.length - 22, true) !== 0x06054b50) throw new Error("PPTX ZIP end record is missing or truncated.");
+  const entries = new Map();
+  let offset = 0;
+  while (offset + 30 <= bytes.length && view.getUint32(offset, true) === 0x04034b50) {
+    const compressedSize = view.getUint32(offset + 18, true);
+    const uncompressedSize = view.getUint32(offset + 22, true);
+    const nameLength = view.getUint16(offset + 26, true);
+    const extraLength = view.getUint16(offset + 28, true);
+    const nameStart = offset + 30;
+    const dataStart = nameStart + nameLength + extraLength;
+    const dataEnd = dataStart + compressedSize;
+    if (dataEnd > bytes.length || compressedSize !== uncompressedSize) throw new Error("PPTX contains a truncated or unsupported ZIP entry.");
+    const name = new TextDecoder().decode(bytes.slice(nameStart, nameStart + nameLength));
+    entries.set(name, bytes.slice(dataStart, dataEnd));
+    offset = dataEnd;
+  }
+  const required = [
+    "[Content_Types].xml", "_rels/.rels", "docProps/core.xml", "docProps/app.xml",
+    "ppt/presentation.xml", "ppt/_rels/presentation.xml.rels",
+    "ppt/slideMasters/slideMaster1.xml", "ppt/slideMasters/_rels/slideMaster1.xml.rels",
+    "ppt/slideLayouts/slideLayout1.xml", "ppt/slideLayouts/_rels/slideLayout1.xml.rels",
+    "ppt/theme/theme1.xml"
+  ];
+  for (let index = 1; index <= 9; index += 1) {
+    required.push(`ppt/slides/slide${index}.xml`, `ppt/slides/_rels/slide${index}.xml.rels`);
+  }
+  for (const name of required) if (!entries.has(name)) throw new Error(`PPTX required part is missing: ${name}`);
+  const text = (name) => new TextDecoder().decode(entries.get(name));
+  const contentTypes = text("[Content_Types].xml");
+  for (let index = 1; index <= 9; index += 1) {
+    if (!contentTypes.includes(`PartName="/ppt/slides/slide${index}.xml"`)) throw new Error(`PPTX content type is missing for slide ${index}.`);
+  }
+  const normalizeTarget = (source, target) => {
+    const base = source.split("/").slice(0, -1);
+    for (const part of target.split("/")) {
+      if (part === "..") base.pop();
+      else if (part !== ".") base.push(part);
+    }
+    return base.join("/");
+  };
+  const relationshipFiles = [...entries.keys()].filter((name) => name.endsWith(".rels"));
+  for (const relName of relationshipFiles) {
+    const source = relName === "_rels/.rels"
+      ? ""
+      : relName.replace("/_rels/", "/").replace(/\.rels$/, "");
+    for (const match of text(relName).matchAll(/Target="([^"]+)"/g)) {
+      const target = normalizeTarget(source || "root.xml", match[1]);
+      if (!entries.has(target)) throw new Error(`PPTX relationship target is missing: ${relName} -> ${match[1]}`);
+    }
+  }
+  const presentation = text("ppt/presentation.xml");
+  if ((presentation.match(/<p:sldId /g) || []).length !== 9) throw new Error("PPTX must contain exactly nine briefing slides.");
+  return { valid: true, entryCount: entries.size, slideCount: 9 };
 }
 
 export function buildInventoryPdf(model) {
@@ -571,7 +634,7 @@ function wordStyles() { return `<?xml version="1.0"?><w:styles xmlns:w="http://s
 <w:style w:type="paragraph" w:styleId="CardGap"><w:name w:val="Card gap"/><w:pPr><w:spacing w:after="90"/></w:pPr><w:rPr><w:sz w:val="4"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="SectionGap"><w:name w:val="Section gap"/><w:pPr><w:spacing w:after="100"/></w:pPr><w:rPr><w:sz w:val="4"/></w:rPr></w:style>
 </w:styles>`; }
-function titleSlide(model) { return slideXml([shapeText(1, "Pharmacy inventory briefing", 700000, 1050000, 10800000, 900000, 5000, true, "086C5C"), shapeText(2, `${model.pharmacyName}\n${model.branch} | ${model.location}`, 700000, 2350000, 10800000, 1200000, 2600, false, "19332F"), shapeText(3, `${model.rows.length} medicines\nPrepared ${model.generatedKenya} Africa/Nairobi`, 700000, 4200000, 10800000, 1000000, 2000, false, "536B66")]); }
+function titleSlide(model) { return slideXml([shapeText(1, "Pharmacy owner briefing", 700000, 1050000, 10800000, 900000, 5000, true, "086C5C"), shapeText(2, `${model.pharmacyName}\n${model.branch} | ${model.location}`, 700000, 2350000, 10800000, 1200000, 2600, false, "19332F"), shapeText(3, `Inventory position and owner decisions\nPrepared ${model.generatedKenya} Africa/Nairobi`, 700000, 4200000, 10800000, 1000000, 2000, false, "536B66")]); }
 function presentationOverviewSlide(model) {
   const metrics = [
     ["Medicines", model.summary.medicineCount], ["Units in stock", model.summary.totalStock],
@@ -581,7 +644,7 @@ function presentationOverviewSlide(model) {
     ["Low stock", model.summary.lowStockCount], ["Expiring soon", model.summary.expiringSoonCount]
   ];
   const shapes = [
-    shapeText(1, "Inventory overview", 600000, 260000, 10800000, 650000, 3500, true, "086C5C"),
+    shapeText(1, "The pharmacy has a clear inventory baseline", 600000, 260000, 10800000, 650000, 3500, true, "086C5C"),
     shapeText(2, `${model.pharmacyName} | ${model.branch} | ${model.location}`, 600000, 880000, 10800000, 420000, 1800, false, "536B66")
   ];
   metrics.forEach(([label, value], index) => {
@@ -592,35 +655,86 @@ function presentationOverviewSlide(model) {
     shapes.push(shapeText(3 + index * 2, label, x, y, 3300000, 760000, 2000, true, "19332F", row % 2 ? "F1F7F5" : "FFFFFF"));
     shapes.push(shapeText(4 + index * 2, String(value), x + 3300000, y, 2000000, 760000, 2400, true, "086C5C", "EDF7F4"));
   });
-  shapes.push(shapeText(30, "Choose Presentation for a clear staff, owner or supplier briefing on a large screen. Use Word for editable notes and Excel for analysis.", 600000, 5950000, 10800000, 520000, 1600, false, "536B66"));
+  shapes.push(shapeText(30, "This briefing supports a management conversation. Use Excel for detailed analysis and Word for record-by-record corrections.", 600000, 5950000, 10800000, 520000, 1600, false, "536B66"));
   return slideXml(shapes);
 }
-function presentationInventorySlide(model, rows, index, total) {
-  const shapes = [
-    shapeText(1, `Inventory review | ${index} of ${total}`, 500000, 220000, 7800000, 600000, 3500, true, "086C5C"),
-    shapeText(2, `Medicines ${(index - 1) * OFFICE_RECORDS_PER_PAGE + 1}-${(index - 1) * OFFICE_RECORDS_PER_PAGE + rows.length} of ${model.rows.length}`, 8700000, 300000, 3000000, 420000, 1800, false, "536B66")
-  ];
-  let id = 3;
-  rows.forEach((row, rowIndex) => {
-    const y = 1050000 + rowIndex * 1010000;
-    const fill = rowIndex % 2 ? "F1F7F5" : "FFFFFF";
-    const identity = [row.strength, row.form, row.unit].filter(recordedValue).join(" | ") || "Identity not recorded";
-    const prices = `Selling KES ${recordedValue(row.sellingPrice) ? row.sellingPrice : "Not recorded"} | Cost KES ${recordedValue(row.costPrice) ? row.costPrice : "Not recorded"}`;
-    const supplier = recordedValue(row.supplier) ? `Supplier: ${row.supplier}` : "Supplier: Not recorded";
-    const trace = [
-      recordedValue(row.expiry) ? `Expiry ${row.expiry}` : "Expiry Not recorded",
-      recordedValue(row.batch) ? `Batch ${row.batch}` : "",
-      recordedValue(row.shelf) ? `Shelf ${row.shelf}` : "",
-      recordedValue(row.barcode) ? `Barcode ${row.barcode}` : ""
-    ].filter(Boolean).join(" | ");
-    shapes.push(shapeText(id++, row.medicine, 500000, y, 3000000, 420000, 2000, true, "19332F", fill));
-    shapes.push(shapeText(id++, identity, 3500000, y, 4200000, 420000, 1600, false, "19332F", fill));
-    shapes.push(shapeText(id++, prices, 500000, y + 420000, 4200000, 420000, 1600, true, "19332F", fill));
-    shapes.push(shapeText(id++, `${supplier}\n${trace}`, 4700000, y + 420000, 5000000, 500000, 1600, false, "536B66", fill));
-    shapes.push(shapeText(id++, row.stock === "" ? "Stock\nNot recorded" : `STOCK\n${row.stock}`, 9700000, y, 2000000, 920000, row.stock === "" ? 1800 : 2400, true, row.stock === "" ? "536B66" : "086C5C", "EDF7F4"));
+function presentationPositionSlide(model) {
+  const recordedStock = model.rows.filter((row) => row.stock !== "");
+  const missingStock = model.rows.length - recordedStock.length;
+  const recordedPrices = model.rows.filter((row) => recordedValue(row.sellingPrice)).length;
+  return briefingMetricSlide(model, "The strongest next step is completing missing operating data", [
+    ["Stock recorded", `${recordedStock.length} of ${model.rows.length}`],
+    ["Stock not recorded", missingStock],
+    ["Selling prices recorded", `${recordedPrices} of ${model.rows.length}`],
+    ["Total units recorded", model.summary.totalStock]
+  ], missingStock ? "Decision: assign an owner and date for completing missing stock counts." : "Decision: preserve the complete stock baseline and review exceptions.");
+}
+function presentationValueSlide(model) {
+  return briefingMetricSlide(model, "Recorded inventory carries measurable working capital", [
+    ["Retail stock value", `KES ${formatPdfNumber(model.summary.retailStockValue)}`],
+    ["Cost stock value", `KES ${formatPdfNumber(model.summary.costStockValue)}`],
+    ["Potential gross margin", `KES ${formatPdfNumber(model.summary.potentialGrossMargin)}`],
+    ["Margin on recorded cost", model.summary.costStockValue ? `${Math.round(model.summary.potentialGrossMargin / model.summary.costStockValue * 100)}%` : "Not available"]
+  ], "Decision: use Excel for reconciliation before committing purchasing or cash-flow actions.");
+}
+function presentationLowStockSlide(model) {
+  const flagged = model.rows.filter((row) => model.finderIndex.find((entry) => entry.id === row.finderId)?.flags?.lowStock);
+  const sample = flagged.slice(0, 4).map((row) => `${row.medicine}: ${row.stock === "" ? "stock not recorded" : `${row.stock} units`}`);
+  return briefingListSlide(model, flagged.length ? "Low-stock items require a purchasing decision" : "No low-stock items are flagged in this snapshot", sample.length ? sample : ["No medicine is currently at or below its recorded reorder level."], flagged.length ? "Decision: confirm quantities and suppliers before placing orders." : "Decision: confirm reorder levels remain appropriate.");
+}
+function presentationExpirySlide(model) {
+  const flagged = model.rows.filter((row) => model.finderIndex.find((entry) => entry.id === row.finderId)?.flags?.expiringSoon);
+  const missing = model.rows.filter((row) => !recordedValue(row.expiry)).length;
+  const lines = flagged.slice(0, 3).map((row) => `${row.medicine}: ${row.expiry}`);
+  lines.push(`${missing} medicine${missing === 1 ? "" : "s"} without a recorded expiry date`);
+  return briefingListSlide(model, flagged.length ? "Expiry exposure needs active follow-up" : "No near-term expiry is flagged", lines, "Decision: verify missing dates and agree the next expiry review.");
+}
+function presentationSupplierSlide(model) {
+  const counts = new Map();
+  for (const row of model.rows) {
+    const supplier = recordedValue(row.supplier) ? row.supplier : "Supplier not recorded";
+    counts.set(supplier, (counts.get(supplier) || 0) + 1);
+  }
+  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 5);
+  return briefingListSlide(model, "Supplier concentration shapes purchasing resilience", ranked.map(([supplier, count]) => `${supplier}: ${count} medicine${count === 1 ? "" : "s"}`), "Decision: confirm preferred suppliers and resolve missing supplier records.");
+}
+function presentationActionsSlide(model) {
+  const missingStock = model.rows.filter((row) => row.stock === "").length;
+  const missingSupplier = model.rows.filter((row) => !recordedValue(row.supplier)).length;
+  const missingExpiry = model.rows.filter((row) => !recordedValue(row.expiry)).length;
+  return briefingListSlide(model, "Keep the next inventory cycle decision-ready", [
+    missingStock ? `Complete ${missingStock} missing stock count${missingStock === 1 ? "" : "s"}.` : "Preserve the complete stock-count baseline.",
+    missingSupplier ? `Confirm ${missingSupplier} missing supplier record${missingSupplier === 1 ? "" : "s"}.` : "Maintain complete supplier records.",
+    missingExpiry ? `Verify ${missingExpiry} missing expiry date${missingExpiry === 1 ? "" : "s"}.` : "Continue the scheduled expiry review."
+  ], "Agree owners and dates, then use the editable Word copy to record corrections.");
+}
+function presentationClosingSlide(model) {
+  return slideXml([
+    shapeText(1, "Make the inventory decisions that matter", 700000, 900000, 10800000, 850000, 4200, true, "086C5C"),
+    shapeText(2, "1. Confirm the gaps that matter\n2. Assign owners and dates\n3. Reconcile in Excel\n4. Record approved corrections in Word", 900000, 2200000, 9300000, 2200000, 2600, false, "19332F", "F1F7F5"),
+    shapeText(3, `${model.pharmacyName} | ${model.branch}\nSnapshot: ${model.generatedKenya} Africa/Nairobi`, 900000, 5050000, 9300000, 800000, 1800, false, "536B66")
+  ]);
+}
+function briefingMetricSlide(model, title, metrics, decision) {
+  const shapes = [shapeText(1, title, 600000, 280000, 10800000, 800000, 3500, true, "086C5C")];
+  metrics.forEach(([label, value], index) => {
+    const x = 700000 + (index % 2) * 5650000;
+    const y = 1500000 + Math.floor(index / 2) * 1550000;
+    shapes.push(shapeText(2 + index * 2, label, x, y, 3400000, 700000, 1900, true, "19332F", "F1F7F5"));
+    shapes.push(shapeText(3 + index * 2, String(value), x + 3400000, y, 1800000, 700000, 2600, true, "086C5C", "EDF7F4"));
   });
-  shapes.push(shapeText(id, `${model.pharmacyName} | ${model.branch} | Generated ${model.generatedKenya}`, 500000, 6350000, 11200000, 280000, 1600, false, "536B66"));
+  shapes.push(shapeText(20, decision, 700000, 5100000, 10800000, 700000, 1900, true, "19332F"));
+  shapes.push(shapeText(21, `${model.pharmacyName} | Generated ${model.generatedKenya}`, 700000, 6300000, 10800000, 260000, 1400, false, "536B66"));
   return slideXml(shapes);
+}
+function briefingListSlide(model, title, lines, decision) {
+  const body = lines.map((line) => `• ${line}`).join("\n");
+  return slideXml([
+    shapeText(1, title, 600000, 280000, 10800000, 800000, 3500, true, "086C5C"),
+    shapeText(2, body, 800000, 1450000, 10300000, 3100000, 2400, false, "19332F", "F1F7F5"),
+    shapeText(3, decision, 800000, 5000000, 10300000, 700000, 1900, true, "19332F"),
+    shapeText(4, `${model.pharmacyName} | Generated ${model.generatedKenya}`, 800000, 6300000, 10300000, 260000, 1400, false, "536B66")
+  ]);
 }
 function tableSlide(model, rows, index, total) {
   const headers = ["Medicine", "Identity", "Prices", "Stock", "Supplier", "Traceability", "Expiry / shelf"];
@@ -640,7 +754,10 @@ function tableSlide(model, rows, index, total) {
   return slideXml(shapes);
 }
 function slideXml(shapes) { return `<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="0" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>${shapes.join("")}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`; }
-function shapeText(id, text, x, y, cx, cy, size, bold, color, fill = "FFFFFF") { return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Text ${id}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="${fill}"/></a:solidFill><a:ln><a:noFill/></a:ln></p:spPr><p:txBody><a:bodyPr wrap="square" lIns="70000" rIns="70000" tIns="35000" bIns="35000"/><a:lstStyle/><a:p><a:r><a:rPr lang="en-KE" sz="${size}" b="${bold ? 1 : 0}"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></a:rPr><a:t>${xml(text)}</a:t></a:r><a:endParaRPr lang="en-KE"/></a:p></p:txBody></p:sp>`; }
+function shapeText(id, text, x, y, cx, cy, size, bold, color, fill = "FFFFFF") {
+  const paragraphs = String(text).split("\n").map((line) => `<a:p><a:r><a:rPr lang="en-KE" sz="${size}" b="${bold ? 1 : 0}"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></a:rPr><a:t>${xml(line)}</a:t></a:r><a:endParaRPr lang="en-KE" sz="${size}"/></a:p>`).join("");
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Text ${id}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="${fill}"/></a:solidFill><a:ln><a:noFill/></a:ln></p:spPr><p:txBody><a:bodyPr wrap="square" lIns="70000" rIns="70000" tIns="35000" bIns="35000"/><a:lstStyle/>${paragraphs}</p:txBody></p:sp>`;
+}
 function slideMaster() { return `<?xml version="1.0"?><p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld><p:sldLayoutIdLst><p:sldLayoutId id="1" r:id="rId1"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle/><p:bodyStyle/><p:otherStyle/></p:txStyles></p:sldMaster>`; }
 function slideLayout() { return `<?xml version="1.0"?><p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" type="blank"><p:cSld name="Blank"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld></p:sldLayout>`; }
 function pptTheme() { return `<?xml version="1.0"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="MS2.0"><a:themeElements><a:clrScheme name="MS2.0"><a:dk1><a:srgbClr val="19332F"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="536B66"/></a:dk2><a:lt2><a:srgbClr val="F1F7F5"/></a:lt2><a:accent1><a:srgbClr val="086C5C"/></a:accent1><a:accent2><a:srgbClr val="C9D8D4"/></a:accent2><a:accent3><a:srgbClr val="58A696"/></a:accent3><a:accent4><a:srgbClr val="D3A229"/></a:accent4><a:accent5><a:srgbClr val="7E9B95"/></a:accent5><a:accent6><a:srgbClr val="B7CDC8"/></a:accent6><a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme><a:fontScheme name="MS2.0"><a:majorFont><a:latin typeface="Aptos Display"/></a:majorFont><a:minorFont><a:latin typeface="Aptos"/></a:minorFont></a:fontScheme><a:fmtScheme name="MS2.0"><a:fillStyleLst/><a:lnStyleLst/><a:effectStyleLst/><a:bgFillStyleLst/></a:fmtScheme></a:themeElements></a:theme>`; }

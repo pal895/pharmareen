@@ -472,3 +472,9 @@ Tests use fake services and do not call WhatsApp Web bridge, OpenAI, or Google S
 - `GET /health`: health check.
 - `POST /bridge/whatsapp-web`: WhatsApp Web bridge bridge endpoint.
 - `POST /reports/daily`: generate, save, and optionally send the daily report.
+
+## Presentation compatibility and export history
+
+Presentation is a nine-slide owner/management decision briefing, not another inventory list. The production path validates the complete OOXML package before download, and the exact generated deck is application-tested in Microsoft PowerPoint.
+
+Export activity updates one compact Export Hub card in the main chat. Newest-first pharmacy-isolated metadata history lives inside Export Hub; retries are deduplicated, failures can be generated again, and generated binaries are never retained in browser storage.

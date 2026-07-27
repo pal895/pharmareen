@@ -23,7 +23,8 @@ import { buildDeterministicNotifications, mergeNotifications, notificationToCard
 import {
   EXPORT_FORMATS, buildBulkPasteTemplate, buildCanonicalInventoryExport, buildDocumentCard,
   buildInventoryCsv, buildInventoryDocx, buildInventoryPdf, buildInventoryPptx,
-  buildInventoryXlsx, buildPrintHtml, downloadBlobFile, downloadTextFile, exportFilename
+  buildInventoryXlsx, buildPrintHtml, downloadBlobFile, downloadTextFile, exportFilename,
+  validateInventoryPptxPackage
 } from "./services/documentGenerator.js";
 import {
   CATALOG_EDIT_FIELDS,
@@ -88,6 +89,8 @@ const FEED_KEY = "ms20-main-app:conversation-feed";
 const ACTIVE_CARDS_KEY = "ms20-main-app:active-cards";
 const INVOICE_MEMORY_KEY = "ms20-main-app:invoice-memory";
 const QUARANTINED_CARDS_KEY = "ms20-main-app:quarantined-cards";
+const EXPORT_HISTORY_KEY_PREFIX = "ms20-main-app:export-history";
+const EXPORT_HISTORY_LIMIT = 50;
 const FEED_RESUME_LIMIT = 40;
 const ACTIVE_CARD_RESUME_LIMIT = 12;
 const CARD_FONT_SCALE_MIN = 0.85;
@@ -129,6 +132,7 @@ const DURABLE_CARD_TYPES = new Set([
   "CatalogWorkspaceCard",
   "ImportMappingCard",
   "DocumentExportCard",
+  "ExportHubCard",
   "SyncReviewCard"
 ]);
 const FIELD_LABELS = {
@@ -2529,6 +2533,7 @@ function resetOnboarding() {
   storage?.removeItem(NOTIFICATION_KEY);
   storage?.removeItem(FEED_KEY);
   storage?.removeItem(ACTIVE_CARDS_KEY);
+  storage?.removeItem(exportHistoryKey());
   state.onboarding.completed = false;
   state.onboarding.started = false;
   state.catalog.items = [];
@@ -3280,11 +3285,14 @@ function exportCatalogCsv() {
 
 function openExportHub() {
   const existing = state.cards.find((card) => card.type === "ExportHubCard");
-  if (existing) return focusCard(existing.id);
+  if (existing) {
+    existing.fields.history = readExportHistory();
+    return focusCard(existing.id);
+  }
   addCard({
     id: `card-export-hub-${Date.now()}`, type: "ExportHubCard", title: "Export Hub",
     source: "Canonical Pharmacy Catalog", confidence: 1, status: "ready", aiRequired: false,
-    fields: { item_count: String(pharmacyBrain.catalog.length), last_download: "None yet" },
+    fields: { item_count: String(pharmacyBrain.catalog.length), last_download: "Ready to generate an export.", history: readExportHistory() },
     validation: "Downloads are generated locally from this pharmacy's canonical records with zero AI formatting."
   });
 }
@@ -3293,9 +3301,16 @@ function exportHubTemplate(card) {
   const formatButton = (format) => `<button type="button" data-action="download-inventory-export" data-format="${format.id}" data-card-id="${card.id}"><strong>${format.label}</strong><span>${format.help}</span></button>`;
   const polishedFormats = EXPORT_FORMATS.filter((format) => format.group === "polished");
   const dataFormats = EXPORT_FORMATS.filter((format) => format.group === "data");
+  const history = Array.isArray(card.fields?.history) ? card.fields.history : [];
+  const historyRows = history.length ? history.map((item) => `<li class="export-history-item">
+    <div><strong>${escapeHtml(item.format.toUpperCase())} · ${escapeHtml(item.status)}</strong><span>${escapeHtml(item.generatedKenya)} · ${escapeHtml(String(item.medicineCount))} medicines</span></div>
+    <p>${escapeHtml(item.purpose)}</p>
+    <small>${escapeHtml(item.filename)} · ${escapeHtml(item.openGuidance)}</small>
+    ${item.status === "failed" || item.status === "unavailable" ? `<button type="button" data-action="download-inventory-export" data-format="${escapeHtml(item.format)}" data-card-id="${card.id}">Generate again</button>` : ""}
+  </li>`).join("") : "<li>No exports generated yet.</li>";
   return `<section class="export-hub" aria-label="Export Hub">
     <div class="export-hub-summary"><strong>${pharmacyBrain.catalog.length} medicines</strong><span>${escapeHtml(state.pharmacy.name)} · ${escapeHtml(state.pharmacy.branch || "Main")}</span></div>
-    <p>Choose Excel when you want to search, filter, edit or analyze your complete pharmacy inventory. For the easiest phone reading and sharing experience, choose PDF.</p>
+    <p>Choose Excel for calculations and reconciliation, PDF for read-only sharing and phone viewing, Word for corrections and working notes, Presentation for owner or management decisions, Print for a physical register, and CSV for system-to-system data exchange.</p>
     <div class="export-format-section">
       <h3>Polished owner copies</h3>
       <div class="export-format-grid">${polishedFormats.map(formatButton).join("")}</div>
@@ -3306,6 +3321,7 @@ function exportHubTemplate(card) {
       <div class="export-format-grid">${dataFormats.map(formatButton).join("")}</div>
     </div>
     <p class="export-hub-status" aria-live="polite">${escapeHtml(card.fields?.last_download || "None yet")}</p>
+    <details class="export-history"><summary>Export history (${history.length})</summary><ol>${historyRows}</ol></details>
     <p class="export-hub-assurance">Generated locally · Pharmacy-isolated · Canonical data · Zero AI formatting</p>
   </section>`;
 }
@@ -3322,25 +3338,80 @@ function downloadInventoryExport(format, cardId = "") {
   if (format === "print") {
     const bridgeId = globalThis.crypto?.randomUUID?.() || `finder-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     state.printPreview = { model, bridgeId, query: "", message: "" };
-    updateExportHubStatus(cardId, `Print-ready inventory opened for ${model.rows.length} medicines.`);
+    recordExportEvent(cardId, exportHistoryRecord({ model, format, extension: "print", status: "completed", filename: "Print preview", openGuidance: exportOpenGuidance("print") }));
     return;
   }
   const selected = formats[format];
-  if (!selected) return updateExportHubStatus(cardId, "That export format is not supported.");
+  if (!selected) {
+    return recordExportEvent(cardId, exportHistoryRecord({ model, format: format || "unknown", extension: format || "unknown", status: "unavailable", filename: "Not generated", openGuidance: "Generate again when this format is available." }));
+  }
   const [builder, extension, mime] = selected;
-  downloadBlobFile({ filename: exportFilename(model, extension), contents: builder(model), mime });
-  const guidance = extension === "xlsx"
-    ? " For the best experience, open this file in Microsoft Excel or Google Sheets."
-    : extension === "docx"
-      ? " Open this editable copy in Microsoft Word or Google Docs when you want to add notes or make owner-reviewed changes."
-      : "";
-  updateExportHubStatus(cardId, `${extension.toUpperCase()} downloaded for ${model.rows.length} medicines at ${model.generatedKenya} Africa/Nairobi.${guidance}`);
+  const filename = exportFilename(model, extension);
+  const openGuidance = exportOpenGuidance(extension);
+  try {
+    const contents = builder(model);
+    if (extension === "pptx") validateInventoryPptxPackage(contents);
+    downloadBlobFile({ filename, contents, mime });
+    recordExportEvent(cardId, exportHistoryRecord({ model, format, extension, status: "completed", filename, openGuidance }));
+  } catch (error) {
+    console.error(`MS2.0 ${extension.toUpperCase()} export failed`, error);
+    recordExportEvent(cardId, exportHistoryRecord({ model, format, extension, status: "failed", filename, openGuidance: `Generation failed. ${openGuidance}` }));
+  }
 }
 
-function updateExportHubStatus(cardId, message) {
+function exportHistoryKey() {
+  return `${EXPORT_HISTORY_KEY_PREFIX}:${state.pharmacy.id}`;
+}
+
+function readExportHistory() {
+  try {
+    const history = JSON.parse(safeLocalStorage()?.getItem(exportHistoryKey()) || "[]");
+    return Array.isArray(history) ? history.slice(0, EXPORT_HISTORY_LIMIT) : [];
+  } catch {
+    return [];
+  }
+}
+
+function exportOpenGuidance(extension) {
+  return ({
+    xlsx: "Open in Microsoft Excel or Google Sheets.",
+    pdf: "Open in a PDF reader for read-only viewing or sharing.",
+    docx: "Open in Microsoft Word or Google Docs to edit notes and corrections.",
+    pptx: "Open in Microsoft PowerPoint. If a generic phone viewer rejects it, use PowerPoint or another standards-compatible presentation app.",
+    csv: "Import into the destination system as canonical data.",
+    print: "Use the browser print preview."
+  })[extension] || "Open with a compatible application.";
+}
+
+function exportHistoryRecord({ model, format, extension, status, filename, openGuidance }) {
+  const definition = EXPORT_FORMATS.find((item) => item.id === format);
+  return {
+    id: `${state.pharmacy.id}:${format}:${filename}`,
+    version: "ms20.export-history.v1",
+    format,
+    filename,
+    pharmacyId: state.pharmacy.id,
+    pharmacyName: state.pharmacy.name,
+    generatedIso: model.generatedIso,
+    generatedKenya: `${model.generatedKenya} Africa/Nairobi`,
+    medicineCount: model.rows.length,
+    purpose: definition?.purpose || "Requested export workflow.",
+    openGuidance,
+    status,
+    extension
+  };
+}
+
+function recordExportEvent(cardId, record) {
+  const previous = readExportHistory();
+  const history = [record, ...previous.filter((item) => item.id !== record.id)].slice(0, EXPORT_HISTORY_LIMIT);
+  safeLocalStorage()?.setItem(exportHistoryKey(), JSON.stringify(history));
   const card = state.cards.find((item) => item.id === cardId) || state.cards.find((item) => item.type === "ExportHubCard");
-  if (card) { card.fields.last_download = message; persistActiveCards(); }
-  addFeed("system", message);
+  if (card) {
+    card.fields.history = history;
+    card.fields.last_download = `${record.format.toUpperCase()} ${record.status} · ${record.medicineCount} medicines · ${record.generatedKenya}`;
+    persistActiveCards();
+  }
   render();
 }
 
@@ -3965,7 +4036,7 @@ function ownerCardNote(card) {
   }
   if (card.type === "CatalogImportCard") return "Review the list, edit if needed, then approve.";
   if (card.type === "CatalogWorkspaceCard") return "This view uses the complete saved Pharmacy Catalog.";
-  if (card.type === "ExportHubCard") return "Choose Excel for inventory analysis, PDF for easy phone reading, or Word when you want an editable document with notes. No confirmation is required.";
+  if (card.type === "ExportHubCard") return "Choose Excel for analysis, PDF for read-only sharing, Word for corrections, Presentation for decisions, Print for paper, or CSV for another system. No confirmation is required.";
   if (card.type === "StockCorrectionCard") {
     if (card.photoEvidence && !String(card.fields?.medicine || "").trim() && card.validation) return card.validation;
     if (card.ui?.voiceGuided && card.validation) return card.validation;
