@@ -4,8 +4,9 @@ import { join } from "node:path";
 import {
   EXPORT_FORMATS, buildCanonicalInventoryExport, buildInventoryCsv, buildInventoryDocx,
   buildInventoryPdf, buildInventoryPptx, buildInventoryXlsx, buildOwnerWorkbookSheets,
-  buildPrintHtml, exportFilename, validateInventoryExportSnapshot, validateInventoryPptxPackage
+  buildPrintHtml, exportFilename, protectCsvSpreadsheetText, validateInventoryExportSnapshot, validateInventoryPptxPackage
 } from "../src/services/documentGenerator.js";
+import { exportCompletionSummary, exportFormat } from "../src/services/exportFormatMetadata.js";
 import { buildMedicineFinderIndex, searchMedicineFinder } from "../src/services/medicineFinder.js";
 
 const pharmacy = { id: "pharmacy-a", name: "Zuri Pharmacy", branch: "Main", location: "Nairobi, Kenya" };
@@ -36,12 +37,23 @@ assert.deepEqual(EXPORT_FORMATS.map((format) => format.id), ["xlsx", "pdf", "doc
 assert.deepEqual(EXPORT_FORMATS.filter((format) => format.group === "polished").map((format) => format.id), ["xlsx", "pdf", "docx", "pptx", "print"]);
 assert.deepEqual(EXPORT_FORMATS.filter((format) => format.group === "data").map((format) => format.id), ["csv"]);
 assert.equal(new Set(EXPORT_FORMATS.map((format) => format.purpose)).size, EXPORT_FORMATS.length);
-assert.ok(EXPORT_FORMATS.every((format) => format.help && format.purpose));
-assert.match(EXPORT_FORMATS.find((format) => format.id === "xlsx").purpose, /analysis and pharmacy operations/i);
-assert.match(EXPORT_FORMATS.find((format) => format.id === "pdf").purpose, /read-only sharing/i);
-assert.match(EXPORT_FORMATS.find((format) => format.id === "docx").purpose, /editable owner review/i);
-assert.match(EXPORT_FORMATS.find((format) => format.id === "pptx").help, /management, staff, suppliers, investors or lenders/i);
-assert.match(EXPORT_FORMATS.find((format) => format.id === "csv").purpose, /machine-to-machine/i);
+assert.ok(EXPORT_FORMATS.every((format) => format.cardHelp && format.purpose && format.recommendedApplication && format.nextAction));
+for (const format of EXPORT_FORMATS) {
+  for (const key of ["id", "label", "extension", "mime", "purpose", "recommendedApplication", "fallbackApplications", "nextAction", "historyDescription", "completionWording", "regenerationWording", "icon", "createsFile", "downloadCapability", "printBehavior", "safetyNotes", "expiryBehavior", "accessibilityLabel"]) {
+    assert.ok(Object.hasOwn(format, key), `${format.id} metadata is missing ${key}`);
+  }
+  assert.equal(exportFormat(format.id), format);
+}
+assert.match(EXPORT_FORMATS.find((format) => format.id === "xlsx").purpose, /Analyze, filter, reconcile/i);
+assert.match(EXPORT_FORMATS.find((format) => format.id === "pdf").purpose, /read-only phone sharing/i);
+assert.match(EXPORT_FORMATS.find((format) => format.id === "docx").purpose, /Review, correct, approve/i);
+assert.match(EXPORT_FORMATS.find((format) => format.id === "pptx").cardHelp, /management, staff, suppliers, investors or lenders/i);
+assert.match(EXPORT_FORMATS.find((format) => format.id === "csv").purpose, /another system or import workflow/i);
+assert.match(exportCompletionSummary("pptx", "completed"), /Microsoft PowerPoint/);
+assert.match(exportCompletionSummary("print", "print_dialog_opened"), /does not prove|Choose an available printer/i);
+assert.equal(protectCsvSpreadsheetText("=1+1"), "'=1+1");
+assert.equal(protectCsvSpreadsheetText(" @SUM(A1:A2)"), "' @SUM(A1:A2)");
+assert.equal(protectCsvSpreadsheetText("001234"), "001234");
 assert.throws(() => buildCanonicalInventoryExport({ pharmacy, items: [{ ...items[0], name: "" }], generatedAt }), /mandatory medicine name/);
 assert.throws(() => buildCanonicalInventoryExport({ pharmacy, items: [items[0], { ...items[0] }], generatedAt }), /duplicate medicine identity/);
 assert.throws(() => validateInventoryExportSnapshot({ ...model, summary: { ...model.summary, medicineCount: 714 } }), /medicineCount/);
@@ -55,6 +67,38 @@ const outputs = {
   csv: buildInventoryCsv(model), xlsx: buildInventoryXlsx(model), pdf: buildInventoryPdf(model),
   docx: buildInventoryDocx(model), pptx: buildInventoryPptx(model), html: buildPrintHtml(model)
 };
+const csvSecurityModel = buildCanonicalInventoryExport({
+  pharmacy: { id: "csv-security", name: "Afya, Dawa Pharmacy", branch: "Main", location: "Nairobi, Kenya" },
+  items: [
+    {
+      name: '=HYPERLINK("https://invalid.example","Dawa")', strength: "5 mg\nextended", forms: ["tablet"],
+      units: ["tablet"], sellingPrice: 12.5, costPrice: 3.75, stockLeft: 1000000,
+      supplier: 'Dawa "Bora", Nairobi', barcode: "001234567890",
+      batches: [{ batch: "+CMD", expiry: "2029-12" }], shelf: "@A-01"
+    },
+    {
+      name: "Café dawa – watoto", strength: "", forms: ["syrup"], units: ["bottle"],
+      sellingPrice: 0, costPrice: "", stockLeft: 0, supplier: "O'Connell Pharma",
+      barcode: "000000000007", batches: [], shelf: ""
+    }
+  ],
+  generatedAt
+});
+const securedCsv = buildInventoryCsv(csvSecurityModel);
+assert.ok(securedCsv.startsWith("\ufeffMS2.0 Pharmacy Inventory\r\n"));
+assert.equal(securedCsv.includes("\0"), false);
+assert.equal(securedCsv.replaceAll("\r\n", "").includes("\n"), false);
+assert.match(securedCsv, /"'=HYPERLINK\(""https:\/\/invalid\.example"",""Dawa""\)"/);
+assert.match(securedCsv, /"5 mg\r\nextended"/);
+assert.match(securedCsv, /"Dawa ""Bora"", Nairobi"/);
+assert.match(securedCsv, /,'\+CMD,/);
+assert.match(securedCsv, /,'@A-01/);
+assert.match(securedCsv, /'001234567890/);
+assert.match(securedCsv, /'000000000007/);
+assert.match(securedCsv, /Café dawa – watoto/);
+assert.match(securedCsv, /O'Connell Pharma/);
+assert.match(securedCsv, /,12\.5,3\.75,1000000,/);
+assert.match(securedCsv, /,0,,0,/);
 assert.deepEqual(
   buildInventoryXlsx(buildCanonicalInventoryExport({ pharmacy, items, generatedAt })),
   outputs.xlsx,
@@ -294,6 +338,7 @@ const source = await readFile(new URL("../src/services/documentGenerator.js", im
 const finderSource = await readFile(new URL("../src/services/medicineFinder.js", import.meta.url), "utf8");
 assert.doesNotMatch(`${source}\n${finderSource}`, /fetch\s*\(|OpenAI|chat\.completions|responses\.create/);
 const appSource = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
+const metadataSource = await readFile(new URL("../src/services/exportFormatMetadata.js", import.meta.url), "utf8");
 const cssSource = await readFile(new URL("../src/styles.css", import.meta.url), "utf8");
 const provenance = JSON.parse(await readFile(new URL("../provenance-registry.json", import.meta.url), "utf8"));
 assert.equal(provenance.schema, "ms20.provenance-registry.v1");
@@ -304,20 +349,30 @@ assert.match(appSource, /buildCanonicalInventoryExport\(\{ pharmacy: state\.phar
 assert.match(appSource, /download-inventory-export/);
 assert.match(appSource, /card\.type === "CatalogWorkspaceCard" \|\| card\.type === "ExportHubCard"/);
 assert.match(appSource, /Choose Excel for calculations and reconciliation, PDF for read-only sharing and phone viewing/);
-assert.match(appSource, /Open in Microsoft Excel or Google Sheets\./);
-assert.match(appSource, /Open in Microsoft Word or Google Docs to edit notes and corrections\./);
-assert.match(appSource, /Open in Microsoft PowerPoint\. If a generic phone viewer rejects it/);
+assert.match(metadataSource, /Open the downloaded workbook in Excel or another compatible spreadsheet application\./);
+assert.match(metadataSource, /Open the editable file in Microsoft Word or another compatible document editor\./);
+assert.match(metadataSource, /Open the downloaded presentation in Microsoft PowerPoint for the best experience\./);
+assert.match(metadataSource, /Use browser Print and choose an available printer\./);
+assert.match(metadataSource, /Open it in Excel or Google Sheets to inspect the rows, or import it into another compatible system\./);
 assert.match(appSource, /ms20\.export-history\.v1/);
 assert.match(appSource, /previous\.filter\(\(item\) => item\.id !== record\.id\)/);
 assert.match(appSource, /EXPORT_HISTORY_KEY_PREFIX.*state\.pharmacy\.id/s);
 assert.doesNotMatch(appSource, /function recordExportEvent[\s\S]{0,1200}addFeed\(/);
-assert.match(appSource, /Generate again/);
+assert.match(appSource, /function ensureExportHubCard\(\)/);
+assert.match(appSource, /state\.cards = state\.cards\.filter\(\(item\) => item\.type !== "ExportHubCard" \|\| item === card\)/);
+assert.match(appSource, /card\.fields\.last_download = record\.summary/);
+assert.match(appSource, /data-action="open-export-hub" data-history="true"/);
+assert.match(appSource, /Files stay in your device Downloads\. History keeps metadata only\./);
 assert.match(appSource, /<h3>Polished owner copies<\/h3>/);
 assert.match(appSource, /<h3>Technical data transfer<\/h3>/);
 assert.match(appSource, /CSV preserves the records for other systems, but it cannot carry colours, fonts, spacing or page design\./);
 assert.match(cssSource, /\.export-data-section/);
-assert.match(appSource, /state\.printPreview = \{ model, bridgeId, query: "", message: "" \}/);
+assert.match(appSource, /state\.printPreview = \{ model, bridgeId, query: "", message: "", exportCardId: targetCardId \}/);
 assert.match(appSource, /printFrame\.srcdoc = buildPrintHtml/);
+assert.match(appSource, /window\.__ms20PrintStatus/);
+assert.match(outputs.html, /ms20OpenPrintDialog/);
+assert.match(outputs.html, /status:"print_dialog_opened"/);
+assert.doesNotMatch(`${appSource}\n${source}`, /Printed successfully|physical print completed|status:\s*"completed"[\s\S]{0,80}format:\s*"print"/i);
 assert.match(appSource, /window\.__ms20FinderRequest/);
 assert.match(appSource, /refreshPrintPreviewDom/);
 assert.match(appSource, /cameraOverlayIsRendered === state\.camera\.open/);
@@ -331,6 +386,7 @@ assert.match(appSource, /Microphone access was denied\. Allow it in browser sett
 assert.match(appSource, /Microphone did not start\. Tap Speak medicine to retry/);
 assert.doesNotMatch(appSource, /printWindow\.document\.write/);
 assert.doesNotMatch(appSource, /Export Hub[\s\S]{0,1000}(OpenAI|fetch\s*\()/);
+assert.doesNotMatch(metadataSource, /OpenAI|fetch\s*\(|chat\.completions|responses\.create/);
 assert.match(cssSource, /@media \(max-width: 520px\)[^{]*\{[^}]*\.export-format-grid/);
 assert.match(cssSource, /\.print-preview-overlay/);
 
@@ -340,6 +396,7 @@ await mkdir(outputDir, { recursive: true });
 await Promise.all([
   writeFile(join(outputDir, exportFilename(model, "csv")), outputs.csv), writeFile(join(outputDir, exportFilename(model, "xlsx")), outputs.xlsx),
   writeFile(join(outputDir, exportFilename(model, "pdf")), outputs.pdf), writeFile(join(outputDir, exportFilename(model, "docx")), outputs.docx),
-  writeFile(join(outputDir, exportFilename(model, "pptx")), outputs.pptx), writeFile(join(outputDir, exportFilename(model, "print.html")), outputs.html)
+  writeFile(join(outputDir, exportFilename(model, "pptx")), outputs.pptx), writeFile(join(outputDir, exportFilename(model, "print.html")), outputs.html),
+  writeFile(join(outputDir, "csv-security-fixture.csv"), securedCsv)
 ]);
 console.log(`Export Hub verification passed: 35 canonical records in six formats, pharmacy isolation, balanced pagination, fresh filenames, deterministic zero-AI renderers. 4,200-record finder index ${buildMs.toFixed(1)} ms; exact search ${searchMs.toFixed(1)} ms. Artifacts: ${outputDir}`);

@@ -1,5 +1,11 @@
 # MS2.0 Pharmacy Operating Intelligence Platform
 
+## Export Hub protected checkpoint (2026-07-27)
+
+Excel Operations Workbook, PDF Professional Report, Word Owner Copy, and Presentation Owner Briefing are owner-validated, permanently passed and regression-protected. CSV Technical Data Transfer is the exact next live checkpoint; Print is engineering-prepared and pending live validation.
+
+Every export must answer: **Why would a pharmacy owner deliberately choose this format instead of every other available export?** A format is accepted only for a distinct operational workflow. All surfaces consume the shared `exportFormatMetadata.js` registry, and activity updates one persistent pharmacy-scoped Export Hub status card instead of adding chat-feed messages.
+
 ## Current Product Direction
 
 MS2.0 is now Main App-first. The primary product surface is the isolated app in:

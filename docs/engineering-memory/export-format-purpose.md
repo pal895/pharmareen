@@ -25,10 +25,19 @@ A format is justified only when it solves a distinct real pharmacy workflow. Mul
 - **Presentation:** management, staff, supplier, investor or lender briefings on a large screen.
 - **Print:** an immediate physical working inventory produced from the browser.
 
-Shared canonical parity does not mean identical design. Each format must prioritize the information and interaction needed for its own job.
+Shared canonical parity does not mean identical design. Each format must prioritize the information and interaction needed for its own job. `ms20-main-app/src/services/exportFormatMetadata.js` is authoritative across cards, status, history, application guidance, regeneration and accessibility.
 
 ## Presentation Owner Briefing
 
 Presentation exists for owner and management decisions, not for reproducing the inventory register. Its deterministic nine-slide sequence is title, baseline overview, inventory position, stock/value summary, low-stock attention, expiry outlook, supplier overview, owner actions and closing decision path. Detailed reconciliation remains in Excel and record corrections remain in Word.
 
-Before download, the production path validates the PPTX container, required OOXML parts, content types, relationships and slide count. The exact generated file is tested in Microsoft PowerPoint; generic ad-supported phone viewers are not compatibility authorities.
+Before download, the production path validates the PPTX container, required OOXML parts, content types, relationships and slide count. Owner evidence on 2026-07-27 confirmed download, detection and all nine readable slides in an Android standards-compatible reader. PowerPoint remains recommended; Google Slides and compatible readers are legitimate fallbacks. Presentation is OWNER-VALIDATED PASS.
+
+## Current sequence
+
+- Excel Operations Workbook: passed and protected.
+- PDF Professional Report: passed and protected.
+- Word Owner Copy: passed and protected.
+- Presentation Owner Briefing: passed and protected.
+- CSV Technical Data Transfer: exact next live checkpoint.
+- Print Working Inventory: engineering-prepared; live validation pending.

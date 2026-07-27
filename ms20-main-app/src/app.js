@@ -21,11 +21,12 @@ import {
 } from "./services/catalogOnboarding.js";
 import { buildDeterministicNotifications, mergeNotifications, notificationToCard } from "./services/notificationCenter.js";
 import {
-  EXPORT_FORMATS, buildBulkPasteTemplate, buildCanonicalInventoryExport, buildDocumentCard,
+  buildBulkPasteTemplate, buildCanonicalInventoryExport, buildDocumentCard,
   buildInventoryCsv, buildInventoryDocx, buildInventoryPdf, buildInventoryPptx,
   buildInventoryXlsx, buildPrintHtml, downloadBlobFile, downloadTextFile, exportFilename,
   validateInventoryPptxPackage
 } from "./services/documentGenerator.js";
+import { EXPORT_FORMATS, exportCompletionSummary, exportFormat } from "./services/exportFormatMetadata.js";
 import {
   CATALOG_EDIT_FIELDS,
   applyApprovedCatalogEdit,
@@ -538,6 +539,7 @@ function adminMenuTemplate() {
 }
 
 function cardTemplate(card) {
+  if (card.type === "ExportHubCard") return exportHubCardTemplate(card);
   const fields = cardFieldsFor(card.type);
   const displayed = fields.length ? fields : Object.keys(card.fields || {});
   const progressiveMedicine = PROGRESSIVE_MEDICINE_CARD_TYPES.has(card.type);
@@ -598,12 +600,12 @@ function safeCardTemplate(card) {
 }
 
 function cardCloseButtonTemplate(card, placement) {
+  if (card.type === "ExportHubCard") return "";
   const label = `Close ${friendlyCardLabel(card)} card`;
   return `<button class="card-close-button ${placement === "bottom" ? "card-close-button-bottom" : ""}" type="button" data-action="dismiss-card" data-card-id="${card.id}" aria-label="${escapeHtml(label)}">x</button>`;
 }
 
 function cardBodyTemplate(card, displayed) {
-  if (card.type === "ExportHubCard") return exportHubTemplate(card);
   if (card.type === "CatalogWorkspaceCard") return catalogWorkspaceTemplate(card);
   if (card.type === "CatalogOnboardingCard") {
     return `
@@ -1239,7 +1241,8 @@ function handleAction(dataset) {
     addMissingMedicineCard();
   }
   if (action === "export-catalog-csv") exportCatalogCsv();
-  if (action === "open-export-hub") openExportHub();
+  if (action === "open-export-hub") openExportHub(dataset.history === "true");
+  if (action === "close-export-hub") collapseExportHub();
   if (action === "download-inventory-export") downloadInventoryExport(dataset.format, dataset.cardId);
   if (action === "download-template") downloadBulkPasteTemplate();
   if (action === "read-card") readCardAloud(dataset.cardId);
@@ -2476,6 +2479,20 @@ function hydrateResumeState() {
 }
 
 function reconcileResumeState() {
+  const resumedExportCards = state.cards.filter((card) => card.type === "ExportHubCard");
+  if (resumedExportCards.length) {
+    const keeper = resumedExportCards[0];
+    keeper.id = `card-export-hub-${state.pharmacy.id}`;
+    keeper.fields = {
+      ...keeper.fields,
+      pharmacy_id: state.pharmacy.id,
+      expanded: false,
+      history_open: false,
+      history: readExportHistory()
+    };
+    keeper.fields.last_download = keeper.fields.history[0]?.summary || keeper.fields.last_download || "Ready to generate an export.";
+    state.cards = state.cards.filter((card) => card.type !== "ExportHubCard" || card === keeper);
+  }
   if (state.onboarding.completed) {
     removeCardsByType(["OnboardingCard"]);
   }
@@ -3283,22 +3300,59 @@ function exportCatalogCsv() {
   downloadInventoryExport("csv");
 }
 
-function openExportHub() {
-  const existing = state.cards.find((card) => card.type === "ExportHubCard");
-  if (existing) {
-    existing.fields.history = readExportHistory();
-    return focusCard(existing.id);
-  }
-  addCard({
-    id: `card-export-hub-${Date.now()}`, type: "ExportHubCard", title: "Export Hub",
+function ensureExportHubCard() {
+  const matching = state.cards.filter((card) => card.type === "ExportHubCard" && card.fields?.pharmacy_id === state.pharmacy.id);
+  const card = matching[0] || {
+    id: `card-export-hub-${state.pharmacy.id}`, type: "ExportHubCard", title: "Export Hub",
     source: "Canonical Pharmacy Catalog", confidence: 1, status: "ready", aiRequired: false,
-    fields: { item_count: String(pharmacyBrain.catalog.length), last_download: "Ready to generate an export.", history: readExportHistory() },
+    fields: { pharmacy_id: state.pharmacy.id, item_count: String(pharmacyBrain.catalog.length), expanded: false, history_open: false },
     validation: "Downloads are generated locally from this pharmacy's canonical records with zero AI formatting."
-  });
+  };
+  state.cards = state.cards.filter((item) => item.type !== "ExportHubCard" || item === card);
+  if (!state.cards.includes(card)) state.cards.unshift(card);
+  const history = readExportHistory();
+  card.fields.history = history;
+  card.fields.item_count = String(pharmacyBrain.catalog.length);
+  card.fields.last_download = history[0]?.summary || "Ready to generate an export.";
+  persistActiveCards();
+  return card;
+}
+
+function openExportHub(openHistory = false) {
+  const card = ensureExportHubCard();
+  card.fields.expanded = true;
+  card.fields.history_open = openHistory;
+  persistActiveCards();
+  render();
+  focusCard(card.id);
+}
+
+function collapseExportHub() {
+  const card = ensureExportHubCard();
+  card.fields.expanded = false;
+  card.fields.history_open = false;
+  persistActiveCards();
+  render();
+  focusCard(card.id);
+}
+
+function exportHubCardTemplate(card) {
+  if (card.fields?.expanded === true) {
+    return `<article class="card-message ready export-hub-card export-hub-card-expanded" data-card-id="${card.id}">
+      <div class="card-top"><span class="card-heading"><span class="card-type">Documents</span><strong>Export Hub</strong></span><button class="card-close-button" type="button" data-action="close-export-hub" aria-label="Collapse Export Hub">x</button></div>
+      ${exportHubTemplate(card)}
+    </article>`;
+  }
+  const latest = Array.isArray(card.fields?.history) ? card.fields.history[0] : null;
+  const format = latest ? exportFormat(latest.format) : null;
+  return `<article class="card-message ready export-hub-card export-hub-status-card" data-card-id="${card.id}" data-pharmacy-id="${escapeHtml(state.pharmacy.id)}">
+    <div class="export-status-copy"><span class="card-type">Latest export</span><strong>${escapeHtml(latest?.summary || "Ready to generate an export.")}</strong>${latest ? `<small>${escapeHtml(latest.generatedKenya)}</small>` : ""}<p>${escapeHtml(latest ? format?.nextAction || latest.openGuidance : "Open Export Hub to choose a format.")}</p></div>
+    <div class="export-status-actions"><button type="button" data-action="open-export-hub">Open Export Hub</button>${latest ? '<button type="button" data-action="open-export-hub" data-history="true">View Export History</button>' : ""}</div>
+  </article>`;
 }
 
 function exportHubTemplate(card) {
-  const formatButton = (format) => `<button type="button" data-action="download-inventory-export" data-format="${format.id}" data-card-id="${card.id}"><strong>${format.label}</strong><span>${format.help}</span></button>`;
+  const formatButton = (format) => `<button type="button" data-action="download-inventory-export" data-format="${format.id}" data-card-id="${card.id}" aria-label="${escapeHtml(format.accessibilityLabel)}"><strong>${format.label}</strong><span>${format.cardHelp}</span><small>Open with ${escapeHtml(format.recommendedApplication)}.</small></button>`;
   const polishedFormats = EXPORT_FORMATS.filter((format) => format.group === "polished");
   const dataFormats = EXPORT_FORMATS.filter((format) => format.group === "data");
   const history = Array.isArray(card.fields?.history) ? card.fields.history : [];
@@ -3306,7 +3360,7 @@ function exportHubTemplate(card) {
     <div><strong>${escapeHtml(item.format.toUpperCase())} · ${escapeHtml(item.status)}</strong><span>${escapeHtml(item.generatedKenya)} · ${escapeHtml(String(item.medicineCount))} medicines</span></div>
     <p>${escapeHtml(item.purpose)}</p>
     <small>${escapeHtml(item.filename)} · ${escapeHtml(item.openGuidance)}</small>
-    ${item.status === "failed" || item.status === "unavailable" ? `<button type="button" data-action="download-inventory-export" data-format="${escapeHtml(item.format)}" data-card-id="${card.id}">Generate again</button>` : ""}
+    <button type="button" data-action="download-inventory-export" data-format="${escapeHtml(item.format)}" data-card-id="${card.id}">${escapeHtml(exportFormat(item.format)?.regenerationWording || "Generate again")}</button>
   </li>`).join("") : "<li>No exports generated yet.</li>";
   return `<section class="export-hub" aria-label="Export Hub">
     <div class="export-hub-summary"><strong>${pharmacyBrain.catalog.length} medicines</strong><span>${escapeHtml(state.pharmacy.name)} · ${escapeHtml(state.pharmacy.branch || "Main")}</span></div>
@@ -3321,41 +3375,35 @@ function exportHubTemplate(card) {
       <div class="export-format-grid">${dataFormats.map(formatButton).join("")}</div>
     </div>
     <p class="export-hub-status" aria-live="polite">${escapeHtml(card.fields?.last_download || "None yet")}</p>
-    <details class="export-history"><summary>Export history (${history.length})</summary><ol>${historyRows}</ol></details>
+    <details class="export-history"${card.fields?.history_open ? " open" : ""}><summary>Export history (${history.length})</summary><p class="export-history-help">Files stay in your device Downloads. History keeps metadata only.</p><ol>${historyRows}</ol></details>
     <p class="export-hub-assurance">Generated locally · Pharmacy-isolated · Canonical data · Zero AI formatting</p>
   </section>`;
 }
 
 function downloadInventoryExport(format, cardId = "") {
   const model = buildCanonicalInventoryExport({ pharmacy: state.pharmacy, items: pharmacyBrain.catalog });
-  const formats = {
-    csv: [buildInventoryCsv, "csv", "text/csv;charset=utf-8"],
-    xlsx: [buildInventoryXlsx, "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
-    pdf: [buildInventoryPdf, "pdf", "application/pdf"],
-    docx: [buildInventoryDocx, "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
-    pptx: [buildInventoryPptx, "pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"]
-  };
+  const builders = { csv: buildInventoryCsv, xlsx: buildInventoryXlsx, pdf: buildInventoryPdf, docx: buildInventoryDocx, pptx: buildInventoryPptx };
+  const metadata = exportFormat(format);
+  const targetCardId = cardId || ensureExportHubCard().id;
   if (format === "print") {
     const bridgeId = globalThis.crypto?.randomUUID?.() || `finder-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    state.printPreview = { model, bridgeId, query: "", message: "" };
-    recordExportEvent(cardId, exportHistoryRecord({ model, format, extension: "print", status: "completed", filename: "Print preview", openGuidance: exportOpenGuidance("print") }));
+    state.printPreview = { model, bridgeId, query: "", message: "", exportCardId: targetCardId };
+    recordExportEvent(targetCardId, exportHistoryRecord({ model, format, status: "print_view_ready" }));
     return;
   }
-  const selected = formats[format];
-  if (!selected) {
-    return recordExportEvent(cardId, exportHistoryRecord({ model, format: format || "unknown", extension: format || "unknown", status: "unavailable", filename: "Not generated", openGuidance: "Generate again when this format is available." }));
+  const builder = builders[format];
+  if (!metadata || !builder) {
+    return recordExportEvent(targetCardId, exportHistoryRecord({ model, format: format || "unknown", status: "unavailable" }));
   }
-  const [builder, extension, mime] = selected;
-  const filename = exportFilename(model, extension);
-  const openGuidance = exportOpenGuidance(extension);
+  const filename = exportFilename(model, metadata.extension);
   try {
     const contents = builder(model);
-    if (extension === "pptx") validateInventoryPptxPackage(contents);
-    downloadBlobFile({ filename, contents, mime });
-    recordExportEvent(cardId, exportHistoryRecord({ model, format, extension, status: "completed", filename, openGuidance }));
+    if (format === "pptx") validateInventoryPptxPackage(contents);
+    downloadBlobFile({ filename, contents, mime: metadata.mime });
+    recordExportEvent(targetCardId, exportHistoryRecord({ model, format, status: "completed", filename }));
   } catch (error) {
-    console.error(`MS2.0 ${extension.toUpperCase()} export failed`, error);
-    recordExportEvent(cardId, exportHistoryRecord({ model, format, extension, status: "failed", filename, openGuidance: `Generation failed. ${openGuidance}` }));
+    console.error(`MS2.0 ${format.toUpperCase()} export failed`, error);
+    recordExportEvent(targetCardId, exportHistoryRecord({ model, format, status: "failed", filename }));
   }
 }
 
@@ -3372,21 +3420,11 @@ function readExportHistory() {
   }
 }
 
-function exportOpenGuidance(extension) {
-  return ({
-    xlsx: "Open in Microsoft Excel or Google Sheets.",
-    pdf: "Open in a PDF reader for read-only viewing or sharing.",
-    docx: "Open in Microsoft Word or Google Docs to edit notes and corrections.",
-    pptx: "Open in Microsoft PowerPoint. If a generic phone viewer rejects it, use PowerPoint or another standards-compatible presentation app.",
-    csv: "Import into the destination system as canonical data.",
-    print: "Use the browser print preview."
-  })[extension] || "Open with a compatible application.";
-}
-
-function exportHistoryRecord({ model, format, extension, status, filename, openGuidance }) {
-  const definition = EXPORT_FORMATS.find((item) => item.id === format);
+function exportHistoryRecord({ model, format, status, filename = "" }) {
+  const definition = exportFormat(format);
+  const recordStatus = status || "completed";
   return {
-    id: `${state.pharmacy.id}:${format}:${filename}`,
+    id: `${state.pharmacy.id}:${format}:${model.generatedIso}`,
     version: "ms20.export-history.v1",
     format,
     filename,
@@ -3396,9 +3434,12 @@ function exportHistoryRecord({ model, format, extension, status, filename, openG
     generatedKenya: `${model.generatedKenya} Africa/Nairobi`,
     medicineCount: model.rows.length,
     purpose: definition?.purpose || "Requested export workflow.",
-    openGuidance,
-    status,
-    extension
+    historyDescription: definition?.historyDescription || "Requested export workflow.",
+    recommendedApplication: definition?.recommendedApplication || "Compatible application",
+    openGuidance: definition?.nextAction || "Try generating this export again.",
+    status: recordStatus,
+    extension: definition?.extension || "",
+    summary: exportCompletionSummary(format, recordStatus)
   };
 }
 
@@ -3406,10 +3447,12 @@ function recordExportEvent(cardId, record) {
   const previous = readExportHistory();
   const history = [record, ...previous.filter((item) => item.id !== record.id)].slice(0, EXPORT_HISTORY_LIMIT);
   safeLocalStorage()?.setItem(exportHistoryKey(), JSON.stringify(history));
-  const card = state.cards.find((item) => item.id === cardId) || state.cards.find((item) => item.type === "ExportHubCard");
+  const card = state.cards.find((item) => item.id === cardId) || ensureExportHubCard();
   if (card) {
     card.fields.history = history;
-    card.fields.last_download = `${record.format.toUpperCase()} ${record.status} · ${record.medicineCount} medicines · ${record.generatedKenya}`;
+    card.fields.last_download = record.summary;
+    card.fields.expanded = false;
+    card.fields.history_open = false;
     persistActiveCards();
   }
   render();
@@ -4405,6 +4448,15 @@ window.__ms20FinderRequest = (data) => {
     if (payload.message !== undefined) state.printPreview.message = payload.message;
     if (!state.camera.open) render();
   });
+};
+
+window.__ms20PrintStatus = (data) => {
+  if (!state.printPreview || data?.bridgeId !== state.printPreview.bridgeId) return;
+  if (data.status !== "print_dialog_opened" && data.status !== "print_preparation_failed") return;
+  recordExportEvent(
+    state.printPreview.exportCardId,
+    exportHistoryRecord({ model: state.printPreview.model, format: "print", status: data.status })
+  );
 };
 
 window.addEventListener("online", () => { syncPendingStockCorrections(); render(); });

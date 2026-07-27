@@ -1,5 +1,15 @@
 # MS2.0 Live Main App Test Plan
 
+## Current Export Hub checkpoint — CSV only
+
+Excel, PDF, Word and Presentation are owner-validated, permanently passed and protected. Do not retest or polish them without regression evidence. The one-card status/history architecture is approved. Print is prepared but pending because browsers cannot reliably report physical completion or cancellation.
+
+Exact next checkpoint: **CSV Technical Data Transfer**.
+
+Pull/restart the latest app, open **Export Hub**, tap **CSV data file**, then open the downloaded `.csv` in a phone spreadsheet app. Confirm the headers and all 35 medicines are readable, including any leading-zero barcode. Do not edit, import or approve anything.
+
+Expected: one CSV download; the same compact status card updates; history gains one newest CSV record; no export chat message; catalog stays 35; zero AI/API formatting.
+
 This plan is for Main App live product testing only. Do not return to WhatsApp live testing in this phase.
 
 ## Test Rules

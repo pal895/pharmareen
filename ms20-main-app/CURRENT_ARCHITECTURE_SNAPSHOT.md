@@ -1,5 +1,15 @@
 # MS2.0 Current Architecture Snapshot
 
+## Shared Export Hub architecture (2026-07-27)
+
+`src/services/exportFormatMetadata.js` is the single format registry. Excel serves operational analysis; PDF professional read-only sharing; Word corrections and working notes; Presentation management decisions; Print a browser-generated physical working register; CSV machine interoperability. Reject a new format unless its distinct owner workflow is justified.
+
+`src/app.js` maintains one deterministic compact `ExportHubCard` per pharmacy. It updates with the latest useful status and next action, opens Hub/history directly, and never emits generation feed messages. History is pharmacy-keyed, newest first, bounded, deduplicated by generation identity, metadata-only, and regenerable.
+
+`documentGenerator.js` is deterministic, pharmacy-isolated and zero-AI. CSV uses the canonical schema, UTF-8 BOM, CRLF, quoted fields, spreadsheet formula protection and leading-zero barcode preservation. Print reports only preparation/dialog/failure states because browsers cannot prove completion or cancellation.
+
+Protected owner-validated formats: XLSX, PDF, DOCX and nine-slide PPTX. Next: CSV. Print: prepared, pending live validation.
+
 Snapshot date: 2026-07-10
 
 ## Product Direction
