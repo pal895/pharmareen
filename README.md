@@ -4,7 +4,7 @@
 
 Excel Operations Workbook, PDF Professional Report, Word Owner Copy, Presentation Owner Briefing, CSV Technical Data Transfer and Print Working Inventory are owner-validated, permanently passed and regression-protected. The six-format Export Hub live-validation sequence is complete.
 
-Notifications Quiet State is owner-validated, passed and regression-protected. The active Pending Review Unread checkpoint remains open. Paste List now refreshes Notifications only when a genuine editable review is ready and reuses the shared Mic, Camera and Photo acquisition roots without saving or changing catalog stock.
+Notifications Quiet State and Pending Review Unread State are owner-validated, passed and regression-protected. Paste List refreshes Notifications only when a genuine editable review is ready and reuses the shared Mic, Camera and Photo acquisition roots without saving or changing catalog stock. The active Notifications checkpoint is Review Import Action Routing.
 
 Every export must answer: **Why would a pharmacy owner deliberately choose this format instead of every other available export?** A format is accepted only for a distinct operational workflow. All surfaces consume the shared `exportFormatMetadata.js` registry, and activity updates one persistent pharmacy-scoped Export Hub status card instead of adding chat-feed messages.
 

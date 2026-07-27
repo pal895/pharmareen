@@ -1,6 +1,6 @@
 # MS2.0 Live Main App Test Plan
 
-## Current checkpoint — Notifications Pending Review Unread State
+## Current checkpoint — Notifications Review Import Action Routing
 
 Excel, PDF, Word, Presentation, CSV and Print are owner-validated, permanently passed and protected. Do not retest or polish them without regression evidence. The one-card status/history architecture is approved.
 
@@ -10,19 +10,18 @@ The shared-root review is complete. Common behavior remains centralized in the c
 
 Notifications Quiet State is owner-validated, passed and protected. Evidence confirms Home and the separate Notifications workspace both showed zero unread, no alert card or Operations composer appeared, returning Home was unchanged, and no operational mutation occurred. Do not repeat it without regression evidence.
 
-The first owner attempt after `b9558ff` remains failed: the editable review appeared but the notification projection was not refreshed, so the expected unread alert never existed. The shared lifecycle repair is implemented and protected. Repeat this same checkpoint only:
+Notifications Pending Review Unread State is owner-validated, passed and protected after `c63f687`. Evidence proves Mic input, correct editable parsing, one unread local Learning alert, workspace isolation, cancellation integrity, mark-read and quiet-state restoration. Do not repeat those responsibilities without regression evidence.
 
-1. From Home, open MS2.0 Assistant, tap `+`, then `Paste List`.
-2. Confirm compact `Mic`, `Camera` and `Photo` controls are visible in the Paste List card.
-3. Tap `Mic` and say `Notification Test Medicine 10 mg tablet 1`. Confirm the words appear in the medicine-list field. If browser voice is unavailable, capture its truthful unavailable state and type the same line.
-4. Tap `Review list` once and confirm one editable import review appears. Do not approve or save it.
-5. Return Home. Confirm Notifications shows exactly `1 unread` and a non-quiet pending-review preview.
-6. Open Notifications once. Confirm the header shows `1 unread` and exactly one `Medicine import needs approval` alert whose action is `Review import`.
-7. Confirm the alert remains separate from daily sales and no Operations composer appears.
-8. Capture the Paste List controls, Home unread state and complete Notifications alert. Do not tap `Mark read`.
-9. Return to Operations and cancel/close the unapproved test draft. Confirm the saved catalog remains 35 medicines.
+Test only the next distinct responsibility:
 
-Expected: one deterministic local pending-review notification, no catalog/stock save, no sale/payment, no API request and no AI token use. This is one Notifications test; do not test inventory, expiry, payment-failure or read-state behavior yet.
+1. Create one unapproved Paste List review with `Notification Action Test 10 mg tablet 1`. Do not approve it.
+2. Return Home, open the single unread Notifications alert, and visually confirm `Review import` is now one clear compact tappable button rather than a large field-like value.
+3. Tap `Review import` once.
+4. Confirm MS2.0 returns to the exact existing `Notification Action Test` editable review card, with no duplicate review card and no saved medicine.
+5. Cancel/close that draft, open the catalog and confirm `Showing 35 of 35`.
+6. Return Home and confirm Notifications is quiet at zero unread.
+
+Expected: one shared compact action routes to the existing review, no duplicate card, no catalog/stock save, no sale/payment, no API request and no AI token use. Do not test inventory, expiry or payment-failure alerts yet.
 
 This plan is for Main App live product testing only. Do not return to WhatsApp live testing in this phase.
 

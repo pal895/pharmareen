@@ -121,6 +121,7 @@ Existing offline app route expected on backend:
 - Batch, expiry, barcode, supplier, shelf, price, and stock fields on scanner/import paths.
 - Deterministic notifications for catalog needed, low stock, out of stock, expiry windows, and pending review items.
 - Paste List pending-review alerts are generated only after the shared editable-review transition; merely opening or typing in an input draft creates no alert. The transition refreshes the local notification projection immediately. Paste List reuses the shared microphone, camera and photo-picker acquisition lifecycles rather than maintaining separate capture code.
+- NotificationCard uses one shared action boundary: linked operational actions render as compact primary buttons and route to their existing pending review; informational notifications render values only. Action labels are never duplicated as field-like inputs.
 - Editable card workspace.
 - Local deterministic sale parser.
 - Local deterministic restock parsing with canonical medicine matching, explicit positive stock quantity, separate bonus stock, reusable saved details, optional delivery traceability, and a three-section owner review before mutation.

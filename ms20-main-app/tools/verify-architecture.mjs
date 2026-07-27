@@ -158,7 +158,7 @@ const { runVisualPipeline } = await import(pathToFileURL(path.join(root, "src/se
 const { BackendAdapterRegistry } = await import(pathToFileURL(path.join(root, "src/services/backendAdapters.js")));
 const { SourceBrain, PharmacyBrain } = await import(pathToFileURL(path.join(root, "src/services/brainAdapters.js")));
 const { createPasteImportCard, parseBulkMedicineList, parseDelimitedInventory, partitionCatalogItems, buildCatalogSavedSummary } = await import(pathToFileURL(path.join(root, "src/services/catalogOnboarding.js")));
-const { buildDeterministicNotifications, mergeNotifications } = await import(pathToFileURL(path.join(root, "src/services/notificationCenter.js")));
+const { buildDeterministicNotifications, mergeNotifications, notificationToCard } = await import(pathToFileURL(path.join(root, "src/services/notificationCenter.js")));
 const { buildCatalogCsv, buildBulkPasteTemplate } = await import(pathToFileURL(path.join(root, "src/services/documentGenerator.js")));
 const { createCatalogWorkspaceCard, catalogWorkspaceItems, createCatalogEditDraft, reviewCatalogEdit, applyApprovedCatalogEdit } = await import(pathToFileURL(path.join(root, "src/services/catalogWorkspace.js")));
 
@@ -306,6 +306,12 @@ const pasteInputNotifications = buildDeterministicNotifications({ catalog: [{ na
 assert(!pasteInputNotifications.some((item) => item.id === "learning-import-paste-input"), "An input-only Paste List must not create a pending-review notification");
 const pasteReviewNotifications = buildDeterministicNotifications({ catalog: [{ name: "Zinc" }], pendingCards: [{ id: "paste-review", type: "CatalogImportCard", fields: { entry_mode: "review" } }] });
 assert(pasteReviewNotifications.some((item) => item.id === "learning-import-paste-review" && item.title === "Medicine import needs approval"), "A review-ready Paste List must create one truthful unread notification");
+const pasteReviewCard = notificationToCard(pasteReviewNotifications.find((item) => item.id === "learning-import-paste-review"));
+assert(pasteReviewCard.notificationAction?.label === "Review import" && pasteReviewCard.notificationAction?.targetCardId === "paste-review", "An actionable notification must retain its compact action label and linked review target");
+assert(!Object.hasOwn(pasteReviewCard.fields, "action"), "An actionable notification must not render its action as a large field");
+const informationalNotificationCard = notificationToCard({ id: "info-only", category: "System", title: "Information", message: "No action required.", status: "unread" });
+assert(informationalNotificationCard.notificationAction === null, "An informational notification must not acquire an action button");
+assert(appSource.includes('data-action="open-notification-action"') && appSource.includes("openNotificationAction"), "Notification actions must use one shared compact routing control");
 const setupNotifications = buildDeterministicNotifications({ catalog: [], catalogRequired: false });
 assert(!setupNotifications.some((item) => item.id === "learning-catalog-empty"), "Catalog notification must wait until setup is complete");
 const prunedNotifications = mergeNotifications(

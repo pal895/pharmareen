@@ -628,6 +628,7 @@ function cardBodyTemplate(card, displayed) {
   if (card.type === "CatalogImportCard" && card.fields?.entry_mode === "no_changes") {
     return `<div class="catalog-import-no-changes"><p>${escapeHtml(card.fields?.review_feedback || card.validation || "No new medicines found. Nothing was saved.")}</p></div>`;
   }
+  if (card.type === "NotificationCard") return notificationCardBodyTemplate(card);
   if (card.type === "CatalogImportCard") {
     return catalogImportTableTemplate(card);
   }
@@ -645,6 +646,14 @@ function cardBodyTemplate(card, displayed) {
   return `
     <div class="field-grid">
       ${displayed.map((field) => fieldTemplate(card, field)).join("")}
+    </div>
+  `;
+}
+
+function notificationCardBodyTemplate(card) {
+  return `
+    <div class="field-grid notification-details">
+      ${["category", "message", "status"].map((field) => fieldTemplate(card, field)).join("")}
     </div>
   `;
 }
@@ -967,6 +976,7 @@ function activeActionsTemplate(card) {
   if (card.type === "NotificationCard") {
     return `
       <div class="card-actions">
+        ${card.notificationAction ? `<button class="primary-action" data-action="open-notification-action" data-card-id="${card.id}">${escapeHtml(card.notificationAction.label)}</button>` : ""}
         <button data-action="dismiss-notification" data-notification-id="${notificationIdFromCard(card)}">Done</button>
         ${speechControlsTemplate(card)}
       </div>
@@ -1272,6 +1282,7 @@ function handleAction(dataset) {
   if (action === "stop-reading") stopStockFixReading();
   if (action === "mark-notifications-read") markNotificationsRead();
   if (action === "dismiss-notification") dismissNotification(dataset.notificationId);
+  if (action === "open-notification-action") openNotificationAction(dataset.cardId);
   if (action === "demo-report") addReportCard();
   if (action === "demo-sync") addSyncCard();
   if (action === "demo-stock-correction") addStockCorrectionCard();
@@ -4115,6 +4126,16 @@ function dismissNotification(notificationId) {
 
 function notificationIdFromCard(card) {
   return String(card.id || "").replace(/^card-notification-/, "");
+}
+
+function openNotificationAction(cardId) {
+  const notificationCard = activeNotificationCards().find((item) => item.id === cardId);
+  const targetCardId = notificationCard?.notificationAction?.targetCardId;
+  if (!targetCardId || !state.cards.some((item) => item.id === targetCardId)) return;
+  state.ui.screen = "chat";
+  state.ui.workspace = "operations";
+  render();
+  focusCard(targetCardId);
 }
 
 function friendlyCardLabel(card) {

@@ -65,7 +65,8 @@ export function buildDeterministicNotifications({ catalog = [], pendingCards = [
         key: `pending-${card.id}`,
         title: "Scan needs review",
         message: `${card.title || "A scan"} is waiting for approval.`,
-        action: "Open review"
+        action: "Open review",
+        actionTarget: card.id
       }));
     }
     if (card.type === "CatalogImportCard" && card.fields?.entry_mode === "review") {
@@ -74,7 +75,8 @@ export function buildDeterministicNotifications({ catalog = [], pendingCards = [
         key: `import-${card.id}`,
         title: "Medicine import needs approval",
         message: "A medicine list is ready to check and save.",
-        action: "Review import"
+        action: "Review import",
+        actionTarget: card.id
       }));
     }
   }
@@ -113,20 +115,23 @@ export function notificationToCard(notification) {
     fields: {
       category: notification.category,
       message: notification.message,
-      action: notification.action,
       status: notification.status || "unread"
     },
+    notificationAction: notification.action && notification.actionTarget
+      ? { label: notification.action, targetCardId: notification.actionTarget }
+      : null,
     validation: "Generated locally from pharmacy records."
   };
 }
 
-function createNotification({ category, key, title, message, action }) {
+function createNotification({ category, key, title, message, action, actionTarget = "" }) {
   return {
     id: `${category.toLowerCase()}-${key}`,
     category,
     title,
     message,
     action,
+    actionTarget,
     status: "unread",
     createdAt: new Date().toISOString(),
     aiUsed: false
