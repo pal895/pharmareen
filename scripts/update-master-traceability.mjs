@@ -89,7 +89,7 @@ function commitsFor(row, files) {
     const subject = entry.replace(/^[0-9a-f]+ /, "").toLowerCase();
     return tokens.some((token) => subject.includes(token));
   });
-  return matching.length ? matching.slice(0, 4).join("; ") : unavailable;
+  return matching.length ? matching.slice(0, 5).join("; ") : unavailable;
 }
 
 function remainingWork(row) {
