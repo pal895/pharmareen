@@ -1,5 +1,7 @@
 # Transaction Completion Engine
 
+Canonical live-validation authority: `../../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. This memory defines payment architecture and evidence, not checkpoint order.
+
 ## Permanent decision
 
 MS2.0 completes financial and operational transactions through one Transaction Completion Engine (TCE). Payment is one part of transaction completion, not a separate product engine.

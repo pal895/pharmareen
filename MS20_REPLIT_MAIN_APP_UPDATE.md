@@ -1,5 +1,7 @@
 # MS2.0 Replit Main App Update
 
+Execution/history document only. Canonical owner checkpoint IDs, order and status live only in `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`.
+
 Update date: 2026-07-09
 
 ## Purpose

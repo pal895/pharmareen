@@ -1,5 +1,7 @@
 # MS2.0 Onboarding And Operations Intelligence
 
+Canonical live-validation authority: `../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. This design note supplies evidence only.
+
 Updated: 2026-07-10
 
 This document records the current Main App direction after the messaging-first UI work and the local-first onboarding expansion.
@@ -142,7 +144,7 @@ After onboarding works and at least one medicine is approved into the pharmacy c
 
 ## Reconciled operating-intelligence continuation — 2026-07-28
 
-The earlier “Future rules” list remains approved work, not completed capability. Repository evidence is classified in `../docs/engineering-memory/operating-intelligence-program.md`.
+The earlier “Future rules” list remains approved work, not completed capability. Canonical checkpoint IDs/status are in the master sequence; repository evidence is classified in `../docs/engineering-memory/operating-intelligence-program.md`.
 
 After the current viewport and payment-notification checkpoints, the authoritative intelligence path is:
 

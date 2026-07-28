@@ -1,5 +1,9 @@
 # MS2.0 Pharmacy Operating Intelligence Platform
 
+## Canonical live-validation authority
+
+`MS2.0_MASTER_LIVE_TEST_SEQUENCE.md` is the single authoritative roadmap for every current and future owner live test. All checkpoint counts, order, prerequisites and status must be derived from it. Historical plans and embedded “next” notes are evidence only.
+
 ## Export Hub protected checkpoint (2026-07-27)
 
 Excel Operations Workbook, PDF Professional Report, Word Owner Copy, Presentation Owner Briefing, CSV Technical Data Transfer and Print Working Inventory are owner-validated, permanently passed and regression-protected. The six-format Export Hub live-validation sequence is complete.
@@ -16,7 +20,7 @@ Routine approved Catalog saves use one pharmacy-scoped compact Activity status c
 
 Shared Editable-Card Voice Viewport / Focus Preservation is the sole open checkpoint. Owner evidence rejected the top-only Mic interaction because a lower-field edit still required keyboard use and scrolling back to the card header. Every editable medicine field now exposes the same shared voice controller beside that field, while the shared render boundary retains target identity, caret, nearest scroll container and viewport anchor through microphone startup, listening, transcript updates and review rerenders. The future Post-Validation User-Facing Product-Secrecy and Quiet-UI Audit remains pending and is not part of this repair.
 
-Repository-wide intelligence reconciliation on 2026-07-28 restores the complete forward programme after the current viewport checkpoint: Payment Failure/Cancellation Notification; Exact Form/Unit and Pack Data as a truth prerequisite; deterministic operational analytics; decision-support summaries and next actions; pharmacy-specific learning; stock/expiry/demand risk prioritization; Supplier Ordering and Truthful Fulfilment; Export IP/Privacy/Compliance; Product-Secrecy and Quiet UI; and externally gated Production Payment-Provider Qualification. See `docs/engineering-memory/operating-intelligence-program.md`. Older embedded “next” notes are historical evidence, not competing current plans.
+The complete functional, intelligence, learning, reporting/export, financial/payment, integration, security/compliance and production programme is maintained only in the master sequence.
 
 Routine Codex implementation and live-test reports are permanently compact: repository state, checkpoint, at most three change bullets, concise tests, commit/push, and the exact next owner action. Do not restate protected history or architecture unless an error or explicit owner request requires it.
 

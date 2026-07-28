@@ -1,5 +1,7 @@
 # Export format purpose
 
+Canonical live-validation authority: `../../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. This memory supplies checkpoint evidence only.
+
 ## Permanent engineering question
 
 Before implementing, redesigning or approving any Export Hub format, answer:

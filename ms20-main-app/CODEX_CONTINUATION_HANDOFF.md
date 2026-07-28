@@ -2,7 +2,7 @@
 
 This file is the copy-paste memory package for continuing MS2.0 in a fresh Codex chat.
 
-> Historical foundation handoff. For current checkpoint truth and the reconciled remaining sequence, use `docs/engineering-memory/current-live-validation-state.md` and `LIVE_APP_TEST_PLAN.md`. Embedded “next” statements below describe their original phase and are not a competing current plan.
+> Historical foundation handoff. Derive every checkpoint only from `../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. Embedded “next” statements below are evidence, not a competing plan.
 
 ## Project Identity
 

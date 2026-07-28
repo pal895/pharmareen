@@ -1,5 +1,7 @@
 # PharMareen Controlled Live Test Plan
 
+Historical backend/training plan. Canonical MS2.0 owner checkpoint IDs, order and status live only in `../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`.
+
 Status: PREPARED
 
 Live execution status: NOT STARTED

@@ -1,5 +1,7 @@
 # MS2.0 Current Architecture Snapshot
 
+Canonical live-validation authority: `../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. Architecture evidence may change checkpoint state only by updating that master in the same commit.
+
 ## Notification and Catalog voice architecture (2026-07-28)
 
 Low-stock and Out-of-Stock via Catalog Mic notification lifecycles are owner-validated and protected. Owner evidence proves the complete Cefixime `22 → 0 → 22` Mic-only round trip, one-field reviews, exact single alert through refresh, 35 medicines and final quiet restoration. `buildDeterministicNotifications()` projects alerts from the current pharmacy-scoped catalog with deterministic IDs; `mergeNotifications()` prevents duplicates, preserves read state for an unchanged fact, resets one materially changed alert to unread using a content fingerprint, and removes generated alerts when their source condition clears. Refresh/restart rebuilds the same projection from persisted catalog and card state.
@@ -8,7 +10,7 @@ The Catalog Medicine Action Card and Catalog Search use the existing shared `sta
 
 Long shared editable cards preserve voice reachability and target visibility through one common root. Every primary and advanced editable medicine field renders an adjacent contextual Mic; it selects that exact field and delegates to the existing `startCatalogEditVoice` and shared `startVoiceCapture` boundaries. Before capture, `voiceViewportAnchor.js` records the field, caret, nearest scroll container and viewport coordinate. Microphone startup, listening, interim/final transcript and validation rerenders restore that anchor, bypass normal chat-bottom scrolling and do not reopen the Android keyboard. Approval, discard or intentional navigation clears the retained edit anchor. This supersedes the rejected top-only Mic preservation attempt after `09cb128`. Main Operations Chat Activity Compaction is owner-validated and protected; the viewport/focus checkpoint remains open pending focused owner evidence. The post-validation product-secrecy and quiet-UI audit remains pending.
 
-The reconciled forward validation order is: shared voice viewport; payment failure/cancellation notification; Exact Form/Unit and Pack Data; deterministic operational analytics; decision-support summaries/next actions; pharmacy-specific learning; stock/expiry/demand risk prioritization; Supplier Ordering and Truthful Fulfilment; Export IP/Privacy/Compliance; Product-Secrecy and Quiet UI; then externally gated Production Payment-Provider Qualification. `docs/engineering-memory/operating-intelligence-program.md` classifies implemented/protected, implemented/untested, partial, planned, superseded and absent intelligence capabilities. Historical “next checkpoint” notes elsewhere do not override this sequence.
+The master sequence owns the complete forward order and classifications. `docs/engineering-memory/operating-intelligence-program.md` remains supporting evidence only.
 
 The Notifications Expiry Alert Lifecycle is owner-validated and protected. The shared Catalog Mic normalized Ibuprofen expiry `2026 06` to `2026-06`; the approved expiry-only change preserved 35 medicines, stock `27` and batch `IBU-200C`; deterministic notification projection created exactly one `Ibuprofen has expired` alert through refresh; restoring `2028-12` removed it and returned Notifications to Quiet.
 

@@ -1,5 +1,7 @@
 # MS2.0 Pharmacy Operating Intelligence programme
 
+Canonical checkpoint IDs, order and status live only in `../../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. This document is supporting intelligence evidence and must not maintain a competing execution sequence.
+
 Reconciled: 2026-07-28
 
 MS2.0 is not complete when it merely records, displays, alerts or exports. The operating-intelligence layer must detect or interpret a meaningful pharmacy pattern or risk, explain why it matters, recommend a safe next action, reuse approved pharmacy-specific learning, or measure whether an action helped. Routine operation remains deterministic/local-first and uses no LLM unless a separately approved boundary is justified.
@@ -20,7 +22,7 @@ MS2.0 is not complete when it merely records, displays, alerts or exports. The o
 | Export IP/privacy/compliance, quiet UI and production provider qualification | D / externally gated | Ordered improvement 3, post-validation audit, and Transaction Completion Engine provider gate. |
 | General anomaly detection beyond the named stock, expiry, demand, payment and activity rules | F — not found as an approved standalone repository programme | Do not invent or schedule a generic anomaly engine without a later explicit product decision. |
 
-## Authoritative remaining order
+## Historical reconciliation order — superseded by the master sequence
 
 1. Close Shared Editable-Card Voice Viewport / Focus Preservation.
 2. Validate Payment Failure/Cancellation Action-Needed Notification.

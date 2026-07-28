@@ -1,5 +1,7 @@
 # Current MS2.0 live validation state
 
+Canonical sequence authority: `../../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. This file records evidence and the current pointer only; it does not maintain a separate roadmap.
+
 ## Export Hub checkpoint — 2026-07-27
 
 - Owner evidence makes Excel, PDF, Word and the nine-slide Presentation **OWNER-VALIDATED PASS** and regression-protected. Presentation downloaded, was detected correctly, opened in an Android standards-compatible reader, and displayed all nine readable slides without corruption. The original Android `Error (4)` blocker is resolved. PowerPoint is recommended, not required.
@@ -40,21 +42,13 @@
 - `shared-editable-card-voice-viewport-focus`: **IMPLEMENTED / AWAITING OWNER VALIDATION**.
 - `post-validation-product-secrecy-quiet-ui-audit`: **PENDING**.
 
-## Remaining live-test order
+## Canonical execution pointer
 
-1. Shared Editable-Card Voice Viewport / Focus Preservation — functional, current, awaiting owner evidence.
-2. Payment Failure/Cancellation Action-Needed Notification — functional, next after viewport PASS and repository re-verification.
-3. Exact Form/Unit Sales and Complete Pack Data — functional prerequisite for truthful movement, margin and reorder intelligence.
-4. Deterministic Operational Analytics Commands — operating intelligence; implemented in the backend and automated tests, but not owner live-tested as the current Main App experience.
-5. Decision-Support Summaries and Next Actions — operating intelligence; partial because metrics are protected but current owner summaries do not expose the existing deterministic recommendations.
-6. Pharmacy-Specific Learning and Safe Reuse — operating intelligence; partial because catalog aliases are protected and local memory exists, but adaptive repeated learning is not integrated/live-tested.
-7. Stock, Expiry and Demand Risk Prioritization — operating intelligence; planned, including likely stock-outs, fast/slow/dead stock, expiry urgency/value at risk and recommended action.
-8. Supplier Ordering and Truthful Fulfilment — operating intelligence; planned ordered programme using canonical movement, reorder levels, confirmed conversions, suggested quantity and sourced fulfilment states.
-9. Export IP, Privacy and Compliance Safeguards — product-hardening/compliance.
-10. Post-Validation User-Facing Product-Secrecy and Quiet-UI Audit — product-hardening.
-11. Production Payment-Provider Qualification — externally gated; official onboarding, merchant identity, credentials, authenticated callbacks, reconciliation and adapters remain disabled.
+Current: master checkpoint **#13 Editable-card voice viewport/focus — Implemented, awaiting owner live test**.
 
-Total remaining: **11 checkpoint programs** — **3 functional** (including the current checkpoint), **5 Pharmacy Operating Intelligence**, **2 product-hardening/compliance**, and **1 externally gated production qualification**. The evidence classification is authoritative in `operating-intelligence-program.md`.
+Next after owner PASS: master checkpoint **#54 Payment failure/cancellation notification**.
+
+All remaining order, counts, prerequisites and classifications are maintained only in the master sequence.
 
 ## Protected validation history
 

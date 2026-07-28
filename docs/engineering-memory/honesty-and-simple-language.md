@@ -1,5 +1,7 @@
 # MS2.0 honesty and simple-language standard
 
+Canonical live-validation authority: `../../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. This memory supplies checkpoint evidence only.
+
 This is a permanent, product-wide engineering standard. It applies to existing work when that work is next touched and to every new feature, message, workflow, and review. It is not limited to one screen or one test fixture.
 
 ## Honesty first

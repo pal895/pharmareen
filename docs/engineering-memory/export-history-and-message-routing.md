@@ -1,5 +1,7 @@
 # Export history and message routing
 
+Canonical live-validation authority: `../../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. This memory supplies checkpoint evidence only.
+
 Export generation must not turn the main sales conversation into an audit log. The main chat may contain at most one compact `ExportHubCard`; each generation updates that card in place. Full history belongs inside Export Hub and is ordered newest first.
 
 Each `ms20.export-history.v1` record contains a deterministic identifier, format, filename, pharmacy identity, Africa/Nairobi generation time, medicine count, operational purpose, opening guidance, status and version. Records are stored under a pharmacy-scoped key. Retrying the same file replaces its existing record.

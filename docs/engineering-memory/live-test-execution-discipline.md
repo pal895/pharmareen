@@ -1,5 +1,7 @@
 # Live-test execution discipline
 
+All live-test selection, order, status and counts must come from `../../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. No handoff or chat may reconstruct a smaller parallel list.
+
 These rules are permanent for every MS2.0 live-validation cycle.
 
 ## Exact and self-contained instructions

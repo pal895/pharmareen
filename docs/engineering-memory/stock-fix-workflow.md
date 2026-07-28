@@ -1,5 +1,7 @@
 # Stock Fix workflow engineering memory
 
+Canonical live-validation authority: `../../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. This memory supplies checkpoint evidence only.
+
 ## Shared architecture
 
 Typed/manual, Pharmacy Catalog, picture-assisted and microphone-guided Stock Fix entry all create or hydrate one `StockCorrectionCard`. Every source converges before validation on the same fields: canonical medicine, trusted current stock, requested corrected stock and audit reason. One shared execution policy owns catalog matching, whole non-negative stock validation, stale-current rejection, no-op rejection, signed adjustment, immediate online application and the automatic offline fallback.

@@ -1,5 +1,7 @@
 # MS2.0 Production Deployment
 
+Deployment evidence does not define checkpoint order. Canonical MS2.0 owner validation lives only in `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`.
+
 ## Current Primary Product
 
 MS2.0 is now Main App-first. The production owner experience should be validated from:

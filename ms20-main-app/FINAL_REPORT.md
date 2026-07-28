@@ -1,6 +1,6 @@
 # MS2.0 Main App Foundation Report
 
-> Historical foundation report. It does not define the current validation checkpoint or remaining sequence; use `docs/engineering-memory/current-live-validation-state.md` and `LIVE_APP_TEST_PLAN.md`.
+> Historical foundation report. It does not define checkpoint order; use `../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`.
 
 ## Created
 

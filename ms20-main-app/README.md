@@ -1,6 +1,6 @@
 # MS2.0 Main App Foundation
 
-Current checkpoint order is maintained in `docs/engineering-memory/current-live-validation-state.md` and `LIVE_APP_TEST_PLAN.md`; historical handoffs and embedded “next” notes do not override that reconciled sequence.
+Every checkpoint is maintained only in `../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`; historical handoffs and embedded “next” notes are evidence only.
 
 This folder is the isolated production foundation for the future permanent MS2.0 app.
 

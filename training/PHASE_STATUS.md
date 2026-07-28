@@ -1,5 +1,7 @@
 # PharMareen Training Phase Status
 
+Historical implementation-phase evidence. Canonical MS2.0 owner checkpoint IDs, order and status live only in `../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`.
+
 ## Phase 1 - Training Infrastructure + Medicine Brain
 
 Status: PASS

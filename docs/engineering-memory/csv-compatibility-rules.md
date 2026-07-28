@@ -1,5 +1,7 @@
 # CSV compatibility rules
 
+Canonical live-validation authority: `../../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. This memory supplies checkpoint evidence only.
+
 ## Purpose and canonical shape
 
 CSV is MS2.0's technical data-transfer format. It is selected for import, interoperability and machine processing, while XLSX remains the normal owner-analysis workbook.

@@ -1,5 +1,7 @@
 # Trusted result consistency
 
+Canonical live-validation authority: `../../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. This memory supplies checkpoint evidence only.
+
 Consistency is a product, trust, and operational-safety requirement. Every live-approved result becomes a trusted baseline for the same entity and applicable workflow behavior. Later actions, refreshes, adapters, sync, reports, notifications, and presentation improvements must preserve its meaningful facts unless the owner deliberately changes them or a verified improvement changes behavior without losing correct data.
 
 ## Canonical safe-merge rule

@@ -1,5 +1,7 @@
 # Invoice table OCR engineering memory
 
+Canonical live-validation authority: `../../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. This memory supplies checkpoint evidence only.
+
 ## Test 1 accepted baseline (2026-07-13)
 
 - The AfyaLink first supplier-invoice onboarding test passed end to end: four medicines, no unclear lines, approval, catalog save, export confirmation, and final Saved message.
