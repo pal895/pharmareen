@@ -44,7 +44,13 @@
 
 1. Shared Editable-Card Voice Viewport / Focus Preservation — functional, current, awaiting owner evidence.
 2. Payment Failure/Cancellation Action-Needed Notification — functional, next after viewport PASS and repository re-verification.
-3. Post-Validation User-Facing Product-Secrecy and Quiet-UI Audit — final product-hardening/audit checkpoint.
+3. Supplier Ordering and Truthful Fulfilment — functional program; execute its ordered one-at-a-time cases from the Live App Test Plan.
+4. Exact Form/Unit Sales and Complete Pack Data — functional program; execute its ordered cross-input and integrity cases from the Live App Test Plan.
+5. Export IP, Privacy and Compliance Safeguards — product-hardening/compliance program; execute its ordered format and fail-closed cases.
+6. Post-Validation User-Facing Product-Secrecy and Quiet-UI Audit — final whole-system UI hardening.
+7. Production Payment-Provider Qualification — externally gated production hardening; provider onboarding model, authenticated callbacks, tenant-bound merchant identity, credentials, reconciliation and official adapters remain disabled until direct provider confirmation.
+
+Total remaining: **7 checkpoint programs** — **4 functional** (including the current checkpoint) and **3 product-hardening/production-audit**.
 
 ## Protected validation history
 
@@ -116,7 +122,9 @@
 - Safe invoice, CSV, bulk-paste, and future compatible multi-row CatalogImport reviews inherit ordering. Incomplete invoices intentionally hide ordering and add-row controls until safe; single-medicine cards exclude ordering.
 - Context parsers may differ, but supported fields must converge before editable review. Excel parsing and genuine barcode decoding remain future stages, not part of this fix.
 
-## Remaining live-test sequence
+## Historical pre-closure live-test sequence — superseded
+
+The sequence below records the earlier onboarding-to-operations path and is retained as provenance. Its cases were subsequently completed and protected or replaced by the reconciled authoritative sequence above. It must not be interpreted as a second current queue.
 
 1. Finish the combined CSV-stage validation: false alerts removed, bottom search present, and one shared row move works without approval.
 2. Validate Excel onboarding only after its adapter is ready.

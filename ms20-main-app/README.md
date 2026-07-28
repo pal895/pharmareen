@@ -1,5 +1,7 @@
 # MS2.0 Main App Foundation
 
+Current checkpoint order is maintained in `docs/engineering-memory/current-live-validation-state.md` and `LIVE_APP_TEST_PLAN.md`; historical handoffs and embedded “next” notes do not override that reconciled sequence.
+
 This folder is the isolated production foundation for the future permanent MS2.0 app.
 
 It does not rewrite or modify the current live backend, offline app, WhatsApp/Baileys bridge, Google Sheets code, or pharmacy engine. The current live system is connected through read-only/live-status adapter slots and queue-only card actions.

@@ -142,9 +142,15 @@ Status: **PENDING**. Do not perform during viewport/focus validation.
 
 1. Shared Editable-Card Voice Viewport / Focus Preservation — functional, current.
 2. Payment Failure/Cancellation Action-Needed Notification — functional, next after viewport PASS.
-3. Post-Validation User-Facing Product-Secrecy and Quiet-UI Audit — final product-hardening/audit checkpoint.
+3. Supplier Ordering and Truthful Fulfilment — functional; run the ordered cases in Improvement 1 one at a time.
+4. Exact Form/Unit Sales and Complete Pack Data — functional; run the ordered cases in Improvement 2 one at a time.
+5. Export IP, Privacy and Compliance Safeguards — product-hardening/compliance; run Improvement 3 one case at a time.
+6. Post-Validation User-Facing Product-Secrecy and Quiet-UI Audit — final whole-system UI hardening.
+7. Production Payment-Provider Qualification — externally gated production hardening; do not begin until direct provider confirmation resolves the onboarding model.
 
-Total remaining: **3** checkpoints — **2 functional** and **1 final product-hardening/audit**.
+Total remaining: **7 checkpoint programs** — **4 functional** (including the current checkpoint) and **3 product-hardening/production-audit**.
+
+This reconciled sequence is authoritative. Historical “next” statements later in this file are retained only as evidence of the sequence at that time. They do not reopen passed tests or supersede this queue.
 
 ## Test Rules
 

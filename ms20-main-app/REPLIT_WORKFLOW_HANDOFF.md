@@ -2,6 +2,8 @@
 
 Use this handoff when a fresh Codex chat gets stuck testing only `127.0.0.1` from the local desktop workspace. The correct continuation is Replit-first for live product testing.
 
+> This document remains authoritative for the Replit execution path, not checkpoint order. Current checkpoint truth and the reconciled remaining sequence live in `docs/engineering-memory/current-live-validation-state.md` and `LIVE_APP_TEST_PLAN.md`.
+
 ## Current Transfer Status
 
 As of 2026-07-09, `ms20-main-app/` has been added to the GitHub/Replit project as the Main App-first product surface. After pulling the latest `origin/main` in Replit, verify the Main App from Replit Shell:

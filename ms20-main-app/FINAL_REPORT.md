@@ -1,5 +1,7 @@
 # MS2.0 Main App Foundation Report
 
+> Historical foundation report. It does not define the current validation checkpoint or remaining sequence; use `docs/engineering-memory/current-live-validation-state.md` and `LIVE_APP_TEST_PLAN.md`.
+
 ## Created
 
 The new isolated app was created in:
