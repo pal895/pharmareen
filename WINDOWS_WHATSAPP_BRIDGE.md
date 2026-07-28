@@ -1,5 +1,7 @@
 # PharMareen Windows WhatsApp Bridge
 
+Historical/deprecated channel evidence only. Canonical MS2.0 checkpoint order and status live in `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`.
+
 Use this when Replit Node/npm is unstable.
 
 The setup is:

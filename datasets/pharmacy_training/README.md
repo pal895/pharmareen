@@ -1,5 +1,7 @@
 # PharMareen pharmacy training datasets
 
+Training evidence does not define live-test order or status. Use `../../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md` as the sole canonical validation roadmap.
+
 These JSONL files are deterministic simulation examples for the local-first pharmacy assistant. They cover rushed sales, shorthand, Swahili/English phrases, corrections, payment flows, supplier/restock patterns, offline sync, media intake, barcode mapping, and analytics requests.
 
 Normal sales, restocks, reports, analytics, receipts, corrections, stock checks, barcode lookup, and offline typed sync should stay local and must not call OpenAI. Media/voice/photo rows document where AI is allowed later after safe capture, local classification, and owner confirmation.

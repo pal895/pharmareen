@@ -2,6 +2,8 @@
 
 Canonical live-validation authority: `../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. Architecture evidence may change checkpoint state only by updating that master in the same commit.
 
+The master’s completeness ledger is the architecture-to-validation coverage index. No component, route, adapter, fixture or historical capability creates an implicit checkpoint outside it.
+
 ## Notification and Catalog voice architecture (2026-07-28)
 
 Low-stock and Out-of-Stock via Catalog Mic notification lifecycles are owner-validated and protected. Owner evidence proves the complete Cefixime `22 → 0 → 22` Mic-only round trip, one-field reviews, exact single alert through refresh, 35 medicines and final quiet restoration. `buildDeterministicNotifications()` projects alerts from the current pharmacy-scoped catalog with deterministic IDs; `mergeNotifications()` prevents duplicates, preserves read state for an unchanged fact, resets one materially changed alert to unread using a content fingerprint, and removes generated alerts when their source condition clears. Refresh/restart rebuilds the same projection from persisted catalog and card state.

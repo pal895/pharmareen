@@ -1,5 +1,7 @@
 # WhatsApp Web MVP Bridge
 
+Historical/deprecated channel evidence only. Canonical MS2.0 checkpoint order and status live in `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`.
+
 This is the temporary MVP channel while Meta Cloud API is blocked by business verification.
 
 ## What It Does

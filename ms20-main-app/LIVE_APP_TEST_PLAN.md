@@ -2,6 +2,8 @@
 
 Canonical sequence authority: `../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. This file retains detailed procedures and historical evidence; it must not maintain or infer a competing checkpoint order.
 
+The master’s repository completeness ledger classifies all discovered capabilities, deprecated paths and evidence-backed out-of-scope extensions. Use this plan only for detailed procedures belonging to the checkpoint selected by the master.
+
 ## Historical checkpoint — Notifications Low-Stock Alert
 
 <!-- Superseded low-stock checkpoint retained as historical evidence.

@@ -1,5 +1,7 @@
 # PharMareen Training Dashboard
 
+Generated training evidence only. Canonical MS2.0 checkpoint order and status live in `../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`.
+
 Generated: 2026-06-12T12:45:38.999990+00:00
 Overall status: PASS
 Ready for next phase review: YES

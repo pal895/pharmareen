@@ -1,5 +1,7 @@
 # Deploy MS2.0 Now
 
+Deployment evidence does not define live-test order or status. Use `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md` as the sole canonical validation roadmap.
+
 ## Main App First
 
 The current product to test and sell is the MS2.0 Main App:
