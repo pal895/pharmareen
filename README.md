@@ -22,7 +22,7 @@ Notifications Expiry Alert Lifecycle is **OWNER-VALIDATED PASS / FROZEN / PROTEC
 
 Routine approved Catalog saves use one pharmacy-scoped compact Activity status card and a separate deterministic Activity History. Catalog update prose is prohibited from the permanent operations feed; refresh removes only the exact legacy update messages. History is local, bounded, newest-first, idempotent, Africa/Nairobi-labelled and separate from sales and Notifications. Main Operations Chat Activity Compaction is owner-validated, passed and protected.
 
-Shared Editable-Card Voice Viewport / Focus Preservation is the sole open checkpoint. Owner evidence rejected the top-only Mic interaction because a lower-field edit still required keyboard use and scrolling back to the card header. Every editable medicine field now exposes the same shared voice controller beside that field, while the shared render boundary retains target identity, caret, nearest scroll container and viewport anchor through microphone startup, listening, transcript updates and review rerenders. The future Post-Validation User-Facing Product-Secrecy and Quiet-UI Audit remains pending and is not part of this repair.
+Shared Editable-Card Voice Viewport / Focus Preservation is **OWNER-VALIDATED PASS / PROTECTED**. Final evidence after `67cfcac` proves upper, middle, lower and Expiry contextual field voice retains the selected field through listening, transcript application, one-field validation and discard/restoration. The contextual session owns rendering and suppresses ordinary chat-bottom scrolling; earlier failed attempts remain preserved in Engineering Memory. Do not repeat this checkpoint without direct regression evidence.
 
 The complete functional, intelligence, learning, reporting/export, financial/payment, integration, security/compliance and production programme is maintained only in the master sequence.
 
@@ -518,7 +518,7 @@ Export activity updates one compact Export Hub card in the main chat. Newest-fir
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 76
-- Current: MS2-LT-013 — Editable-card voice viewport/focus
+- Current: MS2-LT-054 — Payment failure/cancellation notification
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.

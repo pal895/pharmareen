@@ -12,7 +12,7 @@ Low-stock and Out-of-Stock via Catalog Mic notification lifecycles are owner-val
 
 The Catalog Medicine Action Card and Catalog Search use the existing shared `startVoiceCapture()` boundary. A focused editable field supplies edit intent; explicit phrases such as `current stock twenty two` are accepted; Catalog Search places the normalized transcript into the synchronized query and immediately invokes the existing local medicine matcher. Validation, change review, approval, persistence and notification refresh remain unchanged; no second microphone service or AI parsing path exists. Catalog Search Mic is owner-validated and protected: invalid speech safely returns zero results, valid speech resolves exact saved medicines, clearing restores 35, repeated use stays accurate, and no operational mutation occurs.
 
-Long shared editable cards preserve voice reachability and target visibility through one common root. Every primary and advanced editable medicine field renders an adjacent contextual Mic; it selects that exact field and delegates to the existing `startCatalogEditVoice` and shared `startVoiceCapture` boundaries. Before capture, `voiceViewportAnchor.js` records the field, caret, nearest scroll container and viewport coordinate. Two owner attempts on 2026-07-29 proved that restoring after global DOM replacement still loses to Android chat layout. Commit `67cfcac` therefore gives an active contextual field session render ownership: microphone start/listening/interim/final status, the selected value and validation review update the existing DOM in place; normal root replacement and `scrollChatToBottom()` do not execute. The ordinary composer Mic retains the normal render path when no contextual session exists. Approval, discard or intentional navigation clears the retained edit anchor. The viewport/focus checkpoint remains open pending focused owner evidence.
+Long shared editable cards preserve voice reachability and target visibility through one common root. Every primary and advanced editable medicine field renders an adjacent contextual Mic; it selects that exact field and delegates to the existing `startCatalogEditVoice` and shared `startVoiceCapture` boundaries. Commit `67cfcac` gives an active contextual field session render ownership: microphone start/listening/interim/final status, selected value and validation review update the existing DOM in place; normal root replacement and `scrollChatToBottom()` do not execute. Final owner evidence on 2026-07-29 validates this contract across upper, middle, lower and Expiry positions with one-field mutation and successful discard/restoration. MS2-LT-013 is PASS / PROTECTED; the earlier failed global-rerender repairs remain historical evidence.
 
 The master sequence owns the complete forward order and classifications. `docs/engineering-memory/operating-intelligence-program.md` remains supporting evidence only.
 
@@ -397,7 +397,7 @@ Planned at their proper test stages:
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 76
-- Current: MS2-LT-013 — Editable-card voice viewport/focus
+- Current: MS2-LT-054 — Payment failure/cancellation notification
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.

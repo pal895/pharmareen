@@ -3,8 +3,8 @@
   "authority": "MS2.0_MASTER_LIVE_TEST_SEQUENCE.md",
   "checkpoint_count": 76,
   "current_checkpoint": {
-    "id": "MS2-LT-013",
-    "name": "Editable-card voice viewport/focus"
+    "id": "MS2-LT-054",
+    "name": "Payment failure/cancellation notification"
   },
   "protected_checkpoint_ids": [
     "MS2-LT-001",
@@ -19,6 +19,7 @@
     "MS2-LT-010",
     "MS2-LT-011",
     "MS2-LT-012",
+    "MS2-LT-013",
     "MS2-LT-014",
     "MS2-LT-015",
     "MS2-LT-016",
@@ -58,6 +59,6 @@
     "status": "ACTIVE",
     "document": "docs/engineering-memory/token-execution-policy.md"
   },
-  "master_sha256": "593afd78670a066bd9f41adec88feebf8ef3b8b3acc23843b47433c5428adba2",
+  "master_sha256": "90cc8d4f24b6301f49c18e6ca97bf71f537a60a34eb1b26405dc6a2fbed4d084",
   "rule": "Load the master and its Engineering Traceability Index; never reconstruct or maintain a parallel sequence."
 }

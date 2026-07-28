@@ -1,247 +1,247 @@
 {
-    "11":  [
-               "ms20-main-app/src/cards/editableCards.js",
-               "ms20-main-app/src/services/catalogReviewPolicy.js"
-           ],
-    "41":  [
-               "ms20-main-app/src/services/excelInventory.js",
-               "ms20-main-app/src/services/ooxmlPackage.js"
-           ],
-    "62":  [
-               "app/routes/meta_webhook.py",
-               "app/providers/meta_whatsapp.py"
-           ],
-    "70":  [
-               "app/main.py",
-               "start.sh"
-           ],
-    "45":  [
-               "ms20-main-app/src/services/documentGenerator.js",
-               "ms20-main-app/src/services/medicineFinder.js"
-           ],
-    "42":  [
-               "ms20-main-app/src/services/documentGenerator.js"
-           ],
-    "3":  [
-              "app/services/local_invoice_ocr.py",
-              "app/services/medicine_onboarding.py"
-          ],
-    "20":  [
-               "app/services/offline_sync.py",
-               "ms20-main-app/src/services/offlineQueue.js"
-           ],
-    "56":  [
-               "app/intake.py",
-               "ms20-main-app/src/services/transactionCompletionEngine.js"
-           ],
-    "12":  [
-               "app/transcription.py",
-               "ms20-main-app/src/app.js"
-           ],
-    "10":  [
-               "ms20-main-app/src/services/catalogWorkspace.js",
-               "ms20-main-app/src/services/activityHistory.js"
-           ],
-    "61":  [
-               "app/services/offline_sync.py",
-               "offline_app/app.js"
-           ],
-    "17":  [
-               "ms20-main-app/src/services/stockCorrectionExecution.js",
-               "ms20-main-app/src/services/stockCorrectionPolicy.js"
-           ],
-    "51":  [
-               "ms20-main-app/src/services/transactionCompletionEngine.js"
-           ],
-    "44":  [
-               "ms20-main-app/src/services/documentGenerator.js",
-               "ms20-main-app/src/services/ooxmlPackage.js"
-           ],
-    "65":  [
-               "app/pharmacy_registry.py",
-               "app/actor_context.py"
-           ],
-    "13":  [
-               "ms20-main-app/src/services/voiceViewportAnchor.js",
-               "ms20-main-app/src/cards/editableCards.js"
-           ],
-    "43":  [
-               "ms20-main-app/src/services/documentGenerator.js",
-               "ms20-main-app/src/services/ooxmlPackage.js"
-           ],
-    "30":  [
-               "ms20-main-app/src/services/notificationCenter.js",
-               "app/services/operational_intelligence.py"
-           ],
-    "53":  [
-               "ms20-main-app/src/services/transactionCompletionEngine.js"
-           ],
-    "18":  [
-               "ms20-main-app/src/services/stockFixEvidencePipeline.js",
-               "app/services/local_stock_fix_ocr.py"
-           ],
-    "36":  [
-               "app/services/operational_intelligence.py",
-               "app/services/photo_intake.py"
-           ],
-    "71":  [
-               "app/main.py",
-               "app/reports.py"
-           ],
-    "72":  [
-               "ms20-main-app/tools/verify-consistency-gate.mjs",
-               "ms20-main-app/tools/verify-architecture.mjs"
-           ],
-    "23":  [
-               "app/services/operational_intelligence.py"
-           ],
-    "19":  [
-               "app/intake.py",
-               "ms20-main-app/src/services/transactionCompletionEngine.js"
-           ],
-    "1":  [
-              "ms20-main-app/src/app.js",
-              "ms20-main-app/src/routes/routeRegistry.js"
-          ],
-    "47":  [
-               "ms20-main-app/src/services/documentGenerator.js",
-               "ms20-main-app/tools/verify-export-hub.mjs"
-           ],
-    "59":  [
-               "app/sheets.py",
-               "app/services/pharmacy_onboarding.py"
-           ],
-    "5":  [
-              "ms20-main-app/src/services/catalogOnboarding.js"
-          ],
-    "54":  [
-               "ms20-main-app/src/services/transactionCompletionEngine.js",
-               "ms20-main-app/src/services/notificationCenter.js"
-           ],
-    "73":  [
-               "app/provisioning.py",
-               "app/deployment.py"
-           ],
-    "52":  [
-               "ms20-main-app/src/services/transactionCompletionEngine.js",
-               "ms20-main-app/src/services/paymentAdapters.js"
-           ],
-    "4":  [
-              "ms20-main-app/src/services/catalogOnboarding.js"
-          ],
-    "8":  [
-              "app/services/photo_intake.py",
-              "ms20-main-app/src/services/visualPipeline.js"
-          ],
-    "58":  [
-               "app/main.py",
-               "ms20-main-app/src/services/liveBackendGateway.js"
-           ],
-    "26":  [
-               "app/reports.py",
-               "app/services/operational_intelligence.py"
-           ],
-    "39":  [
-               "app/reports.py",
-               "ms20-main-app/src/services/localIntelligence.js"
-           ],
-    "14":  [
-               "app/intake.py",
-               "ms20-main-app/src/services/transactionCompletionEngine.js"
-           ],
-    "37":  [
-               "app/ai_policy.py",
-               "app/ai.py"
-           ],
-    "22":  [
-               "app/intake.py",
-               "app/services/operational_intelligence.py"
-           ],
-    "40":  [
-               "ms20-main-app/src/services/documentGenerator.js",
-               "ms20-main-app/src/services/exportFormatMetadata.js"
-           ],
-    "63":  [
-               "local_whatsapp_bridge.js",
-               "whatsapp-web-bridge.js"
-           ],
-    "25":  [
-               "ms20-main-app/src/services/notificationCenter.js",
-               "ms20-main-app/src/services/localIntelligence.js"
-           ],
-    "9":  [
-              "app/services/photo_intake.py",
-              "ms20-main-app/src/services/visualPipeline.js"
-          ],
-    "33":  [
-               "app/correction_learning.py",
-               "app/services/pharmacy_alias_store.py"
-           ],
-    "15":  [
-               "app/intake.py",
-               "app/services/image_restock.py"
-           ],
-    "34":  [
-               "app/services/operational_intelligence.py",
-               "app/training_store.py"
-           ],
-    "21":  [
-               "app/reports.py",
-               "ms20-main-app/src/services/localIntelligence.js"
-           ],
-    "24":  [
-               "ms20-main-app/src/services/notificationCenter.js",
-               "ms20-main-app/src/services/localIntelligence.js"
-           ],
-    "46":  [
-               "ms20-main-app/src/services/exportFormatMetadata.js",
-               "ms20-main-app/src/app.js"
-           ],
-    "16":  [
-               "ms20-main-app/src/services/localIntelligence.js",
-               "app/intake.py"
-           ],
-    "35":  [
-               "app/services/medicine_onboarding.py",
-               "ms20-main-app/src/services/brainAdapters.js"
-           ],
-    "32":  [
-               "app/services/medicine_catalog.py",
-               "ms20-main-app/src/services/catalogWorkspace.js"
-           ],
-    "66":  [
-               "ms20-main-app/src/services/activityHistory.js",
-               "ms20-main-app/src/services/transactionCompletionEngine.js"
-           ],
-    "7":  [
-              "ms20-main-app/src/data/barcodeTestFixtures.js",
-              "ms20-main-app/src/services/medicineMatcher.js"
-          ],
-    "60":  [
-               "baileys-bridge.js",
-               "app/whatsapp.py"
-           ],
-    "2":  [
-              "app/services/pharmacy_onboarding.py",
-              "app/pharmacy_registry.py"
-          ],
-    "50":  [
-               "app/intake.py",
-               "ms20-main-app/src/services/paymentAdapters.js"
-           ],
-    "55":  [
-               "app/intake.py",
-               "ms20-main-app/src/services/transactionCompletionEngine.js"
-           ],
-    "6":  [
-              "ms20-main-app/src/services/catalogOnboarding.js"
-          ],
-    "67":  [
-               "app/actor_context.py",
-               "app/routes/admin.py"
-           ],
-    "31":  [
-               "app/medicine_brain.py",
-               "ms20-main-app/src/services/medicineMatcher.js"
-           ]
+  "1": [
+    "ms20-main-app/src/app.js",
+    "ms20-main-app/src/routes/routeRegistry.js"
+  ],
+  "2": [
+    "app/services/pharmacy_onboarding.py",
+    "app/pharmacy_registry.py"
+  ],
+  "3": [
+    "app/services/local_invoice_ocr.py",
+    "app/services/medicine_onboarding.py"
+  ],
+  "4": [
+    "ms20-main-app/src/services/catalogOnboarding.js"
+  ],
+  "5": [
+    "ms20-main-app/src/services/catalogOnboarding.js"
+  ],
+  "6": [
+    "ms20-main-app/src/services/catalogOnboarding.js"
+  ],
+  "7": [
+    "ms20-main-app/src/data/barcodeTestFixtures.js",
+    "ms20-main-app/src/services/medicineMatcher.js"
+  ],
+  "8": [
+    "app/services/photo_intake.py",
+    "ms20-main-app/src/services/visualPipeline.js"
+  ],
+  "9": [
+    "app/services/photo_intake.py",
+    "ms20-main-app/src/services/visualPipeline.js"
+  ],
+  "10": [
+    "ms20-main-app/src/services/catalogWorkspace.js",
+    "ms20-main-app/src/services/activityHistory.js"
+  ],
+  "11": [
+    "ms20-main-app/src/cards/editableCards.js",
+    "ms20-main-app/src/services/catalogReviewPolicy.js"
+  ],
+  "12": [
+    "app/transcription.py",
+    "ms20-main-app/src/app.js"
+  ],
+  "13": [
+    "ms20-main-app/src/services/voiceViewportAnchor.js",
+    "ms20-main-app/src/cards/editableCards.js"
+  ],
+  "14": [
+    "app/intake.py",
+    "ms20-main-app/src/services/transactionCompletionEngine.js"
+  ],
+  "15": [
+    "app/intake.py",
+    "app/services/image_restock.py"
+  ],
+  "16": [
+    "ms20-main-app/src/services/localIntelligence.js",
+    "app/intake.py"
+  ],
+  "17": [
+    "ms20-main-app/src/services/stockCorrectionExecution.js",
+    "ms20-main-app/src/services/stockCorrectionPolicy.js"
+  ],
+  "18": [
+    "ms20-main-app/src/services/stockFixEvidencePipeline.js",
+    "app/services/local_stock_fix_ocr.py"
+  ],
+  "19": [
+    "app/intake.py",
+    "ms20-main-app/src/services/transactionCompletionEngine.js"
+  ],
+  "20": [
+    "app/services/offline_sync.py",
+    "ms20-main-app/src/services/offlineQueue.js"
+  ],
+  "21": [
+    "app/reports.py",
+    "ms20-main-app/src/services/localIntelligence.js"
+  ],
+  "22": [
+    "app/intake.py",
+    "app/services/operational_intelligence.py"
+  ],
+  "23": [
+    "app/services/operational_intelligence.py"
+  ],
+  "24": [
+    "ms20-main-app/src/services/notificationCenter.js",
+    "ms20-main-app/src/services/localIntelligence.js"
+  ],
+  "25": [
+    "ms20-main-app/src/services/notificationCenter.js",
+    "ms20-main-app/src/services/localIntelligence.js"
+  ],
+  "26": [
+    "app/reports.py",
+    "app/services/operational_intelligence.py"
+  ],
+  "30": [
+    "ms20-main-app/src/services/notificationCenter.js",
+    "app/services/operational_intelligence.py"
+  ],
+  "31": [
+    "app/medicine_brain.py",
+    "ms20-main-app/src/services/medicineMatcher.js"
+  ],
+  "32": [
+    "app/services/medicine_catalog.py",
+    "ms20-main-app/src/services/catalogWorkspace.js"
+  ],
+  "33": [
+    "app/correction_learning.py",
+    "app/services/pharmacy_alias_store.py"
+  ],
+  "34": [
+    "app/services/operational_intelligence.py",
+    "app/training_store.py"
+  ],
+  "35": [
+    "app/services/medicine_onboarding.py",
+    "ms20-main-app/src/services/brainAdapters.js"
+  ],
+  "36": [
+    "app/services/operational_intelligence.py",
+    "app/services/photo_intake.py"
+  ],
+  "37": [
+    "app/ai_policy.py",
+    "app/ai.py"
+  ],
+  "39": [
+    "app/reports.py",
+    "ms20-main-app/src/services/localIntelligence.js"
+  ],
+  "40": [
+    "ms20-main-app/src/services/documentGenerator.js",
+    "ms20-main-app/src/services/exportFormatMetadata.js"
+  ],
+  "41": [
+    "ms20-main-app/src/services/excelInventory.js",
+    "ms20-main-app/src/services/ooxmlPackage.js"
+  ],
+  "42": [
+    "ms20-main-app/src/services/documentGenerator.js"
+  ],
+  "43": [
+    "ms20-main-app/src/services/documentGenerator.js",
+    "ms20-main-app/src/services/ooxmlPackage.js"
+  ],
+  "44": [
+    "ms20-main-app/src/services/documentGenerator.js",
+    "ms20-main-app/src/services/ooxmlPackage.js"
+  ],
+  "45": [
+    "ms20-main-app/src/services/documentGenerator.js",
+    "ms20-main-app/src/services/medicineFinder.js"
+  ],
+  "46": [
+    "ms20-main-app/src/services/exportFormatMetadata.js",
+    "ms20-main-app/src/app.js"
+  ],
+  "47": [
+    "ms20-main-app/src/services/documentGenerator.js",
+    "ms20-main-app/tools/verify-export-hub.mjs"
+  ],
+  "50": [
+    "app/intake.py",
+    "ms20-main-app/src/services/paymentAdapters.js"
+  ],
+  "51": [
+    "ms20-main-app/src/services/transactionCompletionEngine.js"
+  ],
+  "52": [
+    "ms20-main-app/src/services/transactionCompletionEngine.js",
+    "ms20-main-app/src/services/paymentAdapters.js"
+  ],
+  "53": [
+    "ms20-main-app/src/services/transactionCompletionEngine.js"
+  ],
+  "54": [
+    "ms20-main-app/src/services/transactionCompletionEngine.js",
+    "ms20-main-app/src/services/notificationCenter.js"
+  ],
+  "55": [
+    "app/intake.py",
+    "ms20-main-app/src/services/transactionCompletionEngine.js"
+  ],
+  "56": [
+    "app/intake.py",
+    "ms20-main-app/src/services/transactionCompletionEngine.js"
+  ],
+  "58": [
+    "app/main.py",
+    "ms20-main-app/src/services/liveBackendGateway.js"
+  ],
+  "59": [
+    "app/sheets.py",
+    "app/services/pharmacy_onboarding.py"
+  ],
+  "60": [
+    "baileys-bridge.js",
+    "app/whatsapp.py"
+  ],
+  "61": [
+    "app/services/offline_sync.py",
+    "offline_app/app.js"
+  ],
+  "62": [
+    "app/routes/meta_webhook.py",
+    "app/providers/meta_whatsapp.py"
+  ],
+  "63": [
+    "local_whatsapp_bridge.js",
+    "whatsapp-web-bridge.js"
+  ],
+  "65": [
+    "app/pharmacy_registry.py",
+    "app/actor_context.py"
+  ],
+  "66": [
+    "ms20-main-app/src/services/activityHistory.js",
+    "ms20-main-app/src/services/transactionCompletionEngine.js"
+  ],
+  "67": [
+    "app/actor_context.py",
+    "app/routes/admin.py"
+  ],
+  "70": [
+    "app/main.py",
+    "start.sh"
+  ],
+  "71": [
+    "app/main.py",
+    "app/reports.py"
+  ],
+  "72": [
+    "ms20-main-app/tools/verify-consistency-gate.mjs",
+    "ms20-main-app/tools/verify-architecture.mjs"
+  ],
+  "73": [
+    "app/provisioning.py",
+    "app/deployment.py"
+  ]
 }

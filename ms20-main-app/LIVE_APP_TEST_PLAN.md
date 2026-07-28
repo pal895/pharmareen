@@ -123,24 +123,15 @@ FAIL for any second Activity card, full Catalog-update feed message, missing/dup
 
 This plan is for Main App live product testing only. Do not return to WhatsApp live testing in this phase.
 
-## Authoritative current checkpoint — Shared Editable-Card Voice Viewport / Focus Preservation
+## Protected checkpoint — Shared Editable-Card Voice Viewport / Focus Preservation
 
-Status: **IMPLEMENTED / AWAITING OWNER VALIDATION**.
+Status: **OWNER-VALIDATED PASS / FROZEN / PROTECTED**.
 
-Owner evidence after `09cb128` rejected the first implementation. Two further owner screenshot sets on 2026-07-29 proved contextual Mic placement and exact-field routing but rejected viewport continuity; the repeat after `b7ba547` still moved from a visible Expiry month field to the chat bottom as soon as `Speak now` appeared. Commit `67cfcac` removes the underlying competition: during contextual field voice, microphone/transcript/review state updates the existing editor DOM in place and the global rerender/chat-bottom path cannot run. The checkpoint remains open.
+Owner evidence after `09cb128` rejected the first implementation, and the repeat after `b7ba547` still moved from visible Expiry month to the chat bottom. Final evidence after `67cfcac` passes the shared-root contract across upper Strength `10 mg → 5 mg`, middle-field listening, lower Buying price `120 → 121`, and Expiry `2028-09 → 2026 May → 2028-09`. The selected field remained visible, only one field changed, validation stayed colocated and discard restored baseline. Preserve the earlier failures as history; do not schedule this checkpoint again without direct regression evidence.
 
 Objective: prove that the contextual Mic beside every shared editable medicine field keeps the selected field visible and changes only that field through listening and rerendering.
 
-1. Pull/restart the latest commit.
-2. Open one long editable medicine card and scroll to Expiry month.
-3. Tap Expiry month's adjacent Mic.
-4. Confirm the editable card and Expiry month remain visible while `Speak now` appears.
-5. Speak a harmless temporary expiry value and confirm only that field changes without any jump.
-6. Tap **Discard**; do not approve or save.
-
-Required evidence: one decisive screenshot showing the field and its reachable Mic before voice, one after the voice update with the same field visible, and one after discard/restoration. Do not repeat Catalog Search Mic, stock, expiry, Activity Compaction, exports or another protected checkpoint.
-
-PASS only with owner evidence that target identity, single-field mutation and viewport preservation all hold. After PASS, re-read the repository before preparing the next unfinished checkpoint, expected to be Payment Failure/Cancellation Action-Needed Notification if still authoritative.
+Regression contract: contextual Mic remains adjacent and reachable; the selected field and medicine context remain visible during permission, listening, interim/final transcript, validation and discard; only the selected field changes; ordinary chat-bottom scrolling stays suspended; normal composer Mic behavior outside contextual editing remains unchanged.
 
 ## Future checkpoint — Post-Validation User-Facing Product-Secrecy and Quiet-UI Audit
 
@@ -148,7 +139,7 @@ Status: **PENDING**. Do not perform during viewport/focus validation.
 
 ## Canonical execution pointer
 
-See the master sequence. Current pointer: **#13**. Next isolated checkpoint after owner PASS: **#54**. Historical “next” statements later in this file are evidence only.
+See the master sequence for the current pointer. MS2-LT-013 is closed and protected. Do not initiate another checkpoint without an explicit owner command; historical “next” statements later in this file are evidence only.
 
 ## Test Rules
 
@@ -952,7 +943,7 @@ Pass only after owner-device evidence shows the file opens in a compatible prese
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 76
-- Current: MS2-LT-013 — Editable-card voice viewport/focus
+- Current: MS2-LT-054 — Payment failure/cancellation notification
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.

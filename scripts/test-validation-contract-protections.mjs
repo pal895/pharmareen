@@ -62,7 +62,9 @@ validateBridgeSnapshot(manifest, bridgeExpected);
 assert.throws(() => validateBridgeSnapshot({ ...manifest, checkpoint_count: 75 }, bridgeExpected), /Outdated Bridge/);
 assert.throws(() => validateBridgeSnapshot({ ...manifest, token_policy: { status: "INACTIVE" } }, bridgeExpected), /token policy/);
 
-const current = "MS2-LT-013 — Editable-card voice viewport/focus";
+const currentPointer = master.match(/The only current open checkpoint is \*\*#(\d+) ([^*]+)\*\*\./);
+assert.ok(currentPointer, "master current checkpoint pointer is present");
+const current = `MS2-LT-${String(currentPointer[1]).padStart(3, "0")} — ${currentPointer[2]}`;
 const synchronized = fs.readFileSync(path.join(root, contract.synchronized_documents[0]), "utf8");
 const synchronizedExpected = { master: contract.master, count: validated.rows.length, current };
 validateSynchronizedDocument(synchronized, synchronizedExpected);

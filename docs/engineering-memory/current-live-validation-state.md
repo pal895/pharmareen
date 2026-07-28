@@ -33,7 +33,7 @@ Permanent traceability rule: checkpoint IDs, evidence, implementation commits/fi
 - Catalog Search Mic is **OWNER-VALIDATED PASS / FROZEN / PROTECTED**. The authoritative nine-image sequence proves synchronized deployment, a visible Mic beside Catalog Search, truthful requesting/listening feedback, safe local zero-match handling for spoken `Sophie mix`, exact unique matches for spoken `Paracetamol` and `Ibuprofen`, clearing to `Showing 35 of 35`, accurate repeated Paracetamol use, and final Home `0`, `Quiet`, `No urgent alerts`. Different medicine names from the written examples are valid because the checkpoint tests the shared workflow, not fixed vocabulary. No sale, approval, stock mutation, notification, import, API or AI workflow occurred. Do not schedule it again unless future code changes the Search Mic feature.
 - Notifications Expiry Alert Lifecycle is **OWNER-VALIDATED PASS / FROZEN / PROTECTED**. The authoritative 35-image sequence proves synchronized deployment; initial Quiet; 35 medicines; Catalog Search Mic selection of Ibuprofen; protected stock `27`, batch `IBU-200C` and expiry `2028-12`; shared-Mic expiry-only normalization to `2026-06`; exactly one changed field; approval and persistence; exactly one unread local Expiry alert titled `Ibuprofen has expired` with note `Batch IBU-200C expires at end of June 2026.` through refresh; shared-Mic restoration to `2028-12`; and final Home/Notifications Quiet. No unrelated workflow occurred. Do not schedule it again unless its implementation changes.
 - **Main Operations Chat Activity Compaction — OWNER-VALIDATED PASS / PROTECTED**. Owner evidence confirms the Ibuprofen alias-only update and restoration produced one replaceable compact Activity card, no permanent full Catalog-update message, and two newest-first Activity History entries while the final alias baseline returned blank and Notifications stayed Quiet.
-- The sole open live-testing item is **Shared Editable-Card Voice Viewport / Focus Preservation — IMPLEMENTED / AWAITING OWNER VALIDATION**. Two owner screenshot sets on 2026-07-29 prove contextual Mic placement and exact-field routing but decisively reject viewport continuity. The repeat after `b7ba547` still showed Expiry month before tapping Mic and the chat bottom as soon as `Speak now` appeared, proving that layout-frame restoration cannot reliably compete with global DOM replacement on Android. Commit `67cfcac` makes the contextual session authoritative: microphone and transcript states update the existing editor, review and composer controls in place, while global rerender and chat-bottom scrolling are unreachable until the edit is discarded or approved. The checkpoint remains open pending the same focused owner retest.
+- **Shared Editable-Card Voice Viewport / Focus Preservation — OWNER-VALIDATED PASS / FROZEN / PROTECTED** on 2026-07-29. Final owner screenshots after `67cfcac` prove upper Strength `10 mg → 5 mg`, middle-field listening, lower Buying price `120 → 121`, and Expiry `2028-09 → 2026 May → 2028-09` all retained the selected field and medicine context in view; each review changed only one field and discard restored baseline. Earlier failures after `09cb128` and `b7ba547` remain historical evidence. Contextual sessions retain render/scroll ownership until discard or approval; do not regress or repeat without direct evidence.
 - **Post-Validation User-Facing Product-Secrecy and Quiet-UI Audit — PENDING**. Preserve it as a later repository-backed whole-system checkpoint; do not mix it into the viewport repair.
 - CODEX BRIDGE reports default permanently to five compact lines: Repository, Checkpoint, Files changed, Commit and Next owner action. Routine implementation/live-test reports use repository, checkpoint, at most three concise change bullets, tests, commit/push and exact owner action. Extra narrative is allowed only for errors or explicit owner request.
 
@@ -43,12 +43,12 @@ Permanent traceability rule: checkpoint IDs, evidence, implementation commits/fi
 - `catalog-search-mic`: **OWNER-VALIDATED PASS / FROZEN / PROTECTED** on 2026-07-28.
 - `notifications-expiry-alert-lifecycle`: **OWNER-VALIDATED PASS / FROZEN / PROTECTED** on 2026-07-28.
 - `main-operations-chat-activity-compaction`: **OWNER-VALIDATED PASS / FROZEN / PROTECTED** on 2026-07-28.
-- `shared-editable-card-voice-viewport-focus`: **IMPLEMENTED / AWAITING OWNER VALIDATION**.
+- `shared-editable-card-voice-viewport-focus`: **OWNER-VALIDATED PASS / FROZEN / PROTECTED**.
 - `post-validation-product-secrecy-quiet-ui-audit`: **PENDING**.
 
 ## Canonical execution pointer
 
-Current: master checkpoint **#13 Editable-card voice viewport/focus — Implemented, awaiting owner live test**.
+MS2-LT-013 is closed and protected. The master owns the current execution pointer; do not initiate another checkpoint without an explicit owner command.
 
 Next after owner PASS: master checkpoint **#54 Payment failure/cancellation notification**.
 
@@ -540,7 +540,7 @@ The deck is now a deterministic nine-slide owner decision briefing rather than a
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 76
-- Current: MS2-LT-013 — Editable-card voice viewport/focus
+- Current: MS2-LT-054 — Payment failure/cancellation notification
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.
