@@ -74,6 +74,32 @@ assert(outGenerated[0].title === "Cefixime is out of stock" && outGenerated[0].m
 assert(mergeNotifications(outGenerated, buildDeterministicNotifications({ catalog: [{ ...healthyCatalog[0], stockLeft: 0 }] })).length === 1, "Out-of-stock refresh must remain duplicate-safe");
 assert(mergeNotifications(outGenerated, buildDeterministicNotifications({ catalog: healthyCatalog })).length === 0, "Restoring healthy stock must clear out-of-stock");
 
+const expiryBaseline = [
+  {
+    id: "ibuprofen",
+    name: "Ibuprofen",
+    stockLeft: 27,
+    batches: [{ batch: "IBU-200C", expiry: "2028-12" }]
+  },
+  ...Array.from({ length: 34 }, (_, index) => ({
+    id: `healthy-${index}`,
+    name: `Healthy Medicine ${index}`,
+    stockLeft: 20
+  }))
+];
+const expiryChanged = expiryBaseline.map((item) => item.id === "ibuprofen"
+  ? { ...item, batches: [{ batch: "IBU-200C", expiry: "2026-06" }] }
+  : item);
+const expiryNow = new Date("2026-07-28T09:00:00.000Z");
+const expiryGenerated = buildDeterministicNotifications({ catalog: expiryChanged, now: expiryNow });
+assert(expiryChanged.length === 35, "Expiry-only editing must preserve all 35 medicines");
+assert(expiryChanged[0].stockLeft === 27 && expiryChanged[0].batches[0].batch === "IBU-200C", "Expiry-only editing must preserve protected stock and batch");
+assert(expiryGenerated.length === 1, "Changing only Ibuprofen expiry to 2026-06 must create exactly one alert");
+assert(expiryGenerated[0].title === "Ibuprofen has expired", "Expiry alert title must remain canonical");
+assert(expiryGenerated[0].message === "Batch IBU-200C expires at end of June 2026.", "Expiry alert note must retain the end-of-month rule");
+assert(mergeNotifications(expiryGenerated, buildDeterministicNotifications({ catalog: expiryChanged, now: expiryNow })).length === 1, "Expiry refresh must not duplicate the alert");
+assert(mergeNotifications(expiryGenerated, buildDeterministicNotifications({ catalog: expiryBaseline, now: expiryNow })).length === 0, "Restoring 2028-12 must remove the expiry alert and return Notifications to Quiet");
+
 assert(appSource.includes("function reviewPasteList(cardId)"), "Review list must retain one shared parsing boundary");
 assert(appSource.includes("applyCatalogPasteReview(card, newItems"), "Review list must enter the shared review transition");
 assert(appSource.includes("function openNotificationAction(cardId)"), "Review import must retain one shared action router");

@@ -27,6 +27,7 @@ import {
   validateInventoryPptxPackage
 } from "./services/documentGenerator.js";
 import { EXPORT_FORMATS, exportCompletionSummary, exportFormat } from "./services/exportFormatMetadata.js";
+import { appendActivity, createCatalogActivityEntry } from "./services/activityHistory.js";
 import {
   CATALOG_EDIT_FIELDS,
   applyCatalogEditVoice,
@@ -93,6 +94,7 @@ const ACTIVE_CARDS_KEY = "ms20-main-app:active-cards";
 const INVOICE_MEMORY_KEY = "ms20-main-app:invoice-memory";
 const QUARANTINED_CARDS_KEY = "ms20-main-app:quarantined-cards";
 const EXPORT_HISTORY_KEY_PREFIX = "ms20-main-app:export-history";
+const ACTIVITY_HISTORY_KEY_PREFIX = "ms20-main-app:activity-history";
 const EXPORT_HISTORY_LIMIT = 50;
 const FEED_RESUME_LIMIT = 40;
 const ACTIVE_CARD_RESUME_LIMIT = 12;
@@ -136,6 +138,7 @@ const DURABLE_CARD_TYPES = new Set([
   "ImportMappingCard",
   "DocumentExportCard",
   "ExportHubCard",
+  "ActivityHubCard",
   "SyncReviewCard"
 ]);
 const FIELD_LABELS = {
@@ -543,6 +546,7 @@ function adminMenuTemplate() {
 
 function cardTemplate(card) {
   if (card.type === "ExportHubCard") return exportHubCardTemplate(card);
+  if (card.type === "ActivityHubCard") return activityHubCardTemplate(card);
   const fields = cardFieldsFor(card.type);
   const displayed = fields.length ? fields : Object.keys(card.fields || {});
   const progressiveMedicine = PROGRESSIVE_MEDICINE_CARD_TYPES.has(card.type);
@@ -603,7 +607,7 @@ function safeCardTemplate(card) {
 }
 
 function cardCloseButtonTemplate(card, placement) {
-  if (card.type === "ExportHubCard") return "";
+  if (card.type === "ExportHubCard" || card.type === "ActivityHubCard") return "";
   const label = `Close ${friendlyCardLabel(card)} card`;
   return `<button class="card-close-button ${placement === "bottom" ? "card-close-button-bottom" : ""}" type="button" data-action="dismiss-card" data-card-id="${card.id}" aria-label="${escapeHtml(label)}">x</button>`;
 }
@@ -1174,6 +1178,14 @@ function handleAction(dataset) {
   if (action === "open-catalog") {
     navigateToCatalogWorkspace();
     render();
+    return;
+  }
+  if (action === "open-activity-history") {
+    openActivityHub();
+    return;
+  }
+  if (action === "close-activity-history") {
+    collapseActivityHub();
     return;
   }
   if (action === "open-payment-queue") {
@@ -2536,6 +2548,9 @@ function hydrateResumeState() {
 }
 
 function reconcileResumeState() {
+  state.feed = state.feed.filter((item) => !isLegacyCatalogUpdateFeed(item));
+  persistFeed();
+  reconcileActivityHubCard();
   const resumedExportCards = state.cards.filter((card) =>
     card.type === "ExportHubCard"
     && (!card.fields?.pharmacy_id || card.fields.pharmacy_id === state.pharmacy.id)
@@ -3319,7 +3334,12 @@ function approveCatalogEdit(cardId) {
   state.catalog.items = pharmacyBrain.catalog;
   safeLocalStorage()?.setItem(CATALOG_KEY, JSON.stringify(state.catalog.items));
   void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);
-  addFeed("system", `${result.updated.name} updated in the Pharmacy Catalog.`);
+  recordCatalogActivity({
+    medicine: result.updated.name,
+    changes: result.changes,
+    source: card.fields.voice_feedback ? "voice" : "manual",
+    timestamp: result.updated.updatedAt
+  });
   card.fields.selected_id = "";
   card.fields.edit_draft = "";
   card.fields.voice_field = "";
@@ -3328,6 +3348,136 @@ function approveCatalogEdit(cardId) {
   persistActiveCards();
   refreshNotifications();
   render();
+}
+
+function activityHistoryKey() {
+  return `${ACTIVITY_HISTORY_KEY_PREFIX}:${state.pharmacy.id}`;
+}
+
+function readActivityHistory() {
+  try {
+    const history = JSON.parse(safeLocalStorage()?.getItem(activityHistoryKey()) || "[]");
+    return Array.isArray(history)
+      ? history.filter((item) => item?.pharmacyId === state.pharmacy.id && item?.outcome === "saved").slice(0, 100)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistActivityHistory(history) {
+  safeLocalStorage()?.setItem(activityHistoryKey(), JSON.stringify(history.slice(0, 100)));
+}
+
+function recordCatalogActivity({ medicine, changes, source, timestamp }) {
+  const entry = createCatalogActivityEntry({
+    pharmacyId: state.pharmacy.id,
+    medicine,
+    changes,
+    source,
+    timestamp
+  });
+  const history = appendActivity(readActivityHistory(), entry);
+  persistActivityHistory(history);
+  const card = ensureActivityHubCard();
+  card.fields.history = history;
+  card.fields.expanded = false;
+  persistActiveCards();
+}
+
+function reconcileActivityHubCard() {
+  const matching = state.cards.filter((card) =>
+    card.type === "ActivityHubCard"
+    && (!card.fields?.pharmacy_id || card.fields.pharmacy_id === state.pharmacy.id)
+  );
+  if (!matching.length && !readActivityHistory().length) return;
+  const keeper = matching[0] || {
+    id: `card-activity-hub-${state.pharmacy.id}`,
+    type: "ActivityHubCard",
+    title: "Activity",
+    source: "Local approved operations",
+    confidence: 1,
+    status: "ready",
+    aiRequired: false,
+    fields: {}
+  };
+  keeper.id = `card-activity-hub-${state.pharmacy.id}`;
+  keeper.fields = {
+    ...keeper.fields,
+    pharmacy_id: state.pharmacy.id,
+    expanded: false,
+    history: readActivityHistory()
+  };
+  state.cards = state.cards.filter((card) =>
+    card.type !== "ActivityHubCard"
+    || card === keeper
+    || (card.fields?.pharmacy_id && card.fields.pharmacy_id !== state.pharmacy.id)
+  );
+  if (!state.cards.includes(keeper)) state.cards.unshift(keeper);
+}
+
+function ensureActivityHubCard() {
+  reconcileActivityHubCard();
+  let card = state.cards.find((item) =>
+    item.type === "ActivityHubCard" && item.fields?.pharmacy_id === state.pharmacy.id
+  );
+  if (!card) {
+    card = {
+      id: `card-activity-hub-${state.pharmacy.id}`,
+      type: "ActivityHubCard",
+      title: "Activity",
+      source: "Local approved operations",
+      confidence: 1,
+      status: "ready",
+      aiRequired: false,
+      fields: { pharmacy_id: state.pharmacy.id, expanded: false, history: readActivityHistory() },
+      validation: "Local deterministic audit history. Notifications and sales remain separate."
+    };
+    state.cards.unshift(card);
+  }
+  return card;
+}
+
+function openActivityHub() {
+  const card = ensureActivityHubCard();
+  card.fields.history = readActivityHistory();
+  card.fields.expanded = true;
+  persistActiveCards();
+  render();
+  focusCard(card.id);
+}
+
+function collapseActivityHub() {
+  const card = ensureActivityHubCard();
+  card.fields.expanded = false;
+  persistActiveCards();
+  render();
+  focusCard(card.id);
+}
+
+function activityHubCardTemplate(card) {
+  const history = Array.isArray(card.fields?.history) ? card.fields.history : [];
+  const latest = history[0];
+  if (card.fields?.expanded === true) {
+    const rows = history.length
+      ? history.map((item) => `<li class="activity-history-item"><div><strong>${escapeHtml(item.medicine)}</strong><span>${escapeHtml(item.kenyaTime)} Africa/Nairobi</span></div><p>${escapeHtml(item.summary)}</p><small>${escapeHtml(item.eventType.replaceAll("_", " "))} · ${escapeHtml(item.source)} · ${escapeHtml(item.outcome)}</small></li>`).join("")
+      : "<li>No saved activity yet.</li>";
+    return `<article class="card-message ready activity-hub-card activity-hub-expanded" data-card-id="${card.id}">
+      <div class="card-top"><span class="card-heading"><span class="card-type">Local audit</span><strong>Activity History</strong></span><button class="card-close-button" type="button" data-action="close-activity-history" aria-label="Collapse Activity History">x</button></div>
+      <p>Approved Catalog changes are recorded here without adding permanent chat messages.</p>
+      <ol class="activity-history">${rows}</ol>
+      <p class="activity-hub-assurance">Local · Pharmacy-isolated · Refresh-safe · Zero AI · Notifications separate</p>
+    </article>`;
+  }
+  return `<article class="card-message ready activity-hub-card activity-status-card" data-card-id="${card.id}" data-pharmacy-id="${escapeHtml(state.pharmacy.id)}">
+    <div><span class="card-type">Latest Catalog activity</span><strong>${escapeHtml(latest?.summary || "No saved activity yet.")}</strong>${latest ? `<small>${escapeHtml(latest.kenyaTime)} Africa/Nairobi</small>` : ""}<p>${history.length} recent approved update${history.length === 1 ? "" : "s"}.</p></div>
+    <button type="button" data-action="open-activity-history">View Activity History</button>
+  </article>`;
+}
+
+function isLegacyCatalogUpdateFeed(item) {
+  return item?.type === "system"
+    && /^[^.\n]+ updated in the Pharmacy Catalog\.$/.test(String(item.text || ""));
 }
 
 function updateCatalogSearch(cardId, value, sourceInput) {

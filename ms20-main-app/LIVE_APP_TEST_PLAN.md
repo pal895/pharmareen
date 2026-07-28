@@ -64,19 +64,56 @@ Required evidence: initial Catalog with Search Mic and 35 medicines; active Mic/
 PASS only if every spoken query fills the Search field, filters immediately to the correct unique saved medicine, clearing restores 35, repeated use remains accurate, and no operational mutation occurs. FAIL for a missing Mic, typed workaround, wrong/empty transcript, wrong or multiple result, stale query, failure to clear, failure on repeated use, permission state without actionable feedback, mutation, notification, API/AI route, or any need to repeat the protected stock workflow.
 -->
 
-## Authoritative current checkpoint — Notifications Expiry Alert
+## Protected checkpoint — Notifications Expiry Alert Lifecycle
 
-Objective: validate one deterministic expired-medicine alert from an approved Catalog expiry-only change, refresh deduplication, persistence and complete restoration.
+Status: **OWNER-VALIDATED PASS / FROZEN / PROTECTED**. The authoritative 35-image sequence proves Ibuprofen expiry `2028-12 → 2026-06 → 2028-12` through the shared Medicine Action Card Mic, correct YYYY-MM normalization, one-field reviews, approval/persistence, exactly one local Expiry alert through refresh, protected stock `27`, batch `IBU-200C`, 35 medicines and final Quiet restoration. Do not schedule it again without a direct regression.
 
-Protected baseline: Ibuprofen, batch `IBU-200C`, expiry `2028-12`, current stock `27`, catalog `35 of 35`, Home `0 / Quiet / No urgent alerts`.
+## Authoritative current checkpoint — Main Operations Chat Activity Compaction
 
-Expected sequence: change only Ibuprofen Expiry month to `2026-06`; one-field review; approve once; exactly one unread Expiry alert titled `Ibuprofen has expired`, note `Batch IBU-200C expires at June 2026.`, status unread; refresh retains one alert; restore only Expiry month to `2028-12`; alert disappears and all protected baseline facts return.
+Status: **IMPLEMENTED / AWAITING OWNER VALIDATION**.
 
-Owner boundary: do not change Current stock, Batch or any other field; do not use stock zero/five; do not repeat low-stock, out-of-stock or Catalog Search Mic.
+### 1. Objective
 
-Required evidence: initial Quiet Home; Ibuprofen baseline showing batch/expiry/stock; expiry-only unsaved review at `2026-06`; saved Catalog at `2026-06` with 35 medicines and stock 27; Home one unread expiry preview; full Expiry notification; post-refresh single-alert state; expiry-only restoration review at `2028-12`; restored Catalog baseline; final Quiet Home; final empty Notifications.
+Validate that approved Catalog updates maintain one compact Activity status in the main MS2.0 conversation while separate Activity History preserves both audit records without polluting sales/operations chat.
 
-PASS only if the exact single Expiry alert survives refresh without duplication, restoration removes it, Catalog remains 35, Ibuprofen stock remains 27, batch remains `IBU-200C`, and no unrelated workflow occurs. FAIL for any wrong content/count/category/status, duplicate, persistence mismatch, changed stock/batch/other field, failure to restore, stale alert, catalog-count change, API/AI route, or any repeat of a protected checkpoint.
+### 2. Expected behaviour
+
+Two approved harmless alias changes update the same single Activity card; they do not append two full `Medicine updated in the Pharmacy Catalog.` messages. Activity History contains both saved updates newest-first. Refresh creates no duplicate. Notifications remain `0 / Quiet`, and existing sales/operations messages remain unchanged.
+
+### 3–4. Exact owner steps and expected result after each
+
+1. Pull/restart the latest commit, open Home, then open MS2.0 Assistant.
+   Expected: Home is `0 / Quiet`; the operations conversation contains no repeated full Catalog-update messages. Record how many compact Activity cards are visible (zero or one).
+2. Open Menu → Catalog, use Search Mic for `Ibuprofen`, tap `Open & edit`, expand `Packaging, supplier and other details`, and confirm `Aliases` is blank.
+   Expected: the saved Ibuprofen card opens with `No changes yet`; stock, batch and expiry are untouched.
+3. In `Aliases`, enter `activity test`, confirm the review says exactly one field changed — Aliases, then tap `Approve & Save` once.
+   Expected: save succeeds; no stock/expiry notification is created.
+4. Return to the main Assistant conversation.
+   Expected: exactly one compact `Latest Catalog activity` card exists or the existing one is updated; no new full `Ibuprofen updated in the Pharmacy Catalog.` message appears.
+5. Reopen Ibuprofen, clear `Aliases` back to blank, confirm exactly one Aliases change, and tap `Approve & Save` once.
+   Expected: the protected blank alias baseline is restored; the same compact Activity card updates rather than a second card/message being appended.
+6. Return to the main conversation and tap `View Activity History`.
+   Expected: exactly one compact Activity status exists; History shows both successful Ibuprofen Aliases updates newest-first, with Africa/Nairobi times, source and `saved` outcome; existing unrelated operations/sales entries are unchanged.
+7. Refresh once, return Home, and open Notifications.
+   Expected: Activity card/history do not duplicate; Home and Notifications remain `0 / Quiet`; no alert card appears.
+
+### 5. Required screenshots
+
+1. Initial Home Quiet state and initial main-conversation Activity/message count.
+2. First one-field Aliases review before approval.
+3. Main conversation after first save showing the single compact Activity card and no full Catalog-update message.
+4. Second one-field Aliases restoration review before approval.
+5. Main conversation after second save showing the same single compact Activity card.
+6. Open Activity History showing both Ibuprofen entries.
+7. Post-refresh Activity state plus final Home and Notifications Quiet states.
+
+### 6. PASS criteria
+
+PASS only if both approved saves are recorded in Activity History, the main conversation has exactly one compact Activity card and no new full Catalog-update messages, refresh creates no duplicate, the blank alias baseline is restored, unrelated sales/operations history remains, and Notifications stays at zero.
+
+### 7. FAIL criteria
+
+FAIL for any second Activity card, full Catalog-update feed message, missing/duplicate/false history entry, history created before approval or by search/reopen, lost unrelated chat history, non-Nairobi timestamp, failure to restore blank Aliases, notification-count change, or any stock/batch/expiry/sale/payment/API/AI mutation.
 
 This plan is for Main App live product testing only. Do not return to WhatsApp live testing in this phase.
 

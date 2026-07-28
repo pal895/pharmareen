@@ -6,6 +6,14 @@ Low-stock and Out-of-Stock via Catalog Mic notification lifecycles are owner-val
 
 The Catalog Medicine Action Card and Catalog Search use the existing shared `startVoiceCapture()` boundary. A focused editable field supplies edit intent; explicit phrases such as `current stock twenty two` are accepted; Catalog Search places the normalized transcript into the synchronized query and immediately invokes the existing local medicine matcher. Validation, change review, approval, persistence and notification refresh remain unchanged; no second microphone service or AI parsing path exists. Catalog Search Mic is owner-validated and protected: invalid speech safely returns zero results, valid speech resolves exact saved medicines, clearing restores 35, repeated use stays accurate, and no operational mutation occurs.
 
+The Notifications Expiry Alert Lifecycle is owner-validated and protected. The shared Catalog Mic normalized Ibuprofen expiry `2026 06` to `2026-06`; the approved expiry-only change preserved 35 medicines, stock `27` and batch `IBU-200C`; deterministic notification projection created exactly one `Ibuprofen has expired` alert through refresh; restoring `2028-12` removed it and returned Notifications to Quiet.
+
+## Shared Activity History architecture (2026-07-28)
+
+`src/services/activityHistory.js` is the deterministic audit-event root for approved Catalog changes. `approveCatalogEdit()` is the only Catalog edit persistence boundary that records an event. Each entry is pharmacy-scoped, bounded, newest-first, idempotent, Africa/Nairobi-labelled, zero-AI and records event type, medicine, changed fields, source and saved outcome.
+
+`src/app.js` maintains at most one durable `ActivityHubCard` per pharmacy. New saves replace its compact latest-status presentation while Activity History retains detail. Catalog search, card reopening, refresh and discarded drafts do not call the recorder. Exact legacy `Medicine updated in the Pharmacy Catalog.` feed items are removed during resume without touching sales or unrelated operational history. Activity never changes Notification projection or unread counts.
+
 ## Shared Export Hub architecture (2026-07-27)
 
 `src/services/exportFormatMetadata.js` is the single format registry. Excel serves operational analysis; PDF professional read-only sharing; Word corrections and working notes; Presentation management decisions; Print a browser-generated physical working register; CSV machine interoperability. Reject a new format unless its distinct owner workflow is justified.

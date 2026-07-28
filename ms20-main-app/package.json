@@ -12,6 +12,7 @@
     "verify:stock-fix": "node tools/verify-stock-correction.mjs && node tools/verify-stock-correction-ui.mjs && node tools/verify-stock-fix-evidence.mjs",
     "verify:exports": "node tools/verify-export-hub.mjs",
     "verify:notifications": "node tools/verify-notification-review-lifecycle.mjs",
+    "verify:activity": "node tools/verify-activity-history.mjs",
     "verify:consistency": "node tools/verify-consistency-gate.mjs",
     "verify": "node tools/verify-architecture.mjs",
     "serve": "node tools/serve.mjs"
