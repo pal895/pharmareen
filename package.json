@@ -9,7 +9,9 @@
     "wa:baileys": "node baileys-bridge.js",
     "wa:local": "node local_whatsapp_bridge.js",
     "wa:qr-debug": "node scripts/baileys_qr_debug.js",
-    "wa:puppeteer": "node whatsapp-web-bridge.js"
+    "wa:puppeteer": "node whatsapp-web-bridge.js",
+    "validation:sync": "node scripts/sync-validation-contract.mjs",
+    "validation:check": "node scripts/verify-validation-contract.mjs"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "6.7.16",

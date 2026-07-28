@@ -391,3 +391,13 @@ Planned at their proper test stages:
 - Export formats now inherit a purpose-first registry contract. Every format has one unique machine-readable operational purpose and one direct owner-facing explanation. Excel is analysis/operations, PDF read-only sharing, Word editable review, CSV system exchange, Presentation business briefing and Print a physical working copy. A new or redesigned format must answer why the owner chooses it over every alternative or be rejected; shared canonical truth, isolation, deterministic zero-AI rendering and provenance safeguards remain mandatory.
 - Presentation now emits a fixed nine-slide owner decision briefing. `validateInventoryPptxPackage` runs on the exact bytes before download and verifies the ZIP terminator, mandatory OOXML parts, slide content types, relationship targets and slide count. The artifact opens and renders as nine slides in Microsoft PowerPoint; the generic Android app error (4) is an external viewer limitation, while the live checkpoint remains pending.
 - Export completion is routed through `recordExportEvent`. It updates the single durable `ExportHubCard` instead of appending feed messages. Newest-first metadata is stored under `ms20-main-app:export-history:<pharmacy-id>`, deduped by record id and bounded to 50 entries. Files remain owner-device downloads; browser storage retains metadata only.
+
+<!-- VALIDATION_CONTRACT_SYNC_START -->
+## Generated validation-contract reference
+
+- Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
+- Checkpoints: 76
+- Current: MS2-LT-013 — Editable-card voice viewport/focus
+- Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
+- Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.
+<!-- VALIDATION_CONTRACT_SYNC_END -->

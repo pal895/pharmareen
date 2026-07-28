@@ -1,0 +1,33 @@
+{
+  "schema": "ms20.validation-contract.v1",
+  "master": "MS2.0_MASTER_LIVE_TEST_SEQUENCE.md",
+  "categories": [
+    "Core Functional Validation",
+    "Pharmacy Operating Intelligence Validation",
+    "AI / Learning Validation",
+    "Reporting & Export Validation",
+    "Financial & Payment Validation",
+    "Integration Validation",
+    "Security / Privacy / Compliance Validation",
+    "Production Qualification"
+  ],
+  "default_owner_visible_status": "Implemented — awaiting owner live test",
+  "synchronized_documents": [
+    "README.md",
+    "docs/engineering-memory/current-live-validation-state.md",
+    "docs/engineering-memory/live-test-execution-discipline.md",
+    "ms20-main-app/CURRENT_ARCHITECTURE_SNAPSHOT.md",
+    "ms20-main-app/LIVE_APP_TEST_PLAN.md"
+  ],
+  "bridge_manifest": "docs/engineering-memory/bridge-validation-contract.json",
+  "protected_baseline": "scripts/protected-checkpoint-baseline.json",
+  "bridge_consumers": [
+    "CODEX BRIDGE",
+    "CHATGPT BRIDGE"
+  ],
+  "lifecycle": {
+    "register": "Owner-visible approved work receives the next numeric checkpoint ID and is inserted in its category.",
+    "protect": "PASS / PROTECTED requires explicit owner evidence and preserves the checkpoint against routine retesting.",
+    "retire": "Cancelled, merged, superseded or deprecated checkpoints remain in history with a reason and replacement link when applicable."
+  }
+}

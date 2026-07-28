@@ -534,3 +534,13 @@ The Export Hub now enforces one permanent purpose-first architectural question b
 Owner-device evidence on 27 July 2026 confirms that PPTX bytes download and Android associates the file with a slide editor, but the selected generic ad-supported Office app reports error (4). Presentation Owner Briefing remains **pending**. Exact-package validation found no truncation, missing relationship, missing content type or invalid slide count, and the generated artifact opens as nine slides in Microsoft PowerPoint. The observed error is classified as a limitation of that generic Android viewer.
 
 The deck is now a deterministic nine-slide owner decision briefing rather than a 35-medicine inventory dump. Production rejects truncated or structurally incomplete PPTX packages before download. Export messaging updates one durable Export Hub card and keeps pharmacy-scoped, newest-first metadata history inside Export Hub; no generated binary is retained.
+
+<!-- VALIDATION_CONTRACT_SYNC_START -->
+## Generated validation-contract reference
+
+- Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
+- Checkpoints: 76
+- Current: MS2-LT-013 — Editable-card voice viewport/focus
+- Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
+- Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.
+<!-- VALIDATION_CONTRACT_SYNC_END -->

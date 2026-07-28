@@ -944,3 +944,13 @@ The prior generic ad-supported Android Office app is not a compatibility authori
 7. Confirm no clipping, blank slide, broken text, invented claim or medicine-by-medicine dump.
 
 Pass only after owner-device evidence shows the file opens in a compatible presentation app and the one-card/history behavior is correct.
+
+<!-- VALIDATION_CONTRACT_SYNC_START -->
+## Generated validation-contract reference
+
+- Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
+- Checkpoints: 76
+- Current: MS2-LT-013 — Editable-card voice viewport/focus
+- Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
+- Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.
+<!-- VALIDATION_CONTRACT_SYNC_END -->

@@ -59,3 +59,13 @@ Before considering a feature area complete, maintain coverage for:
 12. Smallest remaining live test.
 
 When evidence differs between attempts, record the visible input, active card, timing, connectivity, and any device/browser sound separately. Do not infer that an unexpected sound comes from MS2.0 until its words and trigger are proven. Do not implement a medicine-, phrase-, screen-, or source-specific patch; trace drift to the earliest responsible shared root.
+
+<!-- VALIDATION_CONTRACT_SYNC_START -->
+## Generated validation-contract reference
+
+- Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
+- Checkpoints: 76
+- Current: MS2-LT-013 — Editable-card voice viewport/focus
+- Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
+- Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.
+<!-- VALIDATION_CONTRACT_SYNC_END -->

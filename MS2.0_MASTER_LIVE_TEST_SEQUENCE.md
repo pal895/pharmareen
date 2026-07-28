@@ -4,7 +4,7 @@ Canonicalized: 2026-07-28
 
 This is the single authoritative roadmap for all MS2.0 owner live validation. Future Codex chats and ChatGPT/Codex Bridges must derive checkpoint order and status only from this document. Project Brain, Engineering Memory, architecture documents, handoffs and historical plans provide evidence; they must point here and must not maintain a competing sequence.
 
-Allowed capability classifications are exactly: `PASS / PROTECTED`, `Implemented — awaiting owner live test`, `Partial implementation`, `Planned / approved`, `External qualification`, `Deprecated with repository evidence`, and `Intentionally out of scope with repository evidence`. The 76 numbered checkpoints use the first six states; an out-of-scope item is recorded in the completeness ledger below and is never silently converted into a checkpoint. A PASS requires owner evidence. Automated tests alone never create protected status.
+Allowed capability classifications are exactly: `PASS / PROTECTED`, `Implemented — awaiting owner live test`, `Partial implementation`, `Planned / approved`, `External qualification`, `Deprecated with repository evidence`, and `Intentionally out of scope with repository evidence`. Numbered checkpoints use the first six states; an out-of-scope item is recorded in the completeness ledger below and is never silently converted into a checkpoint. A PASS requires owner evidence. Automated tests alone never create protected status.
 
 Evidence abbreviations: `CVS` = `docs/engineering-memory/current-live-validation-state.md`; `LATP` = `ms20-main-app/LIVE_APP_TEST_PLAN.md`; `ARCH` = `ms20-main-app/CURRENT_ARCHITECTURE_SNAPSHOT.md`; `OI` = `docs/engineering-memory/operating-intelligence-program.md`; `TCE` = `docs/engineering-memory/transaction-completion-engine.md`; `OM` = `ms20-main-app/MS20_ONBOARDING_AND_OPERATIONS_INTELLIGENCE.md`; `TRAIN` = `training/LIVE_TEST_PLAN.md` and `training/PHASE_STATUS.md`.
 
@@ -195,13 +195,27 @@ The only current open checkpoint is **#13 Editable-card voice viewport/focus**. 
 5. A deletion, merge, split, renumbering, prerequisite change or deprecation requires repository evidence, updated totals, an updated completeness-ledger row and same-commit synchronization of directly affected references.
 6. Before push, validate unique checkpoint numbers/names, allowed states, totals, acyclic prerequisites, one current pointer and canonical-reference headers in every tracked Markdown governance/support document.
 
+## Living validation contract
+
+Every approved owner-visible improvement, workflow, intelligence programme, integration, compliance requirement or production qualification must be registered incrementally in this master in the same commit as its implementation evidence. Use the next numeric checkpoint ID, place it in the correct category, declare prerequisites, evidence, commits and primary modules, and default to `Implemented — awaiting owner live test` unless repository evidence supports another state.
+
+Owner PASS transitions require explicit live-test evidence, set `Protected` to `Yes`, retain traceability and prevent routine retesting. Cancellation, merge, supersession or deprecation changes the lifecycle state without deleting the checkpoint; the evidence must retain the reason and replacement ID where applicable.
+
+Governance commands:
+
+- Register, protect or retire from an explicit JSON payload: `node scripts/govern-validation-checkpoint.mjs <register|protect|retire> <payload.json>`.
+- Regenerate the traceability index, synchronized Project Brain/Engineering Memory references and Bridge manifest: `npm run validation:sync`.
+- Validate IDs, names, states, totals, prerequisite graph, dependents, protected evidence, synchronized references and Bridge compatibility: `npm run validation:check`.
+
+Future Codex chats must load this master and `docs/engineering-memory/bridge-validation-contract.json`; they must never reconstruct the sequence manually. CODEX BRIDGE and CHATGPT BRIDGE generation must consume the same manifest and master traceability index.
+
 <!-- TRACEABILITY_INDEX_START -->
 
 ## Engineering traceability index
 
 
 
-This generated index is part of the canonical master. Run `node scripts/update-master-traceability.mjs` after an evidence, status, prerequisite, dependency, implementation-file or checkpoint change. Commit this file and all directly affected Project Brain/Engineering Memory references together.
+This generated index is part of the canonical master. Run `node scripts/sync-validation-contract.mjs` after an evidence, status, prerequisite, dependency, implementation-file or checkpoint change. Commit this file and all synchronized Project Brain/Engineering Memory/Bridge references together.
 
 
 

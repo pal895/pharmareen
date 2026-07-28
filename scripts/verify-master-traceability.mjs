@@ -5,16 +5,17 @@ const root = path.resolve(import.meta.dirname, "..");
 const master = fs.readFileSync(path.join(root, "MS2.0_MASTER_LIVE_TEST_SEQUENCE.md"), "utf8");
 const roadmapIds = [...master.matchAll(/^\| (\d+) \|/gm)].map((match) => Number(match[1]));
 const traceabilityIds = [...master.matchAll(/^### MS2-LT-(\d{3}) —/gm)].map((match) => Number(match[1]));
+const expectedCount = roadmapIds.length;
 
 function unique(values) {
   return new Set(values).size === values.length;
 }
 
-if (roadmapIds.length !== 76 || !unique(roadmapIds)) {
-  throw new Error(`Roadmap must contain 76 unique checkpoints; found ${roadmapIds.length}.`);
+if (!expectedCount || !unique(roadmapIds)) {
+  throw new Error(`Roadmap must contain unique checkpoints; found ${roadmapIds.length}.`);
 }
-if (traceabilityIds.length !== 76 || !unique(traceabilityIds)) {
-  throw new Error(`Traceability index must contain 76 unique checkpoints; found ${traceabilityIds.length}.`);
+if (traceabilityIds.length !== expectedCount || !unique(traceabilityIds)) {
+  throw new Error(`Traceability index must contain ${expectedCount} unique checkpoints; found ${traceabilityIds.length}.`);
 }
 if (roadmapIds.some((id, index) => id !== traceabilityIds[index])) {
   throw new Error("Traceability checkpoint IDs/order do not match the roadmap.");
@@ -58,10 +59,27 @@ function expand(value) {
 }
 
 const roadmapRows = new Map();
+const roadmapNames = new Set();
+const allowedStates = new Set([
+  "PASS / PROTECTED",
+  "Implemented — awaiting owner live test",
+  "Partial implementation",
+  "Planned / approved",
+  "External qualification",
+  "Deprecated with repository evidence",
+]);
 for (const line of master.split(/\r?\n/)) {
   const cells = line.split("|").slice(1, -1).map((cell) => cell.trim());
   if (cells.length === 9 && /^\d+$/.test(cells[0])) {
-    roadmapRows.set(Number(cells[0]), { prerequisites: expand(cells[3]) });
+    const id = Number(cells[0]);
+    const normalizedName = cells[1].toLowerCase();
+    if (roadmapNames.has(normalizedName)) throw new Error(`Duplicate checkpoint name: ${cells[1]}.`);
+    if (!allowedStates.has(cells[4])) throw new Error(`MS2-LT-${id} has invalid state: ${cells[4]}.`);
+    if (cells[4] === "PASS / PROTECTED" && (cells[5] === "Not started" || cells[6] !== "Yes")) {
+      throw new Error(`MS2-LT-${id} cannot be protected without owner evidence and Protected=Yes.`);
+    }
+    roadmapNames.add(normalizedName);
+    roadmapRows.set(id, { prerequisites: expand(cells[3]), state: cells[4] });
   }
 }
 
@@ -94,4 +112,7 @@ for (const [index, block] of blocks.entries()) {
   if (dependentLine !== expected) throw new Error(`MS2-LT-${id} dependent metadata is stale.`);
 }
 
-console.log("MASTER_TRACEABILITY_OK checkpoints=76 metadata_fields=12 prerequisite_graph=acyclic");
+const totalMatch = master.match(/- Total checkpoints: \*\*(\d+)\*\*/);
+if (!totalMatch || Number(totalMatch[1]) !== expectedCount) throw new Error("Canonical checkpoint total is stale.");
+
+console.log(`MASTER_TRACEABILITY_OK checkpoints=${expectedCount} metadata_fields=12 prerequisite_graph=acyclic`);

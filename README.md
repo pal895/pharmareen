@@ -512,3 +512,13 @@ Tests use fake services and do not call WhatsApp Web bridge, OpenAI, or Google S
 Presentation is a nine-slide owner/management decision briefing, not another inventory list. The production path validates the complete OOXML package before download, and the exact generated deck is application-tested in Microsoft PowerPoint.
 
 Export activity updates one compact Export Hub card in the main chat. Newest-first pharmacy-isolated metadata history lives inside Export Hub; retries are deduplicated, failures can be generated again, and generated binaries are never retained in browser storage.
+
+<!-- VALIDATION_CONTRACT_SYNC_START -->
+## Generated validation-contract reference
+
+- Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
+- Checkpoints: 76
+- Current: MS2-LT-013 — Editable-card voice viewport/focus
+- Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
+- Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.
+<!-- VALIDATION_CONTRACT_SYNC_END -->
