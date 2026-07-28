@@ -80,6 +80,7 @@ const rejectedVoice = applyCatalogEditVoice(voicePrice.draft, "many", "stock");
 assert(!rejectedVoice.applied && rejectedVoice.draft.stock === "22", "Invalid numeric voice input must leave the draft unchanged");
 assert(app.includes('data-action="catalog-edit-voice"') && app.includes("startCatalogEditVoice"), "Catalog Medicine Action Cards must expose the shared Mic controller");
 assert(app.includes("startVoiceCapture(") && app.includes("selectCatalogVoiceField"), "Catalog voice editing must reuse shared capture and focused-field selection");
+assert(app.includes('data-action="catalog-edit-field-voice"') && app.includes('data-field="${field}"'), "Every primary and advanced editable medicine field must expose the shared contextual Mic");
 
 const collisionDraft = createCatalogEditDraft(original[0]);
 collisionDraft.name = "Metformin";

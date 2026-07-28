@@ -121,20 +121,30 @@ This plan is for Main App live product testing only. Do not return to WhatsApp l
 
 Status: **IMPLEMENTED / AWAITING OWNER VALIDATION**.
 
-Objective: prove that the shared Medicine Action Card Mic keeps the selected field visible and changes only that field through listening and rerendering.
+Owner evidence after `09cb128` rejected the first implementation: lower fields had no reachable card Mic, selection opened Android typing, the owner had to scroll back to the header Mic, and the voice update displaced the selected field. The checkpoint remains open.
+
+Objective: prove that the contextual Mic beside every shared editable medicine field keeps the selected field visible and changes only that field through listening and rerendering.
 
 1. Open one sufficiently long saved medicine card and scroll to a middle or lower harmless field.
-2. Tap that field, then tap the card Mic and speak a temporary value.
-3. Confirm the selected field stays visible during listening and after the update, only that field changes, and the normal one-field review appears.
+2. Tap the Mic beside that field without returning to the card header, then speak a temporary value.
+3. Confirm the field stays visible during listening and after the update, only that field changes, and the normal one-field review appears.
 4. Discard the draft or restore the exact baseline.
 
-Required evidence: one decisive screenshot before Mic, one during or immediately after the voice update with the same field visible, and one after discard/restoration. Do not repeat Catalog Search Mic, stock, expiry, Activity Compaction, exports or another protected checkpoint.
+Required evidence: one decisive screenshot showing the field and its reachable Mic before voice, one after the voice update with the same field visible, and one after discard/restoration. Do not repeat Catalog Search Mic, stock, expiry, Activity Compaction, exports or another protected checkpoint.
 
 PASS only with owner evidence that target identity, single-field mutation and viewport preservation all hold. After PASS, re-read the repository before preparing the next unfinished checkpoint, expected to be Payment Failure/Cancellation Action-Needed Notification if still authoritative.
 
 ## Future checkpoint — Post-Validation User-Facing Product-Secrecy and Quiet-UI Audit
 
 Status: **PENDING**. Do not perform during viewport/focus validation.
+
+## Remaining live-test order
+
+1. Shared Editable-Card Voice Viewport / Focus Preservation — functional, current.
+2. Payment Failure/Cancellation Action-Needed Notification — functional, next after viewport PASS.
+3. Post-Validation User-Facing Product-Secrecy and Quiet-UI Audit — final product-hardening/audit checkpoint.
+
+Total remaining: **3** checkpoints — **2 functional** and **1 final product-hardening/audit**.
 
 ## Test Rules
 

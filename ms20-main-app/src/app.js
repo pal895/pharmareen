@@ -750,7 +750,13 @@ function catalogMedicineEditorTemplate(card) {
   const presentation = catalogEditPresentation(review);
   const advanced = new Set(["pack_size", "supplier", "shelf", "barcode", "batch", "expiry", "reorder_level", "aliases"]);
   const fields = (showAdvanced) => CATALOG_EDIT_FIELDS.filter((field) => advanced.has(field) === showAdvanced).map((field) => `
-    <label><span>${escapeHtml(fieldLabel(field))}</span><input data-catalog-edit-field="${field}" data-card-id="${card.id}" value="${escapeHtml(String(draft[field] ?? ""))}" ${["stock", "selling_price", "cost_price", "reorder_level"].includes(field) ? 'inputmode="decimal"' : ""}></label>
+    <div class="catalog-edit-field">
+      <div class="catalog-edit-field-heading">
+        <label for="catalog-edit-${card.id}-${field}">${escapeHtml(fieldLabel(field))}</label>
+        <button type="button" data-action="catalog-edit-field-voice" data-card-id="${card.id}" data-field="${field}" aria-label="Speak ${escapeHtml(fieldLabel(field))}" ${state.voice.starting || state.voice.listening ? "disabled" : ""}>Mic</button>
+      </div>
+      <input id="catalog-edit-${card.id}-${field}" data-catalog-edit-field="${field}" data-card-id="${card.id}" value="${escapeHtml(String(draft[field] ?? ""))}" ${["stock", "selling_price", "cost_price", "reorder_level"].includes(field) ? 'inputmode="decimal"' : ""}>
+    </div>
   `).join("");
   return `
     <section class="catalog-medicine-editor" aria-label="Edit ${escapeHtml(draft.name || "medicine")}">
@@ -1217,6 +1223,10 @@ function handleAction(dataset) {
   if (action === "cancel-catalog-edit") cancelCatalogEdit(dataset.cardId);
   if (action === "approve-catalog-edit") approveCatalogEdit(dataset.cardId);
   if (action === "catalog-edit-voice") startCatalogEditVoice(dataset.cardId);
+  if (action === "catalog-edit-field-voice") {
+    selectCatalogVoiceField(dataset.cardId, dataset.field);
+    startCatalogEditVoice(dataset.cardId);
+  }
   if (action === "catalog-search-voice") startCatalogSearchVoice(dataset.cardId, dataset.searchPlacement);
   if (action === "back-home") {
     state.ui.screen = "home";

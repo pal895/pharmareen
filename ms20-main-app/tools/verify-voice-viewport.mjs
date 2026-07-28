@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createVoiceViewportAnchor, restoreVoiceViewportAnchor } from "../src/services/voiceViewportAnchor.js";
 
 globalThis.CSS = { escape: (value) => String(value).replaceAll('"', '\\"') };
+const rootPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const appSource = fs.readFileSync(path.join(rootPath, "src/app.js"), "utf8");
+const cssSource = fs.readFileSync(path.join(rootPath, "src/styles.css"), "utf8");
+
+assert.match(appSource, /data-action="catalog-edit-field-voice"/, "every long-card field exposes a reachable inline Mic");
+assert.match(appSource, /selectCatalogVoiceField\(dataset\.cardId, dataset\.field\);\s*startCatalogEditVoice\(dataset\.cardId\);/, "inline Mic selects the exact target before reusing shared capture");
+assert.match(cssSource, /\.catalog-edit-field-heading[\s\S]*justify-content: space-between/, "field and Mic remain colocated in long cards");
 
 const oldContainer = {
   id: "chatBody",
@@ -68,7 +78,7 @@ restoreVoiceViewportAnchor(newRoot, anchor, {
   scrollBy() {}
 }, { restoreFocus: false });
 assert.equal(focused, false, "listening preserves the anchor without reopening the mobile keyboard");
-assert.equal(caret, null, "caret restoration waits until capture is complete");
+assert.deepEqual(caret, [3, 3], "keyboard dismissal retains the selected field caret without forcing focus");
 assert.equal(restoreVoiceViewportAnchor({ querySelector: () => null }, anchor, view), false, "cleanup is safe after navigation");
 
 console.log("Shared editable-card voice viewport verification passed.");

@@ -857,11 +857,29 @@ input:disabled {
   line-height: 1.45;
 }
 
-.catalog-edit-grid label span {
-  display: block;
-  margin-bottom: 5px;
+.catalog-edit-field {
+  display: grid;
+  gap: 5px;
+}
+
+.catalog-edit-field-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.catalog-edit-field-heading label {
   color: var(--muted);
   font-size: 0.75em;
+  font-weight: 800;
+}
+
+.catalog-edit-field-heading button {
+  min-height: 36px;
+  padding: 6px 12px;
+  border-color: var(--accent);
+  color: var(--accent-deep);
   font-weight: 800;
 }
 

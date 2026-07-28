@@ -57,7 +57,7 @@ export function restoreVoiceViewportAnchor(root, anchor, view = window, { restor
     }
   });
   if (restoreFocus) target.focus?.({ preventScroll: true });
-  if (restoreFocus && Number.isInteger(anchor.selectionStart) && Number.isInteger(anchor.selectionEnd)) {
+  if (Number.isInteger(anchor.selectionStart) && Number.isInteger(anchor.selectionEnd)) {
     target.setSelectionRange?.(anchor.selectionStart, anchor.selectionEnd);
   }
   const delta = target.getBoundingClientRect().top - anchor.top;
