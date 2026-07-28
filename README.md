@@ -8,6 +8,8 @@ Notifications Quiet State, Pending Review Unread State, Review Import Action Rou
 
 CODEX BRIDGE synchronization reports are permanently compact by default: `Repository`, `Checkpoint`, `Files changed`, `Commit`, and `Next owner action`, one line each. Add detail only for an error; never restate protected checkpoint history or completed validation procedures.
 
+Catalog Search Mic is implemented and locally verified but **AWAITING OWNER VALIDATION**. Automated checks are not owner evidence and may never promote a live checkpoint to PASS. Every live-test handoff must include Objective, Expected behaviour, exact numbered owner steps with the expected result after each step, Required screenshots, PASS criteria and FAIL criteria; a checkpoint name alone is never sufficient.
+
 Every export must answer: **Why would a pharmacy owner deliberately choose this format instead of every other available export?** A format is accepted only for a distinct operational workflow. All surfaces consume the shared `exportFormatMetadata.js` registry, and activity updates one persistent pharmacy-scoped Export Hub status card instead of adding chat-feed messages.
 
 Owner evidence confirms the canonical UTF-8-without-BOM CSV opens in Google Sheets as a genuine 35-medicine, 12-column spreadsheet, begins with the exact `Medicine` header, and preserves aligned values and blanks. It is frozen and regression-protected; the unsupported generic Android document reader is outside the compatibility target. See `docs/engineering-memory/csv-compatibility-rules.md`.

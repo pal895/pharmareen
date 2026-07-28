@@ -24,14 +24,14 @@
 - Notification reconciliation uses deterministic IDs and content fingerprints. Repeated projection cannot duplicate an alert or unread count; unchanged refresh preserves read state; a materially changed source fact refreshes the same alert and makes it unread; clearing the source condition removes it. Focused regression tests cover repeated refresh, changed low-stock counts and restoration.
 - Catalog Medicine Action Cards reuse the existing shared microphone capture controller. Tapping a field then Mic, or speaking an explicit field phrase, updates the same local edit draft as typing; spoken numbers including zero and compound values are parsed locally. Existing validation, change tracking, approval, persistence and notification refresh are unchanged.
 - Notifications Out-of-Stock Alert via Catalog Mic is **OWNER-VALIDATED PASS**, frozen and regression-protected. The authoritative 22-image sequence proves synchronized deployment, initial quiet state, 35 medicines, Cefixime baseline `22`, shared-Mic change to `0`, exactly one changed field, approval and persistence, the exact single unread Inventory alert through refresh without duplication, shared-Mic restoration to `22`, a second one-field review, 35-medicine preservation, alert removal and final quiet Notifications. Do not repeat the zero/notification/restoration workflow unless a future change directly modifies it.
-- Catalog Search Mic focused validation is **PASS / PROTECTED**. Syntax and Catalog verification prove both search positions reuse `startVoiceCapture()`, normalize the shared transcript, filter through the existing local matcher, restore the complete catalog on clear, remain accurate on repeated use, and add no app API/AI parsing route. The protected out-of-stock checkpoint was not rerun.
-- The next isolated live-testing item is **Notifications Expiry Alert**. Its owner procedure must be defined from a safe recorded catalog baseline before execution; no stock or out-of-stock workflow may be repeated.
+- Catalog Search Mic is **IMPLEMENTED — AWAITING OWNER VALIDATION**. Focused automated checks prove both search positions reuse `startVoiceCapture()`, normalize the shared transcript, filter through the existing local matcher, restore the complete catalog on clear, remain accurate on repeated use, and add no app API/AI parsing route. These checks prove readiness only, not owner-visible behavior. The prior owner sequence used typed `Cefi` because the deployed Search screen had no Mic; it is not evidence for this checkpoint.
+- The active isolated live-testing item remains **Catalog Search Mic**. Notifications Expiry Alert is blocked until genuine owner evidence passes and protects Catalog Search Mic.
 - CODEX BRIDGE reports default permanently to five compact lines: Repository, Checkpoint, Files changed, Commit and Next owner action. Extra narrative is allowed only for errors.
 
 ## Protected checkpoint registry
 
 - `notifications-out-of-stock-via-catalog-mic`: **OWNER-VALIDATED PASS / FROZEN / PROTECTED** on 2026-07-28.
-- `catalog-search-mic`: **FOCUSED VALIDATION PASS / PROTECTED** on 2026-07-28.
+- `catalog-search-mic`: **IMPLEMENTED / AUTOMATED CHECKS PASS / AWAITING OWNER VALIDATION** on 2026-07-28.
 
 ## Protected validation history
 
@@ -124,6 +124,8 @@ The Git repository is the authoritative shared source for important development 
 ## Permanent live-test execution rule
 
 Every live-test response must be self-contained and include the exact executable command, exact fixture or route, ordered owner actions, approval boundary, expected result, preserved catalog baseline, and requested next evidence. Use the stable response structure and pre-send completeness check in `live-test-execution-discipline.md`. Focused cycles begin with this current state, the latest relevant diff, and directly affected shared components; they use focused tests plus only necessary protected regressions. Repository-wide rediscovery, repeated architecture analysis, unrelated broad suites, implementation loops, and regeneration of known context are prohibited. Local-first, deterministic-first, zero-token-first, and all existing API-token preservation rules remain mandatory. This process rule does not advance or replace the active checkpoint.
+
+Every future live-test checkpoint must end with one complete owner package containing exactly: Objective; Expected behaviour; numbered exact owner steps; the expected result after every step; Required screenshots; PASS criteria; and FAIL criteria. Never provide only the checkpoint name. Automated verification, repository inspection or earlier evidence cannot be relabeled as owner validation.
 
 Permanent circuit breaker: after the root cause is identified, if two further inspection or command cycles produce no new evidence, stop expanding the investigation. Implement the smallest justified shared-root fix or report one concrete blocker; never continue an open-ended loop.
 

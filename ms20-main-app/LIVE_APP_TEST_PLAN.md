@@ -49,13 +49,19 @@ Out-of-Stock Alert via Catalog Mic is **OWNER-VALIDATED PASS**, frozen and prote
 Expected: shared Mic updates the typed-edit draft; one out-of-stock alert survives refresh without duplication; restoration removes it; no sale, payment, import, export, API request or AI token occurs. Do not test expiry or payment failure yet.
 -->
 
-## Protected checkpoint — Catalog Search Mic
+## Authoritative current checkpoint — Catalog Search Mic
 
-Catalog Search Mic focused validation is **PASS** and protected. Both Catalog search positions reuse shared microphone capture; the normalized transcript enters the synchronized query; existing local matching filters immediately; clearing restores the complete catalog; repeated search stays accurate; no app API/AI parsing route exists. The Out-of-Stock Alert workflow was not rerun.
+Status: **IMPLEMENTED — AWAITING OWNER VALIDATION**. Both Catalog search positions reuse shared microphone capture; focused automated verification passes. The prior owner evidence shows typed `Cefi` on a screen without the new Search Mic and therefore cannot pass this checkpoint.
 
-## Authoritative current checkpoint — Notifications Expiry Alert
+Objective: prove the new Mic beside Catalog Search fills and filters the synchronized query accurately through the existing local deterministic matcher, clears safely, and remains correct on repeated use.
 
-Continue only after selecting a safe existing medicine and recording its complete expiry/batch baseline for guaranteed restoration. Validate one deterministic Expiry alert, refresh deduplication and complete restoration. Do not change stock, repeat out-of-stock, or revisit Catalog Search Mic.
+Owner boundary: pull/restart commit `3a57f1800a912c2ef15f4ee368164e474bc2fb42`, then test only Catalog Search Mic. Do not open a Medicine Action Card, edit or approve any medicine, change stock, or open Notifications during the focused sequence.
+
+Expected sequence: Catalog starts at `Showing 35 of 35`; speaking `Cefixime` through the Search Mic fills the field and shows exactly one Cefixime result; clearing restores 35; speaking `Metformin` shows exactly one Metformin result; clearing and speaking `Cefixime` again proves repeated use; final clear restores 35. No sale, card, approval, catalog mutation, notification, backend request or AI parsing is created.
+
+Required evidence: initial Catalog with Search Mic and 35 medicines; active Mic/listening state; Cefixime voice result; first clear at 35; Metformin voice result; repeated Cefixime voice result; final clear at 35; final Home quiet state.
+
+PASS only if every spoken query fills the Search field, filters immediately to the correct unique saved medicine, clearing restores 35, repeated use remains accurate, and no operational mutation occurs. FAIL for a missing Mic, typed workaround, wrong/empty transcript, wrong or multiple result, stale query, failure to clear, failure on repeated use, permission state without actionable feedback, mutation, notification, API/AI route, or any need to repeat the protected stock workflow.
 
 This plan is for Main App live product testing only. Do not return to WhatsApp live testing in this phase.
 
