@@ -68,9 +68,9 @@ PASS only if every spoken query fills the Search field, filters immediately to t
 
 Status: **OWNER-VALIDATED PASS / FROZEN / PROTECTED**. The authoritative 35-image sequence proves Ibuprofen expiry `2028-12 → 2026-06 → 2028-12` through the shared Medicine Action Card Mic, correct YYYY-MM normalization, one-field reviews, approval/persistence, exactly one local Expiry alert through refresh, protected stock `27`, batch `IBU-200C`, 35 medicines and final Quiet restoration. Do not schedule it again without a direct regression.
 
-## Authoritative current checkpoint — Main Operations Chat Activity Compaction
+## Protected checkpoint — Main Operations Chat Activity Compaction
 
-Status: **IMPLEMENTED / AWAITING OWNER VALIDATION**.
+Status: **OWNER-VALIDATED PASS / FROZEN / PROTECTED**.
 
 ### 1. Objective
 
@@ -116,6 +116,25 @@ PASS only if both approved saves are recorded in Activity History, the main conv
 FAIL for any second Activity card, full Catalog-update feed message, missing/duplicate/false history entry, history created before approval or by search/reopen, lost unrelated chat history, non-Nairobi timestamp, failure to restore blank Aliases, notification-count change, or any stock/batch/expiry/sale/payment/API/AI mutation.
 
 This plan is for Main App live product testing only. Do not return to WhatsApp live testing in this phase.
+
+## Authoritative current checkpoint — Shared Editable-Card Voice Viewport / Focus Preservation
+
+Status: **IMPLEMENTED / AWAITING OWNER VALIDATION**.
+
+Objective: prove that the shared Medicine Action Card Mic keeps the selected field visible and changes only that field through listening and rerendering.
+
+1. Open one sufficiently long saved medicine card and scroll to a middle or lower harmless field.
+2. Tap that field, then tap the card Mic and speak a temporary value.
+3. Confirm the selected field stays visible during listening and after the update, only that field changes, and the normal one-field review appears.
+4. Discard the draft or restore the exact baseline.
+
+Required evidence: one decisive screenshot before Mic, one during or immediately after the voice update with the same field visible, and one after discard/restoration. Do not repeat Catalog Search Mic, stock, expiry, Activity Compaction, exports or another protected checkpoint.
+
+PASS only with owner evidence that target identity, single-field mutation and viewport preservation all hold. After PASS, re-read the repository before preparing the next unfinished checkpoint, expected to be Payment Failure/Cancellation Action-Needed Notification if still authoritative.
+
+## Future checkpoint — Post-Validation User-Facing Product-Secrecy and Quiet-UI Audit
+
+Status: **PENDING**. Do not perform during viewport/focus validation.
 
 ## Test Rules
 

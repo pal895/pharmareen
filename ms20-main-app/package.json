@@ -13,6 +13,7 @@
     "verify:exports": "node tools/verify-export-hub.mjs",
     "verify:notifications": "node tools/verify-notification-review-lifecycle.mjs",
     "verify:activity": "node tools/verify-activity-history.mjs",
+    "verify:voice-viewport": "node tools/verify-voice-viewport.mjs",
     "verify:consistency": "node tools/verify-consistency-gate.mjs",
     "verify": "node tools/verify-architecture.mjs",
     "serve": "node tools/serve.mjs"

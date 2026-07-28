@@ -28,6 +28,7 @@ import {
 } from "./services/documentGenerator.js";
 import { EXPORT_FORMATS, exportCompletionSummary, exportFormat } from "./services/exportFormatMetadata.js";
 import { appendActivity, createCatalogActivityEntry } from "./services/activityHistory.js";
+import { createVoiceViewportAnchor, restoreVoiceViewportAnchor } from "./services/voiceViewportAnchor.js";
 import {
   CATALOG_EDIT_FIELDS,
   applyCatalogEditVoice,
@@ -203,6 +204,7 @@ state.liveBackend = {
 refreshNotifications();
 
 const root = document.querySelector("#app");
+let activeVoiceViewportAnchor = null;
 
 function render() {
   state.sync.online = navigator.onLine;
@@ -230,7 +232,16 @@ function render() {
   bindEvents();
   hideReplitBadge();
   if (state.ui.screen === "payments") root.querySelector("#paymentQueueBody")?.scrollTo({ top: 0 });
-  else scrollChatToBottom();
+  else if (activeVoiceViewportAnchor) {
+    requestAnimationFrame(() => restoreVoiceViewportAnchor(
+      root,
+      activeVoiceViewportAnchor,
+      window,
+      { restoreFocus: !state.voice.starting && !state.voice.listening }
+    ));
+  } else {
+    scrollChatToBottom();
+  }
 }
 
 function refreshPrintPreviewDom(frame) {
@@ -3296,6 +3307,12 @@ function selectCatalogVoiceField(cardId, field) {
 function startCatalogEditVoice(cardId) {
   const card = state.cards.find((item) => item.id === cardId && item.type === "CatalogWorkspaceCard");
   if (!card?.fields?.selected_id) return;
+  if (card.fields.voice_field) {
+    activeVoiceViewportAnchor = createVoiceViewportAnchor(root, {
+      cardId,
+      field: card.fields.voice_field
+    });
+  }
   startVoiceCapture(
     (transcript) => {
       const result = applyCatalogEditVoice(catalogEditDraft(card), transcript, card.fields.voice_field);
@@ -3317,6 +3334,7 @@ function startCatalogEditVoice(cardId) {
 function cancelCatalogEdit(cardId) {
   const card = state.cards.find((item) => item.id === cardId && item.type === "CatalogWorkspaceCard");
   if (!card) return;
+  activeVoiceViewportAnchor = null;
   card.fields.selected_id = "";
   card.fields.edit_draft = "";
   card.fields.voice_field = "";
@@ -3328,6 +3346,7 @@ function cancelCatalogEdit(cardId) {
 function approveCatalogEdit(cardId) {
   const card = state.cards.find((item) => item.id === cardId && item.type === "CatalogWorkspaceCard");
   if (!card) return;
+  activeVoiceViewportAnchor = null;
   const result = applyApprovedCatalogEdit(pharmacyBrain.catalog, card.fields.selected_id, catalogEditDraft(card));
   if (!result.valid || !result.changes?.length) return;
   pharmacyBrain.loadCatalog(result.catalog);

@@ -12,7 +12,9 @@ Catalog Search Mic is **OWNER-VALIDATED PASS / PROTECTED**. Owner evidence prove
 
 Notifications Expiry Alert Lifecycle is **OWNER-VALIDATED PASS / FROZEN / PROTECTED**. Evidence proves the complete Ibuprofen `2028-12 → 2026-06 → 2028-12` expiry-only Mic workflow, one-field reviews, stock `27`, batch `IBU-200C`, 35 medicines, exactly one canonical local Expiry alert through refresh, and final Quiet restoration. Do not repeat it without a direct regression.
 
-Routine approved Catalog saves use one pharmacy-scoped compact Activity status card and a separate deterministic Activity History. Catalog update prose is prohibited from the permanent operations feed; refresh removes only the exact legacy update messages. History is local, bounded, newest-first, idempotent, Africa/Nairobi-labelled and separate from sales and Notifications. The Activity compaction implementation is awaiting focused owner validation.
+Routine approved Catalog saves use one pharmacy-scoped compact Activity status card and a separate deterministic Activity History. Catalog update prose is prohibited from the permanent operations feed; refresh removes only the exact legacy update messages. History is local, bounded, newest-first, idempotent, Africa/Nairobi-labelled and separate from sales and Notifications. Main Operations Chat Activity Compaction is owner-validated, passed and protected.
+
+Shared Editable-Card Voice Viewport / Focus Preservation is the sole open checkpoint. The shared render boundary retains the selected field, caret, nearest scroll container and viewport anchor through microphone startup, listening, transcript updates and review rerenders. The future Post-Validation User-Facing Product-Secrecy and Quiet-UI Audit remains pending and is not part of this repair.
 
 Routine Codex implementation and live-test reports are permanently compact: repository state, checkpoint, at most three change bullets, concise tests, commit/push, and the exact next owner action. Do not restate protected history or architecture unless an error or explicit owner request requires it.
 
