@@ -44,13 +44,17 @@
 
 1. Shared Editable-Card Voice Viewport / Focus Preservation — functional, current, awaiting owner evidence.
 2. Payment Failure/Cancellation Action-Needed Notification — functional, next after viewport PASS and repository re-verification.
-3. Supplier Ordering and Truthful Fulfilment — functional program; execute its ordered one-at-a-time cases from the Live App Test Plan.
-4. Exact Form/Unit Sales and Complete Pack Data — functional program; execute its ordered cross-input and integrity cases from the Live App Test Plan.
-5. Export IP, Privacy and Compliance Safeguards — product-hardening/compliance program; execute its ordered format and fail-closed cases.
-6. Post-Validation User-Facing Product-Secrecy and Quiet-UI Audit — final whole-system UI hardening.
-7. Production Payment-Provider Qualification — externally gated production hardening; provider onboarding model, authenticated callbacks, tenant-bound merchant identity, credentials, reconciliation and official adapters remain disabled until direct provider confirmation.
+3. Exact Form/Unit Sales and Complete Pack Data — functional prerequisite for truthful movement, margin and reorder intelligence.
+4. Deterministic Operational Analytics Commands — operating intelligence; implemented in the backend and automated tests, but not owner live-tested as the current Main App experience.
+5. Decision-Support Summaries and Next Actions — operating intelligence; partial because metrics are protected but current owner summaries do not expose the existing deterministic recommendations.
+6. Pharmacy-Specific Learning and Safe Reuse — operating intelligence; partial because catalog aliases are protected and local memory exists, but adaptive repeated learning is not integrated/live-tested.
+7. Stock, Expiry and Demand Risk Prioritization — operating intelligence; planned, including likely stock-outs, fast/slow/dead stock, expiry urgency/value at risk and recommended action.
+8. Supplier Ordering and Truthful Fulfilment — operating intelligence; planned ordered programme using canonical movement, reorder levels, confirmed conversions, suggested quantity and sourced fulfilment states.
+9. Export IP, Privacy and Compliance Safeguards — product-hardening/compliance.
+10. Post-Validation User-Facing Product-Secrecy and Quiet-UI Audit — product-hardening.
+11. Production Payment-Provider Qualification — externally gated; official onboarding, merchant identity, credentials, authenticated callbacks, reconciliation and adapters remain disabled.
 
-Total remaining: **7 checkpoint programs** — **4 functional** (including the current checkpoint) and **3 product-hardening/production-audit**.
+Total remaining: **11 checkpoint programs** — **3 functional** (including the current checkpoint), **5 Pharmacy Operating Intelligence**, **2 product-hardening/compliance**, and **1 externally gated production qualification**. The evidence classification is authoritative in `operating-intelligence-program.md`.
 
 ## Protected validation history
 

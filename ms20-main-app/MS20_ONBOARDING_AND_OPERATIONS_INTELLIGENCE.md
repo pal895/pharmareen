@@ -139,3 +139,18 @@ Onboarding Test A.1: open MS2.0 Assistant and confirm the owner sees onboarding/
 ```
 
 After onboarding works and at least one medicine is approved into the pharmacy catalog, resume sale tests from the paused point.
+
+## Reconciled operating-intelligence continuation — 2026-07-28
+
+The earlier “Future rules” list remains approved work, not completed capability. Repository evidence is classified in `../docs/engineering-memory/operating-intelligence-program.md`.
+
+After the current viewport and payment-notification checkpoints, the authoritative intelligence path is:
+
+1. establish exact form/unit, price and conversion truth;
+2. live-validate the already implemented deterministic analytics commands;
+3. complete owner summaries that state what happened, why it matters and what to do next;
+4. complete safe pharmacy-specific repeated learning and reuse;
+5. add prioritized stock-out, fast/slow/dead-stock, expiry and demand-risk intelligence;
+6. use those truths in owner-controlled Supplier Ordering and Truthful Fulfilment.
+
+Basic alerts, reports and saved aliases remain protected, but they must not be presented as proof that this complete intelligence programme has passed.
