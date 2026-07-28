@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createVoiceViewportAnchor, restoreVoiceViewportAnchor } from "../src/services/voiceViewportAnchor.js";
+import { createVoiceViewportAnchor, restoreVoiceViewportAnchor, settleVoiceViewportAnchor } from "../src/services/voiceViewportAnchor.js";
 
 globalThis.CSS = { escape: (value) => String(value).replaceAll('"', '\\"') };
 const rootPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -80,5 +80,27 @@ restoreVoiceViewportAnchor(newRoot, anchor, {
 assert.equal(focused, false, "listening preserves the anchor without reopening the mobile keyboard");
 assert.deepEqual(caret, [3, 3], "keyboard dismissal retains the selected field caret without forcing focus");
 assert.equal(restoreVoiceViewportAnchor({ querySelector: () => null }, anchor, view), false, "cleanup is safe after navigation");
+
+const scheduledFrames = [];
+newContainer.scrollTop = 0;
+const settlingView = {
+  scrollTo() {},
+  scrollBy() {},
+  requestAnimationFrame(callback) {
+    scheduledFrames.push(callback);
+  }
+};
+assert.equal(
+  settleVoiceViewportAnchor(newRoot, anchor, settlingView, { restoreFocus: false }),
+  true,
+  "the rebuilt scroll container is restored immediately"
+);
+assert.equal(newContainer.scrollTop, 640, "the first restoration happens before the browser can paint the rebuilt chat");
+newContainer.scrollTop = 0;
+scheduledFrames.shift()();
+assert.equal(newContainer.scrollTop, 640, "the anchor survives the first mobile layout frame");
+newContainer.scrollTop = 0;
+scheduledFrames.shift()();
+assert.equal(newContainer.scrollTop, 640, "the anchor survives the settled mobile layout frame");
 
 console.log("Shared editable-card voice viewport verification passed.");

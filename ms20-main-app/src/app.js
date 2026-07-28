@@ -28,7 +28,7 @@ import {
 } from "./services/documentGenerator.js";
 import { EXPORT_FORMATS, exportCompletionSummary, exportFormat } from "./services/exportFormatMetadata.js";
 import { appendActivity, createCatalogActivityEntry } from "./services/activityHistory.js";
-import { createVoiceViewportAnchor, restoreVoiceViewportAnchor } from "./services/voiceViewportAnchor.js";
+import { createVoiceViewportAnchor, settleVoiceViewportAnchor } from "./services/voiceViewportAnchor.js";
 import {
   CATALOG_EDIT_FIELDS,
   applyCatalogEditVoice,
@@ -233,12 +233,12 @@ function render() {
   hideReplitBadge();
   if (state.ui.screen === "payments") root.querySelector("#paymentQueueBody")?.scrollTo({ top: 0 });
   else if (activeVoiceViewportAnchor) {
-    requestAnimationFrame(() => restoreVoiceViewportAnchor(
+    settleVoiceViewportAnchor(
       root,
       activeVoiceViewportAnchor,
       window,
       { restoreFocus: !state.voice.starting && !state.voice.listening }
-    ));
+    );
   } else {
     scrollChatToBottom();
   }

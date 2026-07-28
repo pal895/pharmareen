@@ -64,3 +64,18 @@ export function restoreVoiceViewportAnchor(root, anchor, view = window, { restor
   if (Math.abs(delta) > 1) view.scrollBy?.(0, delta);
   return true;
 }
+
+export function settleVoiceViewportAnchor(root, anchor, view = window, { restoreFocus = true } = {}) {
+  if (!anchor) return false;
+  const schedule = typeof view?.requestAnimationFrame === "function"
+    ? view.requestAnimationFrame.bind(view)
+    : (callback) => callback();
+  const firstRestore = restoreVoiceViewportAnchor(root, anchor, view, { restoreFocus: false });
+  schedule(() => {
+    restoreVoiceViewportAnchor(root, anchor, view, { restoreFocus: false });
+    schedule(() => {
+      restoreVoiceViewportAnchor(root, anchor, view, { restoreFocus });
+    });
+  });
+  return firstRestore;
+}
