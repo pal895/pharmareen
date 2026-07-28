@@ -49,11 +49,11 @@ Out-of-Stock Alert via Catalog Mic is **OWNER-VALIDATED PASS**, frozen and prote
 Expected: shared Mic updates the typed-edit draft; one out-of-stock alert survives refresh without duplication; restoration removes it; no sale, payment, import, export, API request or AI token occurs. Do not test expiry or payment failure yet.
 -->
 
-## Authoritative current checkpoint — Catalog Search Mic
+## Protected checkpoint — Catalog Search Mic
 
-Status: **IMPLEMENTED — AWAITING OWNER VALIDATION**. Both Catalog search positions reuse shared microphone capture; focused automated verification passes. The prior owner evidence shows typed `Cefi` on a screen without the new Search Mic and therefore cannot pass this checkpoint.
+Status: **OWNER-VALIDATED PASS / FROZEN / PROTECTED**. The authoritative nine-image sequence proves the Search Mic is visible, requesting/listening is truthful, spoken `Sophie mix` safely returns zero matches, spoken `Paracetamol` and `Ibuprofen` each return exactly one correct saved medicine, clearing restores `35 of 35`, repeated use remains accurate, and Home finishes `0`, `Quiet`, `No urgent alerts`. No operational mutation occurred. The medicine names are evidence inputs, not checkpoint requirements. Do not schedule this checkpoint again unless the Search Mic feature changes.
 
-Objective: prove the new Mic beside Catalog Search fills and filters the synchronized query accurately through the existing local deterministic matcher, clears safely, and remains correct on repeated use.
+<!-- Historical owner package retained as protected evidence. Do not schedule.
 
 Owner boundary: pull/restart commit `3a57f1800a912c2ef15f4ee368164e474bc2fb42`, then test only Catalog Search Mic. Do not open a Medicine Action Card, edit or approve any medicine, change stock, or open Notifications during the focused sequence.
 
@@ -62,6 +62,21 @@ Expected sequence: Catalog starts at `Showing 35 of 35`; speaking `Cefixime` thr
 Required evidence: initial Catalog with Search Mic and 35 medicines; active Mic/listening state; Cefixime voice result; first clear at 35; Metformin voice result; repeated Cefixime voice result; final clear at 35; final Home quiet state.
 
 PASS only if every spoken query fills the Search field, filters immediately to the correct unique saved medicine, clearing restores 35, repeated use remains accurate, and no operational mutation occurs. FAIL for a missing Mic, typed workaround, wrong/empty transcript, wrong or multiple result, stale query, failure to clear, failure on repeated use, permission state without actionable feedback, mutation, notification, API/AI route, or any need to repeat the protected stock workflow.
+-->
+
+## Authoritative current checkpoint — Notifications Expiry Alert
+
+Objective: validate one deterministic expired-medicine alert from an approved Catalog expiry-only change, refresh deduplication, persistence and complete restoration.
+
+Protected baseline: Ibuprofen, batch `IBU-200C`, expiry `2028-12`, current stock `27`, catalog `35 of 35`, Home `0 / Quiet / No urgent alerts`.
+
+Expected sequence: change only Ibuprofen Expiry month to `2026-06`; one-field review; approve once; exactly one unread Expiry alert titled `Ibuprofen has expired`, note `Batch IBU-200C expires at June 2026.`, status unread; refresh retains one alert; restore only Expiry month to `2028-12`; alert disappears and all protected baseline facts return.
+
+Owner boundary: do not change Current stock, Batch or any other field; do not use stock zero/five; do not repeat low-stock, out-of-stock or Catalog Search Mic.
+
+Required evidence: initial Quiet Home; Ibuprofen baseline showing batch/expiry/stock; expiry-only unsaved review at `2026-06`; saved Catalog at `2026-06` with 35 medicines and stock 27; Home one unread expiry preview; full Expiry notification; post-refresh single-alert state; expiry-only restoration review at `2028-12`; restored Catalog baseline; final Quiet Home; final empty Notifications.
+
+PASS only if the exact single Expiry alert survives refresh without duplication, restoration removes it, Catalog remains 35, Ibuprofen stock remains 27, batch remains `IBU-200C`, and no unrelated workflow occurs. FAIL for any wrong content/count/category/status, duplicate, persistence mismatch, changed stock/batch/other field, failure to restore, stale alert, catalog-count change, API/AI route, or any repeat of a protected checkpoint.
 
 This plan is for Main App live product testing only. Do not return to WhatsApp live testing in this phase.
 

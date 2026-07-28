@@ -24,18 +24,19 @@
 - Notification reconciliation uses deterministic IDs and content fingerprints. Repeated projection cannot duplicate an alert or unread count; unchanged refresh preserves read state; a materially changed source fact refreshes the same alert and makes it unread; clearing the source condition removes it. Focused regression tests cover repeated refresh, changed low-stock counts and restoration.
 - Catalog Medicine Action Cards reuse the existing shared microphone capture controller. Tapping a field then Mic, or speaking an explicit field phrase, updates the same local edit draft as typing; spoken numbers including zero and compound values are parsed locally. Existing validation, change tracking, approval, persistence and notification refresh are unchanged.
 - Notifications Out-of-Stock Alert via Catalog Mic is **OWNER-VALIDATED PASS**, frozen and regression-protected. The authoritative 22-image sequence proves synchronized deployment, initial quiet state, 35 medicines, Cefixime baseline `22`, shared-Mic change to `0`, exactly one changed field, approval and persistence, the exact single unread Inventory alert through refresh without duplication, shared-Mic restoration to `22`, a second one-field review, 35-medicine preservation, alert removal and final quiet Notifications. Do not repeat the zero/notification/restoration workflow unless a future change directly modifies it.
-- Catalog Search Mic is **IMPLEMENTED — AWAITING OWNER VALIDATION**. Focused automated checks prove both search positions reuse `startVoiceCapture()`, normalize the shared transcript, filter through the existing local matcher, restore the complete catalog on clear, remain accurate on repeated use, and add no app API/AI parsing route. These checks prove readiness only, not owner-visible behavior. The prior owner sequence used typed `Cefi` because the deployed Search screen had no Mic; it is not evidence for this checkpoint.
-- The active isolated live-testing item remains **Catalog Search Mic**. Notifications Expiry Alert is blocked until genuine owner evidence passes and protects Catalog Search Mic.
+- Catalog Search Mic is **OWNER-VALIDATED PASS / FROZEN / PROTECTED**. The authoritative nine-image sequence proves synchronized deployment, a visible Mic beside Catalog Search, truthful requesting/listening feedback, safe local zero-match handling for spoken `Sophie mix`, exact unique matches for spoken `Paracetamol` and `Ibuprofen`, clearing to `Showing 35 of 35`, accurate repeated Paracetamol use, and final Home `0`, `Quiet`, `No urgent alerts`. Different medicine names from the written examples are valid because the checkpoint tests the shared workflow, not fixed vocabulary. No sale, approval, stock mutation, notification, import, API or AI workflow occurred. Do not schedule it again unless future code changes the Search Mic feature.
+- The active isolated live-testing item is now **Notifications Expiry Alert**. Use saved Ibuprofen with protected batch `IBU-200C`, expiry baseline `2028-12`, current stock `27`, and 35 medicines. Change only Expiry month to `2026-06`, require one deterministic expired alert through refresh, then restore `2028-12` and require Quiet state. Do not change stock or repeat low/out-of-stock.
 - CODEX BRIDGE reports default permanently to five compact lines: Repository, Checkpoint, Files changed, Commit and Next owner action. Extra narrative is allowed only for errors.
 
 ## Protected checkpoint registry
 
 - `notifications-out-of-stock-via-catalog-mic`: **OWNER-VALIDATED PASS / FROZEN / PROTECTED** on 2026-07-28.
-- `catalog-search-mic`: **IMPLEMENTED / AUTOMATED CHECKS PASS / AWAITING OWNER VALIDATION** on 2026-07-28.
+- `catalog-search-mic`: **OWNER-VALIDATED PASS / FROZEN / PROTECTED** on 2026-07-28.
 
 ## Protected validation history
 
 - Owner screenshots record Cefixime `22 → 0 → 22` exclusively through the Medicine Action Card Mic, one-field reviews, exactly one canonical out-of-stock alert across refresh, complete restoration, 35 medicines and final `0`, `Quiet`, `No urgent alerts`.
+- Owner screenshots record Catalog Search Mic permission/listening, invalid spoken-query safety, exact local Paracetamol and Ibuprofen matching, clear-to-35 behavior, repeated use and final Quiet Home without mutation.
 - Do not cosmetically polish passed formats without genuine regression evidence.
 
 ## Preserved state
