@@ -7,8 +7,20 @@ export function createCatalogWorkspaceCard(itemCount = 0) {
     confidence: 1,
     status: "ready",
     aiRequired: false,
-    fields: { item_count: String(itemCount), query: "", selected_id: "", edit_draft: "", voice_field: "", voice_feedback: "" },
+    fields: { item_count: String(itemCount), query: "", search_voice_feedback: "", selected_id: "", edit_draft: "", voice_field: "", voice_feedback: "" },
     validation: "Loaded directly from the saved Pharmacy Catalog. No medicines are recreated by this view."
+  };
+}
+
+export function applyCatalogSearchVoice(transcript = "") {
+  const query = String(transcript || "").trim();
+  if (!query) {
+    return { applied: false, query: "", feedback: "No medicine was heard. Tap Mic and try again." };
+  }
+  return {
+    applied: true,
+    query,
+    feedback: `Heard “${query}”. Catalog filtered locally.`
   };
 }
 

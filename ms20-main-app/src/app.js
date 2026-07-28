@@ -30,6 +30,7 @@ import { EXPORT_FORMATS, exportCompletionSummary, exportFormat } from "./service
 import {
   CATALOG_EDIT_FIELDS,
   applyCatalogEditVoice,
+  applyCatalogSearchVoice,
   applyApprovedCatalogEdit,
   catalogItemId,
   createCatalogEditDraft,
@@ -680,11 +681,18 @@ function catalogWorkspaceTemplate(card) {
 }
 
 function catalogSearchTemplate(card, query, placement) {
+  const voiceBusy = state.voice.starting || state.voice.listening;
   return `
-    <label class="catalog-search catalog-search-${placement}">
+    <div class="catalog-search catalog-search-${placement}">
+      <label for="catalog-search-${card.id}-${placement}">
       <span>${placement === "bottom" ? "Search catalog again" : "Search catalog"}</span>
-      <input type="search" data-catalog-search data-catalog-search-placement="${placement}" data-card-id="${card.id}" value="${escapeHtml(query)}" placeholder="Medicine, form, supplier, barcode">
-    </label>
+      </label>
+      <div class="catalog-search-control">
+        <input id="catalog-search-${card.id}-${placement}" type="search" data-catalog-search data-catalog-search-placement="${placement}" data-card-id="${card.id}" value="${escapeHtml(query)}" placeholder="Medicine, form, supplier, barcode">
+        <button type="button" data-action="catalog-search-voice" data-card-id="${card.id}" data-search-placement="${placement}" aria-label="Search catalog by voice" ${voiceBusy ? "disabled" : ""}>${voiceBusy ? "Listening…" : "Mic"}</button>
+      </div>
+      ${card.fields?.search_voice_feedback ? `<p class="catalog-search-feedback" role="status">${escapeHtml(card.fields.search_voice_feedback)}</p>` : ""}
+    </div>
   `;
 }
 
@@ -1186,6 +1194,7 @@ function handleAction(dataset) {
   if (action === "cancel-catalog-edit") cancelCatalogEdit(dataset.cardId);
   if (action === "approve-catalog-edit") approveCatalogEdit(dataset.cardId);
   if (action === "catalog-edit-voice") startCatalogEditVoice(dataset.cardId);
+  if (action === "catalog-search-voice") startCatalogSearchVoice(dataset.cardId, dataset.searchPlacement);
   if (action === "back-home") {
     state.ui.screen = "home";
     render();
@@ -3234,6 +3243,31 @@ function updateCatalogEditDraft(cardId, field, value) {
   }
   const approve = root.querySelector('[data-action="approve-catalog-edit"]');
   if (approve) approve.disabled = !review.valid || !review.changes?.length;
+}
+
+function startCatalogSearchVoice(cardId, placement = "top") {
+  const card = state.cards.find((item) => item.id === cardId && item.type === "CatalogWorkspaceCard");
+  if (!card) return;
+  startVoiceCapture(
+    (transcript) => {
+      const result = applyCatalogSearchVoice(transcript);
+      card.fields.search_voice_feedback = result.feedback;
+      if (result.applied) card.fields.query = result.query;
+      persistActiveCards();
+      render();
+      if (result.applied) {
+        requestAnimationFrame(() => {
+          const input = root.querySelector(`[data-catalog-search-placement="${placement}"][data-card-id="${cardId}"]`);
+          input?.focus();
+          input?.setSelectionRange?.(result.query.length, result.query.length);
+        });
+      }
+    },
+    (message) => {
+      card.fields.search_voice_feedback = message;
+      persistActiveCards();
+    }
+  );
 }
 
 function selectCatalogVoiceField(cardId, field) {

@@ -23,7 +23,19 @@
 - Notifications Low-Stock Alert is **OWNER-VALIDATED PASS** and regression-protected. Authoritative evidence records Cefixime at restoration baseline `22`, one approved change to `5`, immediate Catalog consistency, exactly one unread local Inventory alert titled `Cefixime is low` with note `Cefixime has 5 left. Prepare a restock if needed.`, and automatic removal after restoring `22`. Catalog stayed 35 and Home/Notifications returned to the protected quiet state.
 - Notification reconciliation uses deterministic IDs and content fingerprints. Repeated projection cannot duplicate an alert or unread count; unchanged refresh preserves read state; a materially changed source fact refreshes the same alert and makes it unread; clearing the source condition removes it. Focused regression tests cover repeated refresh, changed low-stock counts and restoration.
 - Catalog Medicine Action Cards reuse the existing shared microphone capture controller. Tapping a field then Mic, or speaking an explicit field phrase, updates the same local edit draft as typing; spoken numbers including zero and compound values are parsed locally. Existing validation, change tracking, approval, persistence and notification refresh are unchanged.
-- The next isolated checkpoint is **Notifications Out-of-Stock Alert via Catalog Mic**. Use Cefixime's protected baseline `22`, set Current stock to spoken `zero`, verify exactly one out-of-stock alert through refresh, then restore spoken `twenty two` and require quiet state and 35 medicines.
+- Notifications Out-of-Stock Alert via Catalog Mic is **OWNER-VALIDATED PASS**, frozen and regression-protected. The authoritative 22-image sequence proves synchronized deployment, initial quiet state, 35 medicines, Cefixime baseline `22`, shared-Mic change to `0`, exactly one changed field, approval and persistence, the exact single unread Inventory alert through refresh without duplication, shared-Mic restoration to `22`, a second one-field review, 35-medicine preservation, alert removal and final quiet Notifications. Do not repeat the zero/notification/restoration workflow unless a future change directly modifies it.
+- Catalog Search Mic focused validation is **PASS / PROTECTED**. Syntax and Catalog verification prove both search positions reuse `startVoiceCapture()`, normalize the shared transcript, filter through the existing local matcher, restore the complete catalog on clear, remain accurate on repeated use, and add no app API/AI parsing route. The protected out-of-stock checkpoint was not rerun.
+- The next isolated live-testing item is **Notifications Expiry Alert**. Its owner procedure must be defined from a safe recorded catalog baseline before execution; no stock or out-of-stock workflow may be repeated.
+- CODEX BRIDGE reports default permanently to five compact lines: Repository, Checkpoint, Files changed, Commit and Next owner action. Extra narrative is allowed only for errors.
+
+## Protected checkpoint registry
+
+- `notifications-out-of-stock-via-catalog-mic`: **OWNER-VALIDATED PASS / FROZEN / PROTECTED** on 2026-07-28.
+- `catalog-search-mic`: **FOCUSED VALIDATION PASS / PROTECTED** on 2026-07-28.
+
+## Protected validation history
+
+- Owner screenshots record Cefixime `22 → 0 → 22` exclusively through the Medicine Action Card Mic, one-field reviews, exactly one canonical out-of-stock alert across refresh, complete restoration, 35 medicines and final `0`, `Quiet`, `No urgent alerts`.
 - Do not cosmetically polish passed formats without genuine regression evidence.
 
 ## Preserved state

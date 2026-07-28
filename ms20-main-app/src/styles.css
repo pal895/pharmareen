@@ -702,6 +702,26 @@ input:disabled {
   background: #fff;
 }
 
+.catalog-search-control {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.catalog-search-control input {
+  min-width: 0;
+}
+
+.catalog-search-control button {
+  flex: 0 0 auto;
+  min-width: 58px;
+}
+
+.catalog-search-feedback {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
 .catalog-search-bottom {
   display: block;
   margin-top: 18px;

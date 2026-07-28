@@ -4,7 +4,9 @@
 
 Excel Operations Workbook, PDF Professional Report, Word Owner Copy, Presentation Owner Briefing, CSV Technical Data Transfer and Print Working Inventory are owner-validated, permanently passed and regression-protected. The six-format Export Hub live-validation sequence is complete.
 
-Notifications Quiet State, Pending Review Unread State, Review Import Action Routing and Low-Stock Alert are owner-validated, passed and regression-protected. Low-stock alerts are deterministic projections of the saved pharmacy catalog: one medicine produces at most one alert, a changed stock fact refreshes that alert as unread, and restoring healthy stock removes it. Catalog Medicine Action Cards reuse the shared microphone capture path for focused voice edits. The next isolated checkpoint is Out-of-Stock Alert via Catalog Mic.
+Notifications Quiet State, Pending Review Unread State, Review Import Action Routing, Low-Stock Alert and Out-of-Stock Alert via Catalog Mic are owner-validated, passed and regression-protected. Owner evidence proves the complete Cefixime `22 → 0 → 22` Mic-only round trip, exact single unread out-of-stock alert through refresh, 35-medicine preservation and final quiet-state restoration. Do not repeat it without a direct regression. Catalog Medicine Action Cards and Catalog Search reuse the shared microphone capture path; search transcripts filter the saved catalog locally and deterministically.
+
+CODEX BRIDGE synchronization reports are permanently compact by default: `Repository`, `Checkpoint`, `Files changed`, `Commit`, and `Next owner action`, one line each. Add detail only for an error; never restate protected checkpoint history or completed validation procedures.
 
 Every export must answer: **Why would a pharmacy owner deliberately choose this format instead of every other available export?** A format is accepted only for a distinct operational workflow. All surfaces consume the shared `exportFormatMetadata.js` registry, and activity updates one persistent pharmacy-scoped Export Hub status card instead of adding chat-feed messages.
 

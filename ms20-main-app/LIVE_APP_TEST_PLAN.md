@@ -31,10 +31,11 @@ Expected: the shared deterministic notification projection creates one low-stock
 
 -->
 
-## Authoritative current checkpoint — Notifications Out-of-Stock Alert via Catalog Mic
+## Protected checkpoint — Notifications Out-of-Stock Alert via Catalog Mic
 
-Low-Stock Alert is owner-validated, passed and protected. Evidence proves one deterministic unread Cefixime alert at stock `5`, exact Inventory content, automatic removal after restoring `22`, 35 medicines and quiet-state restoration.
+Out-of-Stock Alert via Catalog Mic is **OWNER-VALIDATED PASS**, frozen and protected. The authoritative 22-image owner sequence proves the complete Cefixime `22 → 0 → 22` shared-Mic workflow, one changed field each time, approval/persistence, exactly one canonical unread Inventory alert through refresh, 35 medicines and final quiet-state restoration. Do not repeat this workflow without a direct regression.
 
+<!-- Historical procedure retained as protected evidence. Do not schedule.
 1. Start on Home and confirm Notifications is `0`, `Quiet`, `No urgent alerts`.
 2. Open Assistant → Menu → Catalog. Search `Cefixime`, tap `Open & edit`, and confirm Current stock is `22`.
 3. Tap `Current stock`, tap `Mic` inside the Medicine Action Card, and say `zero`. Confirm truthful voice feedback, Current stock `0`, and one unsaved Current stock change. Leave every other field unchanged.
@@ -46,6 +47,15 @@ Low-Stock Alert is owner-validated, passed and protected. Evidence proves one de
 9. Refresh once. Confirm `Showing 35 of 35`, Cefixime `22`, Home `0`, `Quiet`, `No urgent alerts`, and no notification card.
 
 Expected: shared Mic updates the typed-edit draft; one out-of-stock alert survives refresh without duplication; restoration removes it; no sale, payment, import, export, API request or AI token occurs. Do not test expiry or payment failure yet.
+-->
+
+## Protected checkpoint — Catalog Search Mic
+
+Catalog Search Mic focused validation is **PASS** and protected. Both Catalog search positions reuse shared microphone capture; the normalized transcript enters the synchronized query; existing local matching filters immediately; clearing restores the complete catalog; repeated search stays accurate; no app API/AI parsing route exists. The Out-of-Stock Alert workflow was not rerun.
+
+## Authoritative current checkpoint — Notifications Expiry Alert
+
+Continue only after selecting a safe existing medicine and recording its complete expiry/batch baseline for guaranteed restoration. Validate one deterministic Expiry alert, refresh deduplication and complete restoration. Do not change stock, repeat out-of-stock, or revisit Catalog Search Mic.
 
 This plan is for Main App live product testing only. Do not return to WhatsApp live testing in this phase.
 

@@ -8,6 +8,7 @@ const css = fs.readFileSync(path.join(root, "src/styles.css"), "utf8");
 const {
   applyApprovedCatalogEdit,
   applyCatalogEditVoice,
+  applyCatalogSearchVoice,
   catalogEditPresentation,
   catalogWorkspaceItems,
   createCatalogEditDraft,
@@ -42,6 +43,16 @@ assert(app.includes('data-action="approve-catalog-edit"') && app.includes('data-
 assert(app.includes("function bindActionElements(scope)") && app.includes("scope.onclick = (event)") && app.includes('event.target.closest?.("[data-action]")'), "Every render must install one current delegated action handler");
 assert(app.includes('catalogSearchTemplate(card, query, "top")') && app.includes('catalogSearchTemplate(card, query, "bottom")'), "Long catalog lists must expose the same search component above and below the results");
 assert(app.includes('querySelectorAll("[data-catalog-search]")'), "Top and bottom catalog search controls must stay synchronized and interactive");
+const spokenSearch = applyCatalogSearchVoice("  Cefixime  ");
+assert(spokenSearch.applied && spokenSearch.query === "Cefixime", "Catalog voice search must normalize the shared transcript deterministically");
+assert(catalogWorkspaceItems(original, spokenSearch.query).map((item) => item.id).join() === "med-1", "Catalog voice search must filter through the existing local catalog matcher");
+const repeatedSearch = applyCatalogSearchVoice("Metformin");
+assert(repeatedSearch.applied && catalogWorkspaceItems(original, repeatedSearch.query).map((item) => item.id).join() === "med-2", "Catalog voice search must remain accurate after repeated use");
+assert(catalogWorkspaceItems(original, "").length === original.length, "Clearing Catalog voice search must restore the complete saved catalog");
+assert(!applyCatalogSearchVoice("  ").applied, "Empty voice search must not replace the current query");
+assert(app.includes('data-action="catalog-search-voice"') && app.includes("startCatalogSearchVoice"), "Both Catalog search positions must expose the shared Mic controller");
+assert(app.includes("applyCatalogSearchVoice(transcript)") && app.includes("startVoiceCapture("), "Catalog Search Mic must reuse shared capture and deterministic local query processing");
+assert(css.includes(".catalog-search-control"), "Catalog Search Mic must remain beside the search input");
 assert(css.includes("grid-template-columns: repeat(2") && css.includes(".catalog-edit-grid") && css.includes("grid-template-columns: 1fr"), "Desktop and mobile catalog editor layouts must be protected");
 
 const draft = createCatalogEditDraft(original[0]);

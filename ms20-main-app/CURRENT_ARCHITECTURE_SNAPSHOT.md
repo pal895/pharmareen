@@ -2,9 +2,9 @@
 
 ## Notification and Catalog voice architecture (2026-07-28)
 
-Low-stock notification lifecycle is owner-validated and protected. `buildDeterministicNotifications()` projects alerts from the current pharmacy-scoped catalog with deterministic IDs; `mergeNotifications()` prevents duplicates, preserves read state for an unchanged fact, resets one materially changed alert to unread using a content fingerprint, and removes generated alerts when their source condition clears. Refresh/restart rebuilds the same projection from persisted catalog and card state.
+Low-stock and Out-of-Stock via Catalog Mic notification lifecycles are owner-validated and protected. Owner evidence proves the complete Cefixime `22 → 0 → 22` Mic-only round trip, one-field reviews, exact single alert through refresh, 35 medicines and final quiet restoration. `buildDeterministicNotifications()` projects alerts from the current pharmacy-scoped catalog with deterministic IDs; `mergeNotifications()` prevents duplicates, preserves read state for an unchanged fact, resets one materially changed alert to unread using a content fingerprint, and removes generated alerts when their source condition clears. Refresh/restart rebuilds the same projection from persisted catalog and card state.
 
-The Catalog Medicine Action Card uses the existing shared `startVoiceCapture()` boundary. A focused editable field supplies intent, explicit phrases such as `current stock twenty two` are also accepted, and deterministic local parsing updates the same draft used by typing. Validation, change review, approval, persistence and notification refresh remain unchanged; no second microphone service or AI parsing path exists.
+The Catalog Medicine Action Card and Catalog Search use the existing shared `startVoiceCapture()` boundary. A focused editable field supplies edit intent; explicit phrases such as `current stock twenty two` are accepted; Catalog Search places the normalized transcript into the synchronized query and immediately invokes the existing local medicine matcher. Validation, change review, approval, persistence and notification refresh remain unchanged; no second microphone service or AI parsing path exists.
 
 ## Shared Export Hub architecture (2026-07-27)
 
