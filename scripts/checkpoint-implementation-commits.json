@@ -1,0 +1,298 @@
+{
+    "10":  [
+               "87a15ca Compact catalog activity history",
+               "3a57f18 Protect out-of-stock pass and add catalog search mic",
+               "937cc3f Normalize expiry months and repeat catalog search"
+           ],
+    "63":  [
+               "d05c30f Add Windows local WhatsApp bridge setup",
+               "995661b Migrate MVP channel to WhatsApp Web bridge",
+               "a5022ae Add WhatsApp Web MVP bridge"
+           ],
+    "30":  [
+               "9afd4e4 Close unread review checkpoint and route notification actions",
+               "ed1d316 Automate transaction completion and simplify payment navigation"
+           ],
+    "49":  [
+
+           ],
+    "62":  [
+               "722d9e7 Add Meta callback webhook alias",
+               "840e6dc Prepare Meta WhatsApp Cloud API webhook"
+           ],
+    "22":  [
+               "1498960 Add POS parity commands and bridge startup hardening",
+               "7691591 Simplify pharmacy commands and voice fallback"
+           ],
+    "13":  [
+               "464674f Make card voice editing reachable inline",
+               "09cb128 Preserve editable card voice viewport",
+               "1dff3b2 Centralize editable medicine fields"
+           ],
+    "47":  [
+               "9b49581 Finish Export Hub layout integrity"
+           ],
+    "71":  [
+               "94c535e Remove AI latency from MS2.0 reports",
+               "4081134 Retain and expose MS2.0 report source warmup",
+               "b8d738e Improve MS2.0 shared data reads and report performance"
+           ],
+    "73":  [
+
+           ],
+    "3":  [
+              "efaeebb Read ambiguous invoice cells directly",
+              "342bf5e Refine ambiguous invoice cells locally",
+              "59eec84 Preserve complete invoice evidence and pricing"
+          ],
+    "8":  [
+              "df18086 Add local-first catalog onboarding foundation",
+              "cc5d3e3 Add photo invoice intake infrastructure"
+          ],
+    "12":  [
+               "464674f Make card voice editing reachable inline",
+               "09cb128 Preserve editable card voice viewport",
+               "9afd4e4 Close unread review checkpoint and route notification actions"
+           ],
+    "65":  [
+               "c306c33 Wire production pharmacy registry onboarding"
+           ],
+    "40":  [
+               "c072675 Remove visible CSV byte order mark",
+               "c38ee07 Harden CSV mobile compatibility",
+               "01cdcff Protect Export Hub workflows and advance CSV validation"
+           ],
+    "14":  [
+               "a639e3c Harden phone medicine selector readiness",
+               "543ddf3 Require confirmation for WhatsApp medicine selector",
+               "78ad94d Complete Kenya medicine brain architecture pass"
+           ],
+    "26":  [
+               "b397234 Add media intelligence training layer",
+               "ad79c52 Add pharmacy training simulation intelligence"
+           ],
+    "17":  [
+               "1b4de86 Stabilize guided Stock Fix conversation",
+               "c86cfc8 Stabilize Stock Fix OCR and optional reason",
+               "b5ffd6a Unify Stock Fix evidence inputs"
+           ],
+    "28":  [
+
+           ],
+    "76":  [
+
+           ],
+    "36":  [
+               "a4262e2 Strengthen local-first media and voice architecture",
+               "b397234 Add media intelligence training layer"
+           ],
+    "4":  [
+              "7a6335c Prepare local Excel catalog onboarding",
+              "8c22f10 Require explicit paste input before catalog review",
+              "e4a4cfa Prepare clean paste onboarding fixture"
+          ],
+    "50":  [
+               "6f91b2a Save selector quantity payment choices immediately",
+               "ad15a4f Fix deterministic routing payments and media AI wiring",
+               "ab334cf Add simple payment modes and receipt fallback UX"
+           ],
+    "45":  [
+               "f8fe088 Fix same-context Print Finder capture",
+               "db1709c Fix shared Print Finder capture and reset",
+               "6600418 Make print inventory review compact and searchable"
+           ],
+    "60":  [
+               "dfda7c6 Route Baileys text through live runtime endpoint",
+               "0ebac5b Fix Baileys LID phone identity for live onboarding",
+               "7545006 Polish WhatsApp voice selector recovery"
+           ],
+    "38":  [
+
+           ],
+    "23":  [
+
+           ],
+    "51":  [
+
+           ],
+    "20":  [
+               "911a830 Fix Replit startup and offline static routes"
+           ],
+    "59":  [
+               "c306c33 Wire production pharmacy registry onboarding",
+               "e0a23f3 Complete pre-demo pharmacy engine upgrade",
+               "6b9c37c Use admin workbook tabs for pharmacy onboarding"
+           ],
+    "69":  [
+
+           ],
+    "54":  [
+               "dd05778 Close low stock and harden notification edits",
+               "9afd4e4 Close unread review checkpoint and route notification actions",
+               "c63f687 Fix pending-review notifications and Paste List capture"
+           ],
+    "66":  [
+
+           ],
+    "57":  [
+
+           ],
+    "43":  [
+
+           ],
+    "35":  [
+               "e158ec9 Add trusted result consistency gate"
+           ],
+    "41":  [
+               "7a6335c Prepare local Excel catalog onboarding"
+           ],
+    "5":  [
+              "7a6335c Prepare local Excel catalog onboarding",
+              "c663670 Preserve strength through CSV review",
+              "e4a4cfa Prepare clean paste onboarding fixture"
+          ],
+    "34":  [
+
+           ],
+    "6":  [
+              "7a6335c Prepare local Excel catalog onboarding",
+              "e4a4cfa Prepare clean paste onboarding fixture",
+              "df18086 Add local-first catalog onboarding foundation"
+          ],
+    "53":  [
+               "ed1d316 Automate transaction completion and simplify payment navigation",
+               "2e64e41 Prepare transaction completion engine"
+           ],
+    "2":  [
+
+          ],
+    "44":  [
+               "d993c82 Fix Presentation briefing and export history",
+               "c561003 Pass Word owner copy and prepare Presentation briefing"
+           ],
+    "72":  [
+               "e158ec9 Add trusted result consistency gate",
+               "48c6d47 Consolidate invoice reviews and integrate consistency gate",
+               "5c78e1d Merge repeated invoice scans without regression"
+           ],
+    "11":  [
+               "6476f7c Share medicine review row controls",
+               "1dff3b2 Centralize editable medicine fields"
+           ],
+    "70":  [
+               "0823d58 Disable Replit user installs inside virtualenv",
+               "63b25d6 Use dedicated writable Replit virtualenv",
+               "10612b3 Use project virtualenv for Replit dependencies"
+           ],
+    "68":  [
+
+           ],
+    "1":  [
+              "ed1d316 Automate transaction completion and simplify payment navigation"
+          ],
+    "58":  [
+               "1b06cdb Serve MS2 main app through Replit backend"
+           ],
+    "55":  [
+
+           ],
+    "33":  [
+
+           ],
+    "67":  [
+
+           ],
+    "27":  [
+
+           ],
+    "16":  [
+               "d6901b9 Fix voice restock review and recovery",
+               "5e3ee33 Answer medicine stock checks instantly",
+               "616fda4 Keep mobile chat fixed and normalize restocks"
+           ],
+    "64":  [
+
+           ],
+    "24":  [
+               "dd05778 Close low stock and harden notification edits",
+               "d6901b9 Fix voice restock review and recovery",
+               "5e3ee33 Answer medicine stock checks instantly"
+           ],
+    "19":  [
+
+           ],
+    "29":  [
+
+           ],
+    "61":  [
+               "8a27db6 Improve offline Tap and Talk first-attempt selector",
+               "cf1e787 Harden WhatsApp selector and offline Tap Talk parity",
+               "ca386fd Fix offline parity tap talk and bridge health"
+           ],
+    "9":  [
+              "df18086 Add local-first catalog onboarding foundation",
+              "cc5d3e3 Add photo invoice intake infrastructure"
+          ],
+    "74":  [
+
+           ],
+    "37":  [
+               "9917fd2 Polish voice media trust and token guardrails",
+               "bbe3c73 Add pharmacy assistant training guardrails",
+               "43ad769 Add media quota fallbacks and photo intake skeleton"
+           ],
+    "7":  [
+              "0d7ce83 Add Loperamide barcode live-test fixture",
+              "3de02cb Add controlled barcode live-test fixture"
+          ],
+    "52":  [
+
+           ],
+    "39":  [
+               "94c535e Remove AI latency from MS2.0 reports",
+               "4f9f7e0 Speed historical reports and repair speech resume",
+               "9942219 Add deterministic historical reports and speech controls"
+           ],
+    "48":  [
+
+           ],
+    "21":  [
+               "9fbf0d2 Make daily report refresh truthful and read-only"
+           ],
+    "56":  [
+
+           ],
+    "46":  [
+               "87a15ca Compact catalog activity history",
+               "01cdcff Protect Export Hub workflows and advance CSV validation",
+               "d993c82 Fix Presentation briefing and export history"
+           ],
+    "75":  [
+
+           ],
+    "32":  [
+               "3a57f18 Protect out-of-stock pass and add catalog search mic",
+               "937cc3f Normalize expiry months and repeat catalog search",
+               "6ea68bb Require complete catalog search intent"
+           ],
+    "31":  [
+               "aed9819 Block generic-only medicine voice matches",
+               "6cc6ac7 Centralize local medicine recognition"
+           ],
+    "15":  [
+               "67560ab Fix offline confirmation delivery diagnostics and stock safety",
+               "46f8d32 Fix offline confirmation delivery and stock safety"
+           ],
+    "25":  [
+               "937cc3f Normalize expiry months and repeat catalog search"
+           ],
+    "18":  [
+               "74f7f69 Focus Stock Fix OCR on package region",
+               "b9aea88 Harden Stock Fix package recognition",
+               "c86cfc8 Stabilize Stock Fix OCR and optional reason"
+           ],
+    "42":  [
+               "7a8995d Pass PDF owner copy and begin Word validation",
+               "623a9dc Pass Excel compatibility and start phone-first PDF"
+           ]
+}

@@ -2,6 +2,8 @@
 
 All live-test selection, order, status and counts must come from `../../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. No handoff or chat may reconstruct a smaller parallel list.
 
+Every handoff or Bridge must also resolve the selected checkpoint through the master’s `MS2-LT-NNN` Engineering Traceability Index. It may summarize that evidence chain but may not replace, omit or independently maintain it. Any checkpoint/evidence change requires regeneration with `node scripts/update-master-traceability.mjs` and a passing `node scripts/verify-master-traceability.mjs`.
+
 These rules are permanent for every MS2.0 live-validation cycle.
 
 ## Exact and self-contained instructions

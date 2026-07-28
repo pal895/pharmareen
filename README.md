@@ -6,6 +6,8 @@
 
 The master’s repository completeness ledger classifies every discovered owner-facing domain, including evidence-backed deprecated and intentionally out-of-scope items. Bridges and synchronization packages must copy neither historical subsets nor independent counts; they must read the master at the current repository commit.
 
+The master is also the engineering traceability index. Every checkpoint has a stable `MS2-LT-NNN` ID, evidence, implementation commits/files, owner proof, remaining work, prerequisites and dependents. After any checkpoint/evidence change, regenerate and verify it with `node scripts/update-master-traceability.mjs` and `node scripts/verify-master-traceability.mjs`; a future Codex or ChatGPT Bridge must derive its evidence chain from that generated index.
+
 ## Export Hub protected checkpoint (2026-07-27)
 
 Excel Operations Workbook, PDF Professional Report, Word Owner Copy, Presentation Owner Briefing, CSV Technical Data Transfer and Print Working Inventory are owner-validated, permanently passed and regression-protected. The six-format Export Hub live-validation sequence is complete.

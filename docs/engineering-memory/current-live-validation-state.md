@@ -4,6 +4,8 @@ Canonical sequence authority: `../../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. This f
 
 Final completeness audit: the master contains 76 unique checkpoints, an evidence-backed domain ledger, acyclic numeric prerequisites, and the sole execution pointer. Historical embedded sequences remain evidence only; future chats and Bridges must read the master at the current commit.
 
+Permanent traceability rule: checkpoint IDs, evidence, implementation commits/files, owner proof, remaining work, prerequisites and dependents live in the master’s generated Engineering Traceability Index. Update it with `node scripts/update-master-traceability.mjs` and require `node scripts/verify-master-traceability.mjs` to pass in the same commit as any checkpoint or evidence change.
+
 ## Export Hub checkpoint — 2026-07-27
 
 - Owner evidence makes Excel, PDF, Word and the nine-slide Presentation **OWNER-VALIDATED PASS** and regression-protected. Presentation downloaded, was detected correctly, opened in an Android standards-compatible reader, and displayed all nine readable slides without corruption. The original Android `Error (4)` blocker is resolved. PowerPoint is recommended, not required.

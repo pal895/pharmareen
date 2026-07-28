@@ -4,6 +4,8 @@ Canonical sequence authority: `../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. This file
 
 The master’s repository completeness ledger classifies all discovered capabilities, deprecated paths and evidence-backed out-of-scope extensions. Use this plan only for detailed procedures belonging to the checkpoint selected by the master.
 
+The master’s generated `MS2-LT-NNN` Engineering Traceability Index is the sole checkpoint-to-evidence chain. Detailed procedures here must cite that stable ID and cannot override its status, implementation evidence, prerequisites or dependents.
+
 ## Historical checkpoint — Notifications Low-Stock Alert
 
 <!-- Superseded low-stock checkpoint retained as historical evidence.

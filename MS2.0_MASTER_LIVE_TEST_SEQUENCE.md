@@ -66,14 +66,14 @@ Evidence abbreviations: `CVS` = `docs/engineering-memory/current-live-validation
 | # | Checkpoint | Objective | Prerequisite(s) | Implementation state | Owner validation | Protected | Est. live test | Evidence/document source |
 |---:|---|---|---|---|---|---|---|---|
 | 39 | Report periods, refresh and Read | Generate Today/historical/custom reports, preserve freshness/source truth and read aloud reliably. | 21 | PASS / PROTECTED | Passed | Yes | 12 min | CVS; LATP report history; report verifier/tests |
-| 40 | CSV Technical Data Transfer | Export canonical 35×12 machine data with safe encoding, quoting and spreadsheet protections. | 10 | PASS / PROTECTED | Passed | Yes | CVS; CSV compatibility memory |
-| 41 | Excel Operations Workbook | Produce purpose-built operational sheets with reconciled metrics and complete canonical inventory. | 10, 21 | PASS / PROTECTED | Passed | Yes | CVS; Export Hub verifier |
-| 42 | PDF Owner Copy | Produce readable portrait overview and complete medicine cards without clipping. | 10, 21 | PASS / PROTECTED | Passed | Yes | CVS; Export Hub evidence |
-| 43 | Word Owner Copy | Produce editable owner notes/corrections document with all medicines and stable page flow. | 10, 21 | PASS / PROTECTED | Passed | Yes | CVS; Export Hub evidence |
-| 44 | Presentation Owner Briefing | Produce a readable nine-slide decision briefing with correct identity and no invented claims. | 10, 21 | PASS / PROTECTED | Passed | Yes | CVS; Export Hub evidence |
-| 45 | Print Working Inventory | Show mobile review/finder and complete native print preview without claiming physical completion. | 10 | PASS / PROTECTED | Passed | Yes | CVS; Print evidence |
-| 46 | Export Hub status/history | Maintain one pharmacy-scoped status card, deduplicated history and no operations-feed spam. | 40–45 | PASS / PROTECTED | Passed | Yes | CVS; export history memory/verifier |
-| 47 | Cross-format canonical integrity | Keep one immutable snapshot, all records/fields, valid packages, filenames and readable layouts across formats. | 40–46 | PASS / PROTECTED | Passed | Yes | CVS; consistency/export verifiers |
+| 40 | CSV Technical Data Transfer | Export canonical 35×12 machine data with safe encoding, quoting and spreadsheet protections. | 10 | PASS / PROTECTED | Passed | Yes | Repository evidence not yet available. | CVS; CSV compatibility memory |
+| 41 | Excel Operations Workbook | Produce purpose-built operational sheets with reconciled metrics and complete canonical inventory. | 10, 21 | PASS / PROTECTED | Passed | Yes | Repository evidence not yet available. | CVS; Export Hub verifier |
+| 42 | PDF Owner Copy | Produce readable portrait overview and complete medicine cards without clipping. | 10, 21 | PASS / PROTECTED | Passed | Yes | Repository evidence not yet available. | CVS; Export Hub evidence |
+| 43 | Word Owner Copy | Produce editable owner notes/corrections document with all medicines and stable page flow. | 10, 21 | PASS / PROTECTED | Passed | Yes | Repository evidence not yet available. | CVS; Export Hub evidence |
+| 44 | Presentation Owner Briefing | Produce a readable nine-slide decision briefing with correct identity and no invented claims. | 10, 21 | PASS / PROTECTED | Passed | Yes | Repository evidence not yet available. | CVS; Export Hub evidence |
+| 45 | Print Working Inventory | Show mobile review/finder and complete native print preview without claiming physical completion. | 10 | PASS / PROTECTED | Passed | Yes | Repository evidence not yet available. | CVS; Print evidence |
+| 46 | Export Hub status/history | Maintain one pharmacy-scoped status card, deduplicated history and no operations-feed spam. | 40–45 | PASS / PROTECTED | Passed | Yes | Repository evidence not yet available. | CVS; export history memory/verifier |
+| 47 | Cross-format canonical integrity | Keep one immutable snapshot, all records/fields, valid packages, filenames and readable layouts across formats. | 40–46 | PASS / PROTECTED | Passed | Yes | Repository evidence not yet available. | CVS; consistency/export verifiers |
 | 48 | Future operational documents | Generate supplier orders, GRNs, cash/finance reconciliation, expiry and supplier reports from stored truth. | 29, 39–47 | Planned / approved | Not started | No | 20 min | OM Documents/Future rules; LATP Improvement 1 |
 
 ## 5. Financial & Payment Validation
@@ -109,8 +109,8 @@ Evidence abbreviations: `CVS` = `docs/engineering-memory/current-live-validation
 | 65 | Pharmacy/branch isolation | Prevent cross-pharmacy catalog, learning, notification, payment, export and credential leakage. | Implemented pharmacy-scoped data workflows | PASS / PROTECTED | Passed in protected workflows and automated gates | Yes | 15 min | CVS; ARCH; isolation tests/verifiers |
 | 66 | Idempotency, audit and duplicate prevention | Ensure retries/callbacks/imports/actions cannot duplicate mutations and every protected correction remains traceable. | 14–20, 51–53 | PASS / PROTECTED | Passed across protected workflows | Yes | 15 min | CVS; TCE; activity/export/offline verifiers |
 | 67 | Authentication, roles and access controls | Enforce owner/admin/branch authorization and minimum-necessary access across UI, routes and downloads. | 2, 58–65 | Partial implementation | Not owner-qualified end to end | No | 15 min | registry/admin/routes; ARCH; compliance plan |
-| 68 | Export IP/privacy/compliance safeguards | Register assets/licences, fail closed, redact/anonymize, control IDs/sharing/retention and avoid false endorsement. | 40–48, 65–67 | Planned / approved | Not started | No | LATP Improvement 3 |
-| 69 | Product-secrecy and quiet-UI audit | Remove unnecessary internal implementation disclosures while preserving legal/safety/privacy truth. | All functional/intelligence tests | Planned / approved | Not started | No | CVS; LATP future audit |
+| 68 | Export IP/privacy/compliance safeguards | Register assets/licences, fail closed, redact/anonymize, control IDs/sharing/retention and avoid false endorsement. | 40–48, 65–67 | Planned / approved | Not started | No | Repository evidence not yet available. | LATP Improvement 3 |
+| 69 | Product-secrecy and quiet-UI audit | Remove unnecessary internal implementation disclosures while preserving legal/safety/privacy truth. | All functional/intelligence tests | Planned / approved | Not started | No | Repository evidence not yet available. | CVS; LATP future audit |
 
 ## 8. Production Qualification
 
@@ -194,3 +194,1155 @@ The only current open checkpoint is **#13 Editable-card voice viewport/focus**. 
 4. A checkpoint may change status only here, with owner evidence for `PASS / PROTECTED`; dependent documents may record detail but cannot override it.
 5. A deletion, merge, split, renumbering, prerequisite change or deprecation requires repository evidence, updated totals, an updated completeness-ledger row and same-commit synchronization of directly affected references.
 6. Before push, validate unique checkpoint numbers/names, allowed states, totals, acyclic prerequisites, one current pointer and canonical-reference headers in every tracked Markdown governance/support document.
+
+<!-- TRACEABILITY_INDEX_START -->
+
+## Engineering traceability index
+
+
+
+This generated index is part of the canonical master. Run `node scripts/update-master-traceability.mjs` after an evidence, status, prerequisite, dependency, implementation-file or checkpoint change. Commit this file and all directly affected Project Brain/Engineering Memory references together.
+
+
+
+### MS2-LT-001 — Main App shell and navigation
+
+- **Checkpoint ID:** MS2-LT-001
+- **Name:** Main App shell and navigation
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; ARCH; `verify-architecture.mjs`
+- **Implementation commit(s):** ed1d316 Automate transaction completion and simplify payment navigation
+- **Primary implementation files/modules:** `ms20-main-app/src/app.js`; `ms20-main-app/src/routes/routeRegistry.js`
+- **Owner live-test evidence:** Passed; source: CVS; ARCH; `verify-architecture.mjs`
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** None
+- **Dependent checkpoints:** MS2-LT-002, MS2-LT-012, MS2-LT-058
+
+### MS2-LT-002 — First-run owner setup
+
+- **Checkpoint ID:** MS2-LT-002
+- **Name:** First-run owner setup
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; OM; `pharmacy_onboarding.py`; onboarding tests
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** `app/services/pharmacy_onboarding.py`; `app/pharmacy_registry.py`
+- **Owner live-test evidence:** Passed; source: CVS; OM; `pharmacy_onboarding.py`; onboarding tests
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 1
+- **Dependent checkpoints:** MS2-LT-003, MS2-LT-004, MS2-LT-005, MS2-LT-006, MS2-LT-007, MS2-LT-008, MS2-LT-009, MS2-LT-010, MS2-LT-031, MS2-LT-059, MS2-LT-067, MS2-LT-073
+
+### MS2-LT-003 — Invoice onboarding and local OCR
+
+- **Checkpoint ID:** MS2-LT-003
+- **Name:** Invoice onboarding and local OCR
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; `invoice-table-ocr.md`; invoice fixtures/tests
+- **Implementation commit(s):** efaeebb Read ambiguous invoice cells directly; 342bf5e Refine ambiguous invoice cells locally; 59eec84 Preserve complete invoice evidence and pricing
+- **Primary implementation files/modules:** `app/services/local_invoice_ocr.py`; `app/services/medicine_onboarding.py`
+- **Owner live-test evidence:** Passed; source: CVS; `invoice-table-ocr.md`; invoice fixtures/tests
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 2
+- **Dependent checkpoints:** MS2-LT-011, MS2-LT-035, MS2-LT-036
+
+### MS2-LT-004 — Bulk paste onboarding
+
+- **Checkpoint ID:** MS2-LT-004
+- **Name:** Bulk paste onboarding
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; LATP; paste fixtures; catalog verifiers
+- **Implementation commit(s):** 7a6335c Prepare local Excel catalog onboarding; 8c22f10 Require explicit paste input before catalog review; e4a4cfa Prepare clean paste onboarding fixture
+- **Primary implementation files/modules:** `ms20-main-app/src/services/catalogOnboarding.js`
+- **Owner live-test evidence:** Passed; source: CVS; LATP; paste fixtures; catalog verifiers
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 2
+- **Dependent checkpoints:** MS2-LT-011
+
+### MS2-LT-005 — CSV onboarding
+
+- **Checkpoint ID:** MS2-LT-005
+- **Name:** CSV onboarding
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; CSV fixture/verifier
+- **Implementation commit(s):** 7a6335c Prepare local Excel catalog onboarding; c663670 Preserve strength through CSV review; e4a4cfa Prepare clean paste onboarding fixture
+- **Primary implementation files/modules:** `ms20-main-app/src/services/catalogOnboarding.js`
+- **Owner live-test evidence:** Passed; source: CVS; CSV fixture/verifier
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 2
+- **Dependent checkpoints:** MS2-LT-011
+
+### MS2-LT-006 — XLSX onboarding
+
+- **Checkpoint ID:** MS2-LT-006
+- **Name:** XLSX onboarding
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; Test 5 fixture/verifier
+- **Implementation commit(s):** 7a6335c Prepare local Excel catalog onboarding; e4a4cfa Prepare clean paste onboarding fixture; df18086 Add local-first catalog onboarding foundation
+- **Primary implementation files/modules:** `ms20-main-app/src/services/catalogOnboarding.js`
+- **Owner live-test evidence:** Passed; source: CVS; Test 5 fixture/verifier
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 2
+- **Dependent checkpoints:** MS2-LT-011
+
+### MS2-LT-007 — Barcode onboarding
+
+- **Checkpoint ID:** MS2-LT-007
+- **Name:** Barcode onboarding
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; barcode fixtures/verifiers
+- **Implementation commit(s):** 0d7ce83 Add Loperamide barcode live-test fixture; 3de02cb Add controlled barcode live-test fixture
+- **Primary implementation files/modules:** `ms20-main-app/src/data/barcodeTestFixtures.js`; `ms20-main-app/src/services/medicineMatcher.js`
+- **Owner live-test evidence:** Passed; source: CVS; barcode fixtures/verifiers
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 2
+- **Dependent checkpoints:** MS2-LT-011, MS2-LT-035, MS2-LT-036
+
+### MS2-LT-008 — Shelf-photo onboarding
+
+- **Checkpoint ID:** MS2-LT-008
+- **Name:** Shelf-photo onboarding
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; shelf fixtures/verifier
+- **Implementation commit(s):** df18086 Add local-first catalog onboarding foundation; cc5d3e3 Add photo invoice intake infrastructure
+- **Primary implementation files/modules:** `app/services/photo_intake.py`; `ms20-main-app/src/services/visualPipeline.js`
+- **Owner live-test evidence:** Passed; source: CVS; shelf fixtures/verifier
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 2
+- **Dependent checkpoints:** MS2-LT-011, MS2-LT-035, MS2-LT-036
+
+### MS2-LT-009 — Medicine-pack photo onboarding
+
+- **Checkpoint ID:** MS2-LT-009
+- **Name:** Medicine-pack photo onboarding
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; medicine-photo fixture/verifier
+- **Implementation commit(s):** df18086 Add local-first catalog onboarding foundation; cc5d3e3 Add photo invoice intake infrastructure
+- **Primary implementation files/modules:** `app/services/photo_intake.py`; `ms20-main-app/src/services/visualPipeline.js`
+- **Owner live-test evidence:** Passed; source: CVS; medicine-photo fixture/verifier
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 2
+- **Dependent checkpoints:** MS2-LT-011, MS2-LT-035, MS2-LT-036
+
+### MS2-LT-010 — Catalog browse/search/edit
+
+- **Checkpoint ID:** MS2-LT-010
+- **Name:** Catalog browse/search/edit
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; Catalog Search Mic and Activity Compaction evidence; catalog/activity verifiers
+- **Implementation commit(s):** 87a15ca Compact catalog activity history; 3a57f18 Protect out-of-stock pass and add catalog search mic; 937cc3f Normalize expiry months and repeat catalog search
+- **Primary implementation files/modules:** `ms20-main-app/src/services/catalogWorkspace.js`; `ms20-main-app/src/services/activityHistory.js`
+- **Owner live-test evidence:** Passed; source: CVS; Catalog Search Mic and Activity Compaction evidence; catalog/activity verifiers
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 2
+- **Dependent checkpoints:** MS2-LT-011, MS2-LT-013, MS2-LT-014, MS2-LT-015, MS2-LT-016, MS2-LT-017, MS2-LT-024, MS2-LT-025, MS2-LT-040, MS2-LT-041, MS2-LT-042, MS2-LT-043, MS2-LT-044, MS2-LT-045, MS2-LT-049
+
+### MS2-LT-011 — Shared medicine review integrity
+
+- **Checkpoint ID:** MS2-LT-011
+- **Name:** Shared medicine review integrity
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; shared-field/readiness/reordering verifiers
+- **Implementation commit(s):** 6476f7c Share medicine review row controls; 1dff3b2 Centralize editable medicine fields
+- **Primary implementation files/modules:** `ms20-main-app/src/cards/editableCards.js`; `ms20-main-app/src/services/catalogReviewPolicy.js`
+- **Owner live-test evidence:** Passed; source: CVS; shared-field/readiness/reordering verifiers
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 3–10
+- **Dependent checkpoints:** MS2-LT-013, MS2-LT-014, MS2-LT-015, MS2-LT-049
+
+### MS2-LT-012 — Shared voice capture and review
+
+- **Checkpoint ID:** MS2-LT-012
+- **Name:** Shared voice capture and review
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; Mic Test 2; voice verifiers
+- **Implementation commit(s):** 464674f Make card voice editing reachable inline; 09cb128 Preserve editable card voice viewport; 9afd4e4 Close unread review checkpoint and route notification actions
+- **Primary implementation files/modules:** `app/transcription.py`; `ms20-main-app/src/app.js`
+- **Owner live-test evidence:** Passed; source: CVS; Mic Test 2; voice verifiers
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 1
+- **Dependent checkpoints:** MS2-LT-013, MS2-LT-014, MS2-LT-015, MS2-LT-049
+
+### MS2-LT-013 — Editable-card voice viewport/focus
+
+- **Checkpoint ID:** MS2-LT-013
+- **Name:** Editable-card voice viewport/focus
+- **Category:** Core Functional Validation
+- **Current status:** Implemented — awaiting owner live test
+- **Repository evidence:** CVS; LATP; `voiceViewportAnchor.js`; viewport verifier
+- **Implementation commit(s):** 464674f Make card voice editing reachable inline; 09cb128 Preserve editable card voice viewport; 1dff3b2 Centralize editable medicine fields
+- **Primary implementation files/modules:** `ms20-main-app/src/services/voiceViewportAnchor.js`; `ms20-main-app/src/cards/editableCards.js`
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete decisive owner live validation for: Keep an inline Mic reachable beside any field and preserve the exact target/viewport through transcription.
+- **Prerequisite checkpoints:** 10–12
+- **Dependent checkpoints:** MS2-LT-049
+
+### MS2-LT-014 — Known-medicine sales
+
+- **Checkpoint ID:** MS2-LT-014
+- **Name:** Known-medicine sales
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; TCE Fast Record evidence; sales tests
+- **Implementation commit(s):** a639e3c Harden phone medicine selector readiness; 543ddf3 Require confirmation for WhatsApp medicine selector; 78ad94d Complete Kenya medicine brain architecture pass
+- **Primary implementation files/modules:** `app/intake.py`; `ms20-main-app/src/services/transactionCompletionEngine.js`
+- **Owner live-test evidence:** Passed; source: CVS; TCE Fast Record evidence; sales tests
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 10–12
+- **Dependent checkpoints:** MS2-LT-019, MS2-LT-020, MS2-LT-021, MS2-LT-024, MS2-LT-026, MS2-LT-027, MS2-LT-034, MS2-LT-049, MS2-LT-050, MS2-LT-051, MS2-LT-066
+
+### MS2-LT-015 — Restocking and delivery details
+
+- **Checkpoint ID:** MS2-LT-015
+- **Name:** Restocking and delivery details
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; voice-restock verifier; intake tests
+- **Implementation commit(s):** 67560ab Fix offline confirmation delivery diagnostics and stock safety; 46f8d32 Fix offline confirmation delivery and stock safety
+- **Primary implementation files/modules:** `app/intake.py`; `app/services/image_restock.py`
+- **Owner live-test evidence:** Passed; source: CVS; voice-restock verifier; intake tests
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 10–12
+- **Dependent checkpoints:** MS2-LT-019, MS2-LT-020, MS2-LT-049, MS2-LT-066
+
+### MS2-LT-016 — Stock enquiry
+
+- **Checkpoint ID:** MS2-LT-016
+- **Name:** Stock enquiry
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; `localIntelligence.js`; stock tests
+- **Implementation commit(s):** d6901b9 Fix voice restock review and recovery; 5e3ee33 Answer medicine stock checks instantly; 616fda4 Keep mobile chat fixed and normalize restocks
+- **Primary implementation files/modules:** `ms20-main-app/src/services/localIntelligence.js`; `app/intake.py`
+- **Owner live-test evidence:** Passed; source: CVS; `localIntelligence.js`; stock tests
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 10
+- **Dependent checkpoints:** MS2-LT-019, MS2-LT-020, MS2-LT-066
+
+### MS2-LT-017 — Manual stock correction
+
+- **Checkpoint ID:** MS2-LT-017
+- **Name:** Manual stock correction
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; `stock-fix-workflow.md`; stock-correction verifiers
+- **Implementation commit(s):** 1b4de86 Stabilize guided Stock Fix conversation; c86cfc8 Stabilize Stock Fix OCR and optional reason; b5ffd6a Unify Stock Fix evidence inputs
+- **Primary implementation files/modules:** `ms20-main-app/src/services/stockCorrectionExecution.js`; `ms20-main-app/src/services/stockCorrectionPolicy.js`
+- **Owner live-test evidence:** Passed; source: CVS; `stock-fix-workflow.md`; stock-correction verifiers
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 10
+- **Dependent checkpoints:** MS2-LT-018, MS2-LT-019, MS2-LT-020, MS2-LT-066
+
+### MS2-LT-018 — Stock Fix acquisition parity
+
+- **Checkpoint ID:** MS2-LT-018
+- **Name:** Stock Fix acquisition parity
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; stock-fix evidence/UI verifiers
+- **Implementation commit(s):** 74f7f69 Focus Stock Fix OCR on package region; b9aea88 Harden Stock Fix package recognition; c86cfc8 Stabilize Stock Fix OCR and optional reason
+- **Primary implementation files/modules:** `ms20-main-app/src/services/stockFixEvidencePipeline.js`; `app/services/local_stock_fix_ocr.py`
+- **Owner live-test evidence:** Passed; source: CVS; stock-fix evidence/UI verifiers
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 17
+- **Dependent checkpoints:** MS2-LT-019, MS2-LT-020, MS2-LT-066
+
+### MS2-LT-019 — Corrections, cancellation and undo
+
+- **Checkpoint ID:** MS2-LT-019
+- **Name:** Corrections, cancellation and undo
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; TCE; issue-return/intake tests
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** `app/intake.py`; `ms20-main-app/src/services/transactionCompletionEngine.js`
+- **Owner live-test evidence:** Passed; source: CVS; TCE; issue-return/intake tests
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 14–18
+- **Dependent checkpoints:** MS2-LT-020, MS2-LT-066
+
+### MS2-LT-020 — Offline operation and synchronization
+
+- **Checkpoint ID:** MS2-LT-020
+- **Name:** Offline operation and synchronization
+- **Category:** Core Functional Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** TRAIN; offline app/sync/queue tests
+- **Implementation commit(s):** 911a830 Fix Replit startup and offline static routes
+- **Primary implementation files/modules:** `app/services/offline_sync.py`; `ms20-main-app/src/services/offlineQueue.js`
+- **Owner live-test evidence:** Passed; source: TRAIN; offline app/sync/queue tests
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 14–19
+- **Dependent checkpoints:** MS2-LT-021, MS2-LT-059, MS2-LT-061, MS2-LT-066
+
+### MS2-LT-021 — Daily operational metrics
+
+- **Checkpoint ID:** MS2-LT-021
+- **Name:** Daily operational metrics
+- **Category:** Pharmacy Operating Intelligence Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS report evidence; `reports.py`; report verifier
+- **Implementation commit(s):** 9fbf0d2 Make daily report refresh truthful and read-only
+- **Primary implementation files/modules:** `app/reports.py`; `ms20-main-app/src/services/localIntelligence.js`
+- **Owner live-test evidence:** Passed; source: CVS report evidence; `reports.py`; report verifier
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 14, 20
+- **Dependent checkpoints:** MS2-LT-022, MS2-LT-023, MS2-LT-026, MS2-LT-027, MS2-LT-028, MS2-LT-039, MS2-LT-041, MS2-LT-042, MS2-LT-043, MS2-LT-044
+
+### MS2-LT-022 — Direct analytics commands
+
+- **Checkpoint ID:** MS2-LT-022
+- **Name:** Direct analytics commands
+- **Category:** Pharmacy Operating Intelligence Validation
+- **Current status:** Implemented — awaiting owner live test
+- **Repository evidence:** OI; `intake.py`; analytics/token tests
+- **Implementation commit(s):** 1498960 Add POS parity commands and bridge startup hardening; 7691591 Simplify pharmacy commands and voice fallback
+- **Primary implementation files/modules:** `app/intake.py`; `app/services/operational_intelligence.py`
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete decisive owner live validation for: Answer cash/M-Pesa today, payment split/top method, best seller, peak hours, missed demand and profit locally.
+- **Prerequisite checkpoints:** 21
+- **Dependent checkpoints:** MS2-LT-023
+
+### MS2-LT-023 — Decision-support summary
+
+- **Checkpoint ID:** MS2-LT-023
+- **Name:** Decision-support summary
+- **Category:** Pharmacy Operating Intelligence Validation
+- **Current status:** Partial implementation
+- **Repository evidence:** OI; `deterministic_recommendations()`; current renderer gap
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** `app/services/operational_intelligence.py`
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete the unimplemented portion and owner-validate: State what happened, why it matters and a deterministic next action without routine LLM use.
+- **Prerequisite checkpoints:** 21–22
+- **Dependent checkpoints:** MS2-LT-030, MS2-LT-038
+
+### MS2-LT-024 — Low/out-of-stock intelligence
+
+- **Checkpoint ID:** MS2-LT-024
+- **Name:** Low/out-of-stock intelligence
+- **Category:** Pharmacy Operating Intelligence Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; notification lifecycle evidence
+- **Implementation commit(s):** dd05778 Close low stock and harden notification edits; d6901b9 Fix voice restock review and recovery; 5e3ee33 Answer medicine stock checks instantly
+- **Primary implementation files/modules:** `ms20-main-app/src/services/notificationCenter.js`; `ms20-main-app/src/services/localIntelligence.js`
+- **Owner live-test evidence:** Passed; source: CVS; notification lifecycle evidence
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 10, 14
+- **Dependent checkpoints:** MS2-LT-029, MS2-LT-030
+
+### MS2-LT-025 — Expiry intelligence
+
+- **Checkpoint ID:** MS2-LT-025
+- **Name:** Expiry intelligence
+- **Category:** Pharmacy Operating Intelligence Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; expiry lifecycle evidence
+- **Implementation commit(s):** 937cc3f Normalize expiry months and repeat catalog search
+- **Primary implementation files/modules:** `ms20-main-app/src/services/notificationCenter.js`; `ms20-main-app/src/services/localIntelligence.js`
+- **Owner live-test evidence:** Passed; source: CVS; expiry lifecycle evidence
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 10
+- **Dependent checkpoints:** MS2-LT-030
+
+### MS2-LT-026 — Missed-demand and lost-opportunity intelligence
+
+- **Checkpoint ID:** MS2-LT-026
+- **Name:** Missed-demand and lost-opportunity intelligence
+- **Category:** Pharmacy Operating Intelligence Validation
+- **Current status:** Partial implementation
+- **Repository evidence:** OM future rules; `reports.py`; intake/training tests
+- **Implementation commit(s):** b397234 Add media intelligence training layer; ad79c52 Add pharmacy training simulation intelligence
+- **Primary implementation files/modules:** `app/reports.py`; `app/services/operational_intelligence.py`
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete the unimplemented portion and owner-validate: Aggregate no-stock/not-sold demand and recommend a truthful response.
+- **Prerequisite checkpoints:** 14, 21
+- **Dependent checkpoints:** MS2-LT-030
+
+### MS2-LT-027 — Fast/slow/dead-stock intelligence
+
+- **Checkpoint ID:** MS2-LT-027
+- **Name:** Fast/slow/dead-stock intelligence
+- **Category:** Pharmacy Operating Intelligence Validation
+- **Current status:** Planned / approved
+- **Repository evidence:** OM; OI; historical Operational Intelligence continuation
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Implement and owner-validate: Detect movement patterns, inactivity and value tied up, then recommend owner action.
+- **Prerequisite checkpoints:** 14, 21, 49
+- **Dependent checkpoints:** MS2-LT-028, MS2-LT-029, MS2-LT-030
+
+### MS2-LT-028 — Stock-out and demand-risk prediction
+
+- **Checkpoint ID:** MS2-LT-028
+- **Name:** Stock-out and demand-risk prediction
+- **Category:** Pharmacy Operating Intelligence Validation
+- **Current status:** Planned / approved
+- **Repository evidence:** OI; LATP approved improvements
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Implement and owner-validate: Anticipate likely stock-outs using canonical movement, lead time and confirmed unit truth.
+- **Prerequisite checkpoints:** 21, 27, 49
+- **Dependent checkpoints:** MS2-LT-029, MS2-LT-030
+
+### MS2-LT-029 — Reorder-level and supplier-order intelligence
+
+- **Checkpoint ID:** MS2-LT-029
+- **Name:** Reorder-level and supplier-order intelligence
+- **Category:** Pharmacy Operating Intelligence Validation
+- **Current status:** Planned / approved
+- **Repository evidence:** LATP Improvement 1; OI
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Implement and owner-validate: Suggest truthful reorder quantities, allow owner control/grouping/sending and track sourced fulfilment.
+- **Prerequisite checkpoints:** 24, 27–28, 49
+- **Dependent checkpoints:** MS2-LT-030, MS2-LT-048, MS2-LT-057, MS2-LT-064
+
+### MS2-LT-030 — Operational dashboard and action prioritization
+
+- **Checkpoint ID:** MS2-LT-030
+- **Name:** Operational dashboard and action prioritization
+- **Category:** Pharmacy Operating Intelligence Validation
+- **Current status:** Partial implementation
+- **Repository evidence:** notification center; deployment dashboard; OM/OI
+- **Implementation commit(s):** 9afd4e4 Close unread review checkpoint and route notification actions; ed1d316 Automate transaction completion and simplify payment navigation
+- **Primary implementation files/modules:** `ms20-main-app/src/services/notificationCenter.js`; `app/services/operational_intelligence.py`
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete the unimplemented portion and owner-validate: Rank urgent/value-at-risk work and expose calm next-best actions with measurable outcomes.
+- **Prerequisite checkpoints:** 23–29
+- **Dependent checkpoints:** None
+
+### MS2-LT-031 — Source Brain and shared medicine matcher
+
+- **Checkpoint ID:** MS2-LT-031
+- **Name:** Source Brain and shared medicine matcher
+- **Category:** AI / Learning Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; OM; matcher verifier/tests
+- **Implementation commit(s):** aed9819 Block generic-only medicine voice matches; 6cc6ac7 Centralize local medicine recognition
+- **Primary implementation files/modules:** `app/medicine_brain.py`; `ms20-main-app/src/services/medicineMatcher.js`
+- **Owner live-test evidence:** Passed through onboarding/search evidence; source: CVS; OM; matcher verifier/tests
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed through onboarding/search evidence; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 2
+- **Dependent checkpoints:** MS2-LT-032, MS2-LT-033, MS2-LT-034, MS2-LT-035, MS2-LT-037, MS2-LT-060
+
+### MS2-LT-032 — Pharmacy Catalog learning boundary
+
+- **Checkpoint ID:** MS2-LT-032
+- **Name:** Pharmacy Catalog learning boundary
+- **Category:** AI / Learning Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; OM; catalog persistence evidence
+- **Implementation commit(s):** 3a57f18 Protect out-of-stock pass and add catalog search mic; 937cc3f Normalize expiry months and repeat catalog search; 6ea68bb Require complete catalog search intent
+- **Primary implementation files/modules:** `app/services/medicine_catalog.py`; `ms20-main-app/src/services/catalogWorkspace.js`
+- **Owner live-test evidence:** Passed; source: CVS; OM; catalog persistence evidence
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 31
+- **Dependent checkpoints:** MS2-LT-033
+
+### MS2-LT-033 — Pharmacy alias/shorthand learning
+
+- **Checkpoint ID:** MS2-LT-033
+- **Name:** Pharmacy alias/shorthand learning
+- **Category:** AI / Learning Validation
+- **Current status:** Partial implementation
+- **Repository evidence:** OI; `AdaptiveAliasLearner`; training tests
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** `app/correction_learning.py`; `app/services/pharmacy_alias_store.py`
+- **Owner live-test evidence:** Manual alias path passed; adaptive path untested; source: OI; `AdaptiveAliasLearner`; training tests
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete the unimplemented portion and owner-validate: Learn repeated confirmed local shorthand safely, retain review and avoid dangerous promotion.
+- **Prerequisite checkpoints:** 31–32
+- **Dependent checkpoints:** MS2-LT-038
+
+### MS2-LT-034 — Operational memory and reusable commands
+
+- **Checkpoint ID:** MS2-LT-034
+- **Name:** Operational memory and reusable commands
+- **Category:** AI / Learning Validation
+- **Current status:** Implemented — awaiting owner live test
+- **Repository evidence:** `OperationalMemory`; reuse UI; intake/training tests
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** `app/services/operational_intelligence.py`; `app/training_store.py`
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete decisive owner live validation for: Reuse recent approved transaction context and owner commands within safe local boundaries.
+- **Prerequisite checkpoints:** 14, 31
+- **Dependent checkpoints:** MS2-LT-038
+
+### MS2-LT-035 — Trusted-result/cache reuse
+
+- **Checkpoint ID:** MS2-LT-035
+- **Name:** Trusted-result/cache reuse
+- **Category:** AI / Learning Validation
+- **Current status:** Partial implementation
+- **Repository evidence:** `trusted-result-consistency.md`; fixture history
+- **Implementation commit(s):** e158ec9 Add trusted result consistency gate
+- **Primary implementation files/modules:** `app/services/medicine_onboarding.py`; `ms20-main-app/src/services/brainAdapters.js`
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete the unimplemented portion and owner-validate: Reuse verified invoice/photo/barcode evidence before AI and keep corrections medicine/pharmacy scoped.
+- **Prerequisite checkpoints:** 3, 7–9, 31
+- **Dependent checkpoints:** MS2-LT-037, MS2-LT-038
+
+### MS2-LT-036 — Media classification and extraction routing
+
+- **Checkpoint ID:** MS2-LT-036
+- **Name:** Media classification and extraction routing
+- **Category:** AI / Learning Validation
+- **Current status:** Partial implementation
+- **Repository evidence:** `operational_intelligence.py`; photo/intake tests
+- **Implementation commit(s):** a4262e2 Strengthen local-first media and voice architecture; b397234 Add media intelligence training layer
+- **Primary implementation files/modules:** `app/services/operational_intelligence.py`; `app/services/photo_intake.py`
+- **Owner live-test evidence:** Core routes passed; full general classifier untested; source: `operational_intelligence.py`; photo/intake tests
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete the unimplemented portion and owner-validate: Classify invoice, receipt, shelf, pack, barcode and unclear media; preserve review and safe fallback.
+- **Prerequisite checkpoints:** 3, 7–9
+- **Dependent checkpoints:** MS2-LT-037, MS2-LT-038
+
+### MS2-LT-037 — AI fallback approval boundary
+
+- **Checkpoint ID:** MS2-LT-037
+- **Name:** AI fallback approval boundary
+- **Category:** AI / Learning Validation
+- **Current status:** Implemented — awaiting owner live test
+- **Repository evidence:** `ai_policy.py`; AI policy/token tests; ARCH
+- **Implementation commit(s):** 9917fd2 Polish voice media trust and token guardrails; bbe3c73 Add pharmacy assistant training guardrails; 43ad769 Add media quota fallbacks and photo intake skeleton
+- **Primary implementation files/modules:** `app/ai_policy.py`; `app/ai.py`
+- **Owner live-test evidence:** Zero-AI paths passed; fallback not owner-qualified; source: `ai_policy.py`; AI policy/token tests; ARCH
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete decisive owner live validation for: Use AI only for explicitly approved unresolved voice/command/media cases with privacy, timeout, cache and cost controls.
+- **Prerequisite checkpoints:** 31, 35–36
+- **Dependent checkpoints:** MS2-LT-038
+
+### MS2-LT-038 — Learning effectiveness and rollback
+
+- **Checkpoint ID:** MS2-LT-038
+- **Name:** Learning effectiveness and rollback
+- **Category:** AI / Learning Validation
+- **Current status:** Planned / approved
+- **Repository evidence:** OI; training/reliability/learning architecture
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Implement and owner-validate: Measure whether approved learning/recommendations helped and allow safe correction/forgetting without cross-pharmacy leakage.
+- **Prerequisite checkpoints:** 23, 33–37
+- **Dependent checkpoints:** None
+
+### MS2-LT-039 — Report periods, refresh and Read
+
+- **Checkpoint ID:** MS2-LT-039
+- **Name:** Report periods, refresh and Read
+- **Category:** Reporting & Export Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; LATP report history; report verifier/tests
+- **Implementation commit(s):** 94c535e Remove AI latency from MS2.0 reports; 4f9f7e0 Speed historical reports and repair speech resume; 9942219 Add deterministic historical reports and speech controls
+- **Primary implementation files/modules:** `app/reports.py`; `ms20-main-app/src/services/localIntelligence.js`
+- **Owner live-test evidence:** Passed; source: CVS; LATP report history; report verifier/tests
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 21
+- **Dependent checkpoints:** MS2-LT-048, MS2-LT-071
+
+### MS2-LT-040 — CSV Technical Data Transfer
+
+- **Checkpoint ID:** MS2-LT-040
+- **Name:** CSV Technical Data Transfer
+- **Category:** Reporting & Export Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; CSV compatibility memory
+- **Implementation commit(s):** c072675 Remove visible CSV byte order mark; c38ee07 Harden CSV mobile compatibility; 01cdcff Protect Export Hub workflows and advance CSV validation
+- **Primary implementation files/modules:** `ms20-main-app/src/services/documentGenerator.js`; `ms20-main-app/src/services/exportFormatMetadata.js`
+- **Owner live-test evidence:** Passed; source: CVS; CSV compatibility memory
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 10
+- **Dependent checkpoints:** MS2-LT-046, MS2-LT-047, MS2-LT-048, MS2-LT-068
+
+### MS2-LT-041 — Excel Operations Workbook
+
+- **Checkpoint ID:** MS2-LT-041
+- **Name:** Excel Operations Workbook
+- **Category:** Reporting & Export Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; Export Hub verifier
+- **Implementation commit(s):** 7a6335c Prepare local Excel catalog onboarding
+- **Primary implementation files/modules:** `ms20-main-app/src/services/excelInventory.js`; `ms20-main-app/src/services/ooxmlPackage.js`
+- **Owner live-test evidence:** Passed; source: CVS; Export Hub verifier
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 10, 21
+- **Dependent checkpoints:** MS2-LT-046, MS2-LT-047, MS2-LT-048, MS2-LT-068
+
+### MS2-LT-042 — PDF Owner Copy
+
+- **Checkpoint ID:** MS2-LT-042
+- **Name:** PDF Owner Copy
+- **Category:** Reporting & Export Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; Export Hub evidence
+- **Implementation commit(s):** 7a8995d Pass PDF owner copy and begin Word validation; 623a9dc Pass Excel compatibility and start phone-first PDF
+- **Primary implementation files/modules:** `ms20-main-app/src/services/documentGenerator.js`
+- **Owner live-test evidence:** Passed; source: CVS; Export Hub evidence
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 10, 21
+- **Dependent checkpoints:** MS2-LT-046, MS2-LT-047, MS2-LT-048, MS2-LT-068
+
+### MS2-LT-043 — Word Owner Copy
+
+- **Checkpoint ID:** MS2-LT-043
+- **Name:** Word Owner Copy
+- **Category:** Reporting & Export Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; Export Hub evidence
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** `ms20-main-app/src/services/documentGenerator.js`; `ms20-main-app/src/services/ooxmlPackage.js`
+- **Owner live-test evidence:** Passed; source: CVS; Export Hub evidence
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 10, 21
+- **Dependent checkpoints:** MS2-LT-046, MS2-LT-047, MS2-LT-048, MS2-LT-068
+
+### MS2-LT-044 — Presentation Owner Briefing
+
+- **Checkpoint ID:** MS2-LT-044
+- **Name:** Presentation Owner Briefing
+- **Category:** Reporting & Export Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; Export Hub evidence
+- **Implementation commit(s):** d993c82 Fix Presentation briefing and export history; c561003 Pass Word owner copy and prepare Presentation briefing
+- **Primary implementation files/modules:** `ms20-main-app/src/services/documentGenerator.js`; `ms20-main-app/src/services/ooxmlPackage.js`
+- **Owner live-test evidence:** Passed; source: CVS; Export Hub evidence
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 10, 21
+- **Dependent checkpoints:** MS2-LT-046, MS2-LT-047, MS2-LT-048, MS2-LT-068
+
+### MS2-LT-045 — Print Working Inventory
+
+- **Checkpoint ID:** MS2-LT-045
+- **Name:** Print Working Inventory
+- **Category:** Reporting & Export Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; Print evidence
+- **Implementation commit(s):** f8fe088 Fix same-context Print Finder capture; db1709c Fix shared Print Finder capture and reset; 6600418 Make print inventory review compact and searchable
+- **Primary implementation files/modules:** `ms20-main-app/src/services/documentGenerator.js`; `ms20-main-app/src/services/medicineFinder.js`
+- **Owner live-test evidence:** Passed; source: CVS; Print evidence
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 10
+- **Dependent checkpoints:** MS2-LT-046, MS2-LT-047, MS2-LT-048, MS2-LT-068
+
+### MS2-LT-046 — Export Hub status/history
+
+- **Checkpoint ID:** MS2-LT-046
+- **Name:** Export Hub status/history
+- **Category:** Reporting & Export Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; export history memory/verifier
+- **Implementation commit(s):** 87a15ca Compact catalog activity history; 01cdcff Protect Export Hub workflows and advance CSV validation; d993c82 Fix Presentation briefing and export history
+- **Primary implementation files/modules:** `ms20-main-app/src/services/exportFormatMetadata.js`; `ms20-main-app/src/app.js`
+- **Owner live-test evidence:** Passed; source: CVS; export history memory/verifier
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 40–45
+- **Dependent checkpoints:** MS2-LT-047, MS2-LT-048, MS2-LT-064, MS2-LT-068
+
+### MS2-LT-047 — Cross-format canonical integrity
+
+- **Checkpoint ID:** MS2-LT-047
+- **Name:** Cross-format canonical integrity
+- **Category:** Reporting & Export Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; consistency/export verifiers
+- **Implementation commit(s):** 9b49581 Finish Export Hub layout integrity
+- **Primary implementation files/modules:** `ms20-main-app/src/services/documentGenerator.js`; `ms20-main-app/tools/verify-export-hub.mjs`
+- **Owner live-test evidence:** Passed; source: CVS; consistency/export verifiers
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 40–46
+- **Dependent checkpoints:** MS2-LT-048, MS2-LT-068
+
+### MS2-LT-048 — Future operational documents
+
+- **Checkpoint ID:** MS2-LT-048
+- **Name:** Future operational documents
+- **Category:** Reporting & Export Validation
+- **Current status:** Planned / approved
+- **Repository evidence:** OM Documents/Future rules; LATP Improvement 1
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Implement and owner-validate: Generate supplier orders, GRNs, cash/finance reconciliation, expiry and supplier reports from stored truth.
+- **Prerequisite checkpoints:** 29, 39–47
+- **Dependent checkpoints:** MS2-LT-064, MS2-LT-068
+
+### MS2-LT-049 — Exact form/unit/pack/price truth
+
+- **Checkpoint ID:** MS2-LT-049
+- **Name:** Exact form/unit/pack/price truth
+- **Category:** Financial & Payment Validation
+- **Current status:** Planned / approved
+- **Repository evidence:** LATP Improvement 2; OI prerequisite
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Implement and owner-validate: Prevent unit/strength price leakage and preserve conversions across all inputs and consumers.
+- **Prerequisite checkpoints:** 10–15
+- **Dependent checkpoints:** MS2-LT-027, MS2-LT-028, MS2-LT-029, MS2-LT-050, MS2-LT-074
+
+### MS2-LT-050 — Payment modes, splits and discounts
+
+- **Checkpoint ID:** MS2-LT-050
+- **Name:** Payment modes, splits and discounts
+- **Category:** Financial & Payment Validation
+- **Current status:** Implemented — awaiting owner live test
+- **Repository evidence:** `intake.py`; day-2/intake tests; commit history
+- **Implementation commit(s):** 6f91b2a Save selector quantity payment choices immediately; ad15a4f Fix deterministic routing payments and media AI wiring; ab334cf Add simple payment modes and receipt fallback UX
+- **Primary implementation files/modules:** `app/intake.py`; `ms20-main-app/src/services/paymentAdapters.js`
+- **Owner live-test evidence:** Only narrower payment paths passed; source: `intake.py`; day-2/intake tests; commit history
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete decisive owner live validation for: Handle Cash, M-Pesa, Card, Credit, Mixed, payment corrections and supported discounts truthfully.
+- **Prerequisite checkpoints:** 14, 49
+- **Dependent checkpoints:** MS2-LT-057, MS2-LT-074
+
+### MS2-LT-051 — TCE Fast Record
+
+- **Checkpoint ID:** MS2-LT-051
+- **Name:** TCE Fast Record
+- **Category:** Financial & Payment Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; TCE
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** `ms20-main-app/src/services/transactionCompletionEngine.js`
+- **Owner live-test evidence:** Passed; source: CVS; TCE
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 14
+- **Dependent checkpoints:** MS2-LT-052, MS2-LT-055, MS2-LT-056, MS2-LT-066, MS2-LT-074
+
+### MS2-LT-052 — Request & Verify success
+
+- **Checkpoint ID:** MS2-LT-052
+- **Name:** Request & Verify success
+- **Category:** Financial & Payment Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; TCE; TCE/UI verifiers
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** `ms20-main-app/src/services/transactionCompletionEngine.js`; `ms20-main-app/src/services/paymentAdapters.js`
+- **Owner live-test evidence:** Passed; source: CVS; TCE; TCE/UI verifiers
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 51
+- **Dependent checkpoints:** MS2-LT-053, MS2-LT-054, MS2-LT-055, MS2-LT-056, MS2-LT-066, MS2-LT-074
+
+### MS2-LT-053 — Concurrent payment completion
+
+- **Checkpoint ID:** MS2-LT-053
+- **Name:** Concurrent payment completion
+- **Category:** Financial & Payment Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** TCE quiet-concurrency evidence
+- **Implementation commit(s):** ed1d316 Automate transaction completion and simplify payment navigation; 2e64e41 Prepare transaction completion engine
+- **Primary implementation files/modules:** `ms20-main-app/src/services/transactionCompletionEngine.js`
+- **Owner live-test evidence:** Passed; source: TCE quiet-concurrency evidence
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 52
+- **Dependent checkpoints:** MS2-LT-054, MS2-LT-055, MS2-LT-056, MS2-LT-066, MS2-LT-074
+
+### MS2-LT-054 — Payment failure/cancellation notification
+
+- **Checkpoint ID:** MS2-LT-054
+- **Name:** Payment failure/cancellation notification
+- **Category:** Financial & Payment Validation
+- **Current status:** Implemented — awaiting owner live test
+- **Repository evidence:** TCE; ARCH; notification implementation
+- **Implementation commit(s):** dd05778 Close low stock and harden notification edits; 9afd4e4 Close unread review checkpoint and route notification actions; c63f687 Fix pending-review notifications and Paste List capture
+- **Primary implementation files/modules:** `ms20-main-app/src/services/transactionCompletionEngine.js`; `ms20-main-app/src/services/notificationCenter.js`
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete decisive owner live validation for: Preserve stock/paid records and create one durable action-needed Notification without chat noise.
+- **Prerequisite checkpoints:** 52–53
+- **Dependent checkpoints:** MS2-LT-055, MS2-LT-056, MS2-LT-074
+
+### MS2-LT-055 — Refunds, returns and credits
+
+- **Checkpoint ID:** MS2-LT-055
+- **Name:** Refunds, returns and credits
+- **Category:** Financial & Payment Validation
+- **Current status:** Partial implementation
+- **Repository evidence:** TCE; issue-return tests; intake history
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** `app/intake.py`; `ms20-main-app/src/services/transactionCompletionEngine.js`
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete the unimplemented portion and owner-validate: Record linked financial/stock adjustments without deleting original history.
+- **Prerequisite checkpoints:** 51–54
+- **Dependent checkpoints:** MS2-LT-056, MS2-LT-057, MS2-LT-074
+
+### MS2-LT-056 — Undo/reversal reconciliation
+
+- **Checkpoint ID:** MS2-LT-056
+- **Name:** Undo/reversal reconciliation
+- **Category:** Financial & Payment Validation
+- **Current status:** Partial implementation
+- **Repository evidence:** TCE; ledger/intake tests
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** `app/intake.py`; `ms20-main-app/src/services/transactionCompletionEngine.js`
+- **Owner live-test evidence:** Basic cancellation/undo passed; full TCE reconciliation untested; source: TCE; ledger/intake tests
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete the unimplemented portion and owner-validate: Reconcile stock, finance, receipt, reports and audit exactly once for visible sale numbers.
+- **Prerequisite checkpoints:** 51–55
+- **Dependent checkpoints:** MS2-LT-074
+
+### MS2-LT-057 — Supplier/restock payments
+
+- **Checkpoint ID:** MS2-LT-057
+- **Name:** Supplier/restock payments
+- **Category:** Financial & Payment Validation
+- **Current status:** Planned / approved
+- **Repository evidence:** TCE permanent scope; supplier workflows
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Implement and owner-validate: Support supplier payment, credit and future settlement flows through the adapter/TCE boundary.
+- **Prerequisite checkpoints:** 29, 50, 55
+- **Dependent checkpoints:** MS2-LT-074
+
+### MS2-LT-058 — Main App/backend adapter gateway
+
+- **Checkpoint ID:** MS2-LT-058
+- **Name:** Main App/backend adapter gateway
+- **Category:** Integration Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; ARCH; backend adapter/route tests
+- **Implementation commit(s):** 1b06cdb Serve MS2 main app through Replit backend
+- **Primary implementation files/modules:** `app/main.py`; `ms20-main-app/src/services/liveBackendGateway.js`
+- **Owner live-test evidence:** Passed on Replit; source: CVS; ARCH; backend adapter/route tests
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed on Replit; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 1
+- **Dependent checkpoints:** MS2-LT-060, MS2-LT-061, MS2-LT-062, MS2-LT-063, MS2-LT-067, MS2-LT-070
+
+### MS2-LT-059 — Google Sheets pharmacy persistence
+
+- **Checkpoint ID:** MS2-LT-059
+- **Name:** Google Sheets pharmacy persistence
+- **Category:** Integration Validation
+- **Current status:** Implemented — awaiting owner live test
+- **Repository evidence:** onboarding/sheets tests; TRAIN
+- **Implementation commit(s):** c306c33 Wire production pharmacy registry onboarding; e0a23f3 Complete pre-demo pharmacy engine upgrade; 6b9c37c Use admin workbook tabs for pharmacy onboarding
+- **Primary implementation files/modules:** `app/sheets.py`; `app/services/pharmacy_onboarding.py`
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete decisive owner live validation for: Provision/read/write isolated pharmacy sheets and recover safely when unavailable.
+- **Prerequisite checkpoints:** 2, 20
+- **Dependent checkpoints:** MS2-LT-060, MS2-LT-067, MS2-LT-073
+
+### MS2-LT-060 — WhatsApp/Baileys optional channel
+
+- **Checkpoint ID:** MS2-LT-060
+- **Name:** WhatsApp/Baileys optional channel
+- **Category:** Integration Validation
+- **Current status:** Implemented — awaiting owner live test
+- **Repository evidence:** bridge docs/tests; commit history
+- **Implementation commit(s):** dfda7c6 Route Baileys text through live runtime endpoint; 0ebac5b Fix Baileys LID phone identity for live onboarding; 7545006 Polish WhatsApp voice selector recovery
+- **Primary implementation files/modules:** `baileys-bridge.js`; `app/whatsapp.py`
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete decisive owner live validation for: Route text/voice/media through shared pharmacy logic without making it the Main App proof path.
+- **Prerequisite checkpoints:** 31, 58–59
+- **Dependent checkpoints:** MS2-LT-067, MS2-LT-076
+
+### MS2-LT-061 — Offline PWA and media bridge
+
+- **Checkpoint ID:** MS2-LT-061
+- **Name:** Offline PWA and media bridge
+- **Category:** Integration Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** TRAIN; offline/bridge tests
+- **Implementation commit(s):** 8a27db6 Improve offline Tap and Talk first-attempt selector; cf1e787 Harden WhatsApp selector and offline Tap Talk parity; ca386fd Fix offline parity tap talk and bridge health
+- **Primary implementation files/modules:** `app/services/offline_sync.py`; `offline_app/app.js`
+- **Owner live-test evidence:** Passed during offline programme; source: TRAIN; offline/bridge tests
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed during offline programme; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 20, 58
+- **Dependent checkpoints:** MS2-LT-067, MS2-LT-076
+
+### MS2-LT-062 — Meta/Twilio legacy webhook channels
+
+- **Checkpoint ID:** MS2-LT-062
+- **Name:** Meta/Twilio legacy webhook channels
+- **Category:** Integration Validation
+- **Current status:** Deprecated with repository evidence
+- **Repository evidence:** README; Meta webhook tests; Baileys migration commits
+- **Implementation commit(s):** 722d9e7 Add Meta callback webhook alias; 840e6dc Prepare Meta WhatsApp Cloud API webhook
+- **Primary implementation files/modules:** `app/routes/meta_webhook.py`; `app/providers/meta_whatsapp.py`
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** None; retain only for evidence-backed historical compatibility.
+- **Prerequisite checkpoints:** 58
+- **Dependent checkpoints:** MS2-LT-067
+
+### MS2-LT-063 — Local WhatsApp Web MVP bridge
+
+- **Checkpoint ID:** MS2-LT-063
+- **Name:** Local WhatsApp Web MVP bridge
+- **Category:** Integration Validation
+- **Current status:** Deprecated with repository evidence
+- **Repository evidence:** WhatsApp Web docs/tests; Baileys migration
+- **Implementation commit(s):** d05c30f Add Windows local WhatsApp bridge setup; 995661b Migrate MVP channel to WhatsApp Web bridge; a5022ae Add WhatsApp Web MVP bridge
+- **Primary implementation files/modules:** `local_whatsapp_bridge.js`; `whatsapp-web-bridge.js`
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** None; retain only for evidence-backed historical compatibility.
+- **Prerequisite checkpoints:** 58
+- **Dependent checkpoints:** MS2-LT-067
+
+### MS2-LT-064 — Share/email/document delivery routes
+
+- **Checkpoint ID:** MS2-LT-064
+- **Name:** Share/email/document delivery routes
+- **Category:** Integration Validation
+- **Current status:** Planned / approved
+- **Repository evidence:** LATP Improvement 1; export metadata
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Implement and owner-validate: Send supported outputs/orders through safe device/share/email routes with truthful receipt state.
+- **Prerequisite checkpoints:** 29, 46, 48
+- **Dependent checkpoints:** MS2-LT-067
+
+### MS2-LT-065 — Pharmacy/branch isolation
+
+- **Checkpoint ID:** MS2-LT-065
+- **Name:** Pharmacy/branch isolation
+- **Category:** Security / Privacy / Compliance Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; ARCH; isolation tests/verifiers
+- **Implementation commit(s):** c306c33 Wire production pharmacy registry onboarding
+- **Primary implementation files/modules:** `app/pharmacy_registry.py`; `app/actor_context.py`
+- **Owner live-test evidence:** Passed in protected workflows and automated gates; source: CVS; ARCH; isolation tests/verifiers
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed in protected workflows and automated gates; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** Implemented pharmacy-scoped data workflows
+- **Dependent checkpoints:** MS2-LT-067, MS2-LT-068, MS2-LT-073, MS2-LT-074, MS2-LT-076
+
+### MS2-LT-066 — Idempotency, audit and duplicate prevention
+
+- **Checkpoint ID:** MS2-LT-066
+- **Name:** Idempotency, audit and duplicate prevention
+- **Category:** Security / Privacy / Compliance Validation
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; TCE; activity/export/offline verifiers
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** `ms20-main-app/src/services/activityHistory.js`; `ms20-main-app/src/services/transactionCompletionEngine.js`
+- **Owner live-test evidence:** Passed across protected workflows; source: CVS; TCE; activity/export/offline verifiers
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed across protected workflows; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 14–20, 51–53
+- **Dependent checkpoints:** MS2-LT-068, MS2-LT-073, MS2-LT-074, MS2-LT-076
+
+### MS2-LT-067 — Authentication, roles and access controls
+
+- **Checkpoint ID:** MS2-LT-067
+- **Name:** Authentication, roles and access controls
+- **Category:** Security / Privacy / Compliance Validation
+- **Current status:** Partial implementation
+- **Repository evidence:** registry/admin/routes; ARCH; compliance plan
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** `app/actor_context.py`; `app/routes/admin.py`
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete the unimplemented portion and owner-validate: Enforce owner/admin/branch authorization and minimum-necessary access across UI, routes and downloads.
+- **Prerequisite checkpoints:** 2, 58–65
+- **Dependent checkpoints:** MS2-LT-068, MS2-LT-073, MS2-LT-074, MS2-LT-076
+
+### MS2-LT-068 — Export IP/privacy/compliance safeguards
+
+- **Checkpoint ID:** MS2-LT-068
+- **Name:** Export IP/privacy/compliance safeguards
+- **Category:** Security / Privacy / Compliance Validation
+- **Current status:** Planned / approved
+- **Repository evidence:** LATP Improvement 3
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Implement and owner-validate: Register assets/licences, fail closed, redact/anonymize, control IDs/sharing/retention and avoid false endorsement.
+- **Prerequisite checkpoints:** 40–48, 65–67
+- **Dependent checkpoints:** MS2-LT-074, MS2-LT-075, MS2-LT-076
+
+### MS2-LT-069 — Product-secrecy and quiet-UI audit
+
+- **Checkpoint ID:** MS2-LT-069
+- **Name:** Product-secrecy and quiet-UI audit
+- **Category:** Security / Privacy / Compliance Validation
+- **Current status:** Planned / approved
+- **Repository evidence:** CVS; LATP future audit
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Implement and owner-validate: Remove unnecessary internal implementation disclosures while preserving legal/safety/privacy truth.
+- **Prerequisite checkpoints:** All functional/intelligence tests
+- **Dependent checkpoints:** MS2-LT-075, MS2-LT-076
+
+### MS2-LT-070 — Replit deployment and health
+
+- **Checkpoint ID:** MS2-LT-070
+- **Name:** Replit deployment and health
+- **Category:** Production Qualification
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; Replit handoff; production tests
+- **Implementation commit(s):** 0823d58 Disable Replit user installs inside virtualenv; 63b25d6 Use dedicated writable Replit virtualenv; 10612b3 Use project virtualenv for Replit dependencies
+- **Primary implementation files/modules:** `app/main.py`; `start.sh`
+- **Owner live-test evidence:** Repeatedly passed; source: CVS; Replit handoff; production tests
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Repeatedly passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 58
+- **Dependent checkpoints:** MS2-LT-071, MS2-LT-076
+
+### MS2-LT-071 — Startup/report observability
+
+- **Checkpoint ID:** MS2-LT-071
+- **Name:** Startup/report observability
+- **Category:** Production Qualification
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** CVS; startup/warmup tests
+- **Implementation commit(s):** 94c535e Remove AI latency from MS2.0 reports; 4081134 Retain and expose MS2.0 report source warmup; b8d738e Improve MS2.0 shared data reads and report performance
+- **Primary implementation files/modules:** `app/main.py`; `app/reports.py`
+- **Owner live-test evidence:** Passed; source: CVS; startup/warmup tests
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
+- **Prerequisite checkpoints:** 39, 70
+- **Dependent checkpoints:** MS2-LT-076
+
+### MS2-LT-072 — Architecture/consistency regression gate
+
+- **Checkpoint ID:** MS2-LT-072
+- **Name:** Architecture/consistency regression gate
+- **Category:** Production Qualification
+- **Current status:** Implemented — awaiting owner live test
+- **Repository evidence:** all `verify-*.mjs`; regression tests
+- **Implementation commit(s):** e158ec9 Add trusted result consistency gate; 48c6d47 Consolidate invoice reviews and integrate consistency gate; 5c78e1d Merge repeated invoice scans without regression
+- **Primary implementation files/modules:** `ms20-main-app/tools/verify-consistency-gate.mjs`; `ms20-main-app/tools/verify-architecture.mjs`
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete decisive owner live validation for: Prove zero-token defaults, protected contracts, fixtures and canonical consistency before deployment.
+- **Prerequisite checkpoints:** All implemented checkpoints
+- **Dependent checkpoints:** MS2-LT-076
+
+### MS2-LT-073 — Autonomous pharmacy provisioning
+
+- **Checkpoint ID:** MS2-LT-073
+- **Name:** Autonomous pharmacy provisioning
+- **Category:** Production Qualification
+- **Current status:** Implemented — awaiting owner live test
+- **Repository evidence:** TRAIN Phases 12–13; provisioning tests
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** `app/provisioning.py`; `app/deployment.py`
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete decisive owner live validation for: Create isolated profile/owner/branch/catalog/queue/monitoring configuration and recover failed onboarding.
+- **Prerequisite checkpoints:** 2, 59, 65–67
+- **Dependent checkpoints:** MS2-LT-076
+
+### MS2-LT-074 — Production payment-provider qualification
+
+- **Checkpoint ID:** MS2-LT-074
+- **Name:** Production payment-provider qualification
+- **Category:** Production Qualification
+- **Current status:** External qualification
+- **Repository evidence:** TCE; Safaricom unresolved question
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete the externally gated qualification: Confirm merchant onboarding model, tenant identity, credentials, authenticated callbacks, reconciliation and official adapters.
+- **Prerequisite checkpoints:** 49–57, 65–68
+- **Dependent checkpoints:** None
+
+### MS2-LT-075 — Professional legal/regulatory qualification
+
+- **Checkpoint ID:** MS2-LT-075
+- **Name:** Professional legal/regulatory qualification
+- **Category:** Production Qualification
+- **Current status:** External qualification
+- **Repository evidence:** LATP Improvement 3 pre-launch gates
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete the externally gated qualification: Obtain Kenya IP, trademark, ODPC/privacy, pharmacy, payments, terms/DPA, security and retention review.
+- **Prerequisite checkpoints:** 68–69
+- **Dependent checkpoints:** None
+
+### MS2-LT-076 — Production channel/scale qualification
+
+- **Checkpoint ID:** MS2-LT-076
+- **Name:** Production channel/scale qualification
+- **Category:** Production Qualification
+- **Current status:** External qualification
+- **Repository evidence:** TRAIN; deployment/provisioning/bridge tests
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Complete the externally gated qualification: Qualify official messaging/channel operations, multi-pharmacy scale, backup/recovery, monitoring and incident response.
+- **Prerequisite checkpoints:** 60–61, 65–73
+- **Dependent checkpoints:** None
+
+<!-- TRACEABILITY_INDEX_END -->
