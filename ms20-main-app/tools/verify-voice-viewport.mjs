@@ -12,6 +12,26 @@ const cssSource = fs.readFileSync(path.join(rootPath, "src/styles.css"), "utf8")
 assert.match(appSource, /data-action="catalog-edit-field-voice"/, "every long-card field exposes a reachable inline Mic");
 assert.match(appSource, /selectCatalogVoiceField\(dataset\.cardId, dataset\.field\);\s*startCatalogEditVoice\(dataset\.cardId\);/, "inline Mic selects the exact target before reusing shared capture");
 assert.match(cssSource, /\.catalog-edit-field-heading[\s\S]*justify-content: space-between/, "field and Mic remain colocated in long cards");
+assert.match(
+  appSource,
+  /if \(activeVoiceViewportAnchor && refreshContextualFieldVoiceDom\(\)\) return;\s*const existingPrintFrame/,
+  "contextual field voice takes render ownership before global DOM replacement"
+);
+assert.match(
+  appSource,
+  /function refreshContextualFieldVoiceDom\(\)[\s\S]*target\.value = nextValue[\s\S]*refreshCatalogEditReviewDom\(card, draft\)[\s\S]*restoreVoiceViewportAnchor/,
+  "the active field, validation review and viewport update in place throughout transcription"
+);
+assert.match(
+  appSource,
+  /if \(activeVoiceViewportAnchor && refreshContextualFieldVoiceDom\(\)\) return;[\s\S]*else \{\s*scrollChatToBottom\(\);/,
+  "ordinary chat-bottom scrolling is unreachable while the contextual session owns the viewport"
+);
+assert.match(
+  appSource,
+  /if \(action === "start-voice"\) startVoiceCapture\(\);/,
+  "the normal composer Mic remains on the shared capture path outside contextual sessions"
+);
 
 const oldContainer = {
   id: "chatBody",

@@ -28,7 +28,7 @@ import {
 } from "./services/documentGenerator.js";
 import { EXPORT_FORMATS, exportCompletionSummary, exportFormat } from "./services/exportFormatMetadata.js";
 import { appendActivity, createCatalogActivityEntry } from "./services/activityHistory.js";
-import { createVoiceViewportAnchor, settleVoiceViewportAnchor } from "./services/voiceViewportAnchor.js";
+import { createVoiceViewportAnchor, restoreVoiceViewportAnchor, settleVoiceViewportAnchor } from "./services/voiceViewportAnchor.js";
 import {
   CATALOG_EDIT_FIELDS,
   applyCatalogEditVoice,
@@ -209,6 +209,7 @@ let activeVoiceViewportAnchor = null;
 function render() {
   state.sync.online = navigator.onLine;
   state.sync.pending = queue.pendingCount();
+  if (activeVoiceViewportAnchor && refreshContextualFieldVoiceDom()) return;
   const existingPrintFrame = root.querySelector("#ms20PrintPreview");
   const cameraOverlayIsRendered = Boolean(root.querySelector(".camera-overlay"));
   if (state.printPreview && existingPrintFrame && cameraOverlayIsRendered === state.camera.open) {
@@ -3263,6 +3264,10 @@ function updateCatalogEditDraft(cardId, field, value) {
   draft[field] = value;
   card.fields.edit_draft = JSON.stringify(draft);
   persistActiveCards();
+  refreshCatalogEditReviewDom(card, draft);
+}
+
+function refreshCatalogEditReviewDom(card, draft = catalogEditDraft(card)) {
   const warning = root.querySelector(".catalog-edit-warning, .catalog-change-summary");
   const review = reviewCatalogEdit(pharmacyBrain.catalog, card.fields.selected_id, draft);
   const presentation = catalogEditPresentation(review);
@@ -3279,6 +3284,42 @@ function updateCatalogEditDraft(cardId, field, value) {
   }
   const approve = root.querySelector('[data-action="approve-catalog-edit"]');
   if (approve) approve.disabled = !review.valid || !review.changes?.length;
+}
+
+function refreshContextualFieldVoiceDom() {
+  const anchor = activeVoiceViewportAnchor;
+  if (!anchor || state.ui.screen !== "chat") return false;
+  const target = root.querySelector(anchor.selector);
+  const card = state.cards.find((item) => item.id === anchor.cardId && item.type === "CatalogWorkspaceCard");
+  if (!target || !card?.fields?.selected_id) return false;
+
+  const draft = catalogEditDraft(card);
+  const nextValue = String(draft[anchor.field] ?? "");
+  if (target.value !== nextValue) target.value = nextValue;
+  refreshCatalogEditReviewDom(card, draft);
+
+  const busy = state.voice.starting || state.voice.listening;
+  root.querySelectorAll('[data-action="catalog-edit-field-voice"], [data-action="catalog-edit-voice"]').forEach((button) => {
+    button.disabled = busy;
+    if (button.dataset.action === "catalog-edit-voice") button.textContent = busy ? "Listeningâ€¦" : "Mic";
+  });
+  const localStatus = root.querySelector(".catalog-edit-voice [role='status']");
+  if (localStatus) {
+    localStatus.textContent = state.voice.status
+      || card.fields.voice_feedback
+      || `${fieldLabel(anchor.field)} selected. Tap Mic and speak the new value.`;
+  }
+
+  const composerVoice = root.querySelector('[data-action="start-voice"]');
+  if (composerVoice) {
+    composerVoice.disabled = busy;
+    composerVoice.classList.toggle("listening", busy);
+    composerVoice.textContent = state.voice.starting ? "Wait" : state.voice.listening ? "Speak" : "Mic";
+    composerVoice.setAttribute("aria-label", state.voice.starting ? "Starting microphone" : state.voice.listening ? "Speak now" : "Use voice");
+  }
+
+  restoreVoiceViewportAnchor(root, anchor, window, { restoreFocus: false });
+  return true;
 }
 
 function startCatalogSearchVoice(cardId, placement = "top") {
