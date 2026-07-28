@@ -1,0 +1,537 @@
+{
+    "schema":  "ms20.approved-owner-visible-improvements.v1",
+    "improvements":  [
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-001",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-001",
+                             "name":  "Main App shell and navigation",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-002",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-002",
+                             "name":  "First-run owner setup",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-003",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-003",
+                             "name":  "Invoice onboarding and local OCR",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-004",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-004",
+                             "name":  "Bulk paste onboarding",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-005",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-005",
+                             "name":  "CSV onboarding",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-006",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-006",
+                             "name":  "XLSX onboarding",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-007",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-007",
+                             "name":  "Barcode onboarding",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-008",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-008",
+                             "name":  "Shelf-photo onboarding",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-009",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-009",
+                             "name":  "Medicine-pack photo onboarding",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-010",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-010",
+                             "name":  "Catalog browse/search/edit",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-011",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-011",
+                             "name":  "Shared medicine review integrity",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-012",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-012",
+                             "name":  "Shared voice capture and review",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-013",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-013",
+                             "name":  "Editable-card voice viewport/focus",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-014",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-014",
+                             "name":  "Known-medicine sales",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-015",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-015",
+                             "name":  "Restocking and delivery details",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-016",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-016",
+                             "name":  "Stock enquiry",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-017",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-017",
+                             "name":  "Manual stock correction",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-018",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-018",
+                             "name":  "Stock Fix acquisition parity",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-019",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-019",
+                             "name":  "Corrections, cancellation and undo",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-020",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-020",
+                             "name":  "Offline operation and synchronization",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-021",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-021",
+                             "name":  "Daily operational metrics",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-022",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-022",
+                             "name":  "Direct analytics commands",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-023",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-023",
+                             "name":  "Decision-support summary",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-024",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-024",
+                             "name":  "Low/out-of-stock intelligence",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-025",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-025",
+                             "name":  "Expiry intelligence",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-026",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-026",
+                             "name":  "Missed-demand and lost-opportunity intelligence",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-027",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-027",
+                             "name":  "Fast/slow/dead-stock intelligence",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-028",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-028",
+                             "name":  "Stock-out and demand-risk prediction",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-029",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-029",
+                             "name":  "Reorder-level and supplier-order intelligence",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-030",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-030",
+                             "name":  "Operational dashboard and action prioritization",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-031",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-031",
+                             "name":  "Source Brain and shared medicine matcher",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-032",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-032",
+                             "name":  "Pharmacy Catalog learning boundary",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-033",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-033",
+                             "name":  "Pharmacy alias/shorthand learning",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-034",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-034",
+                             "name":  "Operational memory and reusable commands",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-035",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-035",
+                             "name":  "Trusted-result/cache reuse",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-036",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-036",
+                             "name":  "Media classification and extraction routing",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-037",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-037",
+                             "name":  "AI fallback approval boundary",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-038",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-038",
+                             "name":  "Learning effectiveness and rollback",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-039",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-039",
+                             "name":  "Report periods, refresh and Read",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-040",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-040",
+                             "name":  "CSV Technical Data Transfer",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-041",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-041",
+                             "name":  "Excel Operations Workbook",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-042",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-042",
+                             "name":  "PDF Owner Copy",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-043",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-043",
+                             "name":  "Word Owner Copy",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-044",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-044",
+                             "name":  "Presentation Owner Briefing",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-045",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-045",
+                             "name":  "Print Working Inventory",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-046",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-046",
+                             "name":  "Export Hub status/history",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-047",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-047",
+                             "name":  "Cross-format canonical integrity",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-048",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-048",
+                             "name":  "Future operational documents",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-049",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-049",
+                             "name":  "Exact form/unit/pack/price truth",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-050",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-050",
+                             "name":  "Payment modes, splits and discounts",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-051",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-051",
+                             "name":  "TCE Fast Record",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-052",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-052",
+                             "name":  "Request \u0026 Verify success",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-053",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-053",
+                             "name":  "Concurrent payment completion",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-054",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-054",
+                             "name":  "Payment failure/cancellation notification",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-055",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-055",
+                             "name":  "Refunds, returns and credits",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-056",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-056",
+                             "name":  "Undo/reversal reconciliation",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-057",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-057",
+                             "name":  "Supplier/restock payments",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-058",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-058",
+                             "name":  "Main App/backend adapter gateway",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-059",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-059",
+                             "name":  "Google Sheets pharmacy persistence",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-060",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-060",
+                             "name":  "WhatsApp/Baileys optional channel",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-061",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-061",
+                             "name":  "Offline PWA and media bridge",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-062",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-062",
+                             "name":  "Meta/Twilio legacy webhook channels",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-063",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-063",
+                             "name":  "Local WhatsApp Web MVP bridge",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-064",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-064",
+                             "name":  "Share/email/document delivery routes",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-065",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-065",
+                             "name":  "Pharmacy/branch isolation",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-066",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-066",
+                             "name":  "Idempotency, audit and duplicate prevention",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-067",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-067",
+                             "name":  "Authentication, roles and access controls",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-068",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-068",
+                             "name":  "Export IP/privacy/compliance safeguards",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-069",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-069",
+                             "name":  "Product-secrecy and quiet-UI audit",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-070",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-070",
+                             "name":  "Replit deployment and health",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-071",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-071",
+                             "name":  "Startup/report observability",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-072",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-072",
+                             "name":  "Architecture/consistency regression gate",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-073",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-073",
+                             "name":  "Autonomous pharmacy provisioning",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-074",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-074",
+                             "name":  "Production payment-provider qualification",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-075",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-075",
+                             "name":  "Professional legal/regulatory qualification",
+                             "disposition":  "tracked"
+                         },
+                         {
+                             "approval_id":  "APPROVED-MS2-LT-076",
+                             "owner_visible":  true,
+                             "checkpoint_id":  "MS2-LT-076",
+                             "name":  "Production channel/scale qualification",
+                             "disposition":  "tracked"
+                         }
+                     ]
+}

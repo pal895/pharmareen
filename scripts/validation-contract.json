@@ -21,6 +21,11 @@
   ],
   "bridge_manifest": "docs/engineering-memory/bridge-validation-contract.json",
   "protected_baseline": "scripts/protected-checkpoint-baseline.json",
+  "approved_improvements": "scripts/approved-owner-visible-improvements.json",
+  "token_policy": {
+    "status": "ACTIVE",
+    "document": "docs/engineering-memory/token-execution-policy.md"
+  },
   "bridge_consumers": [
     "CODEX BRIDGE",
     "CHATGPT BRIDGE"
@@ -28,6 +33,7 @@
   "lifecycle": {
     "register": "Owner-visible approved work receives the next numeric checkpoint ID and is inserted in its category.",
     "protect": "PASS / PROTECTED requires explicit owner evidence and preserves the checkpoint against routine retesting.",
+    "reopen": "A protected checkpoint can return to validation only with an explicit repository-backed reopening reason that preserves its prior PASS.",
     "retire": "Cancelled, merged, superseded or deprecated checkpoints remain in history with a reason and replacement link when applicable."
   }
 }

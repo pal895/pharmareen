@@ -54,6 +54,10 @@
     "CODEX BRIDGE",
     "CHATGPT BRIDGE"
   ],
-  "master_sha256": "4248e618de57368120f7bfb2011ce83f7a57fcb1404a226eaa0fcdfc74393704",
+  "token_policy": {
+    "status": "ACTIVE",
+    "document": "docs/engineering-memory/token-execution-policy.md"
+  },
+  "master_sha256": "f1c7e5459cb49e1edf211e9d910ac28ed23d2c034dd0790a97bf536fd6acc051",
   "rule": "Load the master and its Engineering Traceability Index; never reconstruct or maintain a parallel sequence."
 }

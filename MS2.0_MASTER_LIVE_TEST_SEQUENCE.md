@@ -203,11 +203,19 @@ Owner PASS transitions require explicit live-test evidence, set `Protected` to `
 
 Governance commands:
 
-- Register, protect or retire from an explicit JSON payload: `node scripts/govern-validation-checkpoint.mjs <register|protect|retire> <payload.json>`.
+- Register, protect, explicitly reopen or retire from an explicit JSON payload: `node scripts/govern-validation-checkpoint.mjs <register|protect|reopen|retire> <payload.json>`.
 - Regenerate the traceability index, synchronized Project Brain/Engineering Memory references and Bridge manifest: `npm run validation:sync`.
 - Validate IDs, names, states, totals, prerequisite graph, dependents, protected evidence, synchronized references and Bridge compatibility: `npm run validation:check`.
 
 Future Codex chats must load this master and `docs/engineering-memory/bridge-validation-contract.json`; they must never reconstruct the sequence manually. CODEX BRIDGE and CHATGPT BRIDGE generation must consume the same manifest and master traceability index.
+
+## Permanent API-token and execution rule
+
+Token policy: **ACTIVE**
+
+MS2.0 execution order is permanently: local deterministic logic → Pharmacy Catalog → Source Brain → local OCR → verified cache → AI/external LLM only as a documented and justified last resort. Routine operational workflows must not invoke an LLM without a repository-recorded engineering justification.
+
+Codex must inspect targeted authority first, reuse shared roots and Engineering Memory, avoid repeated large reads/history/explanations/searches/summaries, prefer focused tests with minimum safety coverage, keep routine owner reports compact, and stop on a real blocker rather than loop. When a chat becomes slow, context-heavy or repetitive, recommend a CODEX BRIDGE. The full inherited rule lives in `docs/engineering-memory/token-execution-policy.md`.
 
 <!-- TRACEABILITY_INDEX_START -->
 

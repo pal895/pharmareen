@@ -542,5 +542,6 @@ The deck is now a deterministic nine-slide owner decision briefing rather than a
 - Checkpoints: 76
 - Current: MS2-LT-013 — Editable-card voice viewport/focus
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
+- Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.
 <!-- VALIDATION_CONTRACT_SYNC_END -->

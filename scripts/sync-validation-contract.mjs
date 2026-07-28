@@ -33,6 +33,7 @@ const manifest = {
     .filter((row) => row.status === "PASS / PROTECTED")
     .map((row) => `MS2-LT-${String(row.id).padStart(3, "0")}`),
   bridge_consumers: contract.bridge_consumers,
+  token_policy: contract.token_policy,
   master_sha256: checksum,
   rule: "Load the master and its Engineering Traceability Index; never reconstruct or maintain a parallel sequence."
 };
@@ -47,6 +48,7 @@ const synchronizedBlock = [
   `- Checkpoints: ${rows.length}`,
   `- Current: ${manifest.current_checkpoint ? `${manifest.current_checkpoint.id} — ${manifest.current_checkpoint.name}` : "None"}`,
   `- Bridge manifest: \`${contract.bridge_manifest}\``,
+  `- Token policy: ${contract.token_policy.status} — \`${contract.token_policy.document}\``,
   "- Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.",
   syncEnd,
 ].join("\n");

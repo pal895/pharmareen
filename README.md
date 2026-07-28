@@ -520,5 +520,6 @@ Export activity updates one compact Export Hub card in the main chat. Newest-fir
 - Checkpoints: 76
 - Current: MS2-LT-013 — Editable-card voice viewport/focus
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
+- Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.
 <!-- VALIDATION_CONTRACT_SYNC_END -->
