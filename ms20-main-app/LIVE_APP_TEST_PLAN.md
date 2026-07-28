@@ -127,14 +127,15 @@ This plan is for Main App live product testing only. Do not return to WhatsApp l
 
 Status: **IMPLEMENTED / AWAITING OWNER VALIDATION**.
 
-Owner evidence after `09cb128` rejected the first implementation: lower fields had no reachable card Mic, selection opened Android typing, the owner had to scroll back to the header Mic, and the voice update displaced the selected field. The checkpoint remains open.
+Owner evidence after `09cb128` rejected the first implementation: lower fields had no reachable card Mic, selection opened Android typing, the owner had to scroll back to the header Mic, and the voice update displaced the selected field. Owner evidence on 2026-07-29 then proved the contextual Mic and exact-field routing work, but still rejected viewport continuity: tapping the Expiry month Mic moved the card to the chat bottom, `2026 May` reached only the intended field, and the owner had to scroll back manually. Commit `b7ba547` restores the anchor immediately and across the next two mobile layout frames. The checkpoint remains open.
 
 Objective: prove that the contextual Mic beside every shared editable medicine field keeps the selected field visible and changes only that field through listening and rerendering.
 
-1. Open one sufficiently long saved medicine card and scroll to a middle or lower harmless field.
-2. Tap the Mic beside that field without returning to the card header, then speak a temporary value.
-3. Confirm the field stays visible during listening and after the update, only that field changes, and the normal one-field review appears.
-4. Discard the draft or restore the exact baseline.
+1. If the prior `2026 May` Expiry month draft is still open, tap **Discard** first; do not approve it.
+2. After deploying `b7ba547`, reopen the same long saved medicine card and return to Expiry month.
+3. Tap its adjacent Mic and speak `2028 December`.
+4. Confirm Expiry month stays visible during listening and after the update, and no other field changes.
+5. Tap **Discard**; do not approve or save.
 
 Required evidence: one decisive screenshot showing the field and its reachable Mic before voice, one after the voice update with the same field visible, and one after discard/restoration. Do not repeat Catalog Search Mic, stock, expiry, Activity Compaction, exports or another protected checkpoint.
 

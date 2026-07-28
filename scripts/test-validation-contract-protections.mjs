@@ -28,7 +28,14 @@ const row1 = master.match(/^\| 1 \|.*$/m)[0];
 mustReject("duplicate ID", (text) => text.replace(row1, `${row1}\n${row1.replace("Main App shell and navigation", "Duplicate ID fixture")}`), /Duplicate checkpoint ID/);
 mustReject("deleted checkpoint", (text) => text.replace(`${row1}\n`, ""), /deleted|orphan|missing prerequisite/i);
 mustReject("orphan checkpoint", (text) => text.replace(/^### MS2-LT-001 —[\s\S]*?(?=^### MS2-LT-002 —)/m, ""), /Orphan checkpoint/);
-mustReject("missing prerequisite", (text) => text.replace("| 13 | Editable-card voice viewport/focus |", "| 13 | Editable-card voice viewport/focus |").replace("| 10–12 | Implemented — awaiting owner live test | Open |", "| 999 | Implemented — awaiting owner live test | Open |"), /missing prerequisite/);
+mustReject(
+  "missing prerequisite",
+  (text) => text.replace(
+    /(\| 13 \| Editable-card voice viewport\/focus \|[^|\r\n]*\|) 10–12 (\|)/,
+    "$1 999 $2",
+  ),
+  /missing prerequisite/,
+);
 mustReject("circular prerequisite", (text) => text.replace("| 1 | Main App shell and navigation | Open Home, Assistant, Notifications, Catalog and Payment Queue without unintended mutation. | None |", "| 1 | Main App shell and navigation | Open Home, Assistant, Notifications, Catalog and Payment Queue without unintended mutation. | 2 |"), /Circular prerequisite/);
 mustReject("missing dependent", (text) => text.replace("- **Dependent checkpoints:** MS2-LT-002, MS2-LT-012, MS2-LT-058", "- **Dependent checkpoints:** None"), /dependent metadata/);
 mustReject("weakened protected status", (text) => text.replace("| 1 | Main App shell and navigation | Open Home, Assistant, Notifications, Catalog and Payment Queue without unintended mutation. | None | PASS / PROTECTED | Passed | Yes |", "| 1 | Main App shell and navigation | Open Home, Assistant, Notifications, Catalog and Payment Queue without unintended mutation. | None | Partial implementation | Not passed | No |"), /silently weakened|status is inconsistent/);

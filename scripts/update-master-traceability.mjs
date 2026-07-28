@@ -89,7 +89,7 @@ function commitsFor(row, files) {
     const subject = entry.replace(/^[0-9a-f]+ /, "").toLowerCase();
     return tokens.some((token) => subject.includes(token));
   });
-  return matching.length ? matching.slice(0, 3).join("; ") : unavailable;
+  return matching.length ? matching.slice(0, 4).join("; ") : unavailable;
 }
 
 function remainingWork(row) {
@@ -113,7 +113,7 @@ const blocks = rows.map((row) => {
   const files = (primaryFiles[row.id] || []).filter((file) => fs.existsSync(path.join(root, file)));
   const hasOwnerEvidence = row.status === "PASS / PROTECTED"
     || (
-      /(owner|passed)/i.test(row.ownerValidation)
+      /(owner|passed|fail)/i.test(row.ownerValidation)
       && !/(^not |automated|controlled fixtures|historical bridge|lack|pending)/i.test(row.ownerValidation)
     );
   const ownerEvidence = hasOwnerEvidence

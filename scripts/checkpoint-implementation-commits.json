@@ -27,7 +27,8 @@
     "13":  [
                "464674f Make card voice editing reachable inline",
                "09cb128 Preserve editable card voice viewport",
-               "1dff3b2 Centralize editable medicine fields"
+               "1dff3b2 Centralize editable medicine fields",
+               "b7ba547 Stabilize voice field viewport across mobile layout"
            ],
     "47":  [
                "9b49581 Finish Export Hub layout integrity"

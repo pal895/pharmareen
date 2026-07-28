@@ -24,7 +24,7 @@ Evidence abbreviations: `CVS` = `docs/engineering-memory/current-live-validation
 | 10 | Catalog browse/search/edit | Browse 35 canonical medicines, search safely, edit one draft, approve/discard, persist and retain compact audited activity history. | 2 | PASS / PROTECTED | Passed | Yes | 10 min | CVS; Catalog Search Mic and Activity Compaction evidence; catalog/activity verifiers |
 | 11 | Shared medicine review integrity | Preserve canonical fields, progressive mobile cards, row controls, validation and review-before-mutation. | 3–10 | PASS / PROTECTED | Passed | Yes | 12 min | CVS; shared-field/readiness/reordering verifiers |
 | 12 | Shared voice capture and review | Handle permission/start/listen/transcript/recovery and produce deterministic review-first commands. | 1 | PASS / PROTECTED | Passed | Yes | 10 min | CVS; Mic Test 2; voice verifiers |
-| 13 | Editable-card voice viewport/focus | Keep an inline Mic reachable beside any field and preserve the exact target/viewport through transcription. | 10–12 | Implemented — awaiting owner live test | Open | No | 5 min | CVS; LATP; `voiceViewportAnchor.js`; viewport verifier |
+| 13 | Editable-card voice viewport/focus | Keep an inline Mic reachable beside any field and preserve the exact target/viewport through transcription. | 10–12 | Implemented — awaiting owner live test | Owner FAIL 2026-07-29: exact field routed; viewport jumped | No | 5 min | CVS; LATP; owner mobile screenshots; `voiceViewportAnchor.js`; viewport verifier |
 | 14 | Known-medicine sales | Record typed/voice known sales, canonical identity, quantity, payment, receipt and stock exactly once. | 10–12 | PASS / PROTECTED | Passed | Yes | 10 min | CVS; TCE Fast Record evidence; sales tests |
 | 15 | Restocking and delivery details | Review typed/voice restocks, quantity/bonus/cost/supplier/batch/expiry and add stock once. | 10–12 | PASS / PROTECTED | Passed | Yes | 12 min | CVS; voice-restock verifier; intake tests |
 | 16 | Stock enquiry | Answer saved stock locally and truthfully without creating a draft or mutation. | 10 | PASS / PROTECTED | Passed | Yes | 4 min | CVS; `localIntelligence.js`; stock tests |
@@ -413,10 +413,10 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **Name:** Editable-card voice viewport/focus
 - **Category:** Core Functional Validation
 - **Current status:** Implemented — awaiting owner live test
-- **Repository evidence:** CVS; LATP; `voiceViewportAnchor.js`; viewport verifier
-- **Implementation commit(s):** 464674f Make card voice editing reachable inline; 09cb128 Preserve editable card voice viewport; 1dff3b2 Centralize editable medicine fields
+- **Repository evidence:** CVS; LATP; owner mobile screenshots; `voiceViewportAnchor.js`; viewport verifier
+- **Implementation commit(s):** 464674f Make card voice editing reachable inline; 09cb128 Preserve editable card voice viewport; 1dff3b2 Centralize editable medicine fields; b7ba547 Stabilize voice field viewport across mobile layout
 - **Primary implementation files/modules:** `ms20-main-app/src/services/voiceViewportAnchor.js`; `ms20-main-app/src/cards/editableCards.js`
-- **Owner live-test evidence:** Repository evidence not yet available.
+- **Owner live-test evidence:** Owner FAIL 2026-07-29: exact field routed; viewport jumped; source: CVS; LATP; owner mobile screenshots; `voiceViewportAnchor.js`; viewport verifier
 - **PASS / PROTECTED confirmation:** Not applicable.
 - **Remaining implementation work:** Complete decisive owner live validation for: Keep an inline Mic reachable beside any field and preserve the exact target/viewport through transcription.
 - **Prerequisite checkpoints:** 10–12
