@@ -1,5 +1,15 @@
 # MS2.0 Current Architecture Snapshot
 
+## Shared Production Sales Card boundary — 2026-07-29
+
+- One canonical model: `src/services/productionSaleCard.js`.
+- One canonical renderer: `productionSaleCardBody` in `src/app.js`.
+- Typed and voice inputs both resolve to `SaleCard`; no instant typed write and no `VoiceReviewCard`.
+- Review, correction, Payment Queue, payment verification and failed-payment recovery preserve the same exact medicine/form/unit/quantity/unit-price/total/payment/stock/status fields.
+- Per-unit price and stock-conversion maps are retained at the Pharmacy Brain boundary. Ambiguous units/forms are explicit choices; missing or unsafe truth blocks Confirm.
+- Transaction metadata carries the canonical sale projection so queue/history/notifications do not reconstruct a divergent card.
+- Owner live approval is pending; MS2-LT-049 is not started.
+
 Canonical live-validation authority: `../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. Architecture evidence may change checkpoint state only by updating that master in the same commit.
 
 The master’s completeness ledger is the architecture-to-validation coverage index. No component, route, adapter, fixture or historical capability creates an implicit checkpoint outside it.

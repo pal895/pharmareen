@@ -5,7 +5,6 @@ export const EditableCardTypes = [
   "OnboardingCard",
   "StockCorrectionCard",
   "ReportCard",
-  "VoiceReviewCard",
   "PhotoReviewCard",
   "MedicineMatchCard",
   "VisualScanCard",

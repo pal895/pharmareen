@@ -59,6 +59,7 @@ import { CashPaymentAdapter, ManualPaymentAdapter, SimulatorPaymentAdapter } fro
 import { TransactionCompletionEngine } from "./services/transactionCompletionEngine.js";
 import { applyStockCorrectionVoice, PharmacyPronunciationMemory, reviewStockCorrection, stockCorrectionGuidance, trustedCatalogStock } from "./services/stockCorrectionPolicy.js";
 import { executeStockCorrection, replayPendingStockCorrections } from "./services/stockCorrectionExecution.js";
+import { prepareProductionSaleCard, productionSaleSummary, saleFieldsFromTransaction } from "./services/productionSaleCard.js";
 import { hydrateStockFixDraft, normalizeStockFixEvidence } from "./services/stockFixEvidencePipeline.js";
 import { readXlsxInventory } from "./services/excelInventory.js";
 import { listRouteSlots, resolveOfflineSlot } from "./routes/routeRegistry.js";
@@ -129,7 +130,6 @@ const DURABLE_CARD_TYPES = new Set([
   "OnboardingCard",
   "StockCorrectionCard",
   "ReportCard",
-  "VoiceReviewCard",
   "PhotoReviewCard",
   "MedicineMatchCard",
   "VisualScanCard",
@@ -332,12 +332,9 @@ function paymentQueueScreenTemplate() {
 
 function paymentQueueItemTemplate(item) {
   const simulatorMode = transactionEngine.settings().environment !== "production";
-  return `<article class="operation-card payment-queue-item">
-    <p class="card-eyebrow">${escapeHtml(transactionDayLabel(item))} · ${escapeHtml(item.saleLabel || "Transaction")}</p>
-    <h2>${escapeHtml(item.metadata?.medicine || "Payment")}</h2>
-    <p>${Number(item.metadata?.quantity || 0)} item(s) · ${escapeHtml(paymentLabel(item.paymentMethod))} · Waiting</p>
-    <p><strong>Expected amount: ${escapeHtml(paymentAmountLabel(item.amount))}</strong></p>
-    <p>Serving can continue. Stock changes only after confirmation.</p>
+  return `<article class="operation-card payment-queue-item production-sale-card">
+    ${productionSaleCardBody(saleFieldsFromTransaction(item), `${transactionDayLabel(item)} · ${item.saleLabel || "Transaction"}`)}
+    <p class="sale-consequence">Serving can continue. Stock changes only after verified payment.</p>
     ${simulatorMode ? `<div class="card-actions">
       <button data-action="simulate-payment-result" data-transaction-id="${escapeHtml(item.id)}" data-status="confirmed">Simulate paid</button>
       <button data-action="simulate-payment-result" data-transaction-id="${escapeHtml(item.id)}" data-status="failed">Simulate failed</button>
@@ -581,8 +578,7 @@ function cardTemplate(card) {
       ${noteBeforeBody ? `<p class="card-note card-note-before-review">${escapeHtml(note)}</p>` : ""}
       ${cardBodyTemplate(card, displayed)}
       ${card.type === "StockCorrectionCard" && card.voiceTranscripts?.length ? `<section class="stock-fix-voice-transcript" aria-label="Voice transcript"><strong>Voice transcript</strong>${card.voiceTranscripts.map((entry, index) => `<p>${index + 1}. ${escapeHtml(entry)}</p>`).join("")}</section>` : ""}
-      ${!progressiveMedicine && (card.type === "SaleCard" || card.type === "VoiceReviewCard") ? paymentToolbar(card) : ""}
-      ${!progressiveMedicine && (card.type === "SaleCard" || card.type === "RestockCard") ? quantityToolbar(card) : ""}
+      ${!progressiveMedicine && card.type === "RestockCard" ? quantityToolbar(card) : ""}
       ${noteBeforeBody ? "" : `<p class="card-note" data-card-note="${card.id}">${escapeHtml(note)}</p>`}
       ${progressiveMedicine ? "" : activeActionsTemplate(card)}
       <details class="card-technical">
@@ -625,6 +621,7 @@ function cardCloseButtonTemplate(card, placement) {
 }
 
 function cardBodyTemplate(card, displayed) {
+  if (card.type === "SaleCard") return productionSaleCardBody(card.fields, card.voiceSource ? "Voice sale review" : "Sale review", card);
   if (card.type === "CatalogWorkspaceCard") return catalogWorkspaceTemplate(card);
   if (card.type === "CatalogOnboardingCard") {
     return `
@@ -666,6 +663,36 @@ function cardBodyTemplate(card, displayed) {
       ${displayed.map((field) => fieldTemplate(card, field)).join("")}
     </div>
   `;
+}
+
+function productionSaleCardBody(fields = {}, eyebrow = "Sale", card = null) {
+  const editable = Boolean(card);
+  const value = (field) => escapeHtml(String(fields[field] ?? ""));
+  const field = (name, label, inputMode = "") => editable
+    ? `<label><span>${label}</span>${["form", "unit"].includes(name) && card.saleOptions?.[`${name}s`]?.length > 1
+      ? `<select data-card-id="${card.id}" data-field="${name}"><option value="">Choose exact ${name}</option>${card.saleOptions[`${name}s`].map((option) => `<option ${String(fields[name]) === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>`
+      : `<input data-card-id="${card.id}" data-field="${name}" ${inputMode ? `inputmode="${inputMode}"` : ""} value="${value(name)}">`}</label>`
+    : `<div><span>${label}</span><strong>${value(name) || "Unknown"}</strong></div>`;
+  return `<section class="production-sale-card-body" aria-label="Production Sales Card">
+    <p class="card-eyebrow">${escapeHtml(eyebrow)}</p>
+    <p class="sale-summary">${escapeHtml(productionSaleSummary(fields))}</p>
+    ${card?.fields?.transcript ? `<p class="sale-transcript">Heard: “${escapeHtml(card.fields.transcript)}”</p>` : ""}
+    <div class="production-sale-primary">
+      ${field("medicine", "Medicine")}
+      ${field("form", "Exact form")}
+      ${field("unit", "Selling unit")}
+      ${field("quantity", "Quantity", "decimal")}
+      ${field("selling_price", "Unit price (KES)", "decimal")}
+      ${field("expected_total", "Expected total (KES)", "decimal")}
+      ${field("payment", "Payment")}
+    </div>
+    <div class="sale-consequence-grid">
+      ${field("stock_before", "Stock before", "decimal")}
+      ${field("stock_after", "Stock after confirmed sale", "decimal")}
+      ${field("sale_status", "Status")}
+    </div>
+    ${fields.strength ? `<p class="sale-secondary">Strength: ${escapeHtml(String(fields.strength))}</p>` : ""}
+  </section>`;
 }
 
 function notificationCardBodyTemplate(card) {
@@ -1484,7 +1511,7 @@ function handleVoiceTranscript(text) {
     card.fields.review_feedback = `Heard: “${String(text || "").trim()}”. Check the medicine, stock to add, and unit. Add delivery details only when you have them. Nothing changes until you confirm.`;
     card.validation = card.fields.review_feedback;
   } else if (card.type !== "MedicineMatchCard") {
-    card.type = "VoiceReviewCard";
+    card.type = "SaleCard";
     card.title = "Check voice result";
     card.fields = {
       transcript: text,
@@ -1492,6 +1519,7 @@ function handleVoiceTranscript(text) {
       quantity: card.fields?.quantity || "",
       payment: card.fields?.payment || ""
     };
+    prepareProductionSaleCard(card, pharmacyBrain.findMedicine(card.fields.medicine));
   } else {
     card.fields.voice_transcript = String(text || "").trim();
     card.fields.review_feedback = `Heard: “${String(text || "").trim()}”. Check every field. Nothing changes until you confirm.`;
@@ -1706,17 +1734,13 @@ function buildCommandCard(text) {
 }
 
 function canRecordInstantly(card, sourceText) {
-  if (card.type !== "SaleCard") return false;
-  if (!commandHasExplicitPayment(sourceText)) return false;
-  if (String(card.fields?.medicine || "").trim().length < 3) return false;
-  if (!Number.isFinite(Number(card.fields?.quantity)) || Number(card.fields.quantity) <= 0) return false;
-  if (pharmacyBrain.findMedicine(card.fields.medicine).status !== "matched") return false;
-  return ["cash", "mpesa", "credit", "mixed"].includes(String(card.fields?.payment || "").toLowerCase());
+  return false;
 }
 
 function prepareUnknownMedicineFallback(card, sourceText) {
   if (card.type !== "SaleCard") return card;
-  if (pharmacyBrain.findMedicine(card.fields?.medicine).status === "matched") return card;
+  const catalogMatch = pharmacyBrain.findMedicine(card.fields?.medicine);
+  if (catalogMatch.status === "matched") return prepareProductionSaleCard(card, catalogMatch);
   const sourceMatch = sourceBrain.lookupMedicine(card.fields?.medicine);
   card.type = "MedicineMatchCard";
   card.title = "Add new medicine";
@@ -3149,6 +3173,7 @@ function startCatalogPastePhoto(cardId, camera) {
 function confirmCard(cardId) {
   const card = state.cards.find((item) => item.id === cardId);
   if (!card || card.submitting) return;
+  if (card.type === "SaleCard") prepareProductionSaleCard(card, pharmacyBrain.findMedicine(card.fields?.medicine));
   if (card.type === "ReportCard") return void generateReport(card);
   if (card.type === "StockCorrectionCard" && requestGuidedStockFixConfirmation(card)) return;
   card.submitting = true;
@@ -4048,7 +4073,7 @@ function stopStockFixReading() {
 function recordCard(card) {
   const backend = backendAdapters.prepareBackendAction(card, state.liveBackend);
   card.integration = backend;
-  const saleCard = card.type === "SaleCard" || card.type === "VoiceReviewCard" || card.type === "MedicineMatchCard";
+  const saleCard = card.type === "SaleCard" || card.type === "MedicineMatchCard";
   const paymentMethod = String(card.fields?.payment || "cash").replace("-", "").toLowerCase();
   const requestVerify = transactionEngine.settings().completionMode === "request_verify" && paymentMethod !== "cash";
   const transactionResult = saleCard
@@ -4064,6 +4089,12 @@ function recordCard(card) {
         medicine: card.fields?.medicine || "",
         quantity: Number(card.fields?.quantity || 0),
         sellingPrice: Number(card.fields?.selling_price || 0),
+        expectedTotal: Number(card.fields?.expected_total || 0),
+        strength: card.fields?.strength || "",
+        form: card.fields?.form || "",
+        unit: card.fields?.unit || "",
+        stockBefore: Number(card.fields?.stock_before),
+        stockAfter: Number(card.fields?.stock_after),
         pharmacyId: state.pharmacy.id,
         branchId: state.pharmacy.branch,
         merchantAccountId: requestVerify ? "simulator-pharmacy-merchant" : "manual-record",
@@ -4196,6 +4227,12 @@ function applyConfirmedPendingSale(transaction) {
     quantity: Number(transaction.metadata?.quantity || 0),
     payment: transaction.paymentMethod,
     selling_price: Number(transaction.metadata?.sellingPrice || 0),
+    expected_total: Number(transaction.metadata?.expectedTotal || transaction.amount || 0),
+    strength: transaction.metadata?.strength || "",
+    form: transaction.metadata?.form || "",
+    unit: transaction.metadata?.unit || "",
+    stock_before: transaction.metadata?.stockBefore ?? "",
+    stock_after: transaction.metadata?.stockAfter ?? "",
     sale_number: transaction.saleNumber,
     transaction_id: transaction.permanentId
   }};
@@ -4437,7 +4474,6 @@ function friendlyCardLabel(card) {
     OnboardingCard: "Setup",
     StockCorrectionCard: "Stock fix",
     ReportCard: "Report",
-    VoiceReviewCard: "Voice",
     PhotoReviewCard: "Photo",
     MedicineMatchCard: "Medicine check",
     VisualScanCard: "Scan",
@@ -4482,7 +4518,6 @@ function ownerCardNote(card) {
   if (confirmationBlocker) return confirmationBlocker;
   if (card.status === "needs_correction") return "Edit anything that looks wrong, then confirm.";
   if (card.type === "SaleCard") return "Complete the sale details, then confirm.";
-  if (card.type === "VoiceReviewCard") return "Check the voice result, then confirm.";
   if (card.type === "InvoiceCard") return "Check the invoice before saving.";
   if (card.type === "VisualScanCard" && card.fields?.scan_type === "barcode") return card.validation || "Check the barcode details before saving.";
   if (card.type === "PhotoReviewCard" || card.type === "VisualScanCard") return "Check the photo details before saving.";
@@ -4496,7 +4531,7 @@ function ownerCardNote(card) {
 }
 
 function savedReplyFor(card) {
-  if (card.type === "SaleCard" || card.type === "VoiceReviewCard") {
+  if (card.type === "SaleCard") {
     const medicine = card.fields?.medicine || "Sale";
     const quantity = card.fields?.quantity || "1";
     const payment = paymentLabel(String(card.fields?.payment || "cash").toLowerCase());

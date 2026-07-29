@@ -559,6 +559,12 @@ The two unread alerts are correct because their IDs and sales differ: Sale 1 Zin
 
 The unsuitable Zinc selection exposed a test-planning defect, not a product failure. `ms20-main-app/SALE_LIVE_TEST_FIXTURE_STANDARD.md`, `fixtures/launch-sale-test-medicines.json` and `saleTestFixture.js` now require scenario-specific catalog preflight and visible before/after stock. Sale-related tests must use the production shared SaleCard and record incidental shared-root friction. The next dependency-valid Launch Critical milestone is MS2-LT-049; it is identified but not started.
 
+## Production Sales Card owner hold — 2026-07-29
+
+At the owner's direction, milestone execution is paused before MS2-LT-049. Historical owner requirements were reconciled into one shared Production Sales Card: canonical medicine, exact form/unit, quantity, unit-specific price, expected total, payment, stock consequence and terminal state are first-class; ambiguity is an explicit choice; Unknown price/conversion and unsafe form/unit/strength/stock combinations block confirmation. Typed sales no longer bypass review. Voice review no longer creates `VoiceReviewCard`; Payment Queue and recovery project the same shared sale model. Notifications carry the exact failed payment consequence.
+
+The production standard is implemented and deterministically protected, but it is not owner-approved yet. The only next action is a complete owner live test with screenshots. Do not start MS2-LT-049 or any other milestone until explicit approval.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

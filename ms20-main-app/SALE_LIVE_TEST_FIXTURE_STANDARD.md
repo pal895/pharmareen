@@ -53,7 +53,7 @@ All test routes must use the production shared-root `SaleCard`, shared medicine 
 
 The flow must show or preserve canonical medicine, quantity, payment, form/unit, exact unit price, expected total, stock/payment consequence, and Waiting/Paid/Failed/Cancelled state. Review flows preserve Confirm, Correct, Read and Cancel plus protected voice viewport/focus behavior. Multiuser and offline tests additionally preserve staff attribution and local/sync state.
 
-Some exact unit/pack/price presentation remains governed by MS2-LT-049. Until it is implemented and protected, a test needing that truth must stop if the authoritative flow cannot prove it.
+The shared Production Sales Card must visibly prove exact form, selling unit, unit price, total and stock consequence before any fixture is eligible. Unit-specific price and conversion maps belong to the canonical catalog record. Missing or ambiguous values are `Unknown`/explicit-choice blockers, never inferred defaults. The card upgrade awaits owner live approval; no milestone fixture may run until that approval.
 
 ## Permanent friction capture
 

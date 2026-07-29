@@ -8,6 +8,7 @@ const MEDICINE_REVIEW_TYPES = new Set([
 ]);
 
 export function medicineReviewBlocker(card = {}) {
+  if (card.type === "SaleCard" && card.saleIssues?.length) return card.validation || "Complete the exact sale details before confirming.";
   if (!MEDICINE_REVIEW_TYPES.has(card.type)) return "";
   if (!String(card.fields?.medicine || "").trim()) {
     if (card.type === "VisualScanCard" && card.fields?.scan_type === "barcode" && card.fields?.barcode) {

@@ -1719,3 +1719,19 @@ pre {
 .activity-hub-assurance { margin: 0; color: #536b66; font-size: 0.9rem; }
 @media (max-width: 520px) { .activity-status-card { grid-template-columns: 1fr; } .activity-history-item div { align-items: flex-start; flex-direction: column; } }
 @media (max-width: 520px) { .export-format-grid { grid-template-columns: 1fr; } .export-hub-summary { align-items: flex-start; flex-direction: column; } .export-hub-summary span { text-align: left; } }
+
+.production-sale-card-body { display: grid; gap: 0.8rem; }
+.production-sale-card-body .card-eyebrow { margin: 0; }
+.sale-summary { margin: 0; padding: 0.8rem; border-left: 4px solid #086c5c; border-radius: 0.65rem; background: #edf7f4; color: #19332f; font-weight: 800; line-height: 1.4; }
+.sale-transcript, .sale-secondary, .sale-consequence { margin: 0; color: #536b66; line-height: 1.4; }
+.production-sale-primary, .sale-consequence-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+.production-sale-primary label, .sale-consequence-grid label, .production-sale-primary > div, .sale-consequence-grid > div { display: grid; gap: 0.35rem; min-width: 0; }
+.production-sale-primary label:first-child { grid-column: 1 / -1; }
+.production-sale-primary span, .sale-consequence-grid span { color: #536b66; font-size: 0.78rem; font-weight: 800; }
+.production-sale-primary input, .production-sale-primary select, .sale-consequence-grid input { min-width: 0; min-height: 48px; padding: 0.7rem; border: 1px solid #b8d3cd; border-radius: 0.8rem; background: #fff; color: #19332f; font: inherit; }
+.sale-consequence-grid { padding: 0.75rem; border-radius: 0.8rem; background: #f4f8f7; }
+.sale-consequence-grid strong { overflow-wrap: anywhere; color: #19332f; }
+@media (max-width: 520px) {
+  .production-sale-primary, .sale-consequence-grid { grid-template-columns: 1fr; }
+  .production-sale-primary label:first-child { grid-column: auto; }
+}

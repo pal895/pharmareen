@@ -62,7 +62,7 @@ Prefer original MS2.0 code, already verified project capabilities, standard brow
   - OnboardingCard
   - StockCorrectionCard
   - ReportCard
-  - VoiceReviewCard
+  - SaleCard (the single shared Production Sales Card for typed and voice sales)
   - PhotoReviewCard
   - MedicineMatchCard
   - VisualScanCard

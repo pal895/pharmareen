@@ -17,7 +17,7 @@ assert(source.includes("applyConfirmedPendingSale(result.transaction)"), "Only c
 assert(source.includes("transaction.metadata?.stockApplied"), "Deferred stock application must be idempotent");
 assert(source.includes("You can keep serving"), "Pending copy must explicitly preserve non-blocking service");
 assert(source.includes("transactionDayLabel(item)"), "Queue history must distinguish daily sale-number resets");
-assert(source.includes("Expected amount: ${escapeHtml(paymentAmountLabel(item.amount))}"), "Waiting payments must show the amount the owner is verifying");
+assert(source.includes("productionSaleCardBody(saleFieldsFromTransaction(item)"), "Waiting payments must use the shared Production Sales Card, including the amount the owner is verifying");
 assert(source.includes("paymentHistoryLineTemplate"), "Completed history must use the financially complete transaction summary");
 assert(source.includes("${escapeHtml(medicine)} x${quantity}"), "History must identify the medicine and quantity");
 assert(source.includes('return `KES ${value.toLocaleString("en-KE"'), "Payment amounts must use an explicit Kenyan currency label");

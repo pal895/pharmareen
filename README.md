@@ -1,5 +1,13 @@
 # MS2.0 Pharmacy Operating Intelligence Platform
 
+## Permanent Production Sales Card standard
+
+MS2.0 has exactly one authoritative Production Sales Card. Typed sales, voice sales, review/correction, payment verification, Payment Queue, failure recovery, notifications and future sale fixtures must use the shared `SaleCard` model in `ms20-main-app/src/services/productionSaleCard.js` and its single renderer in `ms20-main-app/src/app.js`. `VoiceReviewCard` and bespoke queue sale cards are retired.
+
+The first view prioritizes canonical medicine, exact form, exact selling unit, quantity, unit-specific selling price, expected total and payment. It visibly preserves stock before/after and sale status. Ambiguous form/unit choices remain explicit; missing prices/conversions display as Unknown and block confirmation; unit/form/strength mismatches and insufficient stock are unsafe and block confirmation. Secondary traceability stays secondary. No typed sale may bypass review.
+
+Owner live validation of this upgrade is pending. The launch-focused sequence is paused; MS2-LT-049 is identified but not started.
+
 ## Canonical live-validation authority
 
 `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md` is the single authoritative roadmap for every current and future owner live test. All checkpoint counts, order, prerequisites and status must be derived from it. Historical plans and embedded “next” notes are evidence only.

@@ -142,7 +142,7 @@ export function buildTransactionNotification({ transaction, status, now = new Da
     id: `payment-${transaction.id}-${status}`,
     category: "Payment",
     title: `${transaction.saleLabel || "Payment"} payment ${status}`,
-    message: `${transaction.metadata?.medicine || "Payment"} was not completed. Stock and paid records were not changed.`,
+    message: `${transaction.metadata?.medicine || "Payment"} ${transaction.metadata?.form ? `(${transaction.metadata.form}, ${transaction.metadata?.unit || "unit unknown"}) ` : ""}was not completed. Expected ${money(transaction.amount)} by ${paymentLabel(transaction.paymentMethod)}. Stock and paid records were not changed.`,
     action: "Review payment",
     actionTarget: `payment:${transaction.id}`,
     status: "unread",
@@ -150,6 +150,15 @@ export function buildTransactionNotification({ transaction, status, now = new Da
     aiUsed: false,
     origin: "transaction"
   };
+}
+
+function money(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 ? `KES ${amount.toLocaleString("en-KE", { maximumFractionDigits: 2 })}` : "amount Unknown";
+}
+
+function paymentLabel(value) {
+  return String(value || "payment").toLowerCase().replace("mpesa", "M-Pesa");
 }
 
 function createNotification({ category, key, title, message, action, actionTarget = "" }) {

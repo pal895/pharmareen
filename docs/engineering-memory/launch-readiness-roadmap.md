@@ -1,5 +1,7 @@
 # MS2.0 Launch Readiness Roadmap
 
+> **OWNER HOLD — 2026-07-29:** The launch live-test sequence is paused for complete owner validation of the upgraded shared Production Sales Card. MS2-LT-049 and every other milestone remain not started during this hold. Resume only after explicit owner approval.
+
 Authority date: 2026-07-29
 
 This document is the authoritative active-priority roadmap for the first MS2.0 pharmacy launch. `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md` remains the canonical checkpoint/status/evidence registry and historical regression sequence. This roadmap changes active priority only: it does not delete, renumber, weaken, bypass, or falsely complete any checkpoint or prerequisite.

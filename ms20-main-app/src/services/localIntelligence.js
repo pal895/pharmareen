@@ -198,7 +198,6 @@ function titleForCard(type) {
     OnboardingCard: "Review setup",
     StockCorrectionCard: "Review stock correction",
     ReportCard: "Review report",
-    VoiceReviewCard: "Review voice",
     PhotoReviewCard: "Review photo",
     MedicineMatchCard: "Confirm medicine",
     VisualScanCard: "Review scan",

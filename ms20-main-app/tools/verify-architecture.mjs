@@ -37,7 +37,6 @@ const requiredCards = [
   "OnboardingCard",
   "StockCorrectionCard",
   "ReportCard",
-  "VoiceReviewCard",
   "PhotoReviewCard",
   "MedicineMatchCard",
   "VisualScanCard",
