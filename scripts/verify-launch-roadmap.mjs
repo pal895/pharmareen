@@ -14,15 +14,18 @@ for (const line of master.split(/\r?\n/)) {
   }
 }
 
-const legacyNonProtected = rows.filter((row) => row.id <= 76 && row.status !== "PASS / PROTECTED");
+const expectedLegacyMigrationIds = [
+  22, 23, 26, 27, 28, 29, 30, 33, 34, 35, 36, 37, 38, 48, 49, 50, 54,
+  55, 56, 57, 59, 60, 62, 63, 64, 67, 68, 69, 72, 73, 74, 75, 76,
+];
 const migrationIds = [...roadmap.matchAll(/^\| MS2-LT-(\d{3}) [^|]+\| (Launch Critical|Demo Mode|Continuous Improvement) \|/gm)]
   .map((match) => ({ id: Number(match[1]), classification: match[2] }));
-assert.equal(migrationIds.length, legacyNonProtected.length, "Every non-protected legacy checkpoint must have one migration row.");
+assert.equal(migrationIds.length, expectedLegacyMigrationIds.length, "Every original roadmap-migration checkpoint must remain mapped.");
 assert.equal(new Set(migrationIds.map((item) => item.id)).size, migrationIds.length, "Migration rows must be unique.");
 assert.deepEqual(
   migrationIds.map((item) => item.id).sort((a, b) => a - b),
-  legacyNonProtected.map((item) => item.id).sort((a, b) => a - b),
-  "Legacy migration coverage must be exact.",
+  expectedLegacyMigrationIds,
+  "Original legacy migration coverage must remain exact after checkpoints become protected.",
 );
 
 for (const id of [77, 78, 79, 80, 81, 82, 83, 84]) {

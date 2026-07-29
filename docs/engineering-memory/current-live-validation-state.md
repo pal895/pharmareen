@@ -547,12 +547,24 @@ Repository inspection confirmed that terminal payment failure already closed onl
 
 Focused TCE, payment UI, notification lifecycle, voice-viewport and consistency verifiers pass. MS2-LT-054 remains `Implemented — awaiting owner live test`; no PASS is claimed. The next action is exactly one simulator failure test with baseline stock, the durable unread Payment alert, Review payment routing, failed history and unchanged stock as evidence.
 
+## MS2-LT-054 owner closure — 2026-07-29
+
+MS2-LT-054 is PASS / PROTECTED. The 24 attached owner screenshots are one chronological evidence package, not two competing tests.
+
+The preliminary Zinc Sale 1 execution proves the supporting payment route: quantity 1 M-Pesa entered Waiting at KES 70, one Simulate failed action produced failed history, and one actionable Sale 1 notification stated that stock and paid records were unchanged. Zinc’s Current stock was blank, so it cannot prove a numeric stock assertion.
+
+The owner correctly changed to a suitable fixture rather than treating the checkpoint as failed. Septrin Sale 2 is authoritative: the visible catalog record showed suspension/bottle, Current stock 12, selling price KES 180 and buying price KES 120. Voice review resolved Septrin, quantity 1 and M-Pesa. Payment Queue showed one Waiting item and stated stock changes only after confirmation. One Simulate failed action returned the queue to zero waiting; history retained `Septrin x1 · KES 180 · M-Pesa · failed`; one separate unread Sale 2 alert stated Septrin was not completed and stock/paid records were unchanged; Review payment returned to that failed record; final Current stock remained 12.
+
+The two unread alerts are correct because their IDs and sales differ: Sale 1 Zinc and Sale 2 Septrin. No duplicate Septrin alert is visible. Owner and automated evidence jointly protect waiting/failed stock preservation, absence of paid completion, durable failed history, one alert per unique failed sale, correct routing, queue removal, distinct-sale isolation and same-event idempotency.
+
+The unsuitable Zinc selection exposed a test-planning defect, not a product failure. `ms20-main-app/SALE_LIVE_TEST_FIXTURE_STANDARD.md`, `fixtures/launch-sale-test-medicines.json` and `saleTestFixture.js` now require scenario-specific catalog preflight and visible before/after stock. Sale-related tests must use the production shared SaleCard and record incidental shared-root friction. The next dependency-valid Launch Critical milestone is MS2-LT-049; it is identified but not started.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-054 — Payment failure/cancellation notification
+- Current: MS2-LT-049 — Exact form/unit/pack/price truth
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.

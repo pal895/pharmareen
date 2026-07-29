@@ -4,11 +4,13 @@ Authority: `../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md` for checkpoint identity/statu
 
 Fixtures must be deterministic, synthetic, pharmacy-scoped, safe to commit and explicit about uncertainty. They may never contain production credentials, personal data or hidden AI/API dependencies. Existing protected fixtures remain unchanged.
 
+All sale-related fixture selection additionally follows `SALE_LIVE_TEST_FIXTURE_STANDARD.md`. The deterministic preflight must reject blank/insufficient stock, missing scenario-critical values, duplicate/alias conflicts and unstable identities before owner instructions are issued. The exact visible before-state is evidence, not an assumed fixture default.
+
 ## Required fixture families
 
 | Milestone | Planned deterministic fixtures | Minimum automated proof |
 |---|---|---|
-| MS2-LT-054 payment failure/cancellation | One pending M-Pesa sale with recorded baseline stock/finance; failed and cancelled provider events; duplicate and late-success events | One durable unread notification per terminal outcome; no chat-noise entry; no stock/paid receipt mutation; persistence through notification rebuild; idempotent duplicate/late event handling |
+| MS2-LT-054 payment failure/cancellation | Protected Septrin bottle reference with numeric stock 12 and KES 180 unit price; failed/cancelled provider events; duplicate, distinct-sale and late-success events | One durable unread notification per unique failed sale; distinct sales retain distinct alerts; no chat noise or stock/paid mutation; queue removal; failed history; Review payment routing; repeated-event idempotency |
 | MS2-LT-049–056 exact transaction truth | Same medicine in multiple strengths/forms/units/packs; mixed payments; linked refund/return/reversal | No unit/price leakage; exact one-time stock/finance/report/audit effects |
 | MS2-LT-077 multiuser | One pharmacy owner, manager, two staff, revoked invite, lost device and conflicting offline sale | Fixed-role authorization; shared catalog/stock; attribution; revocation; conflict visibility; idempotent sync; consolidated summary plus drill-down |
 | MS2-LT-078 loyalty | Eligible/ineligible first-use events, referral, repeated staff/device events, caps and renewal redemption | Pharmacy pooling; deterministic explanation; no multiplication; owner-only redemption; exact coin/discount/payable history |
@@ -29,3 +31,7 @@ For each milestone:
 4. Record measured network/resource evidence for MS2-LT-080; never substitute a claim.
 5. Keep owner validation at `READY FOR OWNER TEST` until explicit owner evidence exists.
 6. Present one live test only, then stop.
+
+## Sale-card continuous validation
+
+Every Launch Critical, Demo Mode or Continuous Improvement test that naturally uses a sale must also run the shared sale-card integrity verifier. Record incidental friction without broadening the named owner test, preserve valid evidence and repair launch-blocking shared-root defects before later tests inherit them.

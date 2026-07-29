@@ -35,6 +35,7 @@ MS2.0 may be declared launch-ready only when every mandatory row is `PASS` or `P
 | Core onboarding | MS2-LT-002–009, 011 | PROTECTED | A new owner can create the pharmacy and safely add/review medicines through the supported launch inputs without duplicate saves. |
 | Medicine catalog integrity | MS2-LT-010–011, 031–032, 049 | NOT STARTED | Canonical identity, strength, form, unit, pack, price, stock and provenance remain correct across every launch input and consumer. |
 | Fast sales recording | MS2-LT-014, 051–053 | PROTECTED | A known sale records once, receives a stable sale number, and applies stock/finance exactly once. |
+| Payment failure/cancellation safety | MS2-LT-052–054 | PROTECTED | A waiting/failed payment leaves stock and paid truth unchanged, exits the queue, retains failed history and creates one actionable alert per failed sale. |
 | Stock correctness | MS2-LT-015–020, 024–025, 049, 055–056 | NOT STARTED | Sale, restock, correction, return, refund and reversal preserve exact stock and financial truth without silent loss. |
 | Search reliability | MS2-LT-010, 031 | PROTECTED | Typed and supported voice search resolve saved medicines locally, safely handle zero/ambiguous results and do not mutate records. |
 | Editable-card reliability | MS2-LT-011, 013 | PROTECTED | Review, correction, validation, viewport focus, approve and discard remain stable on launch devices. |
@@ -116,7 +117,7 @@ Certification requires plain-language prompts, no developer console/manual stora
 
 | Order | Milestone | Dependencies | Owner-visible value and reason |
 |---:|---|---|---|
-| 1 | MS2-LT-054 payment failure/cancellation notification | 052–053 protected | Smallest unresolved correctness boundary: failed payment must never look paid or change stock, and must create one durable action. |
+| Complete | MS2-LT-054 payment failure/cancellation notification | 052–053 protected | PASS / PROTECTED from Septrin 12-to-12 owner evidence; preserve without routine retest. |
 | 2 | Exact transaction truth | 049 → 050 → 055 → 056 | Prevents unit/price, payment-mode, refund and reversal errors before new account layers amplify them. |
 | 3 | Persistence, access and provisioning foundation | 059 + 067 + 068 + 069 + 072 + 073 | Establishes isolated durable data, permission, audit, privacy and regression boundaries. |
 | 4 | Multiuser Pharmacy V1 | 077 after 059, 066–067, 073 | Shared catalog/stock, invitations, fixed roles, attribution and consolidated reporting are prerequisites for pooled loyalty/community identity. |
@@ -179,6 +180,6 @@ All backlog work keeps its canonical checkpoint/evidence relationship. New appro
 
 ## Active launch priority
 
-**MS2-LT-054 — Payment failure/cancellation notification**
+**MS2-LT-049 — Exact form/unit/pack/price truth**
 
-Status: `READY FOR OWNER TEST`. Focused deterministic verification covers terminal idempotency, unchanged stock/paid truth, durable deduplicated notification state, visible Payment Queue routing and zero chat noise. It is selected because its protected prerequisites are complete, it is the smallest unresolved transaction-correctness boundary, and it materially advances the Launch Gate. No later milestone starts until the owner provides evidence or explicitly redirects work.
+Status: `NOT STARTED`. Its prerequisites MS2-LT-010–015 are protected, and MS2-LT-054 is now closed. It is the next dependency-valid Launch Critical milestone because unit/strength/pack/price mistakes can corrupt every later payment, refund, report, multiuser and loyalty workflow. It has been identified only; no implementation or owner test has begun.

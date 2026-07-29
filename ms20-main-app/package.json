@@ -9,6 +9,7 @@
     "verify:catalog": "node tools/verify-catalog-workspace.mjs",
     "verify:voice-restock": "node tools/verify-voice-restock.mjs",
     "verify:tce": "node tools/verify-transaction-completion-engine.mjs && node tools/verify-request-verify-ui.mjs && node tools/verify-payment-failure-notification.mjs",
+    "verify:sale-test-fixture": "node tools/verify-sale-test-fixture.mjs",
     "verify:stock-fix": "node tools/verify-stock-correction.mjs && node tools/verify-stock-correction-ui.mjs && node tools/verify-stock-fix-evidence.mjs",
     "verify:exports": "node tools/verify-export-hub.mjs",
     "verify:notifications": "node tools/verify-notification-review-lifecycle.mjs",

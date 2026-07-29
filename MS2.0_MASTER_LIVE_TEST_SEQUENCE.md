@@ -85,7 +85,7 @@ Evidence abbreviations: `CVS` = `docs/engineering-memory/current-live-validation
 | 51 | TCE Fast Record | Record owner-confirmed transactions immediately with daily numbering and exact one-time stock/finance effects. | 14 | PASS / PROTECTED | Passed | Yes | 10 min | CVS; TCE |
 | 52 | Request & Verify success | Queue non-cash request, continue serving and complete only after verified success. | 51 | PASS / PROTECTED | Passed | Yes | 12 min | CVS; TCE; TCE/UI verifiers |
 | 53 | Concurrent payment completion | Keep multiple waiting payments isolated, support out-of-order success and prevent duplicate stock effects. | 52 | PASS / PROTECTED | Passed | Yes | 12 min | TCE quiet-concurrency evidence |
-| 54 | Payment failure/cancellation notification | Preserve stock/paid records and create one durable action-needed Notification without chat noise. | 52–53 | Implemented — awaiting owner live test | Ready for one focused owner test after deterministic failure-notification routing verification | No | 8 min | TCE; ARCH; `notificationCenter.js`; `verify-payment-failure-notification.mjs` |
+| 54 | Payment failure/cancellation notification | Preserve stock/paid records and create one durable action-needed Notification without chat noise. | 52–53 | PASS / PROTECTED | Passed 2026-07-29: owner mobile screenshots prove Zinc Sale 1 supporting flow evidence and authoritative Septrin Sale 2 stock-preservation evidence. Septrin began and ended at numeric stock 12, quantity 1, bottle/suspension, KES 180 selling price and M-Pesa; Waiting became failed after one Simulate failed action, Payment Queue returned to 0 waiting, history retained one failed not paid/completed sale, one distinct unread actionable Sale 2 notification stated stock and paid records were unchanged, and Review payment returned to the same failed record. Zinc had blank stock and is supporting flow evidence only; its separate Sale 1 alert is not a duplicate of Septrin Sale 2. | Yes | 8 min | TCE; ARCH; `notificationCenter.js`; `verify-payment-failure-notification.mjs`; 2026-07-29 owner 24-screenshot chronological package; Septrin 12-to-12 authoritative stock proof; Zinc preliminary fixture correction preserved; a76215e |
 | 55 | Refunds, returns and credits | Record linked financial/stock adjustments without deleting original history. | 51–54 | Partial implementation | Not owner-qualified end to end | No | 15 min | TCE; issue-return tests; intake history |
 | 56 | Undo/reversal reconciliation | Reconcile stock, finance, receipt, reports and audit exactly once for visible sale numbers. | 51–55 | Partial implementation | Basic cancellation/undo passed; full TCE reconciliation untested | No | 15 min | TCE; ledger/intake tests |
 | 57 | Supplier/restock payments | Support supplier payment, credit and future settlement flows through the adapter/TCE boundary. | 29, 50, 55 | Planned / approved | Not started | No | 15 min | TCE permanent scope; supplier workflows |
@@ -152,16 +152,16 @@ This ledger deliberately accounts for owner-facing domains discovered across cur
 | Supplier ordering, fulfilment and supplier payments | Planned / approved | 29, 48, 57 | LATP ordered Improvement 1; TCE permanent scope |
 | Reorder, stock-out, demand, fast/slow/dead-stock and expiry intelligence | Planned / approved | 26–30 | OI; OM Future rules |
 | Operational metrics, analytics, dashboard and decision support | Partial implementation | 21–23, 30 | Protected reports plus unqualified/partial intelligence renderers |
-| Notifications, unread/action routing and quiet state | Implemented — awaiting owner live test | 24–25, 54 | Inventory/expiry lifecycles protected; payment failure remains open |
+| Notifications, unread/action routing and quiet state | PASS / PROTECTED | 24–25, 54 | Inventory, expiry and payment-failure lifecycles owner-validated and protected |
 | Payment modes, split/mixed payments and discounts | Implemented — awaiting owner live test | 50 | Intake/TCE implementation and narrower protected payment evidence |
-| Payment failure/cancellation | Implemented — awaiting owner live test | 54 | TCE provider-event and notification boundary |
+| Payment failure/cancellation | PASS / PROTECTED | 54 | Owner Septrin 12-to-12 failure evidence; durable distinct alert and Review payment routing |
 | Refunds, returns, credits and undo/reversal | Partial implementation | 19, 55–56 | Basic cancellation protected; full financial reconciliation remains unqualified |
 | Cash/finance reconciliation | Planned / approved | 48, 56–57 | OM Future rules; TCE reconciliation hooks |
 | Reports, periods, speech controls and performance | PASS / PROTECTED | 21, 39, 71 | Report owner evidence, zero-AI latency/warmup history and tests |
 | CSV, Excel/XLSX, PDF, Word, Presentation and Print | PASS / PROTECTED | 40–47 | Export Hub owner evidence and cross-format verifiers |
 | Future operational document generation | Planned / approved | 48 | OM Documents; LATP |
 | Export and Activity history | PASS / PROTECTED | 10, 46, 66 | Activity/Export History owner evidence and verifiers |
-| Voice and contextual microphone editing | Implemented — awaiting owner live test | 12–13 | Shared voice is protected; contextual viewport/focus is current |
+| Voice and contextual microphone editing | PASS / PROTECTED | 12–13 | Shared voice and contextual viewport/focus are owner-validated and protected |
 | Barcode | PASS / PROTECTED | 7 | Known/unknown fixture and owner evidence |
 | OCR, camera, gallery, shelf and medicine-pack intake | PASS / PROTECTED | 3, 8–9, 18 | Invoice/photo/Stock Fix owner evidence and fixtures |
 | Bulk paste, CSV, XLSX and file imports | PASS / PROTECTED | 4–6, 11 | Owner evidence and import verifiers |
@@ -198,8 +198,8 @@ This ledger deliberately accounts for owner-facing domains discovered across cur
 ## Canonical status totals
 
 - Total checkpoints: **84**
-- PASS / PROTECTED: **43**
-- Implemented — awaiting owner live test: **9**
+- PASS / PROTECTED: **44**
+- Implemented — awaiting owner live test: **8**
 - Partial implementation: **9**
 - Planned / approved: **18**
 - External qualification: **3**
@@ -207,7 +207,7 @@ This ledger deliberately accounts for owner-facing domains discovered across cur
 
 ## Current execution pointer
 
-The only current open checkpoint is **#54 Payment failure/cancellation notification**. It is selected by the dependency-aware Launch Critical queue in `docs/engineering-memory/launch-readiness-roadmap.md`, not by the former ascending sequence. Checkpoints #14–#21 and all other protected checkpoints must not be repeated without regression evidence. After one focused owner test, stop and wait for evidence. The former automatic linear progression is historical and must never resume.
+The only current open checkpoint is **#49 Exact form/unit/pack/price truth**. It is selected by the dependency-aware Launch Critical queue in `docs/engineering-memory/launch-readiness-roadmap.md`, not by the former ascending sequence. Checkpoints #14–#21 and all other protected checkpoints must not be repeated without regression evidence. After one focused owner test, stop and wait for evidence. The former automatic linear progression is historical and must never resume.
 
 ## Canonical synchronization invariants
 
@@ -1051,13 +1051,13 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **Checkpoint ID:** MS2-LT-054
 - **Name:** Payment failure/cancellation notification
 - **Category:** Financial & Payment Validation
-- **Current status:** Implemented — awaiting owner live test
-- **Repository evidence:** TCE; ARCH; `notificationCenter.js`; `verify-payment-failure-notification.mjs`
-- **Implementation commit(s):** dd05778 Close low stock and harden notification edits; 9afd4e4 Close unread review checkpoint and route notification actions; c63f687 Fix pending-review notifications and Paste List capture
-- **Primary implementation files/modules:** `ms20-main-app/src/services/transactionCompletionEngine.js`; `ms20-main-app/src/services/notificationCenter.js`
-- **Owner live-test evidence:** Ready for one focused owner test after deterministic failure-notification routing verification; source: TCE; ARCH; `notificationCenter.js`; `verify-payment-failure-notification.mjs`
-- **PASS / PROTECTED confirmation:** Not applicable.
-- **Remaining implementation work:** Complete decisive owner live validation for: Preserve stock/paid records and create one durable action-needed Notification without chat noise.
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** TCE; ARCH; `notificationCenter.js`; `verify-payment-failure-notification.mjs`; 2026-07-29 owner 24-screenshot chronological package; Septrin 12-to-12 authoritative stock proof; Zinc preliminary fixture correction preserved; a76215e
+- **Implementation commit(s):** a76215e Route failed payment notifications to queue; dd05778 Close low stock and harden notification edits; 9afd4e4 Close unread review checkpoint and route notification actions; c63f687 Fix pending-review notifications and Paste List capture
+- **Primary implementation files/modules:** `ms20-main-app/src/services/transactionCompletionEngine.js`; `ms20-main-app/src/services/notificationCenter.js`; `ms20-main-app/src/services/saleTestFixture.js`; `ms20-main-app/tools/verify-payment-failure-notification.mjs`; `ms20-main-app/tools/verify-sale-test-fixture.mjs`
+- **Owner live-test evidence:** Passed 2026-07-29: owner mobile screenshots prove Zinc Sale 1 supporting flow evidence and authoritative Septrin Sale 2 stock-preservation evidence. Septrin began and ended at numeric stock 12, quantity 1, bottle/suspension, KES 180 selling price and M-Pesa; Waiting became failed after one Simulate failed action, Payment Queue returned to 0 waiting, history retained one failed not paid/completed sale, one distinct unread actionable Sale 2 notification stated stock and paid records were unchanged, and Review payment returned to the same failed record. Zinc had blank stock and is supporting flow evidence only; its separate Sale 1 alert is not a duplicate of Septrin Sale 2.; source: TCE; ARCH; `notificationCenter.js`; `verify-payment-failure-notification.mjs`; 2026-07-29 owner 24-screenshot chronological package; Septrin 12-to-12 authoritative stock proof; Zinc preliminary fixture correction preserved; a76215e
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed 2026-07-29: owner mobile screenshots prove Zinc Sale 1 supporting flow evidence and authoritative Septrin Sale 2 stock-preservation evidence. Septrin began and ended at numeric stock 12, quantity 1, bottle/suspension, KES 180 selling price and M-Pesa; Waiting became failed after one Simulate failed action, Payment Queue returned to 0 waiting, history retained one failed not paid/completed sale, one distinct unread actionable Sale 2 notification stated stock and paid records were unchanged, and Review payment returned to the same failed record. Zinc had blank stock and is supporting flow evidence only; its separate Sale 1 alert is not a duplicate of Septrin Sale 2.; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
 - **Prerequisite checkpoints:** 52–53
 - **Dependent checkpoints:** MS2-LT-055, MS2-LT-056, MS2-LT-074, MS2-LT-083
 

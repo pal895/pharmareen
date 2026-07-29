@@ -182,7 +182,10 @@
   ],
   "54": [
     "ms20-main-app/src/services/transactionCompletionEngine.js",
-    "ms20-main-app/src/services/notificationCenter.js"
+    "ms20-main-app/src/services/notificationCenter.js",
+    "ms20-main-app/src/services/saleTestFixture.js",
+    "ms20-main-app/tools/verify-payment-failure-notification.mjs",
+    "ms20-main-app/tools/verify-sale-test-fixture.mjs"
   ],
   "55": [
     "app/intake.py",

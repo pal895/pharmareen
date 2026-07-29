@@ -48,6 +48,20 @@ const cancelled = buildTransactionNotification({
 assert.equal(cancelled.title, "Sale 8 payment cancelled");
 assert.equal(cancelled.actionTarget, "payment:sale-payment-cancel-fixture");
 
+const zincFailure = buildTransactionNotification({
+  transaction: { ...transaction, id: "sale-1-zinc", saleLabel: "Sale 1", metadata: { medicine: "Zinc", quantity: 1 } },
+  status: "failed",
+  now,
+});
+const septrinFailure = buildTransactionNotification({
+  transaction: { ...transaction, id: "sale-2-septrin", saleLabel: "Sale 2", metadata: { medicine: "Septrin", quantity: 1 } },
+  status: "failed",
+  now,
+});
+const distinctFailures = mergeNotifications([], [zincFailure, septrinFailure]);
+assert.equal(distinctFailures.length, 2, "Different failed sales must retain separate actionable notifications.");
+assert.equal(new Set(distinctFailures.map((item) => item.id)).size, 2, "Distinct failed-sale notification identities must not collide.");
+
 assert.throws(() => buildTransactionNotification({ transaction, status: "confirmed", now }), /failed or cancelled/);
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -57,4 +71,4 @@ const failureBranch = appSource.match(/else if \(result\.updated && \["failed", 
 assert.ok(failureBranch.includes("addTransactionNotification"), "Terminal failure must create the durable notification.");
 assert.ok(!failureBranch.includes("addFeed("), "Terminal failure must not add operational chat noise.");
 
-console.log("PAYMENT_FAILURE_NOTIFICATION_OK durable=1 action=payment_queue stock_paid_unchanged=asserted_by_tce chat_noise=0");
+console.log("PAYMENT_FAILURE_NOTIFICATION_OK durable_per_sale=1 distinct_sales=2 action=payment_queue stock_paid_unchanged=asserted_by_tce chat_noise=0");

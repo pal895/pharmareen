@@ -8,13 +8,15 @@ The master’s generated `MS2-LT-NNN` Engineering Traceability Index is the sole
 
 Active owner testing now follows `../docs/engineering-memory/launch-readiness-roadmap.md`. It selects one dependency-aware Launch Critical milestone and stops for evidence. The historical procedures below remain regression evidence; they do not imply ascending order. Demo Mode certification belongs to MS2-LT-083 and may run only after every mandatory Launch Gate row is PASS/PROTECTED.
 
-## Active Launch Critical owner test — MS2-LT-054
+## Protected Launch Critical evidence — MS2-LT-054
 
-Objective: prove that one simulated failed M-Pesa payment creates one durable action-needed Payment notification, routes back to the correct Payment Queue, and does not change stock or create a paid record/chat acknowledgement.
+MS2-LT-054 is owner-validated PASS / PROTECTED. Do not repeat it without direct regression evidence.
 
-Use one saved medicine and record its current stock before starting. Set Payment Queue completion to `Request & Verify`, submit one M-Pesa sale for quantity 1, and require it to appear as `Waiting` with an expected KES amount. Tap `Simulate failed` once. Open Notifications and require exactly one unread card titled `[Sale number] payment failed`, the message that stock and paid records were not changed, and a visible `Review payment` button. Tap it once and require Payment Queue to open with that same sale shown as `failed`, not paid or waiting. Reopen the medicine and confirm stock equals the recorded baseline.
+The owner first used Zinc. That run validly proved Waiting at KES 70, failed history and a distinct actionable Sale 1 notification, but Zinc had blank Current stock and could not prove numeric preservation. The owner then selected Septrin, a valid fixture with suspension/bottle, stock 12, selling price KES 180 and buying price KES 120. This was a justified fixture correction, not wasteful duplication or a failed attempt.
 
-Required evidence: (1) baseline stock; (2) pending Payment Queue item; (3) unread failed-payment notification with `Review payment`; (4) Payment Queue failed history after routing; (5) unchanged final stock. Fail on missing/duplicate notification, chat success acknowledgement, paid/confirmed history, stock change, broken action routing or any second sale. Do not simulate success/cancellation, test another payment, or begin another milestone.
+The authoritative Septrin execution proves voice review of medicine/quantity/M-Pesa, Waiting Sale 2 at KES 180, explicit deferred stock, one Simulate failed action, zero waiting, durable failed/not-paid history, one unread Sale 2 alert, stock/paid unchanged wording, Review payment routing to the same failed record and final stock 12. Zinc Sale 1 and Septrin Sale 2 each correctly retain one notification; they are not duplicates.
+
+All future sale tests follow `SALE_LIVE_TEST_FIXTURE_STANDARD.md`, run deterministic preflight, capture exact before/after state where required, use the shared production SaleCard and record incidental sale-card friction. MS2-LT-049 is the next dependency-valid milestone but has not begun.
 
 ## Historical checkpoint — Notifications Low-Stock Alert
 
@@ -953,7 +955,7 @@ Pass only after owner-device evidence shows the file opens in a compatible prese
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-054 — Payment failure/cancellation notification
+- Current: MS2-LT-049 — Exact form/unit/pack/price truth
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.

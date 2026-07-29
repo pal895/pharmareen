@@ -1,0 +1,37 @@
+{
+  "schema": "ms20.launch-sale-test-fixtures.v1",
+  "rule": "Reference fixtures never overwrite live pharmacy data. Verify the live catalog record and capture its visible before-state before every sale-related owner test.",
+  "fixtures": [
+    {
+      "fixture_id": "launch-sale-septrin-bottle",
+      "canonical_name": "Septrin",
+      "stable_catalog_id": "septrin",
+      "form": "suspension",
+      "unit": "bottle",
+      "current_stock": 12,
+      "minimum_test_quantity": 1,
+      "selling_price": 180,
+      "buying_price": 120,
+      "barcode": "",
+      "batch": "SEP-100S",
+      "expiry": "2028-09",
+      "reorder_level": null,
+      "aliases": ["cotrimoxazole", "co-trimoxazole"],
+      "approved_uses": [
+        "sale",
+        "payment_failure",
+        "stock_preservation",
+        "refund",
+        "cancellation",
+        "offline_sale",
+        "synchronization",
+        "report",
+        "multiuser_attribution",
+        "loyalty_reward",
+        "demo_mode_sale"
+      ],
+      "not_approved_without_more_data": ["barcode_scan", "reorder_intelligence"],
+      "owner_evidence": "MS2-LT-054 authoritative Septrin execution: visible stock 12 before and after failed Sale 2; unit bottle; selling price KES 180; buying price KES 120."
+    }
+  ]
+}

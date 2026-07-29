@@ -30,6 +30,10 @@ No production architecture for these planned checkpoints is claimed until its mi
 
 The Transaction Completion Engine still owns terminal-event idempotency and rejects late events from rewriting terminal truth. Only confirmed events enter `applyConfirmedPendingSale`; failed/cancelled events do not call stock, finance or feed mutation. Focused verification covers failure, cancellation, persistence, deduplication, action routing and absence of operational chat noise. Owner evidence is still required.
 
+Owner evidence now closes MS2-LT-054. Septrin supplies the authoritative numeric `12 → 12` failure proof; Zinc remains supporting flow evidence because its stock was blank. Distinct stable transaction/status notification IDs correctly retain separate Sale 1 and Sale 2 alerts while repeated processing of the same event remains idempotent.
+
+`src/services/saleTestFixture.js` is the deterministic preflight boundary for future sale-related live tests. It validates stable identity, numeric/sufficient stock, form, selling unit/price, conditional cost/barcode/reorder/expiry requirements, and duplicate/alias conflicts without mutating pharmacy data. `fixtures/launch-sale-test-medicines.json` records reusable reference expectations; live values must still be inspected and captured. `SALE_LIVE_TEST_FIXTURE_STANDARD.md` requires the production SaleCard, matcher, voice, TCE and queue/sync roots and prohibits test-only bypass cards.
+
 ## Notification and Catalog voice architecture (2026-07-28)
 
 Low-stock and Out-of-Stock via Catalog Mic notification lifecycles are owner-validated and protected. Owner evidence proves the complete Cefixime `22 → 0 → 22` Mic-only round trip, one-field reviews, exact single alert through refresh, 35 medicines and final quiet restoration. `buildDeterministicNotifications()` projects alerts from the current pharmacy-scoped catalog with deterministic IDs; `mergeNotifications()` prevents duplicates, preserves read state for an unchanged fact, resets one materially changed alert to unread using a content fingerprint, and removes generated alerts when their source condition clears. Refresh/restart rebuilds the same projection from persisted catalog and card state.
@@ -421,7 +425,7 @@ Planned at their proper test stages:
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-054 — Payment failure/cancellation notification
+- Current: MS2-LT-049 — Exact form/unit/pack/price truth
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.

@@ -26,6 +26,10 @@ Routine approved Catalog saves use one pharmacy-scoped compact Activity status c
 
 Shared Editable-Card Voice Viewport / Focus Preservation is **OWNER-VALIDATED PASS / PROTECTED**. Final evidence after `67cfcac` proves upper, middle, lower and Expiry contextual field voice retains the selected field through listening, transcript application, one-field validation and discard/restoration. The contextual session owns rendering and suppresses ordinary chat-bottom scrolling; earlier failed attempts remain preserved in Engineering Memory. Do not repeat this checkpoint without direct regression evidence.
 
+Payment Failure/Cancellation Notification (MS2-LT-054) is **OWNER-VALIDATED PASS / PROTECTED**. The authoritative Septrin execution proves numeric stock `12 → 12`, M-Pesa quantity 1 at KES 180, Waiting → failed, zero waiting afterward, durable failed history, one actionable Sale 2 alert and Review payment routing to the same failed record. The earlier Zinc run is valid supporting flow evidence only because Zinc had blank Current stock; its Sale 1 alert and Septrin’s Sale 2 alert are distinct, not duplicates.
+
+Every future sale-related owner test must pass the repository-backed preflight in `ms20-main-app/SALE_LIVE_TEST_FIXTURE_STANDARD.md`. Use the real shared SaleCard workflow, verify all scenario-critical catalog values before issuing instructions, capture exact numeric before/after stock when stock is relevant, and record incidental shared sale-card friction without discarding already-valid evidence.
+
 The complete functional, intelligence, learning, reporting/export, financial/payment, integration, security/compliance and production programme is maintained only in the master sequence.
 
 Routine Codex implementation and live-test reports are permanently compact: repository state, checkpoint, at most three change bullets, concise tests, commit/push, and the exact next owner action. Do not restate protected history or architecture unless an error or explicit owner request requires it.
@@ -520,7 +524,7 @@ Export activity updates one compact Export Hub card in the main chat. Newest-fir
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-054 — Payment failure/cancellation notification
+- Current: MS2-LT-049 — Exact form/unit/pack/price truth
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.

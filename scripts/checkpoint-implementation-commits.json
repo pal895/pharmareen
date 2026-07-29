@@ -184,6 +184,7 @@
     "2e64e41 Prepare transaction completion engine"
   ],
   "54": [
+    "a76215e Route failed payment notifications to queue",
     "dd05778 Close low stock and harden notification edits",
     "9afd4e4 Close unread review checkpoint and route notification actions",
     "c63f687 Fix pending-review notifications and Paste List capture"

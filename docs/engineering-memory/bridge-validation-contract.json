@@ -3,8 +3,8 @@
   "authority": "MS2.0_MASTER_LIVE_TEST_SEQUENCE.md",
   "checkpoint_count": 84,
   "current_checkpoint": {
-    "id": "MS2-LT-054",
-    "name": "Payment failure/cancellation notification"
+    "id": "MS2-LT-049",
+    "name": "Exact form/unit/pack/price truth"
   },
   "protected_checkpoint_ids": [
     "MS2-LT-001",
@@ -44,6 +44,7 @@
     "MS2-LT-051",
     "MS2-LT-052",
     "MS2-LT-053",
+    "MS2-LT-054",
     "MS2-LT-058",
     "MS2-LT-061",
     "MS2-LT-065",
@@ -59,6 +60,6 @@
     "status": "ACTIVE",
     "document": "docs/engineering-memory/token-execution-policy.md"
   },
-  "master_sha256": "883ce25bb9c9afcfcd3b5ca3eb502d2608d33e805d440e01483ead0672e1cbda",
+  "master_sha256": "a584a86b9d45b6a4117a2bc644b7b9e367a90abf5bbbd618f0c179b818723da9",
   "rule": "Load the master and its Engineering Traceability Index; never reconstruct or maintain a parallel sequence."
 }
