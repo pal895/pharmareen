@@ -4,6 +4,10 @@
 
 MS2.0 has exactly one authoritative Production Sales Card. Typed sales, voice sales, review/correction, payment verification, Payment Queue, failure recovery, notifications and future sale fixtures must use the shared `SaleCard` model in `ms20-main-app/src/services/productionSaleCard.js` and its single renderer in `ms20-main-app/src/app.js`. `VoiceReviewCard` and bespoke queue sale cards are retired.
 
+Its permanent presentation is compact and progressive: the default cream Fast action surface contains only approval facts and actions; Stock & details and Traceability remain one tap away; full editable inputs appear only after Correct. Every Sale correction field uses the Catalog-proven contextual Mic pattern and shared voice-capture root.
+
+Implementation handoffs stay short: what changed, commit hash, one combined Replit command, one focused owner live test, expected result, then wait for screenshots. Detailed engineering history belongs in repository documentation.
+
 The first view prioritizes canonical medicine, exact form, exact selling unit, quantity, unit-specific selling price, expected total and payment. It visibly preserves stock before/after and sale status. Ambiguous form/unit choices remain explicit; missing prices/conversions display as Unknown and block confirmation; unit/form/strength mismatches and insufficient stock are unsafe and block confirmation. Secondary traceability stays secondary. No typed sale may bypass review.
 
 Owner live validation of this upgrade is pending. The launch-focused sequence is paused; MS2-LT-049 is identified but not started.

@@ -1720,7 +1720,7 @@ pre {
 @media (max-width: 520px) { .activity-status-card { grid-template-columns: 1fr; } .activity-history-item div { align-items: flex-start; flex-direction: column; } }
 @media (max-width: 520px) { .export-format-grid { grid-template-columns: 1fr; } .export-hub-summary { align-items: flex-start; flex-direction: column; } .export-hub-summary span { text-align: left; } }
 
-.production-sale-card-body { display: grid; gap: 0.8rem; }
+.production-sale-card-body { display: grid; gap: 0.65rem; padding: 0.15rem; background: #fffdf5; }
 .production-sale-card-body .card-eyebrow { margin: 0; }
 .sale-summary { margin: 0; padding: 0.8rem; border-left: 4px solid #086c5c; border-radius: 0.65rem; background: #edf7f4; color: #19332f; font-weight: 800; line-height: 1.4; }
 .sale-transcript, .sale-secondary, .sale-consequence { margin: 0; color: #536b66; line-height: 1.4; }
@@ -1731,6 +1731,20 @@ pre {
 .production-sale-primary input, .production-sale-primary select, .sale-consequence-grid input { min-width: 0; min-height: 48px; padding: 0.7rem; border: 1px solid #b8d3cd; border-radius: 0.8rem; background: #fff; color: #19332f; font: inherit; }
 .sale-consequence-grid { padding: 0.75rem; border-radius: 0.8rem; background: #f4f8f7; }
 .sale-consequence-grid strong { overflow-wrap: anywhere; color: #19332f; }
+.sale-approval-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.45rem; }
+.sale-compact-fact { display: grid; gap: 0.18rem; padding: 0.55rem; border: 1px solid #e3ddc8; border-radius: 0.75rem; background: #fff; min-width: 0; }
+.sale-compact-fact span, .sale-stock-strip span { color: #68736c; font-size: 0.72rem; font-weight: 800; }
+.sale-compact-fact strong { overflow-wrap: anywhere; color: #19332f; font-size: 0.94rem; }
+.sale-stock-strip { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.55rem; padding: 0.6rem 0.7rem; border-radius: 0.75rem; background: #f8f2dd; color: #19332f; }
+.sale-stock-strip strong { font-size: 1.05rem; }
+.sale-stock-strip small { color: #536b66; text-align: right; }
+.sale-detail-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; margin: 0; border: 1px solid #e3ddc8; border-radius: 0.75rem; overflow: hidden; background: #fff; }
+.sale-detail-list div { display: grid; gap: 0.18rem; padding: 0.65rem; border-bottom: 1px solid #eee9d9; }
+.sale-detail-list dt { color: #68736c; font-size: 0.74rem; font-weight: 800; }
+.sale-detail-list dd { margin: 0; overflow-wrap: anywhere; color: #19332f; font-weight: 700; }
+.sale-edit-guidance { margin: 0; padding: 0.55rem 0.7rem; border-radius: 0.7rem; background: #edf7f4; color: #246f5d; }
+.production-sale-edit-grid .sale-edit-field:first-child { grid-column: 1 / -1; }
+.sale-edit-field input, .sale-edit-field select { width: 100%; min-height: 44px; padding: 0.62rem 0.7rem; border: 1px solid #b8d3cd; border-radius: 0.75rem; background: #fff; color: #19332f; font: inherit; }
 @media (max-width: 520px) {
   .production-sale-primary, .sale-consequence-grid { grid-template-columns: 1fr; }
   .production-sale-primary label:first-child { grid-column: auto; }

@@ -60,3 +60,6 @@ Production Sales Card recovery tests must additionally prove that payment and qu
 ## Permanent friction capture
 
 Observe the entire shared sale flow whenever another test naturally passes through it. Record unrelated friction immediately. Fix a launch-blocking shared-root cause before it spreads, add regression coverage, preserve valid evidence already collected and avoid repeating proven portions unnecessarily. Friction does not silently disappear merely because another checkpoint supplied the route.
+# Compact Production Sales Card presentation
+
+Every sale fixture must exercise the single shared Production Sales Card. The default fixture view must keep approval facts and actions visible with minimal scrolling; complete stock/detail and traceability facts remain on-demand. Full inputs and their Catalog-shared contextual microphones appear only after Correct. A fixture-specific or permanently expanded Sale card is invalid.

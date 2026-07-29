@@ -583,3 +583,6 @@ This is implementation evidence only. Production Sales Card remains **NOT OWNER-
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.
 <!-- VALIDATION_CONTRACT_SYNC_END -->
+# Production Sales Card simplification hold — 2026-07-29
+
+The recovered Production Sales Card information and parser are implemented, but owner evidence rejected the long all-input presentation before completing the live test. The shared renderer now uses a compact cream approval view with details on demand and correction-only editable fields. Contextual field microphones reuse the Catalog pattern and shared capture root. Status remains **AWAITING OWNER LIVE TEST / NOT PROTECTED**; do not advance to MS2-LT-049 or any later checkpoint.

@@ -4,6 +4,8 @@
 
 - One canonical model: `src/services/productionSaleCard.js`.
 - One canonical renderer: `productionSaleCardBody` in `src/app.js`.
+- One compact presentation rule: Fast action is summary-first and approval-ready; full inputs exist only in explicit Correct mode. Secondary facts use compact on-demand lists.
+- Sale correction fields reuse the Catalog contextual Mic presentation and shared `startVoiceCapture()` root. A workflow-local speech service or permanently expanded Sale form is prohibited.
 - Typed and voice inputs both resolve to `SaleCard`; no instant typed write and no `VoiceReviewCard`.
 - Review, correction, Payment Queue, payment verification and failed-payment recovery preserve the same exact medicine/form/unit/quantity/unit-price/total/payment/stock/status fields.
 - Per-unit price and stock-conversion maps are retained at the Pharmacy Brain boundary. Ambiguous units/forms are explicit choices; missing or unsafe truth blocks Confirm.

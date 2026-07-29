@@ -668,27 +668,26 @@ function cardBodyTemplate(card, displayed) {
 function productionSaleCardBody(fields = {}, eyebrow = "Sale", card = null) {
   const editable = Boolean(card);
   const activeSlide = Math.max(0, Math.min(2, Number(card?.ui?.activeSlide || 0)));
+  const correcting = editable && Boolean(card.ui?.editing);
   const value = (field) => escapeHtml(String(fields[field] ?? ""));
-  const field = (name, label, inputMode = "") => editable
-    ? `<label><span>${label}</span>${["form", "unit"].includes(name) && card.saleOptions?.[`${name}s`]?.length > 1
-      ? `<select data-card-id="${card.id}" data-field="${name}"><option value="">Choose exact ${name}</option>${card.saleOptions[`${name}s`].map((option) => `<option ${String(fields[name]) === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>`
-      : `<input data-card-id="${card.id}" data-field="${name}" ${inputMode ? `inputmode="${inputMode}"` : ""} value="${value(name)}">`}</label>`
-    : `<div><span>${label}</span><strong>${value(name) || "Unknown"}</strong></div>`;
-  const fast = `<div class="production-sale-primary">
-    ${field("medicine", "Medicine")}${field("form", "Exact form")}${field("unit", "Selling unit")}
-    ${field("selling_price", "Unit price (KES)", "decimal")}${field("quantity", "Quantity", "decimal")}
-    ${field("expected_total", "Expected total (KES)", "decimal")}${field("payment", "Payment")}
-  </div><div class="sale-consequence-grid">
-    ${field("stock_before", "Stock before", "decimal")}${field("stock_after", "Stock after confirmed sale", "decimal")}${field("sale_status", "Status")}
-  </div>${editable ? quantityToolbar(card) + paymentToolbar(card) + activeActionsTemplate(card) : ""}`;
-  const stock = `<div class="production-sale-primary">
-    ${field("current_stock", "Current stock", "decimal")}${field("strength", "Strength")}
-    ${field("form", "Form")}${field("unit", "Unit")}${field("cost_price", "Buying price (KES)", "decimal")}
-  </div>`;
-  const trace = `<div class="production-sale-primary">
-    ${field("supplier", "Supplier")}${field("barcode", "Barcode")}${field("batch", "Batch")}
-    ${field("expiry", "Expiry")}${field("aliases", "Aliases")}${field("note", "Note")}
-  </div>`;
+  const fact = (name, label) => `<div class="sale-compact-fact"><span>${label}</span><strong>${value(name) || "Unknown"}</strong></div>`;
+  const editField = (name, label, inputMode = "") => saleEditableFieldTemplate(card, name, label, fields[name], inputMode);
+  const fast = `${correcting ? `<p class="sale-edit-guidance" role="status">${escapeHtml(card.fields?.voice_feedback || "Correct only what is wrong. Every field uses the shared Catalog Mic.")}</p>
+    <div class="production-sale-primary production-sale-edit-grid">
+      ${editField("medicine", "Medicine")}${editField("form", "Exact form")}${editField("unit", "Selling unit")}
+      ${editField("selling_price", "Unit price (KES)", "decimal")}${editField("quantity", "Quantity", "decimal")}${editField("payment", "Payment")}
+    </div>` : `<div class="sale-approval-grid">
+      ${fact("selling_price", "Unit price")}${fact("quantity", "Quantity")}${fact("expected_total", "Total")}${fact("payment", "Payment")}
+    </div><div class="sale-stock-strip"><span>Stock</span><strong>${value("stock_before") || "Unknown"} → ${value("stock_after") || "Unknown"}</strong><small>${value("sale_status") || "Review before recording"}</small></div>`}
+    ${editable ? quantityToolbar(card) + paymentToolbar(card) + activeActionsTemplate(card) : ""}`;
+  const stock = correcting ? `<div class="production-sale-primary production-sale-edit-grid">
+    ${editField("current_stock", "Current stock", "decimal")}${editField("strength", "Strength")}
+    ${editField("form", "Form")}${editField("unit", "Unit")}${editField("cost_price", "Buying price (KES)", "decimal")}
+  </div>` : saleDetailList([["Current stock", fields.current_stock], ["Strength", fields.strength], ["Form", fields.form], ["Unit", fields.unit], ["Buying price", fields.cost_price]]);
+  const trace = correcting ? `<div class="production-sale-primary production-sale-edit-grid">
+    ${editField("supplier", "Supplier")}${editField("barcode", "Barcode")}${editField("batch", "Batch")}
+    ${editField("expiry", "Expiry")}${editField("aliases", "Aliases")}${editField("note", "Note")}
+  </div>` : saleDetailList([["Supplier", fields.supplier], ["Barcode", fields.barcode], ["Batch", fields.batch], ["Expiry", fields.expiry], ["Aliases", fields.aliases], ["Notes", fields.note]]);
   return `<section class="production-sale-card-body medicine-review-workspace" data-medicine-workspace="${card?.id || ""}" aria-label="Production Sales Card">
     <p class="card-eyebrow">${escapeHtml(eyebrow)}</p>
     <p class="sale-summary" data-sale-summary="${card?.id || ""}">${escapeHtml(productionSaleSummary(fields))}</p>
@@ -712,6 +711,28 @@ function notificationCardBodyTemplate(card) {
       ${["category", "message", "status"].map((field) => fieldTemplate(card, field)).join("")}
     </div>
   `;
+}
+
+function saleDetailList(entries) {
+  return `<dl class="sale-detail-list">${entries.map(([label, entry]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(entry || "Not recorded"))}</dd></div>`).join("")}</dl>`;
+}
+
+function contextualEditableFieldTemplate(card, field, label, value = "", inputMode = "", action = "sale-edit-field-voice", catalog = false) {
+  const options = ["form", "unit"].includes(field) ? card.saleOptions?.[`${field}s`] : [];
+  const fieldAttribute = catalog ? `data-catalog-edit-field="${field}"` : `data-field="${field}"`;
+  const control = options?.length > 1
+    ? `<select data-card-id="${card.id}" ${fieldAttribute}><option value="">Choose exact ${field}</option>${options.map((option) => `<option ${String(value) === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>`
+    : `<input data-card-id="${card.id}" ${fieldAttribute} ${inputMode ? `inputmode="${inputMode}"` : ""} value="${escapeHtml(String(value ?? ""))}">`;
+  return `<div class="catalog-edit-field sale-edit-field">
+    <div class="catalog-edit-field-heading">
+      <label>${escapeHtml(label)}</label>
+      <button type="button" data-action="${action}" data-card-id="${card.id}" data-field="${field}" aria-label="Speak ${escapeHtml(label)}" ${state.voice.starting || state.voice.listening ? "disabled" : ""}>Mic</button>
+    </div>${control}
+  </div>`;
+}
+
+function saleEditableFieldTemplate(card, field, label, value = "", inputMode = "") {
+  return contextualEditableFieldTemplate(card, field, label, value, inputMode);
 }
 
 function catalogWorkspaceTemplate(card) {
@@ -788,15 +809,13 @@ function catalogMedicineEditorTemplate(card) {
   const review = reviewCatalogEdit(pharmacyBrain.catalog, card.fields.selected_id, draft);
   const presentation = catalogEditPresentation(review);
   const advanced = new Set(["pack_size", "supplier", "shelf", "barcode", "batch", "expiry", "reorder_level", "aliases"]);
-  const fields = (showAdvanced) => CATALOG_EDIT_FIELDS.filter((field) => advanced.has(field) === showAdvanced).map((field) => `
-    <div class="catalog-edit-field">
-      <div class="catalog-edit-field-heading">
-        <label for="catalog-edit-${card.id}-${field}">${escapeHtml(fieldLabel(field))}</label>
-        <button type="button" data-action="catalog-edit-field-voice" data-card-id="${card.id}" data-field="${field}" aria-label="Speak ${escapeHtml(fieldLabel(field))}" ${state.voice.starting || state.voice.listening ? "disabled" : ""}>Mic</button>
-      </div>
-      <input id="catalog-edit-${card.id}-${field}" data-catalog-edit-field="${field}" data-card-id="${card.id}" value="${escapeHtml(String(draft[field] ?? ""))}" ${["stock", "selling_price", "cost_price", "reorder_level"].includes(field) ? 'inputmode="decimal"' : ""}>
-    </div>
-  `).join("");
+  const fields = (showAdvanced) => CATALOG_EDIT_FIELDS
+    .filter((field) => advanced.has(field) === showAdvanced)
+    .map((field) => contextualEditableFieldTemplate(
+      card, field, fieldLabel(field), draft[field],
+      ["stock", "selling_price", "cost_price", "reorder_level"].includes(field) ? "decimal" : "",
+      "catalog-edit-field-voice", true
+    )).join("");
   return `
     <section class="catalog-medicine-editor" aria-label="Edit ${escapeHtml(draft.name || "medicine")}">
       <button class="catalog-back" type="button" data-action="cancel-catalog-edit" data-card-id="${card.id}">&larr; Back to catalog</button>
@@ -1266,6 +1285,7 @@ function handleAction(dataset) {
     selectCatalogVoiceField(dataset.cardId, dataset.field);
     startCatalogEditVoice(dataset.cardId);
   }
+  if (action === "sale-edit-field-voice") startSaleEditFieldVoice(dataset.cardId, dataset.field);
   if (action === "catalog-search-voice") startCatalogSearchVoice(dataset.cardId, dataset.searchPlacement);
   if (action === "back-home") {
     state.ui.screen = "home";
@@ -3443,6 +3463,43 @@ function startCatalogEditVoice(cardId) {
   );
 }
 
+function startSaleEditFieldVoice(cardId, field) {
+  const card = state.cards.find((item) => item.id === cardId && item.type === "SaleCard");
+  const allowed = new Set(["medicine", "form", "unit", "selling_price", "quantity", "payment", "current_stock", "strength", "cost_price", "supplier", "barcode", "batch", "expiry", "aliases", "note"]);
+  if (!card || !allowed.has(field)) return;
+  card.fields.voice_field = field;
+  card.fields.voice_feedback = `${fieldLabel(field)} selected. Speak the new value.`;
+  persistActiveCards();
+  startVoiceCapture(
+    (transcript) => {
+      const mappedField = { medicine: "name", current_stock: "stock", quantity: "stock" }[field] || field;
+      let value = String(transcript || "").trim();
+      if (["quantity", "selling_price", "current_stock", "cost_price"].includes(field)) {
+        const normalized = applyCatalogEditVoice({ [mappedField]: card.fields[field] }, transcript, mappedField);
+        if (!normalized.applied) {
+          card.fields.voice_feedback = normalized.feedback;
+          persistActiveCards();
+          render();
+          return;
+        }
+        value = normalized.value;
+      } else if (field === "payment") {
+        const payment = value.toLowerCase().replaceAll("-", "").replace(/\s+/g, "");
+        value = payment === "mpesa" ? "mpesa" : payment;
+      }
+      updateCardField(card.id, field, value);
+      card.fields.voice_feedback = `Heard “${transcript}”. ${fieldLabel(field)} updated. Review before confirming.`;
+      persistActiveCards();
+      render();
+      requestAnimationFrame(() => root.querySelector(`[data-card-id="${card.id}"][data-field="${field}"]`)?.focus());
+    },
+    (message) => {
+      card.fields.voice_feedback = message;
+      persistActiveCards();
+    }
+  );
+}
+
 function cancelCatalogEdit(cardId) {
   const card = state.cards.find((item) => item.id === cardId && item.type === "CatalogWorkspaceCard");
   if (!card) return;
@@ -4351,6 +4408,7 @@ function correctCard(cardId) {
   const card = state.cards.find((item) => item.id === cardId);
   if (!card) return;
   card.status = "needs_correction";
+  card.ui = { ...(card.ui || {}), editing: true, activeSlide: 0 };
   card.validation = "Edit the fields, then confirm.";
   persistActiveCards();
   render();

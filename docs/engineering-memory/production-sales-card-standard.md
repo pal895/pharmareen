@@ -36,3 +36,9 @@ The first recovery implementation also flattened the card. The authoritative des
 ## Hold
 
 This recovery does not pass or protect the Production Sales Card and does not start MS2-LT-049. Only complete owner evidence can approve the card. Until then, the launch sequence remains paused.
+
+## Compact production presentation
+
+The recovered information model remains unchanged, but its default presentation is now a compact cream approval surface. The first screen shows the exact identity summary, unit price, quantity, total, payment, stock before/after, status, quantity/payment shortcuts, and Confirm/Read/Correct/Cancel. Stock/detail and traceability facts remain one tap away as dense read-only lists.
+
+Full inputs appear only after explicit **Correct**. Every editable Sale field then renders the same contextual field-heading/Mic pattern proven by Catalog Medicine Action Cards and delegates to the same `startVoiceCapture()` boundary. No second microphone service exists. Future work must not restore the long all-input default card.

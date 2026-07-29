@@ -1512,3 +1512,6 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **Dependent checkpoints:** MS2-LT-078, MS2-LT-083
 
 <!-- TRACEABILITY_INDEX_END -->
+# Owner hold — compact Production Sales Card
+
+The live-test sequence remains paused before MS2-LT-049. Resume only after the owner validates the compact shared Production Sales Card, its on-demand detail sections, correction flow, and inline shared field microphones with screenshots.
