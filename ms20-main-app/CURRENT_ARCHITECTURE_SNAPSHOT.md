@@ -6,6 +6,24 @@ The master’s completeness ledger is the architecture-to-validation coverage in
 
 The generated Engineering Traceability Index in the master maps every checkpoint to repository evidence, implementation commits/files, owner evidence, remaining work and dependency edges. Architecture changes that affect any mapping must regenerate and verify that index in the same commit.
 
+## Launch-readiness architecture direction (2026-07-29)
+
+`../docs/engineering-memory/launch-readiness-roadmap.md` is the active priority and Launch Gate authority. Existing protected shared roots remain unchanged. New launch work must extend the pharmacy-scoped catalog, transaction engine, notification projection, offline queue/sync, audit, identity/access, report and shared editable-card boundaries rather than create parallel loyalty, community, multiuser, photo or assistant implementations.
+
+The launch dependency order is transaction correctness; persistence/access/provisioning; Multiuser Pharmacy; billing clarity; Impala Loyalty; Impala Community; measurable low-data/resource/desktop reliability; compact multi-medicine photo onboarding; daily assistant; external qualification; and Demo Mode certification. Only one milestone may be active and the former numeric sequence cannot select work automatically.
+
+The planned shared ownership boundaries are:
+
+- one pharmacy/account root for owner, staff roles, devices, invitations and immutable attribution;
+- one shared catalog/stock/transaction truth with local queue and idempotent sync status;
+- one pharmacy-pooled Impala wallet with deterministic eligibility/caps and owner-only redemption;
+- one separate moderated Impala community identity, never mixed with operational chat;
+- one measured reliability harness for network bytes/requests, recovery, resources and responsive layouts;
+- one compact multi-pack review that reuses existing medicine schema, matcher, provenance and editable cards;
+- one deterministic daily-summary/feedback service that cannot silently change product behavior.
+
+No production architecture for these planned checkpoints is claimed until its milestone is implemented and verified.
+
 ## Notification and Catalog voice architecture (2026-07-28)
 
 Low-stock and Out-of-Stock via Catalog Mic notification lifecycles are owner-validated and protected. Owner evidence proves the complete Cefixime `22 → 0 → 22` Mic-only round trip, one-field reviews, exact single alert through refresh, 35 medicines and final quiet restoration. `buildDeterministicNotifications()` projects alerts from the current pharmacy-scoped catalog with deterministic IDs; `mergeNotifications()` prevents duplicates, preserves read state for an unchanged fact, resets one materially changed alert to unread using a content fingerprint, and removes generated alerts when their source condition clears. Refresh/restart rebuilds the same projection from persisted catalog and card state.
@@ -396,7 +414,7 @@ Planned at their proper test stages:
 ## Generated validation-contract reference
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
-- Checkpoints: 76
+- Checkpoints: 84
 - Current: MS2-LT-054 — Payment failure/cancellation notification
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`

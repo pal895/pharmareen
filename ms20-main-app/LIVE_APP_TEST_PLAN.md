@@ -6,6 +6,8 @@ The master’s repository completeness ledger classifies all discovered capabili
 
 The master’s generated `MS2-LT-NNN` Engineering Traceability Index is the sole checkpoint-to-evidence chain. Detailed procedures here must cite that stable ID and cannot override its status, implementation evidence, prerequisites or dependents.
 
+Active owner testing now follows `../docs/engineering-memory/launch-readiness-roadmap.md`. It selects one dependency-aware Launch Critical milestone and stops for evidence. The historical procedures below remain regression evidence; they do not imply ascending order. Demo Mode certification belongs to MS2-LT-083 and may run only after every mandatory Launch Gate row is PASS/PROTECTED.
+
 ## Historical checkpoint — Notifications Low-Stock Alert
 
 <!-- Superseded low-stock checkpoint retained as historical evidence.
@@ -942,7 +944,7 @@ Pass only after owner-device evidence shows the file opens in a compatible prese
 ## Generated validation-contract reference
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
-- Checkpoints: 76
+- Checkpoints: 84
 - Current: MS2-LT-054 — Payment failure/cancellation notification
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`

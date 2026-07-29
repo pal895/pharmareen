@@ -4,6 +4,8 @@
 
 `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md` is the single authoritative roadmap for every current and future owner live test. All checkpoint counts, order, prerequisites and status must be derived from it. Historical plans and embedded “next” notes are evidence only.
 
+Active launch priority is governed by `docs/engineering-memory/launch-readiness-roadmap.md`. It classifies work as Launch Critical, Demo Mode or Continuous Improvement and owns the measurable Launch Gate. It changes priority only; the master still owns stable checkpoint IDs, prerequisites, status, protection and evidence. The former ascending sequence must not auto-resume.
+
 The master’s repository completeness ledger classifies every discovered owner-facing domain, including evidence-backed deprecated and intentionally out-of-scope items. Bridges and synchronization packages must copy neither historical subsets nor independent counts; they must read the master at the current repository commit.
 
 The master is also the engineering traceability index. Every checkpoint has a stable `MS2-LT-NNN` ID, evidence, implementation commits/files, owner proof, remaining work, prerequisites and dependents. After any checkpoint/evidence change, regenerate and verify it with `node scripts/update-master-traceability.mjs` and `node scripts/verify-master-traceability.mjs`; a future Codex or ChatGPT Bridge must derive its evidence chain from that generated index.
@@ -517,7 +519,7 @@ Export activity updates one compact Export Hub card in the main chat. Newest-fir
 ## Generated validation-contract reference
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
-- Checkpoints: 76
+- Checkpoints: 84
 - Current: MS2-LT-054 — Payment failure/cancellation notification
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`

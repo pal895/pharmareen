@@ -532,6 +532,62 @@
       "checkpoint_id": "MS2-LT-076",
       "name": "Production channel/scale qualification",
       "disposition": "tracked"
+    },
+    {
+      "approval_id": "APPROVED-MS2-LT-077",
+      "owner_visible": true,
+      "checkpoint_id": "MS2-LT-077",
+      "name": "Multiuser Pharmacy Version 1",
+      "disposition": "tracked"
+    },
+    {
+      "approval_id": "APPROVED-MS2-LT-078",
+      "owner_visible": true,
+      "checkpoint_id": "MS2-LT-078",
+      "name": "Impala Loyalty Program Version 1",
+      "disposition": "tracked"
+    },
+    {
+      "approval_id": "APPROVED-MS2-LT-079",
+      "owner_visible": true,
+      "checkpoint_id": "MS2-LT-079",
+      "name": "Impala Community Version 1",
+      "disposition": "tracked"
+    },
+    {
+      "approval_id": "APPROVED-MS2-LT-080",
+      "owner_visible": true,
+      "checkpoint_id": "MS2-LT-080",
+      "name": "Low-data, low-resource and desktop reliability",
+      "disposition": "tracked"
+    },
+    {
+      "approval_id": "APPROVED-MS2-LT-081",
+      "owner_visible": true,
+      "checkpoint_id": "MS2-LT-081",
+      "name": "Multi-medicine photo onboarding",
+      "disposition": "tracked"
+    },
+    {
+      "approval_id": "APPROVED-MS2-LT-082",
+      "owner_visible": true,
+      "checkpoint_id": "MS2-LT-082",
+      "name": "Daily intelligent assistant Version 1",
+      "disposition": "tracked"
+    },
+    {
+      "approval_id": "APPROVED-MS2-LT-083",
+      "owner_visible": true,
+      "checkpoint_id": "MS2-LT-083",
+      "name": "Demo Mode certification",
+      "disposition": "tracked"
+    },
+    {
+      "approval_id": "APPROVED-MS2-LT-084",
+      "owner_visible": true,
+      "checkpoint_id": "MS2-LT-084",
+      "name": "Subscription and multiuser billing clarity",
+      "disposition": "tracked"
     }
   ]
 }

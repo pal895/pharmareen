@@ -1,7 +1,7 @@
 {
   "schema": "ms20.validation-contract.v1",
   "authority": "MS2.0_MASTER_LIVE_TEST_SEQUENCE.md",
-  "checkpoint_count": 76,
+  "checkpoint_count": 84,
   "current_checkpoint": {
     "id": "MS2-LT-054",
     "name": "Payment failure/cancellation notification"
@@ -59,6 +59,6 @@
     "status": "ACTIVE",
     "document": "docs/engineering-memory/token-execution-policy.md"
   },
-  "master_sha256": "90cc8d4f24b6301f49c18e6ca97bf71f537a60a34eb1b26405dc6a2fbed4d084",
+  "master_sha256": "60de290e1c996d3751e908868619e7abc40611e2e442ca79b6ad11f9f30a25e3",
   "rule": "Load the master and its Engineering Traceability Index; never reconstruct or maintain a parallel sequence."
 }

@@ -124,6 +124,21 @@ Evidence abbreviations: `CVS` = `docs/engineering-memory/current-live-validation
 | 75 | Professional legal/regulatory qualification | Obtain Kenya IP, trademark, ODPC/privacy, pharmacy, payments, terms/DPA, security and retention review. | 68–69 | External qualification | Not performed | No | Multi-session | LATP Improvement 3 pre-launch gates |
 | 76 | Production channel/scale qualification | Qualify official messaging/channel operations, multi-pharmacy scale, backup/recovery, monitoring and incident response. | 60–61, 65–73 | External qualification | Automated stress evidence only | No | Multi-session | TRAIN; deployment/provisioning/bridge tests |
 
+## 9. Launch Program Validation
+
+These owner-approved checkpoints were registered by the 2026-07-29 launch-roadmap reorganization. Their active priority is governed by `docs/engineering-memory/launch-readiness-roadmap.md`; their stable IDs, status, prerequisites, evidence and protection remain governed here.
+
+| # | Checkpoint | Objective | Prerequisite(s) | Implementation state | Owner validation | Protected | Est. live test | Evidence/document source |
+|---:|---|---|---|---|---|---|---|---|
+| 77 | Multiuser Pharmacy Version 1 | Let owner-approved staff join one pharmacy with fixed roles, shared truth, attribution, safe sync, device controls and consolidated reporting. | 59, 66–67, 73 | Planned / approved | Not started | No | 20 min | Launch roadmap; multiuser locked improvement |
+| 78 | Impala Loyalty Program Version 1 | Provide a deterministic pharmacy-pooled coin wallet, earning/referral history, anti-abuse caps and owner-controlled renewal redemption. | 77, 84 | Planned / approved | Not started | No | 15 min | Launch roadmap; Impala Loyalty locked improvement |
+| 79 | Impala Community Version 1 | Provide one moderated pharmacy identity with feed, posts/photos, questions, comments, appreciation, reporting and restriction controls. | 67, 77 | Planned / approved | Not started | No | 20 min | Launch roadmap; Impala Community locked improvement |
+| 80 | Low-data, low-resource and desktop reliability | Measure and qualify weak-network, background-data, queue recovery, battery/memory/heat, suspension/restart and responsive desktop behavior. | 20, 61, 66, 72 | Planned / approved | Not started | No | Multi-session | Launch roadmap; Intelligence + Reliability locked improvement |
+| 81 | Multi-medicine photo onboarding | Detect distinct packs into one compact expandable shared review, preserve uncertainty/provenance and deduplicate before save. | 8–11, 31, 35–36 | Planned / approved | Not started | No | 15 min | Launch roadmap; Intelligence + Reliability locked improvement; future fixture plan |
+| 82 | Daily intelligent assistant Version 1 | Give neutral deterministic morning/evening summaries and capture one privacy-minimized feedback item without automatic product changes. | 21, 24–25 | Planned / approved | Not started | No | 12 min | Launch roadmap; Intelligence + Reliability locked improvement |
+| 83 | Demo Mode certification | Certify a truthful 5–10-step owner walkthrough with real workflows, no hidden intervention and no launch-blocking regression. | 54, 77–82, 84 | Planned / approved | Not started | No | 20 min | Launch roadmap; Demo Mode certification plan |
+| 84 | Subscription and multiuser billing clarity | Define packages, included seats, active-device/replacement rules, expiry/grace behavior, renewal totals and loyalty redemption truth. | 50, 67, 74 | Planned / approved | Not started | No | 15 min | Launch roadmap; owner commercial decisions; provider qualification |
+
 ## Repository completeness ledger
 
 This ledger deliberately accounts for owner-facing domains discovered across current and historical Project Brain/Engineering Memory, plans, architecture, handoffs, commits/diffs, implementation, tests and fixtures. It does not create parallel checkpoints or change checkpoint counts.
@@ -167,6 +182,14 @@ This ledger deliberately accounts for owner-facing domains discovered across cur
 | Autonomous pharmacy provisioning | Implemented — awaiting owner live test | 73 | Phases 12–13 and provisioning tests |
 | Production payment providers and merchant onboarding | External qualification | 74 | TCE unresolved provider/commercial gate |
 | Multi-pharmacy scale, backup/recovery and incident response | External qualification | 76 | TRAIN/deployment evidence; production qualification outstanding |
+| Multiuser pharmacy, fixed roles and shared truth | Planned / approved | 77 | Launch roadmap locked improvement; depends on persistence, audit, access and provisioning |
+| Impala Loyalty Program Version 1 | Planned / approved | 78 | Launch roadmap locked improvement; pharmacy-pooled deterministic wallet and renewal redemption |
+| Impala Community Version 1 | Planned / approved | 79 | Launch roadmap locked improvement; separate moderated pharmacy-focused community |
+| Low-data, low-resource and desktop reliability | Planned / approved | 80 | Launch roadmap measurable reliability budgets |
+| Multi-medicine photo onboarding | Planned / approved | 81 | Launch roadmap compact shared-review and deterministic-first fixture plan |
+| Daily intelligent assistant Version 1 | Planned / approved | 82 | Launch roadmap neutral deterministic summaries and controlled feedback |
+| Demo Mode certification | Planned / approved | 83 | Launch roadmap truthful owner walkthrough gate |
+| Subscription and multiuser billing clarity | Planned / approved | 84 | Launch roadmap package/seat/device/renewal/provider truth |
 | Subscription collection | External qualification | 74 | TCE separates the MS2.0 merchant account; production merchant qualification is externally gated |
 | Insurance settlements and branch transfers | Intentionally out of scope with repository evidence | None | TCE names them only as future extension points; no approved owner workflow or test programme exists |
 | Generic anomaly engine beyond named rules | Intentionally out of scope with repository evidence | None | OI explicitly records no approved standalone anomaly programme |
@@ -174,17 +197,17 @@ This ledger deliberately accounts for owner-facing domains discovered across cur
 
 ## Canonical status totals
 
-- Total checkpoints: **76**
+- Total checkpoints: **84**
 - PASS / PROTECTED: **43**
 - Implemented — awaiting owner live test: **9**
 - Partial implementation: **9**
-- Planned / approved: **10**
+- Planned / approved: **18**
 - External qualification: **3**
 - Deprecated with repository evidence: **2**
 
 ## Current execution pointer
 
-The only current open checkpoint is **#54 Payment failure/cancellation notification**. Checkpoints #14–#21 are already protected and must not be repeated without regression evidence. After #13 passes, execute the inherited isolated checkpoint **#54 Payment failure/cancellation notification**, whose prerequisites #52–#53 are protected. Then resume ascending order among eligible unpassed checkpoints, honoring every prerequisite.
+The only current open checkpoint is **#54 Payment failure/cancellation notification**. It is selected by the dependency-aware Launch Critical queue in `docs/engineering-memory/launch-readiness-roadmap.md`, not by the former ascending sequence. Checkpoints #14–#21 and all other protected checkpoints must not be repeated without regression evidence. After one focused owner test, stop and wait for evidence. The former automatic linear progression is historical and must never resume.
 
 ## Canonical synchronization invariants
 
@@ -194,6 +217,7 @@ The only current open checkpoint is **#54 Payment failure/cancellation notificat
 4. A checkpoint may change status only here, with owner evidence for `PASS / PROTECTED`; dependent documents may record detail but cannot override it.
 5. A deletion, merge, split, renumbering, prerequisite change or deprecation requires repository evidence, updated totals, an updated completeness-ledger row and same-commit synchronization of directly affected references.
 6. Before push, validate unique checkpoint numbers/names, allowed states, totals, acyclic prerequisites, one current pointer and canonical-reference headers in every tracked Markdown governance/support document.
+7. Active implementation priority comes only from `docs/engineering-memory/launch-readiness-roadmap.md`; the historical table order cannot select the next milestone.
 
 ## Living validation contract
 
@@ -345,7 +369,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
 - **Remaining implementation work:** None; preserve against regression.
 - **Prerequisite checkpoints:** 2
-- **Dependent checkpoints:** MS2-LT-011, MS2-LT-035, MS2-LT-036
+- **Dependent checkpoints:** MS2-LT-011, MS2-LT-035, MS2-LT-036, MS2-LT-081
 
 ### MS2-LT-009 — Medicine-pack photo onboarding
 
@@ -360,7 +384,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
 - **Remaining implementation work:** None; preserve against regression.
 - **Prerequisite checkpoints:** 2
-- **Dependent checkpoints:** MS2-LT-011, MS2-LT-035, MS2-LT-036
+- **Dependent checkpoints:** MS2-LT-011, MS2-LT-035, MS2-LT-036, MS2-LT-081
 
 ### MS2-LT-010 — Catalog browse/search/edit
 
@@ -375,7 +399,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
 - **Remaining implementation work:** None; preserve against regression.
 - **Prerequisite checkpoints:** 2
-- **Dependent checkpoints:** MS2-LT-011, MS2-LT-013, MS2-LT-014, MS2-LT-015, MS2-LT-016, MS2-LT-017, MS2-LT-024, MS2-LT-025, MS2-LT-040, MS2-LT-041, MS2-LT-042, MS2-LT-043, MS2-LT-044, MS2-LT-045, MS2-LT-049
+- **Dependent checkpoints:** MS2-LT-011, MS2-LT-013, MS2-LT-014, MS2-LT-015, MS2-LT-016, MS2-LT-017, MS2-LT-024, MS2-LT-025, MS2-LT-040, MS2-LT-041, MS2-LT-042, MS2-LT-043, MS2-LT-044, MS2-LT-045, MS2-LT-049, MS2-LT-081
 
 ### MS2-LT-011 — Shared medicine review integrity
 
@@ -390,7 +414,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
 - **Remaining implementation work:** None; preserve against regression.
 - **Prerequisite checkpoints:** 3–10
-- **Dependent checkpoints:** MS2-LT-013, MS2-LT-014, MS2-LT-015, MS2-LT-049
+- **Dependent checkpoints:** MS2-LT-013, MS2-LT-014, MS2-LT-015, MS2-LT-049, MS2-LT-081
 
 ### MS2-LT-012 — Shared voice capture and review
 
@@ -525,7 +549,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
 - **Remaining implementation work:** None; preserve against regression.
 - **Prerequisite checkpoints:** 14–19
-- **Dependent checkpoints:** MS2-LT-021, MS2-LT-059, MS2-LT-061, MS2-LT-066
+- **Dependent checkpoints:** MS2-LT-021, MS2-LT-059, MS2-LT-061, MS2-LT-066, MS2-LT-080
 
 ### MS2-LT-021 — Daily operational metrics
 
@@ -540,7 +564,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
 - **Remaining implementation work:** None; preserve against regression.
 - **Prerequisite checkpoints:** 14, 20
-- **Dependent checkpoints:** MS2-LT-022, MS2-LT-023, MS2-LT-026, MS2-LT-027, MS2-LT-028, MS2-LT-039, MS2-LT-041, MS2-LT-042, MS2-LT-043, MS2-LT-044
+- **Dependent checkpoints:** MS2-LT-022, MS2-LT-023, MS2-LT-026, MS2-LT-027, MS2-LT-028, MS2-LT-039, MS2-LT-041, MS2-LT-042, MS2-LT-043, MS2-LT-044, MS2-LT-082
 
 ### MS2-LT-022 — Direct analytics commands
 
@@ -585,7 +609,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
 - **Remaining implementation work:** None; preserve against regression.
 - **Prerequisite checkpoints:** 10, 14
-- **Dependent checkpoints:** MS2-LT-029, MS2-LT-030
+- **Dependent checkpoints:** MS2-LT-029, MS2-LT-030, MS2-LT-082
 
 ### MS2-LT-025 — Expiry intelligence
 
@@ -600,7 +624,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed; Protected: Yes.
 - **Remaining implementation work:** None; preserve against regression.
 - **Prerequisite checkpoints:** 10
-- **Dependent checkpoints:** MS2-LT-030
+- **Dependent checkpoints:** MS2-LT-030, MS2-LT-082
 
 ### MS2-LT-026 — Missed-demand and lost-opportunity intelligence
 
@@ -690,7 +714,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed through onboarding/search evidence; Protected: Yes.
 - **Remaining implementation work:** None; preserve against regression.
 - **Prerequisite checkpoints:** 2
-- **Dependent checkpoints:** MS2-LT-032, MS2-LT-033, MS2-LT-034, MS2-LT-035, MS2-LT-037, MS2-LT-060
+- **Dependent checkpoints:** MS2-LT-032, MS2-LT-033, MS2-LT-034, MS2-LT-035, MS2-LT-037, MS2-LT-060, MS2-LT-081
 
 ### MS2-LT-032 — Pharmacy Catalog learning boundary
 
@@ -750,7 +774,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Not applicable.
 - **Remaining implementation work:** Complete the unimplemented portion and owner-validate: Reuse verified invoice/photo/barcode evidence before AI and keep corrections medicine/pharmacy scoped.
 - **Prerequisite checkpoints:** 3, 7–9, 31
-- **Dependent checkpoints:** MS2-LT-037, MS2-LT-038
+- **Dependent checkpoints:** MS2-LT-037, MS2-LT-038, MS2-LT-081
 
 ### MS2-LT-036 — Media classification and extraction routing
 
@@ -765,7 +789,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Not applicable.
 - **Remaining implementation work:** Complete the unimplemented portion and owner-validate: Classify invoice, receipt, shelf, pack, barcode and unclear media; preserve review and safe fallback.
 - **Prerequisite checkpoints:** 3, 7–9
-- **Dependent checkpoints:** MS2-LT-037, MS2-LT-038
+- **Dependent checkpoints:** MS2-LT-037, MS2-LT-038, MS2-LT-081
 
 ### MS2-LT-037 — AI fallback approval boundary
 
@@ -975,7 +999,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Not applicable.
 - **Remaining implementation work:** Complete decisive owner live validation for: Handle Cash, M-Pesa, Card, Credit, Mixed, payment corrections and supported discounts truthfully.
 - **Prerequisite checkpoints:** 14, 49
-- **Dependent checkpoints:** MS2-LT-057, MS2-LT-074
+- **Dependent checkpoints:** MS2-LT-057, MS2-LT-074, MS2-LT-084
 
 ### MS2-LT-051 — TCE Fast Record
 
@@ -1035,7 +1059,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Not applicable.
 - **Remaining implementation work:** Complete decisive owner live validation for: Preserve stock/paid records and create one durable action-needed Notification without chat noise.
 - **Prerequisite checkpoints:** 52–53
-- **Dependent checkpoints:** MS2-LT-055, MS2-LT-056, MS2-LT-074
+- **Dependent checkpoints:** MS2-LT-055, MS2-LT-056, MS2-LT-074, MS2-LT-083
 
 ### MS2-LT-055 — Refunds, returns and credits
 
@@ -1110,7 +1134,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Not applicable.
 - **Remaining implementation work:** Complete decisive owner live validation for: Provision/read/write isolated pharmacy sheets and recover safely when unavailable.
 - **Prerequisite checkpoints:** 2, 20
-- **Dependent checkpoints:** MS2-LT-060, MS2-LT-067, MS2-LT-073
+- **Dependent checkpoints:** MS2-LT-060, MS2-LT-067, MS2-LT-073, MS2-LT-077
 
 ### MS2-LT-060 — WhatsApp/Baileys optional channel
 
@@ -1140,7 +1164,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed during offline programme; Protected: Yes.
 - **Remaining implementation work:** None; preserve against regression.
 - **Prerequisite checkpoints:** 20, 58
-- **Dependent checkpoints:** MS2-LT-067, MS2-LT-076
+- **Dependent checkpoints:** MS2-LT-067, MS2-LT-076, MS2-LT-080
 
 ### MS2-LT-062 — Meta/Twilio legacy webhook channels
 
@@ -1215,7 +1239,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed across protected workflows; Protected: Yes.
 - **Remaining implementation work:** None; preserve against regression.
 - **Prerequisite checkpoints:** 14–20, 51–53
-- **Dependent checkpoints:** MS2-LT-068, MS2-LT-073, MS2-LT-074, MS2-LT-076
+- **Dependent checkpoints:** MS2-LT-068, MS2-LT-073, MS2-LT-074, MS2-LT-076, MS2-LT-077, MS2-LT-080
 
 ### MS2-LT-067 — Authentication, roles and access controls
 
@@ -1230,7 +1254,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Not applicable.
 - **Remaining implementation work:** Complete the unimplemented portion and owner-validate: Enforce owner/admin/branch authorization and minimum-necessary access across UI, routes and downloads.
 - **Prerequisite checkpoints:** 2, 58–65
-- **Dependent checkpoints:** MS2-LT-068, MS2-LT-073, MS2-LT-074, MS2-LT-076
+- **Dependent checkpoints:** MS2-LT-068, MS2-LT-073, MS2-LT-074, MS2-LT-076, MS2-LT-077, MS2-LT-079, MS2-LT-084
 
 ### MS2-LT-068 — Export IP/privacy/compliance safeguards
 
@@ -1305,7 +1329,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Not applicable.
 - **Remaining implementation work:** Complete decisive owner live validation for: Prove zero-token defaults, protected contracts, fixtures and canonical consistency before deployment.
 - **Prerequisite checkpoints:** All implemented checkpoints
-- **Dependent checkpoints:** MS2-LT-076
+- **Dependent checkpoints:** MS2-LT-076, MS2-LT-080
 
 ### MS2-LT-073 — Autonomous pharmacy provisioning
 
@@ -1320,7 +1344,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Not applicable.
 - **Remaining implementation work:** Complete decisive owner live validation for: Create isolated profile/owner/branch/catalog/queue/monitoring configuration and recover failed onboarding.
 - **Prerequisite checkpoints:** 2, 59, 65–67
-- **Dependent checkpoints:** MS2-LT-076
+- **Dependent checkpoints:** MS2-LT-076, MS2-LT-077
 
 ### MS2-LT-074 — Production payment-provider qualification
 
@@ -1335,7 +1359,7 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **PASS / PROTECTED confirmation:** Not applicable.
 - **Remaining implementation work:** Complete the externally gated qualification: Confirm merchant onboarding model, tenant identity, credentials, authenticated callbacks, reconciliation and official adapters.
 - **Prerequisite checkpoints:** 49–57, 65–68
-- **Dependent checkpoints:** None
+- **Dependent checkpoints:** MS2-LT-084
 
 ### MS2-LT-075 — Professional legal/regulatory qualification
 
@@ -1366,5 +1390,125 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **Remaining implementation work:** Complete the externally gated qualification: Qualify official messaging/channel operations, multi-pharmacy scale, backup/recovery, monitoring and incident response.
 - **Prerequisite checkpoints:** 60–61, 65–73
 - **Dependent checkpoints:** None
+
+### MS2-LT-077 — Multiuser Pharmacy Version 1
+
+- **Checkpoint ID:** MS2-LT-077
+- **Name:** Multiuser Pharmacy Version 1
+- **Category:** Launch Program Validation
+- **Current status:** Planned / approved
+- **Repository evidence:** Launch roadmap; multiuser locked improvement
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Implement and owner-validate: Let owner-approved staff join one pharmacy with fixed roles, shared truth, attribution, safe sync, device controls and consolidated reporting.
+- **Prerequisite checkpoints:** 59, 66–67, 73
+- **Dependent checkpoints:** MS2-LT-078, MS2-LT-079, MS2-LT-083
+
+### MS2-LT-078 — Impala Loyalty Program Version 1
+
+- **Checkpoint ID:** MS2-LT-078
+- **Name:** Impala Loyalty Program Version 1
+- **Category:** Launch Program Validation
+- **Current status:** Planned / approved
+- **Repository evidence:** Launch roadmap; Impala Loyalty locked improvement
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Implement and owner-validate: Provide a deterministic pharmacy-pooled coin wallet, earning/referral history, anti-abuse caps and owner-controlled renewal redemption.
+- **Prerequisite checkpoints:** 77, 84
+- **Dependent checkpoints:** MS2-LT-083
+
+### MS2-LT-079 — Impala Community Version 1
+
+- **Checkpoint ID:** MS2-LT-079
+- **Name:** Impala Community Version 1
+- **Category:** Launch Program Validation
+- **Current status:** Planned / approved
+- **Repository evidence:** Launch roadmap; Impala Community locked improvement
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Implement and owner-validate: Provide one moderated pharmacy identity with feed, posts/photos, questions, comments, appreciation, reporting and restriction controls.
+- **Prerequisite checkpoints:** 67, 77
+- **Dependent checkpoints:** MS2-LT-083
+
+### MS2-LT-080 — Low-data, low-resource and desktop reliability
+
+- **Checkpoint ID:** MS2-LT-080
+- **Name:** Low-data, low-resource and desktop reliability
+- **Category:** Launch Program Validation
+- **Current status:** Planned / approved
+- **Repository evidence:** Launch roadmap; Intelligence + Reliability locked improvement
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Implement and owner-validate: Measure and qualify weak-network, background-data, queue recovery, battery/memory/heat, suspension/restart and responsive desktop behavior.
+- **Prerequisite checkpoints:** 20, 61, 66, 72
+- **Dependent checkpoints:** MS2-LT-083
+
+### MS2-LT-081 — Multi-medicine photo onboarding
+
+- **Checkpoint ID:** MS2-LT-081
+- **Name:** Multi-medicine photo onboarding
+- **Category:** Launch Program Validation
+- **Current status:** Planned / approved
+- **Repository evidence:** Launch roadmap; Intelligence + Reliability locked improvement; future fixture plan
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Implement and owner-validate: Detect distinct packs into one compact expandable shared review, preserve uncertainty/provenance and deduplicate before save.
+- **Prerequisite checkpoints:** 8–11, 31, 35–36
+- **Dependent checkpoints:** MS2-LT-083
+
+### MS2-LT-082 — Daily intelligent assistant Version 1
+
+- **Checkpoint ID:** MS2-LT-082
+- **Name:** Daily intelligent assistant Version 1
+- **Category:** Launch Program Validation
+- **Current status:** Planned / approved
+- **Repository evidence:** Launch roadmap; Intelligence + Reliability locked improvement
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Implement and owner-validate: Give neutral deterministic morning/evening summaries and capture one privacy-minimized feedback item without automatic product changes.
+- **Prerequisite checkpoints:** 21, 24–25
+- **Dependent checkpoints:** MS2-LT-083
+
+### MS2-LT-083 — Demo Mode certification
+
+- **Checkpoint ID:** MS2-LT-083
+- **Name:** Demo Mode certification
+- **Category:** Launch Program Validation
+- **Current status:** Planned / approved
+- **Repository evidence:** Launch roadmap; Demo Mode certification plan
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Implement and owner-validate: Certify a truthful 5–10-step owner walkthrough with real workflows, no hidden intervention and no launch-blocking regression.
+- **Prerequisite checkpoints:** 54, 77–82, 84
+- **Dependent checkpoints:** None
+
+### MS2-LT-084 — Subscription and multiuser billing clarity
+
+- **Checkpoint ID:** MS2-LT-084
+- **Name:** Subscription and multiuser billing clarity
+- **Category:** Launch Program Validation
+- **Current status:** Planned / approved
+- **Repository evidence:** Launch roadmap; owner commercial decisions; provider qualification
+- **Implementation commit(s):** Repository evidence not yet available.
+- **Primary implementation files/modules:** Repository evidence not yet available.
+- **Owner live-test evidence:** Repository evidence not yet available.
+- **PASS / PROTECTED confirmation:** Not applicable.
+- **Remaining implementation work:** Implement and owner-validate: Define packages, included seats, active-device/replacement rules, expiry/grace behavior, renewal totals and loyalty redemption truth.
+- **Prerequisite checkpoints:** 50, 67, 74
+- **Dependent checkpoints:** MS2-LT-078, MS2-LT-083
 
 <!-- TRACEABILITY_INDEX_END -->

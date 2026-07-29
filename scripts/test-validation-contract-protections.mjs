@@ -69,7 +69,10 @@ const synchronized = fs.readFileSync(path.join(root, contract.synchronized_docum
 const synchronizedExpected = { master: contract.master, count: validated.rows.length, current };
 validateSynchronizedDocument(synchronized, synchronizedExpected);
 assert.throws(
-  () => validateSynchronizedDocument(synchronized.replace("- Checkpoints: 76", "- Checkpoints: 75"), synchronizedExpected),
+  () => validateSynchronizedDocument(
+    synchronized.replace(`- Checkpoints: ${validated.rows.length}`, `- Checkpoints: ${validated.rows.length - 1}`),
+    synchronizedExpected,
+  ),
   /stale count/,
 );
 assert.throws(

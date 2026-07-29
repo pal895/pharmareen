@@ -535,11 +535,17 @@ Owner-device evidence on 27 July 2026 confirms that PPTX bytes download and Andr
 
 The deck is now a deterministic nine-slide owner decision briefing rather than a 35-medicine inventory dump. Production rejects truncated or structurally incomplete PPTX packages before download. Export messaging updates one durable Export Hub card and keeps pharmacy-scoped, newest-first metadata history inside Export Hub; no generated binary is retained.
 
+## Launch-roadmap reorganization — 2026-07-29
+
+Owner direction replaces automatic ascending checkpoint execution with the Launch Critical, Demo Mode and Continuous Improvement structure in `launch-readiness-roadmap.md`. The master remains the canonical registry and historical regression sequence. All 33 non-protected/deprecated legacy checkpoints are mapped exactly once; eight approved launch-program checkpoints MS2-LT-077–084 register Multiuser Pharmacy V1, Impala Loyalty V1, Impala Community V1, measurable device/network reliability, multi-medicine photo onboarding, daily assistant V1, Demo Mode certification and subscription/multiuser billing clarity.
+
+The Launch Gate is BLOCKED and uses no percentage. Protected checkpoints remain closed. The dependency map selects MS2-LT-054 as the single active milestone because its prerequisites are protected and it is the smallest unresolved transaction-safety boundary; selection is independent of the former numeric order. After focused implementation/verification, issue one owner test and wait.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
-- Checkpoints: 76
+- Checkpoints: 84
 - Current: MS2-LT-054 — Payment failure/cancellation notification
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`

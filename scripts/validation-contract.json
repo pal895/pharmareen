@@ -9,7 +9,8 @@
     "Financial & Payment Validation",
     "Integration Validation",
     "Security / Privacy / Compliance Validation",
-    "Production Qualification"
+    "Production Qualification",
+    "Launch Program Validation"
   ],
   "default_owner_visible_status": "Implemented — awaiting owner live test",
   "synchronized_documents": [

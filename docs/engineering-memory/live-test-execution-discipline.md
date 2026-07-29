@@ -64,7 +64,7 @@ When evidence differs between attempts, record the visible input, active card, t
 ## Generated validation-contract reference
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
-- Checkpoints: 76
+- Checkpoints: 84
 - Current: MS2-LT-054 — Payment failure/cancellation notification
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`

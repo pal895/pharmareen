@@ -96,4 +96,5 @@ for (const document of contract.synchronized_documents) {
 }
 
 await import("./verify-master-traceability.mjs");
+await import("./verify-launch-roadmap.mjs");
 console.log(`VALIDATION_CONTRACT_OK checkpoints=${count} synchronized_documents=${contract.synchronized_documents.length} bridges=${contract.bridge_consumers.length}`);

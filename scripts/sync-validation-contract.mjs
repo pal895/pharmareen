@@ -12,7 +12,7 @@ const master = fs.readFileSync(masterPath, "utf8");
 const rows = [];
 let category = "";
 for (const line of master.split(/\r?\n/)) {
-  const section = line.match(/^## [1-8]\. (.+)$/);
+  const section = line.match(/^## \d+\. (.+)$/);
   if (section) category = section[1];
   const cells = line.split("|").slice(1, -1).map((cell) => cell.trim());
   if (cells.length === 9 && /^\d+$/.test(cells[0])) {

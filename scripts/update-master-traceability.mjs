@@ -22,7 +22,7 @@ let source = markdown.includes(startMarker)
 let section = "";
 const rows = [];
 for (const line of source.split(/\r?\n/)) {
-  const sectionMatch = line.match(/^## ([1-8])\. (.+)$/);
+  const sectionMatch = line.match(/^## (\d+)\. (.+)$/);
   if (sectionMatch) section = sectionMatch[2].trim();
   const cells = line.split("|").slice(1, -1).map((cell) => cell.trim());
   if (cells.length === 9 && /^\d+$/.test(cells[0])) {
