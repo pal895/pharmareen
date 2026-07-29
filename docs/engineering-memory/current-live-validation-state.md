@@ -563,7 +563,15 @@ The unsuitable Zinc selection exposed a test-planning defect, not a product fail
 
 At the owner's direction, milestone execution is paused before MS2-LT-049. Historical owner requirements were reconciled into one shared Production Sales Card: canonical medicine, exact form/unit, quantity, unit-specific price, expected total, payment, stock consequence and terminal state are first-class; ambiguity is an explicit choice; Unknown price/conversion and unsafe form/unit/strength/stock combinations block confirmation. Typed sales no longer bypass review. Voice review no longer creates `VoiceReviewCard`; Payment Queue and recovery project the same shared sale model. Notifications carry the exact failed payment consequence.
 
-The production standard is implemented and deterministically protected, but it is not owner-approved yet. The only next action is a complete owner live test with screenshots. Do not start MS2-LT-049 or any other milestone until explicit approval.
+The production standard has deterministic regression coverage, but it is not owner-approved or protected. The only next action is a complete owner live test with screenshots. Do not start MS2-LT-049 or any other milestone until explicit approval.
+
+### Recovery after rejected first live attempt
+
+Owner screenshots reject the first implementation: `paracetamol cash` became one unresolved medicine string inside `MedicineMatchCard`, leaving quantity, payment and canonical catalog facts blank. The visual shell existed, but the deterministic sale intelligence underneath it did not. The grammar had required quantity, so the no-quantity command fell through to medicine learning.
+
+The root parser now removes terminal Cash/M-Pesa/Credit/Mixed before medicine matching, defaults an explicit-payment sale to quantity 1, supports spaced and compact quantities, and sends typed and voice equivalents through the same catalog-first match. The canonical card hydrates known stock, strength, form, unit, unit-specific selling price, calculated total, stock consequence, buying price and traceability. Its single renderer now owns Fast action, Stock & details and Traceability; a valid sale confirms from Fast action while optional trace fields remain non-blocking. Correction recalculates derived facts and readiness without rerendering or losing focus.
+
+This is implementation evidence only. Production Sales Card remains **NOT OWNER-APPROVED / NOT PROTECTED**. MS2-LT-049 remains not started.
 
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference

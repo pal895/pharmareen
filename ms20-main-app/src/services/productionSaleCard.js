@@ -10,6 +10,7 @@ export function prepareProductionSaleCard(card = {}, catalogMatch = {}) {
   const stockBefore = finiteNumber(match?.stockLeft ?? match?.stock ?? match?.current_stock);
   const forms = values(match?.forms ?? match?.form);
   const units = values(match?.units ?? match?.unit);
+  const batches = Array.isArray(match?.batches) ? match.batches : [];
   const selectedUnit = card.fields?.unit || (units.length === 1 ? units[0] : "");
   const unitPrices = match?.unitPrices || match?.pricesByUnit || {};
   const unitConversions = match?.unitConversions || match?.stockUnitsPerSaleUnit || {};
@@ -27,7 +28,15 @@ export function prepareProductionSaleCard(card = {}, catalogMatch = {}) {
     expected_total: quantity !== null && sellingPrice !== null ? quantity * sellingPrice : "",
     stock_before: stockBefore ?? "",
     stock_after: stockDeduction !== null && stockBefore !== null ? Math.max(0, stockBefore - stockDeduction) : "",
-    sale_status: card.fields?.sale_status || "Review before recording"
+    sale_status: card.fields?.sale_status || "Review before recording",
+    current_stock: stockBefore ?? "",
+    cost_price: card.fields?.cost_price ?? match?.costPrice ?? match?.cost_price ?? "",
+    supplier: card.fields?.supplier || match?.supplier || "",
+    barcode: card.fields?.barcode || match?.barcode || "",
+    batch: card.fields?.batch || batches[0]?.batch || match?.batch || "",
+    expiry: card.fields?.expiry || batches[0]?.expiry || match?.expiry || "",
+    aliases: card.fields?.aliases || values(match?.aliases).join(", "),
+    note: card.fields?.note || ""
   };
   card.productionSaleCardVersion = "1.0";
   card.saleOptions = { forms, units };

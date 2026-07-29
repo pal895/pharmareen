@@ -112,22 +112,18 @@ export function parseLocalCommand(input, catalog = []) {
     };
   }
 
-  const sale = commandText.match(/^(.+?)[\s-]*(\d+(?:\.\d+)?)(?:\s*)?(cash|mpesa|m-pesa|credit|mixed)$/i)
-    || commandText.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*$/i);
+  const sale = parseSaleFacts(commandText, catalog);
   if (sale) {
-    const medicine = sale[1].trim();
-    const quantity = Number(sale[2]);
-    const payment = (sale[3] || "cash").replace("-", "").toLowerCase();
-    const medicineMatch = matchMedicineName(medicine, catalog);
+    const medicineMatch = sale.medicineMatch;
     return {
       kind: "sale",
       cardType: ["ambiguous", "insufficient_identity"].includes(medicineMatch.status) ? "MedicineMatchCard" : "SaleCard",
       aiRequired: false,
       confidence: medicineMatch.status === "matched" ? 0.96 : medicineMatch.confidence,
       fields: {
-        medicine: medicineMatch.status === "insufficient_identity" ? "" : medicineMatch.matches[0]?.name || medicine,
-        quantity,
-        payment,
+        medicine: medicineMatch.status === "insufficient_identity" ? "" : medicineMatch.matches[0]?.name || sale.medicine,
+        quantity: sale.quantity,
+        payment: sale.payment,
         stockLeft: medicineMatch.matches[0]?.stockLeft ?? "Catalog sync needed"
       },
       medicineMatch
@@ -146,6 +142,56 @@ export function parseLocalCommand(input, catalog = []) {
       payment: ""
     }
   };
+}
+
+export function parseSaleFacts(input, catalog = []) {
+  const command = normalizeSpokenNumbers(String(input || "").trim()).trim();
+  if (!command) return null;
+  const paymentMatch = command.match(/(m[\s-]?pesa|cash|credit|mixed)\s*$/i);
+  const payment = paymentMatch ? paymentMatch[1].replace(/[\s-]/g, "").toLowerCase() : "";
+  let saleText = paymentMatch ? command.slice(0, paymentMatch.index).trim() : command;
+  if (!saleText) return null;
+
+  // Catalog-first prevents a numeric medicine identity from being mistaken for quantity.
+  const wholeMatch = matchMedicineName(saleText, catalog);
+  if (payment && wholeMatch.status === "matched" && hasExactCatalogIdentity(saleText, catalog)) {
+    return { medicine: saleText, quantity: 1, payment, medicineMatch: wholeMatch, defaultedQuantity: true };
+  }
+
+  const quantityMatch = saleText.match(/^(.*?)(\d+(?:\.\d+)?)\s*$/);
+  if (quantityMatch) {
+    const medicine = quantityMatch[1].trim();
+    const medicineMatch = matchMedicineName(medicine, catalog);
+    if (medicine && (payment || /\s+\d/.test(saleText))) {
+      return {
+        medicine,
+        quantity: Number(quantityMatch[2]),
+        payment: payment || "cash",
+        medicineMatch,
+        defaultedQuantity: false
+      };
+    }
+  }
+
+  if (payment) {
+    return {
+      medicine: saleText,
+      quantity: 1,
+      payment,
+      medicineMatch: wholeMatch,
+      defaultedQuantity: true
+    };
+  }
+  return null;
+}
+
+function hasExactCatalogIdentity(value, catalog) {
+  const target = normalize(value).replace(/[^a-z0-9]+/g, " ").trim();
+  return catalog.some((medicine) => [
+    medicine?.name,
+    ...(medicine?.aliases || []),
+    ...(medicine?.brandNames || [])
+  ].some((identity) => normalize(identity).replace(/[^a-z0-9]+/g, " ").trim() === target));
 }
 
 function normalizeSpokenNumbers(value) {

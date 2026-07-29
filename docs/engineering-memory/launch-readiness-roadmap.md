@@ -1,6 +1,8 @@
 # MS2.0 Launch Readiness Roadmap
 
 > **OWNER HOLD — 2026-07-29:** The launch live-test sequence is paused for complete owner validation of the upgraded shared Production Sales Card. MS2-LT-049 and every other milestone remain not started during this hold. Resume only after explicit owner approval.
+>
+> The first owner attempt was rejected because `paracetamol cash` was not separated or catalog-hydrated. The deterministic parser/hydration recovery is implemented and awaiting a new focused owner test. This is not a Launch Gate pass and does not protect the card.
 
 Authority date: 2026-07-29
 

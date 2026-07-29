@@ -55,6 +55,8 @@ The flow must show or preserve canonical medicine, quantity, payment, form/unit,
 
 The shared Production Sales Card must visibly prove exact form, selling unit, unit price, total and stock consequence before any fixture is eligible. Unit-specific price and conversion maps belong to the canonical catalog record. Missing or ambiguous values are `Unknown`/explicit-choice blockers, never inferred defaults. The card upgrade awaits owner live approval; no milestone fixture may run until that approval.
 
+Production Sales Card recovery tests must additionally prove that payment and quantity tokens are excluded from medicine identity for spaced, compact and voice commands; that the selected live fixture hydrates all existing catalog facts; and that absent optional supplier/barcode/alias/notes values remain truthful blanks without blocking a safe sale.
+
 ## Permanent friction capture
 
 Observe the entire shared sale flow whenever another test naturally passes through it. Record unrelated friction immediately. Fix a launch-blocking shared-root cause before it spreads, add regression coverage, preserve valid evidence already collected and avoid repeating proven portions unnecessarily. Friction does not silently disappear merely because another checkpoint supplied the route.

@@ -52,8 +52,8 @@ assert.ok(contracts.includes('"SaleCard"'), "SaleCard must remain part of the sh
 for (const action of ["confirm-card", "read-card", "correct-card", "reject-card"]) {
   assert.ok(appSource.includes(`data-action="${action}"`), `The authoritative shared card must preserve ${action}.`);
 }
-assert.ok(appSource.includes("medicineDetailTemplate(card"), "Sale reviews must use the shared medicine-card renderer.");
+assert.ok(appSource.includes("productionSaleCardBody(card.fields"), "Sale reviews must use the one shared Production Sales Card renderer.");
 assert.ok(appSource.includes("startVoiceCapture"), "Voice sales must use the shared voice-capture root.");
 assert.ok(!appSource.includes("TestSaleCard"), "No simplified test-only sale card may bypass the owner workflow.");
 
-console.log("SALE_TEST_FIXTURE_OK canonical=Septrin stock=12 unit=bottle selling_price=180 buying_price=120 shared_sale_card=protected");
+console.log("SALE_TEST_FIXTURE_OK canonical=Septrin stock=12 unit=bottle selling_price=180 buying_price=120 shared_sale_card=regression_ready_owner_pending");

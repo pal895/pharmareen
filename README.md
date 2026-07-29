@@ -8,6 +8,8 @@ The first view prioritizes canonical medicine, exact form, exact selling unit, q
 
 Owner live validation of this upgrade is pending. The launch-focused sequence is paused; MS2-LT-049 is identified but not started.
 
+Owner evidence then rejected the first recovery because `paracetamol cash` was routed to medicine learning as one medicine string. The deterministic parser and canonical hydration roots are repaired, and the one shared card now implements the approved Fast action / Stock & details / Traceability structure. The recovery audit is recorded in `docs/engineering-memory/production-sales-card-standard.md`. It remains awaiting owner live test and is not approved or protected.
+
 ## Canonical live-validation authority
 
 `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md` is the single authoritative roadmap for every current and future owner live test. All checkpoint counts, order, prerequisites and status must be derived from it. Historical plans and embedded “next” notes are evidence only.

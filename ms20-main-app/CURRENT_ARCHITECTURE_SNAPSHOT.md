@@ -9,6 +9,7 @@
 - Per-unit price and stock-conversion maps are retained at the Pharmacy Brain boundary. Ambiguous units/forms are explicit choices; missing or unsafe truth blocks Confirm.
 - Transaction metadata carries the canonical sale projection so queue/history/notifications do not reconstruct a divergent card.
 - Owner live approval is pending; MS2-LT-049 is not started.
+- Recovery audit: terminal payment is parsed before identity, explicit-payment commands safely default quantity to 1, spaced/compact quantities are excluded from identity, and canonical catalog hydration supplies all known fast/stock/trace facts. The shared renderer owns the three approved sections. Optional traceability never blocks confirmation; critical unknowns and contradictions do.
 
 Canonical live-validation authority: `../MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`. Architecture evidence may change checkpoint state only by updating that master in the same commit.
 

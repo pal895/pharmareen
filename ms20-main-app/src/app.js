@@ -580,7 +580,7 @@ function cardTemplate(card) {
       ${card.type === "StockCorrectionCard" && card.voiceTranscripts?.length ? `<section class="stock-fix-voice-transcript" aria-label="Voice transcript"><strong>Voice transcript</strong>${card.voiceTranscripts.map((entry, index) => `<p>${index + 1}. ${escapeHtml(entry)}</p>`).join("")}</section>` : ""}
       ${!progressiveMedicine && card.type === "RestockCard" ? quantityToolbar(card) : ""}
       ${noteBeforeBody ? "" : `<p class="card-note" data-card-note="${card.id}">${escapeHtml(note)}</p>`}
-      ${progressiveMedicine ? "" : activeActionsTemplate(card)}
+      ${progressiveMedicine || card.type === "SaleCard" ? "" : activeActionsTemplate(card)}
       <details class="card-technical">
         <summary>Details</summary>
         ${card.source ? `<p>From: ${escapeHtml(card.source)}</p>` : ""}
@@ -667,31 +667,42 @@ function cardBodyTemplate(card, displayed) {
 
 function productionSaleCardBody(fields = {}, eyebrow = "Sale", card = null) {
   const editable = Boolean(card);
+  const activeSlide = Math.max(0, Math.min(2, Number(card?.ui?.activeSlide || 0)));
   const value = (field) => escapeHtml(String(fields[field] ?? ""));
   const field = (name, label, inputMode = "") => editable
     ? `<label><span>${label}</span>${["form", "unit"].includes(name) && card.saleOptions?.[`${name}s`]?.length > 1
       ? `<select data-card-id="${card.id}" data-field="${name}"><option value="">Choose exact ${name}</option>${card.saleOptions[`${name}s`].map((option) => `<option ${String(fields[name]) === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>`
       : `<input data-card-id="${card.id}" data-field="${name}" ${inputMode ? `inputmode="${inputMode}"` : ""} value="${value(name)}">`}</label>`
     : `<div><span>${label}</span><strong>${value(name) || "Unknown"}</strong></div>`;
-  return `<section class="production-sale-card-body" aria-label="Production Sales Card">
+  const fast = `<div class="production-sale-primary">
+    ${field("medicine", "Medicine")}${field("form", "Exact form")}${field("unit", "Selling unit")}
+    ${field("selling_price", "Unit price (KES)", "decimal")}${field("quantity", "Quantity", "decimal")}
+    ${field("expected_total", "Expected total (KES)", "decimal")}${field("payment", "Payment")}
+  </div><div class="sale-consequence-grid">
+    ${field("stock_before", "Stock before", "decimal")}${field("stock_after", "Stock after confirmed sale", "decimal")}${field("sale_status", "Status")}
+  </div>${editable ? quantityToolbar(card) + paymentToolbar(card) + activeActionsTemplate(card) : ""}`;
+  const stock = `<div class="production-sale-primary">
+    ${field("current_stock", "Current stock", "decimal")}${field("strength", "Strength")}
+    ${field("form", "Form")}${field("unit", "Unit")}${field("cost_price", "Buying price (KES)", "decimal")}
+  </div>`;
+  const trace = `<div class="production-sale-primary">
+    ${field("supplier", "Supplier")}${field("barcode", "Barcode")}${field("batch", "Batch")}
+    ${field("expiry", "Expiry")}${field("aliases", "Aliases")}${field("note", "Note")}
+  </div>`;
+  return `<section class="production-sale-card-body medicine-review-workspace" data-medicine-workspace="${card?.id || ""}" aria-label="Production Sales Card">
     <p class="card-eyebrow">${escapeHtml(eyebrow)}</p>
-    <p class="sale-summary">${escapeHtml(productionSaleSummary(fields))}</p>
+    <p class="sale-summary" data-sale-summary="${card?.id || ""}">${escapeHtml(productionSaleSummary(fields))}</p>
     ${card?.fields?.transcript ? `<p class="sale-transcript">Heard: “${escapeHtml(card.fields.transcript)}”</p>` : ""}
-    <div class="production-sale-primary">
-      ${field("medicine", "Medicine")}
-      ${field("form", "Exact form")}
-      ${field("unit", "Selling unit")}
-      ${field("quantity", "Quantity", "decimal")}
-      ${field("selling_price", "Unit price (KES)", "decimal")}
-      ${field("expected_total", "Expected total (KES)", "decimal")}
-      ${field("payment", "Payment")}
-    </div>
-    <div class="sale-consequence-grid">
-      ${field("stock_before", "Stock before", "decimal")}
-      ${field("stock_after", "Stock after confirmed sale", "decimal")}
-      ${field("sale_status", "Status")}
-    </div>
-    ${fields.strength ? `<p class="sale-secondary">Strength: ${escapeHtml(String(fields.strength))}</p>` : ""}
+    ${editable ? `<div class="medicine-slide-nav" aria-label="Sale review sections">
+      <button type="button" class="${activeSlide === 0 ? "selected" : ""}" data-action="show-medicine-slide" data-card-id="${card.id}" data-slide="0">Fast action</button>
+      <button type="button" class="${activeSlide === 1 ? "selected" : ""}" data-action="show-medicine-slide" data-card-id="${card.id}" data-slide="1">Stock &amp; details</button>
+      <button type="button" class="${activeSlide === 2 ? "selected" : ""}" data-action="show-medicine-slide" data-card-id="${card.id}" data-slide="2">Traceability</button>
+    </div><div class="medicine-slide-status"><span data-medicine-slide-indicator="${card.id}">${activeSlide + 1} of 3</span><span>Summary first; details on demand</span></div>
+    <div class="medicine-slide-track" data-medicine-carousel="${card.id}" data-initial-slide="${activeSlide}">
+      <section class="medicine-slide medicine-slide-fast" aria-label="Fast action">${fast}</section>
+      <section class="medicine-slide" aria-label="Stock and details">${stock}</section>
+      <section class="medicine-slide" aria-label="Traceability">${trace}</section>
+    </div>` : fast}
   </section>`;
 }
 
@@ -3022,6 +3033,10 @@ function updateCardField(cardId, field, value) {
   const card = state.cards.find((item) => item.id === cardId);
   if (!card) return;
   card.fields[field] = value;
+  if (card.type === "SaleCard") {
+    prepareProductionSaleCard(card, pharmacyBrain.findMedicine(card.fields?.medicine));
+    refreshProductionSaleCardControls(card);
+  }
   if (card.type === "ReportCard" && (field === "period" || field === "custom_start" || field === "custom_end")) {
     if (activeReportRequest?.cardId === cardId) activeReportRequest.controller.abort();
     if (field === "period" && !String(value).startsWith("Custom")) {
@@ -3048,6 +3063,27 @@ function updateCardField(cardId, field, value) {
     card.validation = "Paste one medicine per line, then review the proposed rows before saving.";
   }
   persistActiveCards();
+}
+
+function refreshProductionSaleCardControls(card) {
+  const workspace = root.querySelector(`[data-medicine-workspace="${card.id}"]`);
+  if (!workspace) return;
+  for (const field of ["expected_total", "stock_before", "stock_after", "current_stock", "selling_price", "form", "unit"]) {
+    const controls = workspace.querySelectorAll(`[data-card-id="${card.id}"][data-field="${field}"]`);
+    controls.forEach((control) => {
+      if (document.activeElement !== control) control.value = String(card.fields?.[field] ?? "");
+    });
+  }
+  const summary = workspace.querySelector(`[data-sale-summary="${card.id}"]`);
+  if (summary) summary.textContent = productionSaleSummary(card.fields);
+  const confirm = workspace.querySelector(`[data-confirm-card="${card.id}"]`);
+  if (confirm) {
+    const blocker = medicineReviewBlocker(card);
+    confirm.disabled = Boolean(blocker);
+    confirm.title = blocker || "";
+  }
+  const note = root.querySelector(`[data-card-note="${card.id}"]`);
+  if (note) note.textContent = ownerCardNote(card);
 }
 
 function updateCatalogImportCell(cardId, rowIndex, field, value) {
@@ -4380,6 +4416,7 @@ function bumpQuantity(cardId, amount) {
   if (!card) return;
   const current = Number(card.fields.quantity || 0);
   card.fields.quantity = Math.max(0, current + amount);
+  if (card.type === "SaleCard") prepareProductionSaleCard(card, pharmacyBrain.findMedicine(card.fields?.medicine));
   persistActiveCards();
   render();
 }
