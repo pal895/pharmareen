@@ -27,6 +27,6 @@ assert(!source.includes('<button class="show-me-action"'), "Home must not duplic
 assert(source.includes('data-action="open-catalog" aria-label="Open Pharmacy Catalog"'), "Header catalog access must remain protected");
 assert(source.includes('data-action="open-catalog-card"'), "Catalog result cards must keep their Open catalog route");
 assert(source.includes('simulatorMode ? `<div class="card-actions">'), "Simulator controls must be environment-gated");
-assert(source.includes('origin: "transaction"'), "Failed payments must create a durable action-needed notification");
+assert(source.includes("buildTransactionNotification"), "Failed payments must use the shared durable notification builder");
 
 console.log("Request & Verify UI verification passed: owner mode selection, explicit verification amounts, complete history, simulator-only routing, non-blocking queue, confirmation-gated idempotent stock mutation, and mobile card layout.");

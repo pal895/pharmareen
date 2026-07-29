@@ -24,6 +24,12 @@ The planned shared ownership boundaries are:
 
 No production architecture for these planned checkpoints is claimed until its milestone is implemented and verified.
 
+## Payment failure/cancellation action routing (MS2-LT-054)
+
+`buildTransactionNotification()` in `notificationCenter.js` is the single deterministic terminal-failure projection for failed and cancelled payments. It creates a stable transaction/status ID, plain-language stock/paid safety message, zero-AI provenance and a `payment:<transaction-id>` action target. Existing notification merging retains transaction-origin alerts through catalog/expiry projection rebuilds and deduplicates unchanged terminal events. The shared Notification Card now renders `Review payment`; its target routes to the existing Payment Queue rather than creating a second payment workflow.
+
+The Transaction Completion Engine still owns terminal-event idempotency and rejects late events from rewriting terminal truth. Only confirmed events enter `applyConfirmedPendingSale`; failed/cancelled events do not call stock, finance or feed mutation. Focused verification covers failure, cancellation, persistence, deduplication, action routing and absence of operational chat noise. Owner evidence is still required.
+
 ## Notification and Catalog voice architecture (2026-07-28)
 
 Low-stock and Out-of-Stock via Catalog Mic notification lifecycles are owner-validated and protected. Owner evidence proves the complete Cefixime `22 → 0 → 22` Mic-only round trip, one-field reviews, exact single alert through refresh, 35 medicines and final quiet restoration. `buildDeterministicNotifications()` projects alerts from the current pharmacy-scoped catalog with deterministic IDs; `mergeNotifications()` prevents duplicates, preserves read state for an unchanged fact, resets one materially changed alert to unread using a content fingerprint, and removes generated alerts when their source condition clears. Refresh/restart rebuilds the same projection from persisted catalog and card state.

@@ -541,6 +541,12 @@ Owner direction replaces automatic ascending checkpoint execution with the Launc
 
 The Launch Gate is BLOCKED and uses no percentage. Protected checkpoints remain closed. The dependency map selects MS2-LT-054 as the single active milestone because its prerequisites are protected and it is the smallest unresolved transaction-safety boundary; selection is independent of the former numeric order. After focused implementation/verification, issue one owner test and wait.
 
+## MS2-LT-054 implementation readiness — 2026-07-29
+
+Repository inspection confirmed that terminal payment failure already closed only its own request, preserved stock/paid truth and emitted no chat message. The remaining owner-visible gap was the notification action: `Review payment` had no target, so the shared Notification Card could not render it. The deterministic notification root now creates a stable `payment:<transaction-id>` target for failed/cancelled outcomes; the shared action handler routes it to the existing Payment Queue. Transaction alerts remain durable through notification projection rebuilds and unchanged repeated events deduplicate without resetting their original time.
+
+Focused TCE, payment UI, notification lifecycle, voice-viewport and consistency verifiers pass. MS2-LT-054 remains `Implemented — awaiting owner live test`; no PASS is claimed. The next action is exactly one simulator failure test with baseline stock, the durable unread Payment alert, Review payment routing, failed history and unchanged stock as evidence.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

@@ -19,7 +19,7 @@ import {
   buildImportSummary,
   buildCatalogSavedSummary
 } from "./services/catalogOnboarding.js";
-import { buildDeterministicNotifications, mergeNotifications, notificationToCard } from "./services/notificationCenter.js";
+import { buildDeterministicNotifications, buildTransactionNotification, mergeNotifications, notificationToCard } from "./services/notificationCenter.js";
 import {
   buildBulkPasteTemplate, buildCanonicalInventoryExport, buildDocumentCard,
   buildInventoryCsv, buildInventoryDocx, buildInventoryPdf, buildInventoryPptx,
@@ -4184,17 +4184,7 @@ function processTransactionProviderEvent(transactionId, event) {
 }
 
 function addTransactionNotification(transaction, status) {
-  const notification = {
-    id: `payment-${transaction.id}-${status}`,
-    category: "Payment",
-    title: `${transaction.saleLabel || "Payment"} ${status}`,
-    message: `${transaction.metadata?.medicine || "Payment"} was not completed. Stock and paid records were not changed.`,
-    action: "Review payment",
-    status: "unread",
-    createdAt: new Date().toISOString(),
-    aiUsed: false,
-    origin: "transaction"
-  };
+  const notification = buildTransactionNotification({ transaction, status });
   state.notifications = [notification, ...(state.notifications || []).filter((item) => item.id !== notification.id)];
   safeLocalStorage()?.setItem(NOTIFICATION_KEY, JSON.stringify(state.notifications));
 }
@@ -4427,6 +4417,11 @@ function notificationIdFromCard(card) {
 function openNotificationAction(cardId) {
   const notificationCard = activeNotificationCards().find((item) => item.id === cardId);
   const targetCardId = notificationCard?.notificationAction?.targetCardId;
+  if (String(targetCardId || "").startsWith("payment:")) {
+    state.ui.screen = "payments";
+    render();
+    return;
+  }
   if (!targetCardId || !state.cards.some((item) => item.id === targetCardId)) return;
   state.ui.screen = "chat";
   state.ui.workspace = "operations";

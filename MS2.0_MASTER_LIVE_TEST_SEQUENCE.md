@@ -85,7 +85,7 @@ Evidence abbreviations: `CVS` = `docs/engineering-memory/current-live-validation
 | 51 | TCE Fast Record | Record owner-confirmed transactions immediately with daily numbering and exact one-time stock/finance effects. | 14 | PASS / PROTECTED | Passed | Yes | 10 min | CVS; TCE |
 | 52 | Request & Verify success | Queue non-cash request, continue serving and complete only after verified success. | 51 | PASS / PROTECTED | Passed | Yes | 12 min | CVS; TCE; TCE/UI verifiers |
 | 53 | Concurrent payment completion | Keep multiple waiting payments isolated, support out-of-order success and prevent duplicate stock effects. | 52 | PASS / PROTECTED | Passed | Yes | 12 min | TCE quiet-concurrency evidence |
-| 54 | Payment failure/cancellation notification | Preserve stock/paid records and create one durable action-needed Notification without chat noise. | 52–53 | Implemented — awaiting owner live test | Next after checkpoint 13 | No | 8 min | TCE; ARCH; notification implementation |
+| 54 | Payment failure/cancellation notification | Preserve stock/paid records and create one durable action-needed Notification without chat noise. | 52–53 | Implemented — awaiting owner live test | Ready for one focused owner test after deterministic failure-notification routing verification | No | 8 min | TCE; ARCH; `notificationCenter.js`; `verify-payment-failure-notification.mjs` |
 | 55 | Refunds, returns and credits | Record linked financial/stock adjustments without deleting original history. | 51–54 | Partial implementation | Not owner-qualified end to end | No | 15 min | TCE; issue-return tests; intake history |
 | 56 | Undo/reversal reconciliation | Reconcile stock, finance, receipt, reports and audit exactly once for visible sale numbers. | 51–55 | Partial implementation | Basic cancellation/undo passed; full TCE reconciliation untested | No | 15 min | TCE; ledger/intake tests |
 | 57 | Supplier/restock payments | Support supplier payment, credit and future settlement flows through the adapter/TCE boundary. | 29, 50, 55 | Planned / approved | Not started | No | 15 min | TCE permanent scope; supplier workflows |
@@ -1052,10 +1052,10 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **Name:** Payment failure/cancellation notification
 - **Category:** Financial & Payment Validation
 - **Current status:** Implemented — awaiting owner live test
-- **Repository evidence:** TCE; ARCH; notification implementation
+- **Repository evidence:** TCE; ARCH; `notificationCenter.js`; `verify-payment-failure-notification.mjs`
 - **Implementation commit(s):** dd05778 Close low stock and harden notification edits; 9afd4e4 Close unread review checkpoint and route notification actions; c63f687 Fix pending-review notifications and Paste List capture
 - **Primary implementation files/modules:** `ms20-main-app/src/services/transactionCompletionEngine.js`; `ms20-main-app/src/services/notificationCenter.js`
-- **Owner live-test evidence:** Repository evidence not yet available.
+- **Owner live-test evidence:** Ready for one focused owner test after deterministic failure-notification routing verification; source: TCE; ARCH; `notificationCenter.js`; `verify-payment-failure-notification.mjs`
 - **PASS / PROTECTED confirmation:** Not applicable.
 - **Remaining implementation work:** Complete decisive owner live validation for: Preserve stock/paid records and create one durable action-needed Notification without chat noise.
 - **Prerequisite checkpoints:** 52–53

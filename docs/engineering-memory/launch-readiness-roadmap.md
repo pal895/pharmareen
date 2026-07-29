@@ -181,4 +181,4 @@ All backlog work keeps its canonical checkpoint/evidence relationship. New appro
 
 **MS2-LT-054 — Payment failure/cancellation notification**
 
-Status: `READY FOR OWNER TEST` after focused automated verification and any shared-root repair. It is selected because its protected prerequisites are complete, it is the smallest unresolved transaction-correctness boundary, and it materially advances the Launch Gate. No later milestone starts until the owner provides evidence or explicitly redirects work.
+Status: `READY FOR OWNER TEST`. Focused deterministic verification covers terminal idempotency, unchanged stock/paid truth, durable deduplicated notification state, visible Payment Queue routing and zero chat noise. It is selected because its protected prerequisites are complete, it is the smallest unresolved transaction-correctness boundary, and it materially advances the Launch Gate. No later milestone starts until the owner provides evidence or explicitly redirects work.

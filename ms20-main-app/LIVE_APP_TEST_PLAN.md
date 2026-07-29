@@ -8,6 +8,14 @@ The master’s generated `MS2-LT-NNN` Engineering Traceability Index is the sole
 
 Active owner testing now follows `../docs/engineering-memory/launch-readiness-roadmap.md`. It selects one dependency-aware Launch Critical milestone and stops for evidence. The historical procedures below remain regression evidence; they do not imply ascending order. Demo Mode certification belongs to MS2-LT-083 and may run only after every mandatory Launch Gate row is PASS/PROTECTED.
 
+## Active Launch Critical owner test — MS2-LT-054
+
+Objective: prove that one simulated failed M-Pesa payment creates one durable action-needed Payment notification, routes back to the correct Payment Queue, and does not change stock or create a paid record/chat acknowledgement.
+
+Use one saved medicine and record its current stock before starting. Set Payment Queue completion to `Request & Verify`, submit one M-Pesa sale for quantity 1, and require it to appear as `Waiting` with an expected KES amount. Tap `Simulate failed` once. Open Notifications and require exactly one unread card titled `[Sale number] payment failed`, the message that stock and paid records were not changed, and a visible `Review payment` button. Tap it once and require Payment Queue to open with that same sale shown as `failed`, not paid or waiting. Reopen the medicine and confirm stock equals the recorded baseline.
+
+Required evidence: (1) baseline stock; (2) pending Payment Queue item; (3) unread failed-payment notification with `Review payment`; (4) Payment Queue failed history after routing; (5) unchanged final stock. Fail on missing/duplicate notification, chat success acknowledgement, paid/confirmed history, stock change, broken action routing or any second sale. Do not simulate success/cancellation, test another payment, or begin another milestone.
+
 ## Historical checkpoint — Notifications Low-Stock Alert
 
 <!-- Superseded low-stock checkpoint retained as historical evidence.

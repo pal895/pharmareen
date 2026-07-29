@@ -135,6 +135,23 @@ export function notificationToCard(notification) {
   };
 }
 
+export function buildTransactionNotification({ transaction, status, now = new Date() } = {}) {
+  if (!transaction?.id) throw new Error("Transaction notification requires a transaction id.");
+  if (!["failed", "cancelled"].includes(status)) throw new Error("Transaction notification requires failed or cancelled status.");
+  return {
+    id: `payment-${transaction.id}-${status}`,
+    category: "Payment",
+    title: `${transaction.saleLabel || "Payment"} payment ${status}`,
+    message: `${transaction.metadata?.medicine || "Payment"} was not completed. Stock and paid records were not changed.`,
+    action: "Review payment",
+    actionTarget: `payment:${transaction.id}`,
+    status: "unread",
+    createdAt: now.toISOString(),
+    aiUsed: false,
+    origin: "transaction"
+  };
+}
+
 function createNotification({ category, key, title, message, action, actionTarget = "" }) {
   return {
     id: `${category.toLowerCase()}-${key}`,
