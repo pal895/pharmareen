@@ -177,6 +177,16 @@ const FIELD_LABELS = {
   backend_route: "Backend route",
   items_text: "Medicine list"
 };
+const PRODUCTION_SALE_EDITABLE_FIELDS = Object.freeze([
+  "medicine", "form", "unit", "pack_conversion", "selling_price", "quantity", "payment",
+  "current_stock", "strength", "cost_price", "supplier", "barcode", "batch", "expiry",
+  "aliases", "note"
+]);
+const PRODUCTION_SALE_REFRESH_FIELDS = Object.freeze([
+  ...PRODUCTION_SALE_EDITABLE_FIELDS,
+  "expected_total", "stock_before", "stock_after", "sale_status", "stock_deduction",
+  "base_stock_unit"
+]);
 let activeRecognition = null;
 let voiceCaptureAttempt = 0;
 let stockFixReading = null;
@@ -1565,12 +1575,7 @@ function handleVoiceTranscript(text) {
   } else if (card.type !== "MedicineMatchCard") {
     card.type = "SaleCard";
     card.title = "Check voice result";
-    card.fields = {
-      transcript: text,
-      medicine: card.fields?.medicine || "",
-      quantity: card.fields?.quantity || "",
-      payment: card.fields?.payment || ""
-    };
+    card.fields = { ...card.fields, transcript: text };
     prepareProductionSaleCard(card, pharmacyBrain.findMedicine(card.fields.medicine));
   } else {
     card.fields.voice_transcript = String(text || "").trim();
@@ -3116,8 +3121,8 @@ function updateCardField(cardId, field, value) {
 function refreshProductionSaleCardControls(card) {
   const workspace = root.querySelector(`[data-medicine-workspace="${card.id}"]`);
   if (!workspace) return;
-  for (const field of ["expected_total", "stock_before", "stock_after", "current_stock", "selling_price", "form", "unit"]) {
-    const controls = workspace.querySelectorAll(`[data-card-id="${card.id}"][data-field="${field}"]`);
+  for (const field of PRODUCTION_SALE_REFRESH_FIELDS) {
+    const controls = workspace.querySelectorAll(`input[data-card-id="${card.id}"][data-field="${field}"], select[data-card-id="${card.id}"][data-field="${field}"]`);
     controls.forEach((control) => {
       if (document.activeElement !== control) control.value = String(card.fields?.[field] ?? "");
     });
@@ -3513,14 +3518,13 @@ function startCatalogEditVoice(cardId) {
 
 function startSaleEditFieldVoice(cardId, field) {
   const card = state.cards.find((item) => item.id === cardId && item.type === "SaleCard");
-  const allowed = new Set(["medicine", "form", "unit", "pack_conversion", "selling_price", "quantity", "payment", "current_stock", "strength", "cost_price", "supplier", "barcode", "batch", "expiry", "aliases", "note"]);
-  if (!card || !allowed.has(field)) return;
+  if (!card || !PRODUCTION_SALE_EDITABLE_FIELDS.includes(field)) return;
   card.fields.voice_field = field;
   card.fields.voice_feedback = `${fieldLabel(field)} selected. Speak the new value.`;
   activeVoiceViewportAnchor = createVoiceViewportAnchor(root, {
     cardId,
     field,
-    selector: `[data-card-id="${CSS.escape(cardId)}"][data-field="${CSS.escape(field)}"]`
+    selector: `input[data-card-id="${CSS.escape(cardId)}"][data-field="${CSS.escape(field)}"], select[data-card-id="${CSS.escape(cardId)}"][data-field="${CSS.escape(field)}"]`
   });
   persistActiveCards();
   startVoiceCapture(

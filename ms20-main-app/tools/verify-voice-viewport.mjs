@@ -39,6 +39,8 @@ assert.match(appSource, /input\.addEventListener\("focus", \(\) => preserveInlin
 assert.match(cssSource, /\.sale-edit-field \.catalog-edit-field-heading button[\s\S]*width: 44px/, "Sale correction uses a compact but safe inline Mic target");
 assert.match(appSource, /if \(card\.type === "SaleCard"\)[\s\S]*refreshProductionSaleCardControls\(card\)[\s\S]*restoreVoiceViewportAnchor[\s\S]*return true;/, "Sales field voice updates in place without remounting its carousel");
 assert.match(appSource, /startSaleEditFieldVoice[\s\S]*activeVoiceViewportAnchor = createVoiceViewportAnchor[\s\S]*data-field/, "Sales voice owns the exact selected field for its complete lifecycle");
+assert.match(appSource, /PRODUCTION_SALE_REFRESH_FIELDS[\s\S]*?"supplier"[\s\S]*?"barcode"[\s\S]*?"batch"[\s\S]*?"expiry"[\s\S]*?"aliases"[\s\S]*?"note"/, "Slide 3 fields share the in-place refresh registry.");
+assert.match(appSource, /querySelectorAll\(`input\[data-card-id=.*select\[data-card-id=/, "In-place voice refresh targets editable controls instead of Mic buttons.");
 assert.doesNotMatch(appSource, /startSaleEditFieldVoice[\s\S]*requestAnimationFrame\(\(\) => root\.querySelector[\s\S]*?\.focus/, "Sales voice never schedules a competing focus jump");
 assert.match(appSource, /if \(!settleVoiceViewportAnchor[\s\S]*scrollChatToBottom\(\)/, "removing a card falls back to the recent conversation end rather than scrollTop zero");
 

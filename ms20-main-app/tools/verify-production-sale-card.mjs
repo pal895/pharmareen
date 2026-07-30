@@ -124,6 +124,7 @@ assert.equal(packFixtures.medicines[0].unitConversions.packet, 20);
 assert.match(app, /productionSaleCardBody\(card\.fields/);
 assert.match(app, /productionSaleCardBody\(saleFieldsFromTransaction\(item\)/);
 assert.match(app, /card\.type = "SaleCard";\s+card\.title = "Check voice result"/);
+assert.match(app, /card\.fields = \{ \.\.\.card\.fields, transcript: text \};/, "The voice adapter must preserve medicine, quantity, requested unit and payment parsed before Sale preparation.");
 assert.match(app, /function canRecordInstantly[\s\S]*?return false;/);
 assert.doesNotMatch(app, /VoiceReviewCard/);
 assert.match(app, />Fast action<\/button>/);
@@ -133,6 +134,9 @@ assert.match(app, /sale-approval-grid/, "The default approval view must remain c
 assert.match(app, /card\.ui\?\.editing/, "Full editable fields must stay behind the explicit correction state.");
 assert.match(app, /sale-edit-field-voice/, "Every editable Sale field must expose the shared contextual Mic pattern.");
 assert.match(app, /startSaleEditFieldVoice[\s\S]*?startVoiceCapture/, "Sale field microphones must delegate to the shared capture root.");
+for (const field of ["supplier", "barcode", "batch", "expiry", "aliases", "note"]) {
+  assert.match(app, new RegExp(`PRODUCTION_SALE_EDITABLE_FIELDS[\\s\\S]*?"${field}"`), `Slide 3 ${field} must use the shared editable-field registry.`);
+}
 assert.match(app, /contextualEditableFieldTemplate/, "Catalog and Sale correction fields must share one inline field component.");
 assert.doesNotMatch(app, /sale-edit-field-voice[\s\S]{0,300}scrollChatToBottom/, "Sale field voice must never own a scroll-to-bottom path.");
 assert.match(app, /refreshProductionSaleCardControls\(card\)/);
