@@ -5,6 +5,9 @@ export const MEDICINE_FIELD_DEFINITIONS = Object.freeze({
   form: field("form", "Form", 110),
   unit: field("unit", "Unit", 110),
   pack_size: field("pack_size", "Pack size", 120),
+  base_stock_unit: field("base_stock_unit", "Base stock unit", 130),
+  unit_conversions: field("unit_conversions", "Pack conversions", 170),
+  unit_prices: field("unit_prices", "Selling-unit prices", 170),
   quantity: field("quantity", "Quantity", 100, "numeric"),
   bonus_quantity: field("bonus_quantity", "Bonus stock", 100, "numeric"),
   stock: field("stock", "Current stock", 100, "numeric"),
@@ -23,7 +26,7 @@ export const MEDICINE_FIELD_DEFINITIONS = Object.freeze({
 });
 
 export const CATALOG_MEDICINE_FIELD_KEYS = Object.freeze([
-  "name", "strength", "form", "unit", "pack_size", "stock", "selling_price",
+  "name", "strength", "form", "unit", "pack_size", "base_stock_unit", "unit_conversions", "unit_prices", "stock", "selling_price",
   "cost_price", "supplier", "shelf", "barcode", "batch", "expiry", "reorder_level", "aliases"
 ]);
 
@@ -62,6 +65,9 @@ export function normalizeMedicineReviewRow(row = {}) {
     form: row.form || first(row.forms),
     unit: row.unit || first(row.units) || row.form || "",
     pack_size: row.pack_size || first(row.packSizes),
+    base_stock_unit: row.base_stock_unit || row.baseStockUnit || "",
+    unit_conversions: row.unit_conversions || row.unitConversions || {},
+    unit_prices: row.unit_prices || row.unitPrices || {},
     stock: row.stock ?? row.current_stock ?? row.quantity ?? row.stockLeft ?? "",
     cost_price: row.cost_price ?? row.costPrice ?? "",
     line_total: row.line_total ?? row.lineTotal ?? "",
@@ -82,6 +88,9 @@ export function medicineRecordFromFields(fields = {}, { source = "owner_review",
     form: fields.form || "",
     unit: fields.unit || "",
     pack_size: fields.pack_size || "",
+    baseStockUnit: fields.base_stock_unit || "",
+    unitConversions: fields.unit_conversions || {},
+    unitPrices: fields.unit_prices || {},
     stock: fields.stock ?? (quantityIsStock ? fields.quantity : undefined),
     selling_price: fields.selling_price ?? "",
     cost_price: fields.cost_price ?? "",

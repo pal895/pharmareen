@@ -7,6 +7,8 @@
 - One compact presentation rule: Fast action is summary-first and approval-ready; full inputs exist only in explicit Correct mode. Secondary facts use compact on-demand lists.
 - Sale correction fields reuse the Catalog contextual Mic presentation and shared `startVoiceCapture()` root. A workflow-local speech service or permanently expanded Sale form is prohibited.
 - Active editable/review cards own the viewport during inline mutation. `preserveInlineCardViewport()` captures the card through `voiceViewportAnchor.js`; `render()` restores it instead of invoking chat-bottom scrolling. Actual new feed/card additions clear that ownership and retain deliberate conversation auto-scroll.
+- Sales field voice uses the same exact-field anchor but updates its existing DOM in place for the complete recognition lifecycle, preserving the carousel node and selected slide. When a card is removed and its target cannot be restored, render deliberately positions the long conversation at its recent end rather than accepting a zero scroll offset.
+- Per-medicine pack truth is `baseStockUnit` + `unitConversions` + `unitPrices`. Parsing separates selling unit from identity; transaction metadata and stock mutation carry the base-unit deduction. Missing pack truth blocks instead of guessing.
 - Typed and voice inputs both resolve to `SaleCard`; no instant typed write and no `VoiceReviewCard`.
 - Review, correction, Payment Queue, payment verification and failed-payment recovery preserve the same exact medicine/form/unit/quantity/unit-price/total/payment/stock/status fields.
 - Per-unit price and stock-conversion maps are retained at the Pharmacy Brain boundary. Ambiguous units/forms are explicit choices; missing or unsafe truth blocks Confirm.

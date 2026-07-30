@@ -242,7 +242,10 @@ function render() {
       { restoreFocus: !state.voice.starting && !state.voice.listening }
     );
   } else if (activeCardViewportAnchor) {
-    settleVoiceViewportAnchor(root, activeCardViewportAnchor, window, { restoreFocus: false });
+    if (!settleVoiceViewportAnchor(root, activeCardViewportAnchor, window, { restoreFocus: false })) {
+      activeCardViewportAnchor = null;
+      scrollChatToBottom();
+    }
   } else {
     scrollChatToBottom();
   }
@@ -678,6 +681,7 @@ function productionSaleCardBody(fields = {}, eyebrow = "Sale", card = null) {
   const fast = `${correcting ? `<p class="sale-edit-guidance" role="status">${escapeHtml(card.fields?.voice_feedback || "Correct only what is wrong. Every field uses the shared Catalog Mic.")}</p>
     <div class="production-sale-primary production-sale-edit-grid">
       ${editField("medicine", "Medicine")}${editField("form", "Exact form")}${editField("unit", "Selling unit")}
+      ${card.saleIssues?.includes("pack_conversion_unknown") ? editField("pack_conversion", `Base ${fields.base_stock_unit || "stock"} units in one ${fields.unit || "pack"}`, "decimal") : ""}
       ${editField("selling_price", "Unit price (KES)", "decimal")}${editField("quantity", "Quantity", "decimal")}${editField("payment", "Payment")}
     </div>` : `<div class="sale-approval-grid">
       ${fact("selling_price", "Unit price")}${fact("quantity", "Quantity")}${fact("expected_total", "Total")}${fact("payment", "Payment")}
@@ -811,7 +815,7 @@ function catalogMedicineEditorTemplate(card) {
   const draft = catalogEditDraft(card);
   const review = reviewCatalogEdit(pharmacyBrain.catalog, card.fields.selected_id, draft);
   const presentation = catalogEditPresentation(review);
-  const advanced = new Set(["pack_size", "supplier", "shelf", "barcode", "batch", "expiry", "reorder_level", "aliases"]);
+  const advanced = new Set(["pack_size", "base_stock_unit", "unit_conversions", "unit_prices", "supplier", "shelf", "barcode", "batch", "expiry", "reorder_level", "aliases"]);
   const fields = (showAdvanced) => CATALOG_EDIT_FIELDS
     .filter((field) => advanced.has(field) === showAdvanced)
     .map((field) => contextualEditableFieldTemplate(
@@ -1241,6 +1245,9 @@ function bindActionElements(scope) {
 function preserveInlineCardViewport(element) {
   const card = element?.closest?.(".card-message[data-card-id]");
   if (!card) return;
+  if (!["sale-edit-field-voice", "catalog-edit-field-voice", "catalog-edit-voice"].includes(element.dataset.action)) {
+    activeVoiceViewportAnchor = null;
+  }
   activeCardViewportAnchor = createVoiceViewportAnchor(root, {
     cardId: card.dataset.cardId,
     selector: `.card-message[data-card-id="${CSS.escape(card.dataset.cardId)}"]`
@@ -3069,6 +3076,10 @@ function addFeed(type, text) {
 function updateCardField(cardId, field, value) {
   const card = state.cards.find((item) => item.id === cardId);
   if (!card) return;
+  if (card.type === "SaleCard" && field === "unit" && String(card.fields?.unit || "") !== String(value || "")) {
+    card.fields.selling_price = "";
+    card.fields.pack_conversion = "";
+  }
   card.fields[field] = value;
   if (card.type === "SaleCard") {
     prepareProductionSaleCard(card, pharmacyBrain.findMedicine(card.fields?.medicine));
@@ -3295,6 +3306,7 @@ function confirmCard(cardId) {
   if (card.type === "MedicineMatchCard" && card.fields?.medicine) {
     saveCatalogItems([medicineRecordFromFields(card.fields, { source: "sale_time_learning" })]);
   }
+  if (card.type === "SaleCard") saveApprovedSalePackFacts(card);
   if (card.type === "OnboardingCard") {
     state.onboarding.completed = true;
     safeLocalStorage()?.setItem(SETUP_KEY, "true");
@@ -3388,8 +3400,27 @@ function refreshContextualFieldVoiceDom() {
   const anchor = activeVoiceViewportAnchor;
   if (!anchor || state.ui.screen !== "chat") return false;
   const target = root.querySelector(anchor.selector);
-  const card = state.cards.find((item) => item.id === anchor.cardId && item.type === "CatalogWorkspaceCard");
-  if (!target || !card?.fields?.selected_id) return false;
+  const card = state.cards.find((item) => item.id === anchor.cardId);
+  if (!target || !card) return false;
+
+  if (card.type === "SaleCard") {
+    const nextValue = String(card.fields?.[anchor.field] ?? "");
+    if (target.value !== nextValue) target.value = nextValue;
+    refreshProductionSaleCardControls(card);
+    const feedback = root.querySelector(".sale-edit-guidance");
+    if (feedback) feedback.textContent = state.voice.status || card.fields.voice_feedback || `${fieldLabel(anchor.field)} selected. Speak the new value.`;
+    const busy = state.voice.starting || state.voice.listening;
+    root.querySelectorAll('[data-action="sale-edit-field-voice"]').forEach((button) => { button.disabled = busy; });
+    const composerVoice = root.querySelector('[data-action="start-voice"]');
+    if (composerVoice) {
+      composerVoice.disabled = busy;
+      composerVoice.classList.toggle("listening", busy);
+      composerVoice.textContent = state.voice.starting ? "Wait" : state.voice.listening ? "Speak" : "Mic";
+    }
+    restoreVoiceViewportAnchor(root, anchor, window, { restoreFocus: false });
+    return true;
+  }
+  if (card.type !== "CatalogWorkspaceCard" || !card.fields?.selected_id) return false;
 
   const draft = catalogEditDraft(card);
   const nextValue = String(draft[anchor.field] ?? "");
@@ -3482,16 +3513,21 @@ function startCatalogEditVoice(cardId) {
 
 function startSaleEditFieldVoice(cardId, field) {
   const card = state.cards.find((item) => item.id === cardId && item.type === "SaleCard");
-  const allowed = new Set(["medicine", "form", "unit", "selling_price", "quantity", "payment", "current_stock", "strength", "cost_price", "supplier", "barcode", "batch", "expiry", "aliases", "note"]);
+  const allowed = new Set(["medicine", "form", "unit", "pack_conversion", "selling_price", "quantity", "payment", "current_stock", "strength", "cost_price", "supplier", "barcode", "batch", "expiry", "aliases", "note"]);
   if (!card || !allowed.has(field)) return;
   card.fields.voice_field = field;
   card.fields.voice_feedback = `${fieldLabel(field)} selected. Speak the new value.`;
+  activeVoiceViewportAnchor = createVoiceViewportAnchor(root, {
+    cardId,
+    field,
+    selector: `[data-card-id="${CSS.escape(cardId)}"][data-field="${CSS.escape(field)}"]`
+  });
   persistActiveCards();
   startVoiceCapture(
     (transcript) => {
-      const mappedField = { medicine: "name", current_stock: "stock", quantity: "stock" }[field] || field;
+      const mappedField = { medicine: "name", current_stock: "stock", quantity: "stock", pack_conversion: "stock" }[field] || field;
       let value = String(transcript || "").trim();
-      if (["quantity", "selling_price", "current_stock", "cost_price"].includes(field)) {
+      if (["quantity", "pack_conversion", "selling_price", "current_stock", "cost_price"].includes(field)) {
         const normalized = applyCatalogEditVoice({ [mappedField]: card.fields[field] }, transcript, mappedField);
         if (!normalized.applied) {
           card.fields.voice_feedback = normalized.feedback;
@@ -3508,7 +3544,6 @@ function startSaleEditFieldVoice(cardId, field) {
       card.fields.voice_feedback = `Heard “${transcript}”. ${fieldLabel(field)} updated. Review before confirming.`;
       persistActiveCards();
       render();
-      requestAnimationFrame(() => root.querySelector(`[data-card-id="${card.id}"][data-field="${field}"]`)?.focus());
     },
     (message) => {
       card.fields.voice_feedback = message;
@@ -4203,6 +4238,9 @@ function recordCard(card) {
         strength: card.fields?.strength || "",
         form: card.fields?.form || "",
         unit: card.fields?.unit || "",
+        baseStockUnit: card.fields?.base_stock_unit || "",
+        packConversion: Number(card.fields?.pack_conversion || 0),
+        baseStockDeduction: Number(card.fields?.stock_deduction || card.fields?.quantity || 0),
         stockBefore: Number(card.fields?.stock_before),
         stockAfter: Number(card.fields?.stock_after),
         pharmacyId: state.pharmacy.id,
@@ -4377,14 +4415,33 @@ function applyLocalSaleStock(card) {
     return;
   }
   const currentStock = Number(medicine.stockLeft);
-  const quantity = Number(card.fields?.quantity || 0);
-  if (!Number.isFinite(currentStock) || !Number.isFinite(quantity)) {
+  const deduction = Number(card.fields?.stock_deduction || card.fields?.quantity || 0);
+  if (!Number.isFinite(currentStock) || !Number.isFinite(deduction)) {
     card.fields.stockLeft = null;
     return;
   }
-  const remaining = Math.max(0, currentStock - quantity);
+  const remaining = Math.max(0, currentStock - deduction);
   medicine.stockLeft = remaining;
   card.fields.stockLeft = remaining;
+  state.catalog.items = pharmacyBrain.catalog;
+  safeLocalStorage()?.setItem(CATALOG_KEY, JSON.stringify(state.catalog.items));
+  void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);
+}
+
+function saveApprovedSalePackFacts(card) {
+  const match = pharmacyBrain.findMedicine(card.fields?.medicine);
+  if (match.status !== "matched") return;
+  const medicine = match.matches[0];
+  const unit = String(card.fields?.unit || "").trim();
+  const baseUnit = String(card.fields?.base_stock_unit || "").trim();
+  if (!unit || !baseUnit || unit === baseUnit) return;
+  const conversion = Number(card.fields?.pack_conversion);
+  const price = Number(card.fields?.selling_price);
+  if (!Number.isFinite(conversion) || conversion <= 0 || !Number.isFinite(price) || price <= 0) return;
+  medicine.baseStockUnit = baseUnit;
+  medicine.units = [...new Set([...(medicine.units || []), baseUnit, unit])];
+  medicine.unitConversions = { ...(medicine.unitConversions || {}), [baseUnit]: 1, [unit]: conversion };
+  medicine.unitPrices = { ...(medicine.unitPrices || {}), [unit]: price };
   state.catalog.items = pharmacyBrain.catalog;
   safeLocalStorage()?.setItem(CATALOG_KEY, JSON.stringify(state.catalog.items));
   void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);

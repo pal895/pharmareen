@@ -48,3 +48,9 @@ Full inputs appear only after explicit **Correct**. Every editable Sale field th
 Owner evidence proved that quantity, payment, speech controls and correction rerenders were incorrectly entering the normal new-message `scrollChatToBottom()` branch. Inline interaction now captures the active card and its scroll-container coordinates before mutation. The shared render boundary restores that anchor without focusing the composer or reopening the keyboard. Catalog contextual voice retains its more precise field anchor; Sale and every other active card reuse the same anchor service. Only an actual appended feed/card or deliberate focus navigation releases inline ownership.
 
 Sale correction microphones continue to use the shared contextual editable-field component and `startVoiceCapture()`, but receive a compact 44-pixel tap target and quiet cream styling. Computed total and stock-after remain read-only. Status remains awaiting owner live validation; this fix is not protected yet.
+
+## Remaining-root implementation — 2026-07-30
+
+Sales contextual voice now takes in-place render ownership for the exact selected input throughout permission, startup, listening, interim/final result, error and retry. It updates field/status controls without replacing the carousel DOM, scheduling focus, or changing `activeSlide`. A removed card whose visual anchor no longer exists deliberately returns the chat to the recent working end instead of leaving a rebuilt chat at scroll position zero.
+
+Typed and voice sales now parse a requested selling unit independently from medicine and quantity. The shared Sale model consumes authoritative `baseStockUnit`, `unitConversions` and `unitPrices`; unknown conversion or price blocks confirmation and exposes only the required correction fields. See `medicine-pack-hierarchy-standard.md`. The checkpoint remains open pending owner screenshots.

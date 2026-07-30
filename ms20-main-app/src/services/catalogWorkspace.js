@@ -66,6 +66,9 @@ export function createCatalogEditDraft(item = {}) {
     form: item.form || item.forms?.[0] || "",
     unit: item.unit || item.units?.[0] || "",
     pack_size: item.pack_size || item.packSizes?.[0] || "",
+    base_stock_unit: item.baseStockUnit || item.base_stock_unit || item.units?.[0] || item.unit || "",
+    unit_conversions: packMapText(item.unitConversions || item.stockUnitsPerSaleUnit),
+    unit_prices: packMapText(item.unitPrices || item.pricesByUnit),
     stock: item.stockLeft ?? item.stock ?? item.current_stock ?? "",
     selling_price: item.sellingPrice ?? item.selling_price ?? "",
     cost_price: item.costPrice ?? item.cost_price ?? "",
@@ -108,6 +111,9 @@ export function applyApprovedCatalogEdit(catalog = [], originalId, draft = {}) {
     forms: draft.form ? [draft.form.trim()] : [],
     units: draft.unit ? [draft.unit.trim()] : [],
     packSizes: draft.pack_size ? [draft.pack_size.trim()] : [],
+    baseStockUnit: draft.base_stock_unit.trim(),
+    unitConversions: parsePackMap(draft.unit_conversions),
+    unitPrices: parsePackMap(draft.unit_prices),
     stockLeft: draft.stock === "" ? null : draft.stock,
     sellingPrice: draft.selling_price,
     costPrice: draft.cost_price,
@@ -153,6 +159,9 @@ const VOICE_FIELD_ALIASES = [
   ["selling_price", ["selling price", "sale price"]],
   ["cost_price", ["buying price", "cost price"]],
   ["pack_size", ["pack size"]],
+  ["base_stock_unit", ["base stock unit"]],
+  ["unit_conversions", ["pack conversions", "unit conversions"]],
+  ["unit_prices", ["selling unit prices", "unit prices"]],
   ["stock", ["current stock", "stock"]],
   ["expiry", ["expiry month", "expiry"]],
   ["supplier", ["supplier"]],
@@ -224,6 +233,20 @@ function fieldLabelForVoice(field) {
     cost_price: "Buying price", reorder_level: "Reorder level", pack_size: "Pack size",
     expiry: "Expiry month"
   }[field] || field.replaceAll("_", " ").replace(/^\w/, (letter) => letter.toUpperCase());
+}
+
+function packMapText(value = {}) {
+  return Object.entries(value || {}).map(([unit, amount]) => `${unit}=${amount}`).join(", ");
+}
+
+function parsePackMap(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value;
+  const entries = String(value || "").split(",").map((entry) => entry.trim()).filter(Boolean).map((entry) => {
+    const [unit, amount] = entry.split(/[:=]/).map((part) => part.trim());
+    const number = Number(amount);
+    return unit && Number.isFinite(number) && number > 0 ? [unit.toLowerCase(), number] : null;
+  }).filter(Boolean);
+  return Object.fromEntries(entries);
 }
 import { normalizeMedicineText } from "./medicineMatcher.js";
 import { CATALOG_MEDICINE_FIELD_KEYS, normalizeExpiryValue } from "./medicineFieldSchema.js";

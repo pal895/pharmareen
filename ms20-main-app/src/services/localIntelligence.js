@@ -123,6 +123,7 @@ export function parseLocalCommand(input, catalog = []) {
       fields: {
         medicine: medicineMatch.status === "insufficient_identity" ? "" : medicineMatch.matches[0]?.name || sale.medicine,
         quantity: sale.quantity,
+        unit: sale.unit || "",
         payment: sale.payment,
         stockLeft: medicineMatch.matches[0]?.stockLeft ?? "Catalog sync needed"
       },
@@ -151,6 +152,20 @@ export function parseSaleFacts(input, catalog = []) {
   const payment = paymentMatch ? paymentMatch[1].replace(/[\s-]/g, "").toLowerCase() : "";
   let saleText = paymentMatch ? command.slice(0, paymentMatch.index).trim() : command;
   if (!saleText) return null;
+
+  const unitMatch = saleText.match(new RegExp(`^(.*?)\\s+(\\d+(?:\\.\\d+)?)\\s+(${SALE_UNIT_PATTERN})$`, "i"));
+  if (unitMatch) {
+    const medicine = unitMatch[1].trim();
+    const medicineMatch = matchMedicineName(medicine, catalog);
+    return {
+      medicine,
+      quantity: Number(unitMatch[2]),
+      unit: normalizeSaleUnit(unitMatch[3]),
+      payment: payment || "cash",
+      medicineMatch,
+      defaultedQuantity: false
+    };
+  }
 
   // Catalog-first prevents a numeric medicine identity from being mistaken for quantity.
   const wholeMatch = matchMedicineName(saleText, catalog);
@@ -183,6 +198,15 @@ export function parseSaleFacts(input, catalog = []) {
     };
   }
   return null;
+}
+
+const SALE_UNIT_PATTERN = "tablets?|tabs?|capsules?|caps?|strips?|blisters?|packets?|packs?|boxes?|bottles?|sachets?|tubes?|vials?|ampoules?|cartons?|pieces?|doses?";
+
+function normalizeSaleUnit(value) {
+  const unit = String(value || "").trim().toLowerCase();
+  const aliases = { tab: "tablet", tabs: "tablet", cap: "capsule", caps: "capsule", boxes: "box" };
+  if (aliases[unit]) return aliases[unit];
+  return unit.endsWith("s") ? unit.slice(0, -1) : unit;
 }
 
 function hasExactCatalogIdentity(value, catalog) {

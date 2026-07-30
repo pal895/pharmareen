@@ -1,0 +1,26 @@
+{
+  "authority": "owner-approved deterministic test fixtures only",
+  "medicines": [
+    {
+      "name": "Paracetamol",
+      "baseStockUnit": "tablet",
+      "units": ["tablet", "strip", "packet"],
+      "unitConversions": { "tablet": 1, "strip": 10, "packet": 20 },
+      "unitPrices": { "tablet": 5, "strip": 48, "packet": 90 }
+    },
+    {
+      "name": "Amoxil",
+      "baseStockUnit": "capsule",
+      "units": ["capsule", "box"],
+      "unitConversions": { "capsule": 1, "box": 100 },
+      "unitPrices": { "capsule": 12 }
+    },
+    {
+      "name": "ORS",
+      "baseStockUnit": "sachet",
+      "units": ["sachet"],
+      "unitConversions": { "sachet": 1 },
+      "unitPrices": { "sachet": 25 }
+    }
+  ]
+}

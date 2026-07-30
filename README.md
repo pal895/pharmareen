@@ -10,6 +10,8 @@ Implementation handoffs stay short: what changed, commit hash, one combined Repl
 
 Inline editable/review-card updates must preserve the active card viewport. They never invoke chat-bottom auto-scroll or focus the composer; genuine appended conversation messages retain normal auto-scroll. This is one shared render/anchor rule, not a Sales- or Catalog-only patch.
 
+Pack-level sales use pharmacy-owned per-medicine `baseStockUnit`, `unitConversions` and `unitPrices`. Common selling-unit language is parsed locally, but no conversion or price is assumed. Missing facts block confirmation and are collected through the shared correction card.
+
 The first view prioritizes canonical medicine, exact form, exact selling unit, quantity, unit-specific selling price, expected total and payment. It visibly preserves stock before/after and sale status. Ambiguous form/unit choices remain explicit; missing prices/conversions display as Unknown and block confirmation; unit/form/strength mismatches and insufficient stock are unsafe and block confirmation. Secondary traceability stays secondary. No typed sale may bypass review.
 
 Owner live validation of this upgrade is pending. The launch-focused sequence is paused; MS2-LT-049 is identified but not started.

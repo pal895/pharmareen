@@ -1517,3 +1517,5 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 The live-test sequence remains paused before MS2-LT-049. Resume only after the owner validates the compact shared Production Sales Card, its on-demand detail sections, correction flow, and inline shared field microphones with screenshots.
 
 The 2026-07-30 compact-card evidence accepts the visual direction but exposes repeated viewport loss after inline actions. Retest one continuous Septrin card across quantity, payment, tabs, Read/Resume/Stop, Correct, two field microphones and one manual edit without confirming. Pass only if the card never leaves its working viewport and the composer never steals focus.
+
+Newer evidence passes ordinary inline updates but leaves voice-session stability, close-position restoration and pack-unit intelligence open. The single retest must cover microphones on all three slides, close back to the recent conversation position, and `Paracetamol one packet cash` with either authoritative calculation or a safe missing conversion/price prompt. Do not start MS2-LT-049.

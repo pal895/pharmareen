@@ -37,6 +37,10 @@ assert.match(appSource, /else if \(activeCardViewportAnchor\)[\s\S]*settleVoiceV
 assert.match(appSource, /function addFeed[\s\S]*activeCardViewportAnchor = null/, "a genuine new message releases inline viewport ownership");
 assert.match(appSource, /input\.addEventListener\("focus", \(\) => preserveInlineCardViewport\(input\)\)/, "manual field editing also owns the shared viewport");
 assert.match(cssSource, /\.sale-edit-field \.catalog-edit-field-heading button[\s\S]*width: 44px/, "Sale correction uses a compact but safe inline Mic target");
+assert.match(appSource, /if \(card\.type === "SaleCard"\)[\s\S]*refreshProductionSaleCardControls\(card\)[\s\S]*restoreVoiceViewportAnchor[\s\S]*return true;/, "Sales field voice updates in place without remounting its carousel");
+assert.match(appSource, /startSaleEditFieldVoice[\s\S]*activeVoiceViewportAnchor = createVoiceViewportAnchor[\s\S]*data-field/, "Sales voice owns the exact selected field for its complete lifecycle");
+assert.doesNotMatch(appSource, /startSaleEditFieldVoice[\s\S]*requestAnimationFrame\(\(\) => root\.querySelector[\s\S]*?\.focus/, "Sales voice never schedules a competing focus jump");
+assert.match(appSource, /if \(!settleVoiceViewportAnchor[\s\S]*scrollChatToBottom\(\)/, "removing a card falls back to the recent conversation end rather than scrollTop zero");
 
 const oldContainer = {
   id: "chatBody",

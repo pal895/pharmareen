@@ -9,21 +9,28 @@ export function prepareProductionSaleCard(card = {}, catalogMatch = {}) {
   const quantity = positiveNumber(card.fields?.quantity);
   const stockBefore = finiteNumber(match?.stockLeft ?? match?.stock ?? match?.current_stock);
   const forms = values(match?.forms ?? match?.form);
-  const units = values(match?.units ?? match?.unit);
-  const batches = Array.isArray(match?.batches) ? match.batches : [];
-  const selectedUnit = card.fields?.unit || (units.length === 1 ? units[0] : "");
   const unitPrices = match?.unitPrices || match?.pricesByUnit || {};
   const unitConversions = match?.unitConversions || match?.stockUnitsPerSaleUnit || {};
+  const units = uniqueValues([...(values(match?.units ?? match?.unit)), ...Object.keys(unitPrices), ...Object.keys(unitConversions)]);
+  const batches = Array.isArray(match?.batches) ? match.batches : [];
+  const selectedUnit = card.fields?.unit || (units.length === 1 ? units[0] : "");
+  const baseStockUnit = match?.baseStockUnit || match?.base_stock_unit || values(match?.units ?? match?.unit)[0] || "";
+  const packConversion = selectedUnit === baseStockUnit
+    ? 1
+    : positiveNumber(card.fields?.pack_conversion) ?? positiveNumber(unitConversions[selectedUnit]);
   const sellingPrice = positiveNumber(unitPrices[selectedUnit])
     ?? positiveNumber(card.fields?.selling_price)
-    ?? (units.length <= 1 ? positiveNumber(match?.sellingPrice ?? match?.selling_price) : null);
-  const stockDeduction = quantity === null ? null : quantity * (positiveNumber(unitConversions[selectedUnit]) || 1);
+    ?? (selectedUnit === baseStockUnit ? positiveNumber(match?.sellingPrice ?? match?.selling_price) : null);
+  const stockDeduction = quantity === null || packConversion === null ? null : quantity * packConversion;
   card.fields = {
     ...card.fields,
     medicine: match?.name || card.fields?.medicine || "",
     strength: card.fields?.strength || match?.strength || "",
     form: card.fields?.form || (forms.length === 1 ? forms[0] : ""),
     unit: selectedUnit,
+    base_stock_unit: baseStockUnit,
+    pack_conversion: packConversion ?? card.fields?.pack_conversion ?? "",
+    stock_deduction: stockDeduction ?? "",
     selling_price: sellingPrice ?? "",
     expected_total: quantity !== null && sellingPrice !== null ? quantity * sellingPrice : "",
     stock_before: stockBefore ?? "",
@@ -56,16 +63,19 @@ export function productionSaleIssues(card = {}, catalogMatch = {}) {
   if (!String(fields.unit || "").trim()) issues.push("selling_unit_unknown");
   const match = catalogMatch.status === "matched" ? catalogMatch.matches?.[0] : null;
   const forms = values(match?.forms ?? match?.form);
-  const units = values(match?.units ?? match?.unit);
+  const unitPrices = match?.unitPrices || match?.pricesByUnit || {};
+  const unitConversions = match?.unitConversions || match?.stockUnitsPerSaleUnit || {};
+  const units = uniqueValues([...(values(match?.units ?? match?.unit)), ...Object.keys(unitPrices), ...Object.keys(unitConversions)]);
   if (fields.form && forms.length && !forms.includes(fields.form)) issues.push("form_mismatch");
-  if (fields.unit && units.length && !units.includes(fields.unit)) issues.push("selling_unit_mismatch");
+  if (fields.unit && units.length && !units.includes(fields.unit) && !COMMON_PACK_UNITS.has(fields.unit)) issues.push("selling_unit_mismatch");
   if (fields.strength && match?.strength && String(fields.strength).trim() !== String(match.strength).trim()) issues.push("strength_mismatch");
   if (positiveNumber(fields.quantity) === null) issues.push("quantity_invalid");
   if (positiveNumber(fields.selling_price) === null) issues.push("unit_price_unknown");
+  if (fields.unit && fields.base_stock_unit && fields.unit !== fields.base_stock_unit && positiveNumber(fields.pack_conversion) === null) issues.push("pack_conversion_unknown");
   if (!["cash", "mpesa", "credit", "mixed"].includes(normalizePayment(fields.payment))) issues.push("payment_unknown");
   const before = finiteNumber(fields.stock_before);
-  const quantity = positiveNumber(fields.quantity);
-  if (before !== null && quantity !== null && quantity > before) issues.push("insufficient_stock");
+  const deduction = positiveNumber(fields.stock_deduction);
+  if (before !== null && deduction !== null && deduction > before) issues.push("insufficient_stock");
   return issues;
 }
 
@@ -90,7 +100,8 @@ function issueMessage(issues) {
   const labels = {
     medicine_not_uniquely_matched: "choose one exact catalog medicine", form_unknown: "form is Unknown",
     selling_unit_unknown: "selling unit is Unknown", quantity_invalid: "enter a positive quantity",
-    unit_price_unknown: "exact unit price is Unknown", payment_unknown: "choose payment",
+    unit_price_unknown: "exact selling-unit price is Unknown", payment_unknown: "choose payment",
+    pack_conversion_unknown: `enter how many base stock units are in one ${fieldsSafeUnit(issues)}`,
     insufficient_stock: "quantity exceeds available stock", form_mismatch: "form does not match the catalog medicine",
     selling_unit_mismatch: "selling unit does not match the catalog medicine",
     strength_mismatch: "strength does not match the catalog medicine"
@@ -98,11 +109,15 @@ function issueMessage(issues) {
   return `${issues.map((issue) => labels[issue] || issue).join("; ")}. Confirm remains blocked until the sale is safe.`;
 }
 
+function fieldsSafeUnit() { return "requested pack"; }
+const COMMON_PACK_UNITS = new Set(["tablet", "capsule", "sachet", "ampoule", "vial", "bottle", "tube", "strip", "blister", "packet", "pack", "box", "carton", "dose", "piece"]);
+
 function normalizePayment(value) { return String(value || "").trim().toLowerCase().replace("-", ""); }
 function values(value) {
   if (Array.isArray(value)) return value.map(String).map((entry) => entry.trim()).filter(Boolean);
   return String(value || "").split(",").map((entry) => entry.trim()).filter(Boolean);
 }
+function uniqueValues(valuesList) { return [...new Set(valuesList.map(String).map((entry) => entry.trim()).filter(Boolean))]; }
 function finiteNumber(value) {
   if (value === "" || value === null || value === undefined) return null;
   const number = Number(value);

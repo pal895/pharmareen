@@ -65,6 +65,41 @@ for (const [command, quantity, payment] of [
   assert.equal(parsed.fields.payment, payment);
 }
 
+for (const [command, quantity, unit, payment] of [
+  ["paracetamol one packet cash", 1, "packet", "cash"],
+  ["paracetamol 2 packets m-pesa", 2, "packet", "mpesa"],
+  ["Panadol one strip cash", 1, "strip", "cash"],
+  ["paracetamol 3 tabs credit", 3, "tablet", "credit"]
+]) {
+  const parsed = parseLocalCommand(command, parseCatalog);
+  assert.equal(parsed.cardType, "SaleCard");
+  assert.equal(parsed.fields.medicine, "Paracetamol");
+  assert.equal(parsed.fields.quantity, quantity);
+  assert.equal(parsed.fields.unit, unit);
+  assert.equal(parsed.fields.payment, payment);
+}
+
+const packetSale = prepareProductionSaleCard({
+  type: "SaleCard", fields: { medicine: "Paracetamol", unit: "packet", quantity: 1, payment: "cash" }
+}, {
+  status: "matched",
+  matches: [{
+    name: "Paracetamol", forms: ["tablet"], units: ["tablet", "packet"], baseStockUnit: "tablet",
+    stockLeft: 100, unitPrices: { tablet: 5, packet: 90 }, unitConversions: { tablet: 1, packet: 20 }
+  }]
+});
+assert.equal(packetSale.fields.selling_price, 90);
+assert.equal(packetSale.fields.stock_deduction, 20);
+assert.equal(packetSale.fields.stock_after, 80);
+assert.deepEqual(packetSale.saleIssues, []);
+
+const missingPacketFacts = prepareProductionSaleCard({
+  type: "SaleCard", fields: { medicine: "Paracetamol", unit: "packet", quantity: 1, payment: "cash" }
+}, { status: "matched", matches: [{ name: "Paracetamol", forms: ["tablet"], units: ["tablet"], stockLeft: 100, sellingPrice: 5 }] });
+assert.ok(missingPacketFacts.saleIssues.includes("pack_conversion_unknown"));
+assert.ok(missingPacketFacts.saleIssues.includes("unit_price_unknown"));
+assert.equal(missingPacketFacts.fields.stock_after, "");
+
 const unsafe = prepareProductionSaleCard({
   type: "SaleCard", fields: { medicine: "Unknown", quantity: 20, payment: "" }
 }, { status: "not_found", matches: [] });
@@ -83,6 +118,9 @@ assert.equal(transactionFields.expected_total, 180);
 assert.equal(transactionFields.form, "suspension");
 
 const app = fs.readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+const packFixtures = JSON.parse(fs.readFileSync(new URL("../fixtures/sale-pack-hierarchy.json", import.meta.url), "utf8"));
+assert.equal(packFixtures.medicines.length, 3);
+assert.equal(packFixtures.medicines[0].unitConversions.packet, 20);
 assert.match(app, /productionSaleCardBody\(card\.fields/);
 assert.match(app, /productionSaleCardBody\(saleFieldsFromTransaction\(item\)/);
 assert.match(app, /card\.type = "SaleCard";\s+card\.title = "Check voice result"/);
