@@ -42,3 +42,9 @@ This recovery does not pass or protect the Production Sales Card and does not st
 The recovered information model remains unchanged, but its default presentation is now a compact cream approval surface. The first screen shows the exact identity summary, unit price, quantity, total, payment, stock before/after, status, quantity/payment shortcuts, and Confirm/Read/Correct/Cancel. Stock/detail and traceability facts remain one tap away as dense read-only lists.
 
 Full inputs appear only after explicit **Correct**. Every editable Sale field then renders the same contextual field-heading/Mic pattern proven by Catalog Medicine Action Cards and delegates to the same `startVoiceCapture()` boundary. No second microphone service exists. Future work must not restore the long all-input default card.
+
+## Shared viewport ownership — 2026-07-30
+
+Owner evidence proved that quantity, payment, speech controls and correction rerenders were incorrectly entering the normal new-message `scrollChatToBottom()` branch. Inline interaction now captures the active card and its scroll-container coordinates before mutation. The shared render boundary restores that anchor without focusing the composer or reopening the keyboard. Catalog contextual voice retains its more precise field anchor; Sale and every other active card reuse the same anchor service. Only an actual appended feed/card or deliberate focus navigation releases inline ownership.
+
+Sale correction microphones continue to use the shared contextual editable-field component and `startVoiceCapture()`, but receive a compact 44-pixel tap target and quiet cream styling. Computed total and stock-after remain read-only. Status remains awaiting owner live validation; this fix is not protected yet.

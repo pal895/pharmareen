@@ -32,6 +32,11 @@ assert.match(
   /if \(action === "start-voice"\) startVoiceCapture\(\);/,
   "the normal composer Mic remains on the shared capture path outside contextual sessions"
 );
+assert.match(appSource, /preserveInlineCardViewport\(actionElement\)/, "every card action captures the shared viewport anchor before mutation");
+assert.match(appSource, /else if \(activeCardViewportAnchor\)[\s\S]*settleVoiceViewportAnchor[\s\S]*else \{\s*scrollChatToBottom\(\);/, "inline card rerenders restore the card instead of scrolling to chat bottom");
+assert.match(appSource, /function addFeed[\s\S]*activeCardViewportAnchor = null/, "a genuine new message releases inline viewport ownership");
+assert.match(appSource, /input\.addEventListener\("focus", \(\) => preserveInlineCardViewport\(input\)\)/, "manual field editing also owns the shared viewport");
+assert.match(cssSource, /\.sale-edit-field \.catalog-edit-field-heading button[\s\S]*width: 44px/, "Sale correction uses a compact but safe inline Mic target");
 
 const oldContainer = {
   id: "chatBody",
@@ -64,6 +69,15 @@ const anchor = createVoiceViewportAnchor({ querySelector: (query) => query === s
 assert.equal(anchor.field, "aliases", "the exact active voice field is retained");
 assert.equal(anchor.scrollPositions[0].top, 640, "the nearest scroll container is captured");
 assert.equal(anchor.top, 180, "the field viewport position is captured");
+
+const cardSelector = '.card-message[data-card-id="sale-1"]';
+const cardTarget = { parentElement: oldContainer, getBoundingClientRect: () => ({ top: 92 }) };
+const cardAnchor = createVoiceViewportAnchor({ querySelector: (query) => query === cardSelector ? cardTarget : null }, {
+  cardId: "sale-1",
+  selector: cardSelector
+}, view);
+assert.equal(cardAnchor.top, 92, "the same anchor service supports whole-card inline interactions");
+assert.equal(cardAnchor.scrollPositions[0].top, 640, "whole-card actions preserve the chat scroll container");
 
 let focused = false;
 let caret = null;

@@ -5,8 +5,8 @@ function scrollable(element, view) {
   return /(auto|scroll|overlay)/.test(overflow);
 }
 
-export function createVoiceViewportAnchor(root, { cardId, field }, view = window) {
-  const selector = `[data-catalog-edit-field="${CSS.escape(field)}"][data-card-id="${CSS.escape(cardId)}"]`;
+export function createVoiceViewportAnchor(root, { cardId, field = "", selector: suppliedSelector = "" }, view = window) {
+  const selector = suppliedSelector || `[data-catalog-edit-field="${CSS.escape(field)}"][data-card-id="${CSS.escape(cardId)}"]`;
   const target = root?.querySelector?.(selector);
   if (!target) return null;
   const scrollPositions = [];

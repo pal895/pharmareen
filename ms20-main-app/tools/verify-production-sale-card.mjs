@@ -95,6 +95,8 @@ assert.match(app, /sale-approval-grid/, "The default approval view must remain c
 assert.match(app, /card\.ui\?\.editing/, "Full editable fields must stay behind the explicit correction state.");
 assert.match(app, /sale-edit-field-voice/, "Every editable Sale field must expose the shared contextual Mic pattern.");
 assert.match(app, /startSaleEditFieldVoice[\s\S]*?startVoiceCapture/, "Sale field microphones must delegate to the shared capture root.");
+assert.match(app, /contextualEditableFieldTemplate/, "Catalog and Sale correction fields must share one inline field component.");
+assert.doesNotMatch(app, /sale-edit-field-voice[\s\S]{0,300}scrollChatToBottom/, "Sale field voice must never own a scroll-to-bottom path.");
 assert.match(app, /refreshProductionSaleCardControls\(card\)/);
 assert.match(app, /function rejectCard[\s\S]*?removeCard\(cardId\)/, "Cancel must remove only the unsaved draft.");
 assert.match(app, /function confirmCard[\s\S]*?recordCard\(card\)/, "Only Confirm may reach sale recording.");

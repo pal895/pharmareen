@@ -1745,6 +1745,7 @@ pre {
 .sale-edit-guidance { margin: 0; padding: 0.55rem 0.7rem; border-radius: 0.7rem; background: #edf7f4; color: #246f5d; }
 .production-sale-edit-grid .sale-edit-field:first-child { grid-column: 1 / -1; }
 .sale-edit-field input, .sale-edit-field select { width: 100%; min-height: 44px; padding: 0.62rem 0.7rem; border: 1px solid #b8d3cd; border-radius: 0.75rem; background: #fff; color: #19332f; font: inherit; }
+.sale-edit-field .catalog-edit-field-heading button { width: 44px; min-width: 44px; min-height: 36px; padding: 0; border-color: #9bbeb7; border-radius: 999px; background: #fffdf5; color: #285f56; font-size: 0.7rem; }
 @media (max-width: 520px) {
   .production-sale-primary, .sale-consequence-grid { grid-template-columns: 1fr; }
   .production-sale-primary label:first-child { grid-column: auto; }

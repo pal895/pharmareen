@@ -8,6 +8,8 @@ Its permanent presentation is compact and progressive: the default cream Fast ac
 
 Implementation handoffs stay short: what changed, commit hash, one combined Replit command, one focused owner live test, expected result, then wait for screenshots. Detailed engineering history belongs in repository documentation.
 
+Inline editable/review-card updates must preserve the active card viewport. They never invoke chat-bottom auto-scroll or focus the composer; genuine appended conversation messages retain normal auto-scroll. This is one shared render/anchor rule, not a Sales- or Catalog-only patch.
+
 The first view prioritizes canonical medicine, exact form, exact selling unit, quantity, unit-specific selling price, expected total and payment. It visibly preserves stock before/after and sale status. Ambiguous form/unit choices remain explicit; missing prices/conversions display as Unknown and block confirmation; unit/form/strength mismatches and insufficient stock are unsafe and block confirmation. Secondary traceability stays secondary. No typed sale may bypass review.
 
 Owner live validation of this upgrade is pending. The launch-focused sequence is paused; MS2-LT-049 is identified but not started.

@@ -205,6 +205,7 @@ refreshNotifications();
 
 const root = document.querySelector("#app");
 let activeVoiceViewportAnchor = null;
+let activeCardViewportAnchor = null;
 
 function render() {
   state.sync.online = navigator.onLine;
@@ -240,6 +241,8 @@ function render() {
       window,
       { restoreFocus: !state.voice.starting && !state.voice.listening }
     );
+  } else if (activeCardViewportAnchor) {
+    settleVoiceViewportAnchor(root, activeCardViewportAnchor, window, { restoreFocus: false });
   } else {
     scrollChatToBottom();
   }
@@ -1181,6 +1184,7 @@ function bindEvents() {
   });
 
   root.querySelectorAll("[data-field]").forEach((input) => {
+    input.addEventListener("focus", () => preserveInlineCardViewport(input));
     input.addEventListener("input", () => updateCardField(input.dataset.cardId, input.dataset.field, input.value));
   });
 
@@ -1229,8 +1233,18 @@ function bindActionElements(scope) {
   scope.onclick = (event) => {
     const actionElement = event.target.closest?.("[data-action]");
     if (!actionElement || !scope.contains(actionElement)) return;
+    preserveInlineCardViewport(actionElement);
     handleAction(actionElement.dataset);
   };
+}
+
+function preserveInlineCardViewport(element) {
+  const card = element?.closest?.(".card-message[data-card-id]");
+  if (!card) return;
+  activeCardViewportAnchor = createVoiceViewportAnchor(root, {
+    cardId: card.dataset.cardId,
+    selector: `.card-message[data-card-id="${CSS.escape(card.dataset.cardId)}"]`
+  });
 }
 
 function handleAction(dataset) {
@@ -3028,6 +3042,7 @@ function cycleStockFixReview(cardId) {
 }
 
 function addCard(card) {
+  activeCardViewportAnchor = null;
   if (card.type === "CatalogImportCard") removeCardsByType(["CatalogOnboardingCard"]);
   state.cards.unshift(card);
   cloudGateway.saveCardHistory(card);
@@ -3038,12 +3053,14 @@ function addCard(card) {
 }
 
 function focusCard(cardId) {
+  activeCardViewportAnchor = null;
   const card = Array.from(root.querySelectorAll("[data-card-id]"))
     .find((element) => element.dataset.cardId === String(cardId));
   card?.scrollIntoView({ block: "start", behavior: "smooth" });
 }
 
 function addFeed(type, text) {
+  activeCardViewportAnchor = null;
   state.feed.push({ id: `feed-${Date.now()}`, type, text, time: nowLabel() });
   state.feed = state.feed.slice(-FEED_RESUME_LIMIT);
   persistFeed();
