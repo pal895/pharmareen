@@ -1,7 +1,7 @@
 # Production Sales Card Standard and Recovery Audit
 
-Authority date: 2026-07-29
-Owner state: **IMPLEMENTED — AWAITING OWNER LIVE TEST; NOT APPROVED; NOT PROTECTED**
+Authority date: 2026-07-30
+Owner state: **PASS / PROTECTED — OWNER APPROVED 2026-07-30**
 
 This is the reconciled engineering standard for the one shared MS2.0 Production Sales Card. It draws from `README.md`, `current-live-validation-state.md` (especially the approved improvement at line 468), `launch-readiness-roadmap.md`, `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md` MS2-LT-049, `ms20-main-app/LIVE_APP_TEST_PLAN.md` lines 817–823, `CURRENT_ARCHITECTURE_SNAPSHOT.md`, `SALE_LIVE_TEST_FIXTURE_STANDARD.md`, and protected editable-card/voice-viewport evidence.
 
@@ -19,7 +19,7 @@ This is the reconciled engineering standard for the one shared MS2.0 Production 
 | Traceability holds supplier, barcode, batch, expiry, aliases and notes; absent optional values do not block | LATP 819; owner recovery instruction | Implemented | shared renderer; readiness policy |
 | Ambiguous forms/units use an explicit choice; missing unit/price/conversion stays Unknown and blocks | LATP 819; architecture snapshot; fixture standard | Implemented at shared card boundary | `saleOptions`; `productionSaleIssues` |
 | Unit/price/form/strength mismatch and insufficient stock are blocked with an exact explanation | LATP 819; Engineering Memory line 468 | Implemented | `productionSaleIssues` |
-| Unit-specific price and conversion control total and stock consequence | LATP 819–823; MS2-LT-049 specification | Implemented in canonical model; owner validation pending | `unitPrices`; `unitConversions` |
+| Unit-specific price and conversion control total and stock consequence | LATP 819–823; MS2-LT-049 specification | Implemented and owner-approved in the protected Sales Card prerequisite | `unitPrices`; `unitConversions` |
 | Corrections retain identity and viewport and immediately refresh total/readiness without rerendering the card | Protected editable-card viewport rule; Stock Fix control-drift lesson | Implemented | `refreshProductionSaleCardControls` |
 | Read exposes the shared local segmented Read/Pause/Resume/Stop lifecycle | Protected generic editable-card narration | Reused; no new reader variant | `speechControlsTemplate` |
 | Cancel causes no sale, stock, payment, sync or downstream reward action | Review-first/confirmation and TCE rules | Implemented and source-regression protected | `rejectCard`; `recordCard` only after Confirm |
@@ -33,9 +33,11 @@ Owner evidence showed `paracetamol cash` becoming Medicine `paracetamol cash` wi
 
 The first recovery implementation also flattened the card. The authoritative design requires three sections, so the one shared renderer now owns Fast action, Stock & details and Traceability. A valid ordinary sale is confirmable entirely from Fast action; optional traceability never blocks it.
 
-## Hold
+## Owner approval and permanent lock
 
-This recovery does not pass or protect the Production Sales Card and does not start MS2-LT-049. Only complete owner evidence can approve the card. Until then, the launch sequence remains paused.
+The 2026-07-30 owner evidence passes and protects the Production Sales Card recovery checkpoint exactly as rendered and behaved. The compact cream surface, Fast action / Stock & details / Traceability tabs, concise summary, quantity/payment controls, Confirm/Read/Correct/Cancel actions, full correction mode, every inline microphone, manual fallback, viewport/conversation-position stability, catalog context, safe Unknown state, natural missing-conversion question and deterministic stock conversion are one indivisible regression contract.
+
+Future work must not redesign, further simplify, split, duplicate or reinterpret this card. It must not remove fields, tabs, microphones, traceability, correction capability or safety blocking. Typed, voice, review, queue, verification, failure recovery, notifications and future fixtures continue through this shared implementation. This approval closes only the Sales Card recovery hold; it does not pass MS2-LT-049. The authoritative sequence now resumes with that single pending checkpoint.
 
 ## Compact production presentation
 
@@ -47,13 +49,13 @@ Full inputs appear only after explicit **Correct**. Every editable Sale field th
 
 Owner evidence proved that quantity, payment, speech controls and correction rerenders were incorrectly entering the normal new-message `scrollChatToBottom()` branch. Inline interaction now captures the active card and its scroll-container coordinates before mutation. The shared render boundary restores that anchor without focusing the composer or reopening the keyboard. Catalog contextual voice retains its more precise field anchor; Sale and every other active card reuse the same anchor service. Only an actual appended feed/card or deliberate focus navigation releases inline ownership.
 
-Sale correction microphones continue to use the shared contextual editable-field component and `startVoiceCapture()`, but receive a compact 44-pixel tap target and quiet cream styling. Computed total and stock-after remain read-only. Status remains awaiting owner live validation; this fix is not protected yet.
+Sale correction microphones continue to use the shared contextual editable-field component and `startVoiceCapture()`, but receive a compact 44-pixel tap target and quiet cream styling. Computed total and stock-after remain read-only. Owner evidence protects this viewport behavior.
 
 ## Remaining-root implementation — 2026-07-30
 
 Sales contextual voice now takes in-place render ownership for the exact selected input throughout permission, startup, listening, interim/final result, error and retry. It updates field/status controls without replacing the carousel DOM, scheduling focus, or changing `activeSlide`. A removed card whose visual anchor no longer exists deliberately returns the chat to the recent working end instead of leaving a rebuilt chat at scroll position zero.
 
-Typed and voice sales now parse a requested selling unit independently from medicine and quantity. The shared Sale model consumes authoritative `baseStockUnit`, `unitConversions` and `unitPrices`; unknown conversion or price blocks confirmation and exposes only the required correction fields. See `medicine-pack-hierarchy-standard.md`. The checkpoint remains open pending owner screenshots.
+Typed and voice sales now parse a requested selling unit independently from medicine and quantity. The shared Sale model consumes authoritative `baseStockUnit`, `unitConversions` and `unitPrices`; unknown conversion or price blocks confirmation and exposes only the required correction fields. See `medicine-pack-hierarchy-standard.md`. Owner evidence protects this behavior.
 
 ## Shared voice-field and parsed-fact routing — 2026-07-30
 

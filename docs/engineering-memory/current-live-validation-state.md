@@ -572,17 +572,6 @@ Owner screenshots reject the first implementation: `paracetamol cash` became one
 The root parser now removes terminal Cash/M-Pesa/Credit/Mixed before medicine matching, defaults an explicit-payment sale to quantity 1, supports spaced and compact quantities, and sends typed and voice equivalents through the same catalog-first match. The canonical card hydrates known stock, strength, form, unit, unit-specific selling price, calculated total, stock consequence, buying price and traceability. Its single renderer now owns Fast action, Stock & details and Traceability; a valid sale confirms from Fast action while optional trace fields remain non-blocking. Correction recalculates derived facts and readiness without rerendering or losing focus.
 
 This is implementation evidence only. Production Sales Card remains **NOT OWNER-APPROVED / NOT PROTECTED**. MS2-LT-049 remains not started.
-
-<!-- VALIDATION_CONTRACT_SYNC_START -->
-## Generated validation-contract reference
-
-- Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
-- Checkpoints: 84
-- Current: MS2-LT-049 — Exact form/unit/pack/price truth
-- Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
-- Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
-- Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.
-<!-- VALIDATION_CONTRACT_SYNC_END -->
 # Production Sales Card simplification hold — 2026-07-29
 
 The recovered Production Sales Card information and parser are implemented, but owner evidence rejected the long all-input presentation before completing the live test. The shared renderer now uses a compact cream approval view with details on demand and correction-only editable fields. Contextual field microphones reuse the Catalog pattern and shared capture root. Status remains **AWAITING OWNER LIVE TEST / NOT PROTECTED**; do not advance to MS2-LT-049 or any later checkpoint.
@@ -594,3 +583,20 @@ Later screenshots confirm ordinary quantity/payment/tab stability but expose thr
 The latest owner evidence confirms viewport stability, close-position recovery, compact presentation and pack-validation safety. Two shared routing defects were corrected without redesign: Slide 3 now refreshes through the same registered editable-field voice path as Slides 1–2, and the voice adapter no longer discards the parser's requested selling unit. Status remains **AWAITING OWNER SCREENSHOTS / NOT PROTECTED**; do not advance.
 
 The next evidence set passes Slide 3 voice updates, packet/strip preservation, multi-quantity/payment parsing, safe missing conversion/price blocking, and ordinary tablet calculation. The sole remaining friction was singular `box`: an irregular-plural grammar error absorbed “1 box” into medicine identity and opened an empty new-medicine card. The shared parser now recognizes box/boxes and pharmacy-configured units before catalog resolution; the matched medicine context remains attached and only missing box conversion/price stay unresolved. Await the single Paracetamol-box owner test. MS2-LT-049 remains paused.
+
+## Production Sales Card owner approval — 2026-07-30
+
+The final owner screenshot package passes and protects the Production Sales Card recovery checkpoint exactly as implemented. It proves the compact cream three-tab card; stable quantity, payment, tab, typing and voice interaction; Slide 3 voice editing; full Correct/manual editing; close/cancel conversation-position recovery; separate medicine/quantity/requested-unit/payment parsing; packet/strip/box preservation; safe Unknown blocking; retained Paracetamol catalog and traceability context; natural “How many tablets are in one box?” clarification; microphone entry of conversion 12 and price KES 100; correct KES 100 recalculation; no duplicate medicine; and unchanged configured-tablet calculations.
+
+This is PASS / PROTECTED and ends the temporary Sales Card hold. The exact current implementation is the permanent regression contract; do not redesign, split or weaken it. The dependency-aware sequence resumes at the already-selected **MS2-LT-049 — Exact form/unit/pack/price truth**. That checkpoint remains not started until the next focused owner test.
+
+<!-- VALIDATION_CONTRACT_SYNC_START -->
+## Generated validation-contract reference
+
+- Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
+- Checkpoints: 84
+- Current: MS2-LT-049 — Exact form/unit/pack/price truth
+- Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
+- Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
+- Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.
+<!-- VALIDATION_CONTRACT_SYNC_END -->

@@ -14,9 +14,9 @@ Pack-level sales use pharmacy-owned per-medicine `baseStockUnit`, `unitConversio
 
 The first view prioritizes canonical medicine, exact form, exact selling unit, quantity, unit-specific selling price, expected total and payment. It visibly preserves stock before/after and sale status. Ambiguous form/unit choices remain explicit; missing prices/conversions display as Unknown and block confirmation; unit/form/strength mismatches and insufficient stock are unsafe and block confirmation. Secondary traceability stays secondary. No typed sale may bypass review.
 
-Owner live validation of this upgrade is pending. The launch-focused sequence is paused; MS2-LT-049 is identified but not started.
+Owner live validation passed on 2026-07-30. The compact cream layout, three-tab structure, contextual microphones, manual correction, stable viewport, catalog-context preservation and deterministic pack conversion are owner-approved and protected as one permanent regression contract. No redesign, alternate SaleCard or weakened safety path is permitted without new explicit owner direction and matching regression evidence. The paused sequence resumes at the already-selected MS2-LT-049; that checkpoint itself is not yet started or passed.
 
-Owner evidence then rejected the first recovery because `paracetamol cash` was routed to medicine learning as one medicine string. The deterministic parser and canonical hydration roots are repaired, and the one shared card now implements the approved Fast action / Stock & details / Traceability structure. The recovery audit is recorded in `docs/engineering-memory/production-sales-card-standard.md`. It remains awaiting owner live test and is not approved or protected.
+Earlier rejected recovery evidence remains part of the audit trail: `paracetamol cash` once routed to medicine learning as one medicine string. The repaired deterministic parser, canonical hydration and single Fast action / Stock & details / Traceability renderer are recorded in `docs/engineering-memory/production-sales-card-standard.md`.
 
 ## Canonical live-validation authority
 

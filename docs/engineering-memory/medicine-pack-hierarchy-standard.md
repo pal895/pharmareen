@@ -1,7 +1,7 @@
 # Authoritative Medicine Pack Hierarchy
 
 Authority date: 2026-07-30  
-State: implemented; awaiting Production Sales Card owner validation
+State: PASS / PROTECTED in the owner-approved Production Sales Card prerequisite
 
 Each catalog medicine may define:
 
@@ -32,3 +32,7 @@ Transaction metadata records the spoken selling unit, selling quantity, base sto
 - ORS: sachet base; requested carton relationship missing.
 
 These are behavior fixtures, not universal medicine assumptions.
+
+## Owner-approved regression contract
+
+Owner evidence on 2026-07-30 protects separate medicine, quantity, requested-unit and payment parsing; tablet, packet, strip, box and configured-unit preservation; existing catalog-context retention for an unconfigured unit; natural missing-conversion wording; microphone/manual fact entry; confirmation blocking while unsafe; and recalculation from approved conversion and exact selling-unit price. The proved box case kept Paracetamol attached, asked “How many tablets are in one box?”, accepted 12 and KES 100, and recalculated one box to KES 100 without creating a duplicate. No future consumer may guess, substitute a base unit, or bypass deterministic base-stock conversion.

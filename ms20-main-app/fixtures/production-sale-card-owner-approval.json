@@ -1,0 +1,20 @@
+{
+  "contract": "ms20.production-sale-card.owner-approved.v1",
+  "approvedOn": "2026-07-30",
+  "status": "PASS / PROTECTED",
+  "layout": ["compact cream", "Fast action", "Stock & details", "Traceability"],
+  "editing": ["Correct", "manual typing", "inline microphones on all slides"],
+  "stability": ["inline viewport", "selected slide", "recent conversation position"],
+  "saleTruth": ["medicine", "quantity", "requested selling unit", "payment", "unit price", "total", "base-stock deduction"],
+  "safety": ["unknown conversion blocks", "unknown price blocks", "catalog context preserved", "no duplicate medicine", "no guessed conversion or price"],
+  "approvedBoxEvidence": {
+    "medicine": "Paracetamol",
+    "baseUnit": "tablet",
+    "sellingUnit": "box",
+    "baseUnitsPerSellingUnit": 12,
+    "unitPriceKes": 100,
+    "quantity": 1,
+    "expectedTotalKes": 100,
+    "clarification": "How many tablets are in one box?"
+  }
+}

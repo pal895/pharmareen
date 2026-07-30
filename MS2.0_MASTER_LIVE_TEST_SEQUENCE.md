@@ -207,7 +207,7 @@ This ledger deliberately accounts for owner-facing domains discovered across cur
 
 ## Current execution pointer
 
-The only current open checkpoint is **#49 Exact form/unit/pack/price truth**. It is selected by the dependency-aware Launch Critical queue in `docs/engineering-memory/launch-readiness-roadmap.md`, not by the former ascending sequence. Checkpoints #14–#21 and all other protected checkpoints must not be repeated without regression evidence. After one focused owner test, stop and wait for evidence. The former automatic linear progression is historical and must never resume.
+The only current open checkpoint is **#49 Exact form/unit/pack/price truth**. The prerequisite Production Sales Card recovery/simplification hold passed owner validation on 2026-07-30 and its exact compact three-tab, voice/manual, viewport-stable, catalog-preserving and safe pack-conversion behavior is now protected. This does not pass #49. It is selected by the dependency-aware Launch Critical queue in `docs/engineering-memory/launch-readiness-roadmap.md`, not by the former ascending sequence. Checkpoints #14–#21 and the protected Sales Card prerequisite must not be repeated without regression evidence. After one focused owner test, stop and wait for evidence. The former automatic linear progression is historical and must never resume.
 
 ## Canonical synchronization invariants
 
@@ -1512,10 +1512,3 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **Dependent checkpoints:** MS2-LT-078, MS2-LT-083
 
 <!-- TRACEABILITY_INDEX_END -->
-# Owner hold — compact Production Sales Card
-
-The live-test sequence remains paused before MS2-LT-049. Resume only after the owner validates the compact shared Production Sales Card, its on-demand detail sections, correction flow, and inline shared field microphones with screenshots.
-
-The 2026-07-30 compact-card evidence accepts the visual direction but exposes repeated viewport loss after inline actions. Retest one continuous Septrin card across quantity, payment, tabs, Read/Resume/Stop, Correct, two field microphones and one manual edit without confirming. Pass only if the card never leaves its working viewport and the composer never steals focus.
-
-Newer evidence passes ordinary inline updates but leaves voice-session stability, close-position restoration and pack-unit intelligence open. The single retest must cover microphones on all three slides, close back to the recent conversation position, and `Paracetamol one packet cash` with either authoritative calculation or a safe missing conversion/price prompt. Do not start MS2-LT-049.

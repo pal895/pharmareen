@@ -138,6 +138,13 @@ assert.equal(transactionFields.form, "suspension");
 
 const app = fs.readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
 const packFixtures = JSON.parse(fs.readFileSync(new URL("../fixtures/sale-pack-hierarchy.json", import.meta.url), "utf8"));
+const ownerApproval = JSON.parse(fs.readFileSync(new URL("../fixtures/production-sale-card-owner-approval.json", import.meta.url), "utf8"));
+assert.equal(ownerApproval.status, "PASS / PROTECTED");
+assert.deepEqual(ownerApproval.layout, ["compact cream", "Fast action", "Stock & details", "Traceability"]);
+assert.equal(ownerApproval.approvedBoxEvidence.baseUnitsPerSellingUnit, 12);
+assert.equal(ownerApproval.approvedBoxEvidence.unitPriceKes, 100);
+assert.equal(ownerApproval.approvedBoxEvidence.expectedTotalKes, 100);
+assert.match(ownerApproval.approvedBoxEvidence.clarification, /How many tablets are in one box\?/);
 assert.equal(packFixtures.medicines.length, 3);
 assert.equal(packFixtures.medicines[0].unitConversions.packet, 20);
 assert.equal(packFixtures.unknownUnitScenarios.length, 3);
