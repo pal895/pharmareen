@@ -50,7 +50,7 @@ export function prepareProductionSaleCard(card = {}, catalogMatch = {}) {
   card.saleIssues = productionSaleIssues(card, catalogMatch);
   card.status = card.saleIssues.length ? "needs_correction" : "ready";
   card.validation = card.saleIssues.length
-    ? issueMessage(card.saleIssues)
+    ? issueMessage(card.saleIssues, card.fields)
     : "Check the exact medicine, form, selling unit, quantity, unit price, total, payment and stock consequence. Nothing changes until Confirm.";
   return card;
 }
@@ -96,12 +96,14 @@ export function saleFieldsFromTransaction(transaction = {}) {
   };
 }
 
-function issueMessage(issues) {
+function issueMessage(issues, fields = {}) {
+  const requestedUnit = String(fields.unit || "requested pack").trim();
+  const baseUnit = pluralizeUnit(fields.base_stock_unit || "stock unit");
   const labels = {
     medicine_not_uniquely_matched: "choose one exact catalog medicine", form_unknown: "form is Unknown",
     selling_unit_unknown: "selling unit is Unknown", quantity_invalid: "enter a positive quantity",
     unit_price_unknown: "exact selling-unit price is Unknown", payment_unknown: "choose payment",
-    pack_conversion_unknown: `enter how many base stock units are in one ${fieldsSafeUnit(issues)}`,
+    pack_conversion_unknown: `enter how many ${baseUnit} are in one ${requestedUnit}`,
     insufficient_stock: "quantity exceeds available stock", form_mismatch: "form does not match the catalog medicine",
     selling_unit_mismatch: "selling unit does not match the catalog medicine",
     strength_mismatch: "strength does not match the catalog medicine"
@@ -109,7 +111,13 @@ function issueMessage(issues) {
   return `${issues.map((issue) => labels[issue] || issue).join("; ")}. Confirm remains blocked until the sale is safe.`;
 }
 
-function fieldsSafeUnit() { return "requested pack"; }
+function pluralizeUnit(value) {
+  const unit = String(value || "").trim();
+  if (!unit) return "stock units";
+  if (/(s|x|z|ch|sh)$/i.test(unit)) return `${unit}es`;
+  if (/[^aeiou]y$/i.test(unit)) return `${unit.slice(0, -1)}ies`;
+  return `${unit}s`;
+}
 const COMMON_PACK_UNITS = new Set(["tablet", "capsule", "sachet", "ampoule", "vial", "bottle", "tube", "strip", "blister", "packet", "pack", "box", "carton", "dose", "piece"]);
 
 function normalizePayment(value) { return String(value || "").trim().toLowerCase().replace("-", ""); }

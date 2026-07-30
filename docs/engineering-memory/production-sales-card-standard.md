@@ -58,3 +58,7 @@ Typed and voice sales now parse a requested selling unit independently from medi
 ## Shared voice-field and parsed-fact routing — 2026-07-30
 
 All correction microphones, including Supplier, Barcode, Batch, Expiry, Aliases and Notes on Slide 3, are registered in one Production Sale editable-field registry. That same registry drives in-place input refresh, so recognition results update the selected field without remounting the card or moving the viewport. The voice-to-Sale adapter preserves the complete deterministic parse object; medicine, quantity, explicitly requested selling unit and payment therefore survive into conversion validation. A requested packet is never replaced by the catalog base unit, and missing authoritative conversion remains a blocking compact correction.
+
+## Existing medicine with an unconfigured selling unit
+
+An unconfigured selling unit never invalidates a successful catalog medicine match. The shared deterministic parser keeps medicine, quantity, requested unit and payment separate, including irregular singular/plural forms such as box/boxes and units configured by the pharmacy. The Production Sales Card retains all catalog facts and marks only conversion and exact unit price unresolved. Owner copy names the real units—for example, “How many tablets are in one box?”—and confirmation stays blocked until both facts are supplied. Approved facts attach to the existing pharmacy-isolated medicine record; incomplete or cancelled drafts persist nothing.

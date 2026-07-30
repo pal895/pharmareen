@@ -19,7 +19,9 @@ The deterministic sale parser separates medicine identity, quantity, normalized 
 
 `expected total = selling quantity × authoritative unit price`
 
-If conversion is missing, Confirm is blocked and Correct asks for base units in the requested pack. If price is missing, Confirm is blocked and Correct asks for the exact selling-unit price. The base-unit price is never substituted for a larger pack. An approved confirmation persists both facts to that medicine for later offline deterministic use.
+If conversion is missing, Confirm is blocked and Correct asks in natural pharmacy wording using the actual units, such as “How many tablets are in one box?” If price is missing, Confirm is blocked and Correct asks for the exact selling-unit price. The base-unit price is never substituted for a larger pack. A successful catalog medicine match remains attached even when the requested selling unit is not configured; known stock, identity, clinical description, buying price and traceability are never blanked. An approved confirmation persists both facts to that existing medicine for later offline deterministic use; an incomplete or cancelled draft persists nothing.
+
+The local parser recognizes common pharmacy units and all pharmacy-configured unit keys. Irregular singular/plural forms are explicit (`box`/`boxes`), so the unit cannot be absorbed into medicine identity. This rule is shared by typed and voice command adapters.
 
 Transaction metadata records the spoken selling unit, selling quantity, base stock unit, pack conversion and base-stock deduction. Stock mutation uses the base-stock deduction so queued/replayed transactions and future undo/report/export consumers retain auditable pack truth.
 

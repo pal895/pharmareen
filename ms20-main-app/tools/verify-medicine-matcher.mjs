@@ -8,7 +8,7 @@ const catalog = [
   { id: "zinc", name: "Zinc", aliases: ["Zinc syrup"], forms: ["syrup"], units: ["bottle"], sellingPrice: 70 },
   { id: "cefixime-200", name: "Cefixime", strength: "200 mg", aliases: ["Fixime"], forms: ["tablet"] },
   { id: "cefixime-400", name: "Cefixime", strength: "400 mg", aliases: ["Fixime Forte"], forms: ["tablet"] },
-  { id: "panadol", name: "Paracetamol", brandNames: ["Panadol"], aliases: ["PCM"], forms: ["tablet"] },
+  { id: "panadol", name: "Paracetamol", brandNames: ["Panadol"], aliases: ["PCM"], forms: ["tablet"], units: ["tablet"], baseStockUnit: "tablet", stockLeft: 100, sellingPrice: 10, costPrice: 5, supplier: "EastCare Pharma", batch: "PAR-500C", expiry: "2029-06" },
   { id: "amoxicillin", name: "Amoxicillin", aliases: ["Amox"], forms: ["capsule"] },
   { id: "artemether", name: "Artemether Lumefantrine", aliases: ["AL"], forms: ["tablet"] }
 ];
@@ -43,6 +43,17 @@ assert(genericRestock.medicineMatch.status === "insufficient_identity" && generi
 assert(parseLocalCommand("zinc sirup 2 cash", catalog).medicineMatch.matches[0].id === "zinc", "Sales lookup must use shared matcher");
 const spokenNumberSale = parseLocalCommand("zinc syrup one cash", catalog);
 assert(spokenNumberSale.fields.quantity === 1 && spokenNumberSale.fields.payment === "cash", "Spoken number words must become editable sale quantities");
+for (const [command, quantity, unit, payment] of [
+  ["Paracetamol one box cash", 1, "box", "cash"],
+  ["Paracetamol two boxes M-Pesa", 2, "box", "mpesa"],
+  ["Paracetamol one strip cash", 1, "strip", "cash"],
+  ["Paracetamol 2 packets cash", 2, "packet", "cash"]
+]) {
+  const parsed = parseLocalCommand(command, catalog);
+  assert(parsed.cardType === "SaleCard", `${command} must stay on the matched Production Sales Card`);
+  assert(parsed.fields.medicine === "Paracetamol", `${command} must preserve catalog medicine identity`);
+  assert(parsed.fields.quantity === quantity && parsed.fields.unit === unit && parsed.fields.payment === payment, `${command} must keep quantity, requested unit and payment separate`);
+}
 const spokenNumberRestock = parseLocalCommand("restock zinc syrup twelve", catalog);
 assert(spokenNumberRestock.fields.quantity === "12", "Spoken number words must become editable restock quantities");
 const genericSale = parseLocalCommand("syrup 12 cash", catalog);

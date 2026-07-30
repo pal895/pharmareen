@@ -691,7 +691,7 @@ function productionSaleCardBody(fields = {}, eyebrow = "Sale", card = null) {
   const fast = `${correcting ? `<p class="sale-edit-guidance" role="status">${escapeHtml(card.fields?.voice_feedback || "Correct only what is wrong. Every field uses the shared Catalog Mic.")}</p>
     <div class="production-sale-primary production-sale-edit-grid">
       ${editField("medicine", "Medicine")}${editField("form", "Exact form")}${editField("unit", "Selling unit")}
-      ${card.saleIssues?.includes("pack_conversion_unknown") ? editField("pack_conversion", `Base ${fields.base_stock_unit || "stock"} units in one ${fields.unit || "pack"}`, "decimal") : ""}
+      ${card.saleIssues?.includes("pack_conversion_unknown") ? editField("pack_conversion", `How many ${pluralOwnerUnit(fields.base_stock_unit)} are in one ${fields.unit || "pack"}?`, "decimal") : ""}
       ${editField("selling_price", "Unit price (KES)", "decimal")}${editField("quantity", "Quantity", "decimal")}${editField("payment", "Payment")}
     </div>` : `<div class="sale-approval-grid">
       ${fact("selling_price", "Unit price")}${fact("quantity", "Quantity")}${fact("expected_total", "Total")}${fact("payment", "Payment")}
@@ -699,8 +699,8 @@ function productionSaleCardBody(fields = {}, eyebrow = "Sale", card = null) {
     ${editable ? quantityToolbar(card) + paymentToolbar(card) + activeActionsTemplate(card) : ""}`;
   const stock = correcting ? `<div class="production-sale-primary production-sale-edit-grid">
     ${editField("current_stock", "Current stock", "decimal")}${editField("strength", "Strength")}
-    ${editField("form", "Form")}${editField("unit", "Unit")}${editField("cost_price", "Buying price (KES)", "decimal")}
-  </div>` : saleDetailList([["Current stock", fields.current_stock], ["Strength", fields.strength], ["Form", fields.form], ["Unit", fields.unit], ["Buying price", fields.cost_price]]);
+    ${editField("form", "Form")}${editField("unit", "Requested selling unit")}${editField("cost_price", "Buying price (KES)", "decimal")}
+  </div>` : saleDetailList([["Current stock", fields.current_stock], ["Strength", fields.strength], ["Form", fields.form], ["Base unit", fields.base_stock_unit], ["Requested selling unit", fields.unit], ["Buying price", fields.cost_price]]);
   const trace = correcting ? `<div class="production-sale-primary production-sale-edit-grid">
     ${editField("supplier", "Supplier")}${editField("barcode", "Barcode")}${editField("batch", "Batch")}
     ${editField("expiry", "Expiry")}${editField("aliases", "Aliases")}${editField("note", "Note")}
@@ -728,6 +728,13 @@ function notificationCardBodyTemplate(card) {
       ${["category", "message", "status"].map((field) => fieldTemplate(card, field)).join("")}
     </div>
   `;
+}
+
+function pluralOwnerUnit(value) {
+  const unit = String(value || "stock unit").trim();
+  if (/(s|x|z|ch|sh)$/i.test(unit)) return `${unit}es`;
+  if (/[^aeiou]y$/i.test(unit)) return `${unit.slice(0, -1)}ies`;
+  return `${unit}s`;
 }
 
 function saleDetailList(entries) {

@@ -153,7 +153,7 @@ export function parseSaleFacts(input, catalog = []) {
   let saleText = paymentMatch ? command.slice(0, paymentMatch.index).trim() : command;
   if (!saleText) return null;
 
-  const unitMatch = saleText.match(new RegExp(`^(.*?)\\s+(\\d+(?:\\.\\d+)?)\\s+(${SALE_UNIT_PATTERN})$`, "i"));
+  const unitMatch = saleText.match(new RegExp(`^(.*?)\\s+(\\d+(?:\\.\\d+)?)\\s+(${saleUnitPattern(catalog)})$`, "i"));
   if (unitMatch) {
     const medicine = unitMatch[1].trim();
     const medicineMatch = matchMedicineName(medicine, catalog);
@@ -200,7 +200,28 @@ export function parseSaleFacts(input, catalog = []) {
   return null;
 }
 
-const SALE_UNIT_PATTERN = "tablets?|tabs?|capsules?|caps?|strips?|blisters?|packets?|packs?|boxes?|bottles?|sachets?|tubes?|vials?|ampoules?|cartons?|pieces?|doses?";
+const SALE_UNIT_PATTERN = "tablets?|tabs?|capsules?|caps?|strips?|blisters?|packets?|packs?|box(?:es)?|bottles?|sachets?|tubes?|vials?|ampoules?|cartons?|pieces?|doses?";
+
+function saleUnitPattern(catalog = []) {
+  const configured = catalog.flatMap((medicine) => [
+    ...(Array.isArray(medicine?.units) ? medicine.units : [medicine?.unit]),
+    ...Object.keys(medicine?.unitConversions || medicine?.stockUnitsPerSaleUnit || {}),
+    ...Object.keys(medicine?.unitPrices || medicine?.pricesByUnit || {})
+  ]).map((unit) => String(unit || "").trim()).filter(Boolean);
+  return [SALE_UNIT_PATTERN, ...new Set(configured.map(configuredUnitPattern))].join("|");
+}
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function configuredUnitPattern(value) {
+  const unit = String(value || "").trim().toLowerCase();
+  const singular = unit.endsWith("s") ? unit.slice(0, -1) : unit;
+  if (/[^aeiou]y$/.test(singular)) return `${escapeRegex(singular)}|${escapeRegex(`${singular.slice(0, -1)}ies`)}`;
+  if (/(s|x|z|ch|sh)$/.test(singular)) return `${escapeRegex(singular)}(?:es)?`;
+  return `${escapeRegex(singular)}s?`;
+}
 
 function normalizeSaleUnit(value) {
   const unit = String(value || "").trim().toLowerCase();

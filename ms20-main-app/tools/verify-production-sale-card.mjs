@@ -98,6 +98,25 @@ const missingPacketFacts = prepareProductionSaleCard({
 }, { status: "matched", matches: [{ name: "Paracetamol", forms: ["tablet"], units: ["tablet"], stockLeft: 100, sellingPrice: 5 }] });
 assert.ok(missingPacketFacts.saleIssues.includes("pack_conversion_unknown"));
 assert.ok(missingPacketFacts.saleIssues.includes("unit_price_unknown"));
+
+const existingMedicineUnknownBox = prepareProductionSaleCard({
+  type: "SaleCard", fields: { medicine: "Paracetamol", quantity: 1, unit: "box", payment: "cash" }
+}, {
+  status: "matched", matches: [{
+    name: "Paracetamol", strength: "500 mg", forms: ["tablet"], units: ["tablet"],
+    baseStockUnit: "tablet", sellingPrice: 10, costPrice: 5, stockLeft: 100,
+    supplier: "EastCare Pharma", batch: "PAR-500C", expiry: "2029-06", aliases: ["PCM"]
+  }]
+});
+assert.equal(existingMedicineUnknownBox.fields.medicine, "Paracetamol");
+assert.equal(existingMedicineUnknownBox.fields.unit, "box");
+assert.equal(existingMedicineUnknownBox.fields.base_stock_unit, "tablet");
+assert.equal(existingMedicineUnknownBox.fields.current_stock, 100);
+assert.equal(existingMedicineUnknownBox.fields.strength, "500 mg");
+assert.equal(existingMedicineUnknownBox.fields.supplier, "EastCare Pharma");
+assert.ok(existingMedicineUnknownBox.saleIssues.includes("pack_conversion_unknown"));
+assert.ok(existingMedicineUnknownBox.saleIssues.includes("unit_price_unknown"));
+assert.match(existingMedicineUnknownBox.validation, /how many tablets are in one box/i);
 assert.equal(missingPacketFacts.fields.stock_after, "");
 
 const unsafe = prepareProductionSaleCard({
@@ -121,6 +140,9 @@ const app = fs.readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
 const packFixtures = JSON.parse(fs.readFileSync(new URL("../fixtures/sale-pack-hierarchy.json", import.meta.url), "utf8"));
 assert.equal(packFixtures.medicines.length, 3);
 assert.equal(packFixtures.medicines[0].unitConversions.packet, 20);
+assert.equal(packFixtures.unknownUnitScenarios.length, 3);
+assert.equal(packFixtures.unknownUnitScenarios[2].medicine, "Paracetamol");
+assert.deepEqual(packFixtures.unknownUnitScenarios[2].missing, ["unitConversion", "unitPrice"]);
 assert.match(app, /productionSaleCardBody\(card\.fields/);
 assert.match(app, /productionSaleCardBody\(saleFieldsFromTransaction\(item\)/);
 assert.match(app, /card\.type = "SaleCard";\s+card\.title = "Check voice result"/);
@@ -140,6 +162,7 @@ for (const field of ["supplier", "barcode", "batch", "expiry", "aliases", "note"
 assert.match(app, /contextualEditableFieldTemplate/, "Catalog and Sale correction fields must share one inline field component.");
 assert.doesNotMatch(app, /sale-edit-field-voice[\s\S]{0,300}scrollChatToBottom/, "Sale field voice must never own a scroll-to-bottom path.");
 assert.match(app, /refreshProductionSaleCardControls\(card\)/);
+assert.match(app, /function saveApprovedSalePackFacts[\s\S]*medicine\.unitConversions[\s\S]*medicine\.unitPrices/, "Approved conversion and price must attach to the existing catalog medicine.");
 assert.match(app, /function rejectCard[\s\S]*?removeCard\(cardId\)/, "Cancel must remove only the unsaved draft.");
 assert.match(app, /function confirmCard[\s\S]*?recordCard\(card\)/, "Only Confirm may reach sale recording.");
 assert.match(app, /recordCard\(card\);[\s\S]*?removeCard\(cardId\)/, "Recording must remain behind the confirmation boundary.");

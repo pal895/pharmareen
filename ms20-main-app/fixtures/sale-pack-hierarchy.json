@@ -1,5 +1,10 @@
 {
   "authority": "owner-approved deterministic test fixtures only",
+  "unknownUnitScenarios": [
+    { "command": "Paracetamol 2 packets cash", "medicine": "Paracetamol", "quantity": 2, "unit": "packet", "payment": "cash", "contextMustRemainAttached": true },
+    { "command": "Paracetamol one strip cash", "medicine": "Paracetamol", "quantity": 1, "unit": "strip", "payment": "cash", "contextMustRemainAttached": true },
+    { "command": "Paracetamol one box cash", "medicine": "Paracetamol", "quantity": 1, "unit": "box", "payment": "cash", "contextMustRemainAttached": true, "missing": ["unitConversion", "unitPrice"] }
+  ],
   "medicines": [
     {
       "name": "Paracetamol",
