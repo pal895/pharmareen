@@ -441,11 +441,17 @@ function feedItemTemplate(item) {
     `;
   }
   if (item.adjustmentReference) {
+    const reference = item.adjustmentReference;
+    const typeLabel = adjustmentTypeLabel(reference.type);
     return `
       <button class="message-bubble system completed-sale-receipt" type="button" data-action="open-sale-adjustment"
-        data-adjustment-id="${escapeHtml(item.adjustmentReference.adjustmentId || "")}"
-        aria-label="Open completed ${escapeHtml(item.adjustmentReference.type || "sale adjustment")}">
-        <p>${escapeHtml(item.text)}</p>
+        data-adjustment-id="${escapeHtml(reference.adjustmentId || "")}"
+        aria-label="Open ${escapeHtml(typeLabel)} for Sale ${escapeHtml(reference.saleNumber || "")}">
+        ${reference.saleNumber ? `<p class="adjustment-receipt-copy"><strong>${escapeHtml(typeLabel)} for Sale ${escapeHtml(reference.saleNumber)}</strong>
+          <small>${escapeHtml(typeLabel)} record #${escapeHtml(reference.recordNumber)}</small>
+          <span>${escapeHtml(reference.medicine)} x${escapeHtml(reference.quantity)}</span>
+          <span>${escapeHtml(adjustmentMoneyResult(reference))}</span>
+          <span>Stock added back: ${escapeHtml(reference.stockAddedBack)}</span></p>` : `<p>${escapeHtml(item.text)}</p>`}
         <span>MS2.0 / ${escapeHtml(item.time)} · Tap to open adjustment</span>
       </button>
     `;
@@ -666,7 +672,7 @@ function completedSaleDetailCardTemplate(card) {
         <button type="button" data-action="start-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-adjustment-type="credit">Credit</button>
       </div>
       ${linked.length ? `<section class="linked-adjustments"><strong>Linked adjustments</strong>${linked.map((item) =>
-        `<button type="button" data-action="open-sale-adjustment" data-adjustment-id="${escapeHtml(item.id)}">${escapeHtml(item.adjustment_type)} ${item.adjustment_number} · KES ${item.financial_adjustment}</button>`
+        `<button type="button" data-action="open-sale-adjustment" data-adjustment-id="${escapeHtml(item.id)}">${escapeHtml(adjustmentTypeLabel(item.adjustment_type))} for Sale ${fields.sale_number}<small>Record #${item.adjustment_number} · KES ${item.financial_adjustment}</small></button>`
       ).join("")}</section>` : ""}
       <div class="card-bottom-close">${cardCloseButtonTemplate(card, "bottom")}</div>
     </article>
@@ -689,8 +695,8 @@ function saleAdjustmentReviewCardTemplate(card) {
         ["Quantity sold", fields.sold_quantity],
         ["Quantity to adjust", fields.adjustment_quantity],
         ["Unit price", fields.unit_price ? `KES ${fields.unit_price}` : ""],
-        ["Financial adjustment", `KES ${fields.financial_adjustment}`],
-        ["Stock to restore", fields.stock_to_restore],
+        [fields.adjustment_type === "credit" ? "Account credit" : "Money back", `KES ${fields.financial_adjustment}`],
+        ["Stock added back", String(fields.stock_to_restore ?? 0)],
         ["Payment impact", fields.payment_impact],
         ["Original sale", fields.original_sale_status]
       ])}
@@ -698,9 +704,9 @@ function saleAdjustmentReviewCardTemplate(card) {
         <button type="button" data-action="bump-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-delta="-1">-1</button>
         <button type="button" data-action="bump-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-delta="1">+1</button>
       </div>
-      ${fields.adjustment_type === "refund" ? `<fieldset class="refund-stock-choice"><legend>Does returned stock come back into inventory?</legend>
-        <button type="button" data-action="set-refund-stock" data-card-id="${escapeHtml(card.id)}" data-restore-stock="false" aria-pressed="${!fields.restore_stock}">Money only</button>
-        <button type="button" data-action="set-refund-stock" data-card-id="${escapeHtml(card.id)}" data-restore-stock="true" aria-pressed="${fields.restore_stock}">Money + returned stock</button>
+      ${fields.adjustment_type === "refund" ? `<fieldset class="refund-stock-choice"><legend>Should this medicine go back into stock?</legend>
+        <button type="button" data-action="set-refund-stock" data-card-id="${escapeHtml(card.id)}" data-restore-stock="false" aria-pressed="${!fields.restore_stock}"><span aria-hidden="true">✓</span> Money only</button>
+        <button type="button" data-action="set-refund-stock" data-card-id="${escapeHtml(card.id)}" data-restore-stock="true" aria-pressed="${fields.restore_stock}"><span aria-hidden="true">✓</span> Money back + medicine back in stock</button>
       </fieldset>` : ""}
       <p class="card-note">${escapeHtml(fields.review_status)}. The original sale has not been deleted or edited.</p>
       <div class="card-actions">
@@ -716,13 +722,13 @@ function saleAdjustmentDetailCardTemplate(card) {
   const typeLabel = String(fields.adjustment_type || "adjustment").replace(/^./, (letter) => letter.toUpperCase());
   return `
     <article class="card-message ready sale-adjustment-review-card" data-card-id="${escapeHtml(card.id)}">
-      <div class="card-top"><span class="card-heading"><span class="card-type">Completed ${escapeHtml(typeLabel)}</span><strong>${escapeHtml(typeLabel)} ${fields.adjustment_number}</strong></span>${cardCloseButtonTemplate(card, "top")}</div>
+      <div class="card-top"><span class="card-heading"><span class="card-type">Completed ${escapeHtml(typeLabel)} · ${escapeHtml(typeLabel)} record #${fields.adjustment_number}</span><strong>${escapeHtml(typeLabel)} for Sale ${fields.original_sale_number}</strong></span>${cardCloseButtonTemplate(card, "top")}</div>
       ${saleDetailList([
         ["Original sale", `Sale ${fields.original_sale_number}`],
         ["Medicine", fields.medicine], ["Unit", fields.unit],
         ["Quantity adjusted", fields.adjustment_quantity],
-        ["Financial adjustment", `KES ${fields.financial_adjustment}`],
-        ["Stock restored", fields.stock_to_restore],
+        [fields.adjustment_type === "credit" ? "Account credit" : "Money back", `KES ${fields.financial_adjustment}`],
+        ["Stock added back", String(fields.stock_to_restore ?? 0)],
         ["Payment impact", fields.payment_impact],
         ["Status", fields.status],
         ["Confirmed", fields.confirmed_at],
@@ -3337,8 +3343,17 @@ function confirmSaleAdjustment(cardId) {
     aiUsed: false
   });
   state.cards = state.cards.filter((item) => item.id !== cardId);
-  addFeed("system", `${String(record.adjustment_type).replace(/^./, (letter) => letter.toUpperCase())} ${record.adjustment_number}\n✅ Sale ${record.original_sale_number} · ${record.medicine} x${record.adjustment_quantity}\nKES ${record.financial_adjustment} adjusted · Stock restored: ${record.stock_to_restore}`, {
-    adjustmentReference: { adjustmentId: record.id, type: record.adjustment_type }
+  addFeed("system", `${adjustmentTypeLabel(record.adjustment_type)} for Sale ${record.original_sale_number}`, {
+    adjustmentReference: {
+      adjustmentId: record.id,
+      type: record.adjustment_type,
+      saleNumber: record.original_sale_number,
+      recordNumber: record.adjustment_number,
+      medicine: record.medicine,
+      quantity: record.adjustment_quantity,
+      financialAdjustment: record.financial_adjustment,
+      stockAddedBack: record.stock_to_restore
+    }
   });
   persistActiveCards();
   render();
@@ -3354,7 +3369,7 @@ function openSaleAdjustment(adjustmentId) {
   state.cards = state.cards.filter((card) => !["CompletedSaleDetailCard", "SaleAdjustmentReviewCard", "SaleAdjustmentDetailCard"].includes(card.type));
   const card = createEditableCard({
     type: "SaleAdjustmentDetailCard",
-    title: `${record.adjustment_type} ${record.adjustment_number}`,
+    title: `${adjustmentTypeLabel(record.adjustment_type)} for Sale ${record.original_sale_number}`,
     source: "Local adjustment ledger",
     fields: record,
     confidence: 1,
@@ -3364,6 +3379,17 @@ function openSaleAdjustment(adjustmentId) {
   persistActiveCards();
   render();
   focusCard(card.id);
+}
+
+function adjustmentTypeLabel(type) {
+  return String(type || "adjustment").replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function adjustmentMoneyResult(reference) {
+  const amount = `KES ${reference.financialAdjustment}`;
+  if (reference.type === "credit") return `${amount} account credit created`;
+  if (reference.type === "refund") return `${amount} refunded`;
+  return `${amount} reversed`;
 }
 
 function updateCardField(cardId, field, value) {

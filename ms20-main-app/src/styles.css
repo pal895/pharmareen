@@ -346,6 +346,55 @@ input:disabled {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.refund-stock-choice {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.refund-stock-choice legend {
+  padding: 0 6px;
+  font-weight: 750;
+}
+
+.refund-stock-choice button {
+  min-height: 52px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.refund-stock-choice button[aria-pressed="true"] {
+  color: #fff;
+  background: var(--accent);
+  border: 2px solid var(--accent);
+  font-weight: 800;
+  box-shadow: 0 0 0 3px rgba(18, 105, 88, 0.16);
+}
+
+.refund-stock-choice button[aria-pressed="false"] > span {
+  visibility: hidden;
+}
+
+.refund-stock-choice button[aria-pressed="true"] > span {
+  visibility: visible;
+}
+
+.adjustment-receipt-copy small,
+.linked-adjustments small {
+  display: block;
+  margin: 3px 0 7px;
+  color: var(--muted);
+  font-size: 0.82em;
+  font-weight: 600;
+}
+
 .message-bubble p {
   margin: 0;
   white-space: pre-line;

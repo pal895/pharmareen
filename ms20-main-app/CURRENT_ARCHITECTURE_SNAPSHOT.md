@@ -333,6 +333,8 @@ MS2.0 uses one Transaction Completion Engine rather than a standalone Payment En
 
 Completed sales and all Refund/Return/Credit outcomes use one deterministic Sale Adjustment engine. Reviews share remaining-quantity enforcement, explicit stock/payment consequences and a single idempotent Confirm boundary. Confirmed adjustments persist locally with permanent original linkage, audit identity/timestamps, proportional base-stock restoration where authorized, and stable offline queue IDs. Refund never assumes stock restoration; Credit never claims a cash/M-Pesa refund. Adjustment receipts and original sales provide reciprocal navigation, and original transactions remain immutable.
 
+The shared adjustment presentation uses everyday pharmacy wording and separates quantity, money, stock and audit identity. Mutually exclusive choices retain an obvious green/checkmarked selected state. Owner titles lead with `Refund/Return/Credit for Sale N`; record sequence appears only as secondary `record #N` audit text across receipts, details and original-sale links.
+
 - Completion modes: Always Fast Record, Always Request & Verify, or Always Ask.
 - Providers are isolated behind Payment Adapters.
 - Simulator-first development is mandatory before official M-PESA/card adapters.

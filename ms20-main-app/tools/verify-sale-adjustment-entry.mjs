@@ -42,5 +42,14 @@ for (const marker of [
   'data-action="confirm-sale-adjustment"', 'data-action="open-sale-adjustment"',
   'data-action="open-adjustment-original"', "syncAdapter.queueAction"
 ]) assert.match(app, new RegExp(marker));
+for (const text of [
+  "Should this medicine go back into stock?", "Money back + medicine back in stock",
+  "Stock added back", "record #", "for Sale"
+]) assert.ok(app.includes(text), `Missing shared adjustment wording: ${text}`);
+
+const css = fs.readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+assert.match(css, /\.refund-stock-choice button\[aria-pressed="true"\][\s\S]*background:\s*var\(--accent\)/);
+assert.match(app, /aria-pressed="\$\{!fields\.restore_stock\}"[\s\S]*✓[\s\S]*Money only/);
+assert.doesNotMatch(app, /Does returned stock come back into inventory\?/);
 
 console.log("SALE_ADJUSTMENT_WORKFLOW_OK review=shared confirm=idempotent ledger=linked offline=queued");
