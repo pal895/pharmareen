@@ -60,6 +60,7 @@ import { TransactionCompletionEngine } from "./services/transactionCompletionEng
 import { applyStockCorrectionVoice, PharmacyPronunciationMemory, reviewStockCorrection, stockCorrectionGuidance, trustedCatalogStock } from "./services/stockCorrectionPolicy.js";
 import { executeStockCorrection, replayPendingStockCorrections } from "./services/stockCorrectionExecution.js";
 import { prepareProductionSaleCard, productionSaleSummary, saleFieldsFromTransaction } from "./services/productionSaleCard.js";
+import { completedSaleByReference, createSaleAdjustmentReview, saleDetailFields, saleReferenceFromReceipt } from "./services/saleAdjustmentReview.js";
 import { hydrateStockFixDraft, normalizeStockFixEvidence } from "./services/stockFixEvidencePipeline.js";
 import { readXlsxInventory } from "./services/excelInventory.js";
 import { listRouteSlots, resolveOfflineSlot } from "./routes/routeRegistry.js";
@@ -438,6 +439,18 @@ function feedItemTemplate(item) {
       </button>
     `;
   }
+  const saleReference = item.saleReference || saleReferenceFromReceipt(item.text);
+  if (saleReference) {
+    return `
+      <button class="message-bubble system completed-sale-receipt" type="button" data-action="open-completed-sale"
+        data-sale-number="${escapeHtml(String(saleReference.saleNumber || ""))}"
+        data-transaction-id="${escapeHtml(String(saleReference.transactionId || ""))}"
+        aria-label="Open completed Sale ${escapeHtml(String(saleReference.saleNumber || ""))}">
+        <p>${escapeHtml(item.text)}</p>
+        <span>MS2.0 / ${escapeHtml(item.time)} · Tap to open sale</span>
+      </button>
+    `;
+  }
   return `
     <article class="message-bubble ${item.type}" aria-label="MS2.0 message">
       <p>${escapeHtml(item.text)}</p>
@@ -572,6 +585,8 @@ function adminMenuTemplate() {
 function cardTemplate(card) {
   if (card.type === "ExportHubCard") return exportHubCardTemplate(card);
   if (card.type === "ActivityHubCard") return activityHubCardTemplate(card);
+  if (card.type === "CompletedSaleDetailCard") return completedSaleDetailCardTemplate(card);
+  if (card.type === "SaleAdjustmentReviewCard") return saleAdjustmentReviewCardTemplate(card);
   const fields = cardFieldsFor(card.type);
   const displayed = fields.length ? fields : Object.keys(card.fields || {});
   const progressiveMedicine = PROGRESSIVE_MEDICINE_CARD_TYPES.has(card.type);
@@ -607,6 +622,64 @@ function cardTemplate(card) {
       </details>
       <div class="card-bottom-close">
         ${cardCloseButtonTemplate(card, "bottom")}
+      </div>
+    </article>
+  `;
+}
+
+function completedSaleDetailCardTemplate(card) {
+  const fields = card.fields || {};
+  return `
+    <article class="card-message ready sale-detail-card" data-card-id="${escapeHtml(card.id)}">
+      <div class="card-top">
+        <span class="card-heading"><span class="card-type">Completed sale</span><strong>${escapeHtml(card.title)}</strong></span>
+        ${cardCloseButtonTemplate(card, "top")}
+      </div>
+      ${saleDetailList([
+        ["Medicine", fields.medicine],
+        ["Form", fields.form],
+        ["Unit", fields.unit],
+        ["Quantity sold", fields.quantity],
+        ["Unit price", fields.unit_price ? `KES ${fields.unit_price}` : ""],
+        ["Total", fields.total ? `KES ${fields.total}` : ""],
+        ["Payment", paymentLabel(fields.payment || "")],
+        ["Stock after sale", fields.stock_after_sale],
+        ["Status", fields.status]
+      ])}
+      <p class="card-note">Choose one adjustment. The original Sale ${escapeHtml(String(fields.sale_number))} remains in history. Nothing changes until a later confirmation.</p>
+      <div class="card-actions sale-adjustment-actions" aria-label="Sale adjustment options">
+        <button type="button" data-action="start-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-adjustment-type="refund">Refund</button>
+        <button type="button" data-action="start-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-adjustment-type="return">Return</button>
+        <button type="button" data-action="start-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-adjustment-type="credit">Credit</button>
+      </div>
+      <div class="card-bottom-close">${cardCloseButtonTemplate(card, "bottom")}</div>
+    </article>
+  `;
+}
+
+function saleAdjustmentReviewCardTemplate(card) {
+  const fields = card.fields || {};
+  const typeLabel = String(fields.adjustment_type || "adjustment").replace(/^./, (letter) => letter.toUpperCase());
+  return `
+    <article class="card-message ready sale-adjustment-review-card" data-card-id="${escapeHtml(card.id)}">
+      <div class="card-top">
+        <span class="card-heading"><span class="card-type">${escapeHtml(typeLabel)} review</span><strong>${escapeHtml(card.title)}</strong></span>
+        ${cardCloseButtonTemplate(card, "top")}
+      </div>
+      ${saleDetailList([
+        ["Original sale", `Sale ${fields.original_sale_number}`],
+        ["Medicine", fields.medicine],
+        ["Unit", fields.unit],
+        ["Quantity sold", fields.sold_quantity],
+        ["Quantity to adjust", fields.adjustment_quantity],
+        ["Unit price", fields.unit_price ? `KES ${fields.unit_price}` : ""],
+        ["Financial adjustment", `KES ${fields.financial_adjustment}`],
+        ["Stock to restore", fields.stock_to_restore],
+        ["Original sale", fields.original_sale_status]
+      ])}
+      <p class="card-note">${escapeHtml(fields.review_status)}. The original sale has not been deleted or edited.</p>
+      <div class="card-actions">
+        <button type="button" data-action="dismiss-card" data-card-id="${escapeHtml(card.id)}">Cancel review</button>
       </div>
     </article>
   `;
@@ -1279,6 +1352,17 @@ function handleAction(dataset) {
     input.value = dataset.command || "";
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
+    return;
+  }
+  if (action === "open-completed-sale") {
+    openCompletedSale({
+      saleNumber: Number(dataset.saleNumber),
+      transactionId: dataset.transactionId || ""
+    });
+    return;
+  }
+  if (action === "start-sale-adjustment") {
+    startSaleAdjustment(dataset.cardId, dataset.adjustmentType);
     return;
   }
   if (action === "open-chat") {
@@ -3078,11 +3162,58 @@ function focusCard(cardId) {
   card?.scrollIntoView({ block: "start", behavior: "smooth" });
 }
 
-function addFeed(type, text) {
+function addFeed(type, text, metadata = {}) {
   activeCardViewportAnchor = null;
-  state.feed.push({ id: `feed-${Date.now()}`, type, text, time: nowLabel() });
+  state.feed.push({ id: `feed-${Date.now()}`, type, text, time: nowLabel(), ...metadata });
   state.feed = state.feed.slice(-FEED_RESUME_LIMIT);
   persistFeed();
+}
+
+function openCompletedSale(reference) {
+  const transaction = completedSaleByReference(transactionEngine.list(), reference);
+  if (!transaction) {
+    addFeed("system", "This completed sale could not be found in local transaction history. Nothing was changed.");
+    render();
+    return;
+  }
+  state.cards = state.cards.filter((card) => !["CompletedSaleDetailCard", "SaleAdjustmentReviewCard"].includes(card.type));
+  const fields = saleDetailFields(transaction);
+  const card = createEditableCard({
+    type: "CompletedSaleDetailCard",
+    title: `Sale ${fields.sale_number}`,
+    source: "Local transaction history",
+    fields,
+    confidence: 1,
+    validation: "Original completed sale — adjustments require a separate review."
+  });
+  state.cards.push(card);
+  persistActiveCards();
+  render();
+  focusCard(card.id);
+}
+
+function startSaleAdjustment(cardId, adjustmentType) {
+  const detailCard = state.cards.find((card) => card.id === cardId && card.type === "CompletedSaleDetailCard");
+  if (!detailCard) return;
+  const transaction = completedSaleByReference(transactionEngine.list(), {
+    saleNumber: detailCard.fields?.sale_number,
+    transactionId: detailCard.fields?.transaction_id
+  });
+  const fields = createSaleAdjustmentReview(transaction, adjustmentType, 1);
+  if (!fields) return;
+  const card = createEditableCard({
+    type: "SaleAdjustmentReviewCard",
+    title: `${String(adjustmentType).replace(/^./, (letter) => letter.toUpperCase())} Sale ${fields.original_sale_number}`,
+    source: "Linked completed sale",
+    fields,
+    confidence: 1,
+    validation: "Review only. No stock or finance mutation has occurred."
+  });
+  state.cards = state.cards.filter((item) => item.id !== detailCard.id && item.type !== "SaleAdjustmentReviewCard");
+  state.cards.push(card);
+  persistActiveCards();
+  render();
+  focusCard(card.id);
 }
 
 function updateCardField(cardId, field, value) {
@@ -4283,9 +4414,16 @@ function recordCard(card) {
   if (result.added && card.type === "RestockCard") {
     applyLocalRestockStock(card);
   }
-  addFeed("system", result.duplicate ? "Already saved." : transactionResult?.transaction?.status === "pending"
+  const reply = result.duplicate ? "Already saved." : transactionResult?.transaction?.status === "pending"
     ? `Today's ${transactionResult.transaction.saleLabel} is waiting for simulated ${paymentLabel(paymentMethod)} confirmation. You can keep serving. Open Payment Queue to finish it.`
-    : savedReplyFor(card));
+    : savedReplyFor(card);
+  const completedSale = transactionResult?.transaction?.status === "completed" ? transactionResult.transaction : null;
+  addFeed("system", reply, completedSale ? {
+    saleReference: {
+      saleNumber: completedSale.saleNumber,
+      transactionId: completedSale.permanentId || completedSale.id
+    }
+  } : {});
 }
 
 function completeStockCorrection(card) {
@@ -4362,7 +4500,12 @@ function processTransactionProviderEvent(transactionId, event) {
   const result = transactionEngine.providerEvent(transactionId, event);
   if (result.updated && event.status === "confirmed") {
     applyConfirmedPendingSale(result.transaction);
-    addFeed("system", `${result.transaction.saleLabel}\n✅ ${result.transaction.metadata?.medicine} x${result.transaction.metadata?.quantity} recorded · ${paymentLabel(result.transaction.paymentMethod)}\nStock left: ${result.transaction.metadata?.stockLeft ?? "—"}`);
+    addFeed("system", `${result.transaction.saleLabel}\n✅ ${result.transaction.metadata?.medicine} x${result.transaction.metadata?.quantity} recorded · ${paymentLabel(result.transaction.paymentMethod)}\nStock left: ${result.transaction.metadata?.stockLeft ?? "—"}`, {
+      saleReference: {
+        saleNumber: result.transaction.saleNumber,
+        transactionId: result.transaction.permanentId || result.transaction.id
+      }
+    });
     const remaining = transactionEngine.pending();
     if (remaining.length) addFeed("system", `${result.transaction.saleLabel} completed. ${remaining.length} payment${remaining.length === 1 ? " is" : "s are"} still waiting. You can keep serving.`);
   } else if (result.updated && ["failed", "cancelled"].includes(event.status)) {

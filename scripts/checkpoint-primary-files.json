@@ -189,7 +189,9 @@
   ],
   "55": [
     "app/intake.py",
-    "ms20-main-app/src/services/transactionCompletionEngine.js"
+    "ms20-main-app/src/services/transactionCompletionEngine.js",
+    "ms20-main-app/src/services/saleAdjustmentReview.js",
+    "ms20-main-app/src/app.js"
   ],
   "56": [
     "app/intake.py",

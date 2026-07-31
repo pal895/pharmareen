@@ -602,6 +602,14 @@ MS2-LT-050 is **OWNER-VALIDATED PASS / FROZEN / PROTECTED**. The owner screensho
 
 The owner did not press Confirm, so no sale or stock update persisted. This closes MS2-LT-050 without implementation changes or repetition. The dependency-aware Exact Transaction Truth route now selects **MS2-LT-055 — Refunds, returns and credits** because MS2-LT-051–054 are protected. Prepare only its first linked, non-destructive return/refund case and wait for owner screenshots.
 
+## MS2-LT-055 missing-entry failure and root repair — 2026-07-31
+
+Owner screenshots prove the first MS2-LT-055 attempt was blocked by the product, not the owner. Sale 1 completed as Ibuprofen x6 Cash with stock left 21, but its conversation receipt was inert text. A tap did nothing and long-press correctly invoked Android text selection because the receipt had no MS2.0 action boundary.
+
+The shared completion root now attaches a stable sale reference to every newly completed receipt, recognizes persisted numbered receipts, and renders the receipt as a discoverable `Tap to open sale` button. Opening it resolves the completed local transaction and shows one linked detail card with the original medicine, form, unit, quantity, price, total, payment, stock-after and status facts. Refund, Return and Credit are explicit actions on that detail. Each starts one linked review showing original Sale number, adjustment quantity, financial consequence and stock-to-restore consequence; the original sale remains intact and no adjustment is applied from this review checkpoint. The protected Production Sales Card renderer and behavior are unchanged.
+
+Focused verification covers new and persisted receipt resolution, stable transaction linkage, all three adjustment entry actions, exact one-item arithmetic, Credit stock neutrality, no confirmation/mutation path, Production Sales Card regression, TCE behavior and canonical consistency. MS2-LT-055 remains open. Repeat only this checkpoint from the beginning after deployment and stop on the first linked adjustment review for screenshots.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

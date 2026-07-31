@@ -117,6 +117,8 @@ The only approved production AI boundaries are uncached voice-note transcription
 
 Replit redirects backend stdout/stderr to `server.log`, so the truthful background snapshot marker was produced but hidden from the startup shell. `start.sh` now waits after health for at most 15 seconds, inspects only the newest 200 log lines as text, prints the newest real `REPORT_SOURCE_SNAPSHOT_WARMED` marker exactly once, and warns without claiming success if it does not arrive.
 
+Completed sales now retain a stable local transaction reference at the conversation boundary. The shared receipt renderer makes each numbered completion explicitly openable, including persisted numbered receipts recoverable by Sale number. One detail card owns the Refund, Return and Credit entry points and creates linked, non-mutating adjustment reviews; it does not alter or duplicate the protected Production Sales Card.
+
 Local app URL used during verification:
 
 ```text

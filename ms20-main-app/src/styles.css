@@ -327,6 +327,25 @@ input:disabled {
   background: var(--accent-soft);
 }
 
+.completed-sale-receipt {
+  display: block;
+  min-height: 0;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.completed-sale-receipt:hover,
+.completed-sale-receipt:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(18, 105, 88, 0.12);
+}
+
+.sale-adjustment-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .message-bubble p {
   margin: 0;
   white-space: pre-line;
