@@ -596,12 +596,18 @@ MS2-LT-049 is **OWNER-VALIDATED PASS / FROZEN / PROTECTED**. The owner typed `Ib
 
 The sale was not confirmed, so no sale or stock mutation persisted. This evidence closes MS2-LT-049 without repeating it and adds no implementation change. Focused Production Sales Card and sale-fixture verifiers remain the regression evidence. The dependency-aware sequence now selects **MS2-LT-050 — Payment modes, splits and discounts**, whose prerequisites MS2-LT-014 and MS2-LT-049 are protected. Issue only its first focused owner test and wait for screenshots.
 
+## MS2-LT-050 owner closure — 2026-07-31
+
+MS2-LT-050 is **OWNER-VALIDATED PASS / FROZEN / PROTECTED**. The owner screenshot package proves one Septrin bottle Credit review on the shared Production Sales Card: Medicine Septrin, Form suspension, Base unit bottle, Requested selling unit bottle, Quantity 1, Unit price and Total KES 180, Payment Credit, projected stock `12 → 11`, Buying price KES 120, Supplier MedSource Kenya Ltd, Batch SEP-100S and Expiry 2028-09. Strength, Barcode, Aliases and Notes were truthfully `Not recorded`; no value was guessed and no incorrect unit, conversion or Unknown value appeared. Fast action, Stock & details and Traceability all displayed correctly with the protected design unchanged.
+
+The owner did not press Confirm, so no sale or stock update persisted. This closes MS2-LT-050 without implementation changes or repetition. The dependency-aware Exact Transaction Truth route now selects **MS2-LT-055 — Refunds, returns and credits** because MS2-LT-051–054 are protected. Prepare only its first linked, non-destructive return/refund case and wait for owner screenshots.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-050 — Payment modes, splits and discounts
+- Current: MS2-LT-055 — Refunds, returns and credits
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.

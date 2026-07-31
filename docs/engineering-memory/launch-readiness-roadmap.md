@@ -184,6 +184,6 @@ All backlog work keeps its canonical checkpoint/evidence relationship. New appro
 
 ## Active launch priority
 
-**MS2-LT-050 — Payment modes, splits and discounts**
+**MS2-LT-055 — Refunds, returns and credits**
 
-Status: `IMPLEMENTED — NEXT OWNER LIVE TEST`. MS2-LT-049 passed from the 2026-07-31 owner screenshot package and is protected; MS2-LT-014 is also protected, so both prerequisites are satisfied. MS2-LT-050 is the next dependency-valid Launch Critical milestone because launch transactions must preserve truthful payment state. Begin only its first focused case and stop for owner screenshots.
+Status: `PARTIAL IMPLEMENTATION — NEXT DEPENDENCY-VALID CHECKPOINT`. MS2-LT-050 passed from the 2026-07-31 owner Septrin Credit screenshot package and is protected. MS2-LT-051–054 are protected, so MS2-LT-055 is the next milestone in the authoritative Exact Transaction Truth route. Prepare only its first focused linked return/refund case; preserve original sale history and stop for owner screenshots.

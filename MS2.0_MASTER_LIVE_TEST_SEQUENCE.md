@@ -81,7 +81,7 @@ Evidence abbreviations: `CVS` = `docs/engineering-memory/current-live-validation
 | # | Checkpoint | Objective | Prerequisite(s) | Implementation state | Owner validation | Protected | Est. live test | Evidence/document source |
 |---:|---|---|---|---|---|---|---|---|
 | 49 | Exact form/unit/pack/price truth | Prevent unit/strength price leakage and preserve conversions across all inputs and consumers. | 10–15 | PASS / PROTECTED | Passed 2026-07-31: owner screenshots of the typed `Ibuprofen 1 tablet cash` review proved exact tablet form/unit, KES 18 unit/total, cash, projected stock 27 → 26, strength 200 mg, buying price KES 9, supplier Afya Wholesale Ltd, batch IBU-200C, expiry 2028-12, truthful absent optional traceability, all three Production Sales Card tabs, and no confirmed or persisted mutation. | Yes | 20 min | Owner screenshot package supplied through CODEX BRIDGE v5.0; protected Production Sales Card standard; focused production-sale-card and sale-fixture verifiers |
-| 50 | Payment modes, splits and discounts | Handle Cash, M-Pesa, Card, Credit, Mixed, payment corrections and supported discounts truthfully. | 14, 49 | Implemented — awaiting owner live test | Only narrower payment paths passed | No | 15 min | `intake.py`; day-2/intake tests; commit history |
+| 50 | Payment modes, splits and discounts | Handle Cash, M-Pesa, Card, Credit, Mixed, payment corrections and supported discounts truthfully. | 14, 49 | PASS / PROTECTED | Passed 2026-07-31: owner screenshots of the Septrin one-bottle Credit review proved suspension/bottle identity, KES 180 unit price and total, selected Credit payment, projected stock 12 → 11, buying price KES 120, supplier MedSource Kenya Ltd, batch SEP-100S, expiry 2028-09, truthful Not recorded values, all three protected Production Sales Card tabs, and no confirmed or persisted mutation. | Yes | 15 min | Owner screenshot package supplied 2026-07-31; protected Production Sales Card standard; focused production-sale-card and sale-fixture verifiers |
 | 51 | TCE Fast Record | Record owner-confirmed transactions immediately with daily numbering and exact one-time stock/finance effects. | 14 | PASS / PROTECTED | Passed | Yes | 10 min | CVS; TCE |
 | 52 | Request & Verify success | Queue non-cash request, continue serving and complete only after verified success. | 51 | PASS / PROTECTED | Passed | Yes | 12 min | CVS; TCE; TCE/UI verifiers |
 | 53 | Concurrent payment completion | Keep multiple waiting payments isolated, support out-of-order success and prevent duplicate stock effects. | 52 | PASS / PROTECTED | Passed | Yes | 12 min | TCE quiet-concurrency evidence |
@@ -153,7 +153,7 @@ This ledger deliberately accounts for owner-facing domains discovered across cur
 | Reorder, stock-out, demand, fast/slow/dead-stock and expiry intelligence | Planned / approved | 26–30 | OI; OM Future rules |
 | Operational metrics, analytics, dashboard and decision support | Partial implementation | 21–23, 30 | Protected reports plus unqualified/partial intelligence renderers |
 | Notifications, unread/action routing and quiet state | PASS / PROTECTED | 24–25, 54 | Inventory, expiry and payment-failure lifecycles owner-validated and protected |
-| Payment modes, split/mixed payments and discounts | Implemented — awaiting owner live test | 50 | Intake/TCE implementation and narrower protected payment evidence |
+| Payment modes, split/mixed payments and discounts | PASS / PROTECTED | 50 | 2026-07-31 owner Septrin one-bottle Credit screenshot package; Production Sales Card regression verifiers |
 | Payment failure/cancellation | PASS / PROTECTED | 54 | Owner Septrin 12-to-12 failure evidence; durable distinct alert and Review payment routing |
 | Refunds, returns, credits and undo/reversal | Partial implementation | 19, 55–56 | Basic cancellation protected; full financial reconciliation remains unqualified |
 | Cash/finance reconciliation | Planned / approved | 48, 56–57 | OM Future rules; TCE reconciliation hooks |
@@ -198,8 +198,8 @@ This ledger deliberately accounts for owner-facing domains discovered across cur
 ## Canonical status totals
 
 - Total checkpoints: **84**
-- PASS / PROTECTED: **45**
-- Implemented — awaiting owner live test: **8**
+- PASS / PROTECTED: **46**
+- Implemented — awaiting owner live test: **7**
 - Partial implementation: **9**
 - Planned / approved: **17**
 - External qualification: **3**
@@ -207,7 +207,7 @@ This ledger deliberately accounts for owner-facing domains discovered across cur
 
 ## Current execution pointer
 
-The only current open checkpoint is **#50 Payment modes, splits and discounts**. MS2-LT-049 passed owner validation on 2026-07-31 from the typed Ibuprofen known-unit screenshot package and is protected together with the Production Sales Card regression contract. It must not be repeated without regression evidence. MS2-LT-050 is selected by the dependency-aware Launch Critical queue because prerequisites #14 and #49 are protected; the former automatic linear progression is historical and must never resume. Issue only its first focused owner test, then stop and wait for evidence.
+The only current open checkpoint is **#55 Refunds, returns and credits**. MS2-LT-050 passed owner validation on 2026-07-31 from the Septrin one-bottle Credit screenshot package and is protected together with MS2-LT-049 and the Production Sales Card regression contract. None may be repeated without regression evidence. MS2-LT-055 is selected by the dependency-aware Exact Transaction Truth route because prerequisites #51–#54 are protected; the former automatic linear progression is historical and must never resume. Issue only its first focused owner test, then stop and wait for evidence.
 
 ## Canonical synchronization invariants
 
@@ -991,13 +991,13 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **Checkpoint ID:** MS2-LT-050
 - **Name:** Payment modes, splits and discounts
 - **Category:** Financial & Payment Validation
-- **Current status:** Implemented — awaiting owner live test
-- **Repository evidence:** `intake.py`; day-2/intake tests; commit history
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** Owner screenshot package supplied 2026-07-31; protected Production Sales Card standard; focused production-sale-card and sale-fixture verifiers
 - **Implementation commit(s):** 6f91b2a Save selector quantity payment choices immediately; ad15a4f Fix deterministic routing payments and media AI wiring; ab334cf Add simple payment modes and receipt fallback UX
 - **Primary implementation files/modules:** `app/intake.py`; `ms20-main-app/src/services/paymentAdapters.js`
-- **Owner live-test evidence:** Only narrower payment paths passed; source: `intake.py`; day-2/intake tests; commit history
-- **PASS / PROTECTED confirmation:** Not applicable.
-- **Remaining implementation work:** Complete decisive owner live validation for: Handle Cash, M-Pesa, Card, Credit, Mixed, payment corrections and supported discounts truthfully.
+- **Owner live-test evidence:** Passed 2026-07-31: owner screenshots of the Septrin one-bottle Credit review proved suspension/bottle identity, KES 180 unit price and total, selected Credit payment, projected stock 12 → 11, buying price KES 120, supplier MedSource Kenya Ltd, batch SEP-100S, expiry 2028-09, truthful Not recorded values, all three protected Production Sales Card tabs, and no confirmed or persisted mutation.; source: Owner screenshot package supplied 2026-07-31; protected Production Sales Card standard; focused production-sale-card and sale-fixture verifiers
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed 2026-07-31: owner screenshots of the Septrin one-bottle Credit review proved suspension/bottle identity, KES 180 unit price and total, selected Credit payment, projected stock 12 → 11, buying price KES 120, supplier MedSource Kenya Ltd, batch SEP-100S, expiry 2028-09, truthful Not recorded values, all three protected Production Sales Card tabs, and no confirmed or persisted mutation.; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
 - **Prerequisite checkpoints:** 14, 49
 - **Dependent checkpoints:** MS2-LT-057, MS2-LT-074, MS2-LT-084
 

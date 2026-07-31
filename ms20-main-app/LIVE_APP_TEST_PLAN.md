@@ -822,6 +822,8 @@ Implement once across typed, voice, barcode, camera, pack photo, file, catalog, 
 
 MS2-LT-049 closed **OWNER-VALIDATED PASS / FROZEN / PROTECTED** on 2026-07-31. The typed `Ibuprofen 1 tablet cash` owner screenshots proved exact form, base/requested unit, price, total, payment, projected stock and full catalog/traceability truth on all three protected Production Sales Card tabs without confirmation or persisted mutation. Do not repeat this checkpoint. Its shared exact-truth requirements remain regression contracts for voice, multiple units, ambiguity, conversion, supported acquisition sources, persistence, correction, undo, offline behavior and downstream consumers. Dependency-aware routing advances to MS2-LT-050 only.
 
+MS2-LT-050 closed **OWNER-VALIDATED PASS / FROZEN / PROTECTED** on 2026-07-31. The Septrin one-bottle Credit owner screenshots proved exact suspension/bottle identity, KES 180 price and total, Credit selection, projected stock `12 → 11`, buying price KES 120, truthful catalog/traceability values and all three unchanged Production Sales Card tabs without confirmation or persisted mutation. Do not repeat this checkpoint. The authoritative Exact Transaction Truth route advances to MS2-LT-055 only: begin with one linked return/refund case that preserves the original sale record and makes no unreviewed stock or finance change.
+
 ## Ordered approved improvement 3 - Export IP, privacy and compliance safeguards
 
 Dependency position: apply shared-root technical safeguards throughout the remaining current Export Hub formats before production-ready closure, with unresolved professional matters retained as pre-launch gates. Preserve the approved clean MS2.0 direction. Use only original or rights-verified layouts, wording, icons, fonts, templates and assets; do not copy proprietary trade dress or use third-party logos/marks without recorded permission or imply endorsement.
@@ -955,7 +957,7 @@ Pass only after owner-device evidence shows the file opens in a compatible prese
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-050 — Payment modes, splits and discounts
+- Current: MS2-LT-055 — Refunds, returns and credits
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.
