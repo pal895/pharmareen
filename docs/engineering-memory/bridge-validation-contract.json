@@ -62,6 +62,6 @@
     "status": "ACTIVE",
     "document": "docs/engineering-memory/token-execution-policy.md"
   },
-  "master_sha256": "cd305c95d1c59119d53515d4ca3efab2114bfdd4ab0ebb1d5f48b2f8edc9168c",
+  "master_sha256": "698172dd86dff0110b951bb433021a4676f8c0d7f4f937ecb90762bdd47c539f",
   "rule": "Load the master and its Engineering Traceability Index; never reconstruct or maintain a parallel sequence."
 }
