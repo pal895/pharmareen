@@ -60,7 +60,7 @@ import { TransactionCompletionEngine } from "./services/transactionCompletionEng
 import { applyStockCorrectionVoice, PharmacyPronunciationMemory, reviewStockCorrection, stockCorrectionGuidance, trustedCatalogStock } from "./services/stockCorrectionPolicy.js";
 import { executeStockCorrection, replayPendingStockCorrections } from "./services/stockCorrectionExecution.js";
 import { prepareProductionSaleCard, productionSaleSummary, saleFieldsFromTransaction } from "./services/productionSaleCard.js";
-import { completedSaleByReference, createSaleAdjustmentReview, saleDetailFields, saleReferenceFromReceipt } from "./services/saleAdjustmentReview.js";
+import { completedSaleByReference, SaleAdjustmentEngine, saleDetailFields, saleReferenceFromReceipt } from "./services/saleAdjustmentReview.js";
 import { hydrateStockFixDraft, normalizeStockFixEvidence } from "./services/stockFixEvidencePipeline.js";
 import { readXlsxInventory } from "./services/excelInventory.js";
 import { listRouteSlots, resolveOfflineSlot } from "./routes/routeRegistry.js";
@@ -84,6 +84,7 @@ const transactionEngine = new TransactionCompletionEngine({
     simulator: paymentSimulator
   }
 });
+const saleAdjustmentEngine = new SaleAdjustmentEngine({ storage: safeLocalStorage(), staffIdentity: () => "Owner" });
 const pharmacyBrain = new PharmacyBrain({ pharmacyId: state.pharmacy.id });
 const pronunciationMemory = new PharmacyPronunciationMemory(state.pharmacy.id, safeLocalStorage());
 const sourceBrain = new SourceBrain();
@@ -439,6 +440,16 @@ function feedItemTemplate(item) {
       </button>
     `;
   }
+  if (item.adjustmentReference) {
+    return `
+      <button class="message-bubble system completed-sale-receipt" type="button" data-action="open-sale-adjustment"
+        data-adjustment-id="${escapeHtml(item.adjustmentReference.adjustmentId || "")}"
+        aria-label="Open completed ${escapeHtml(item.adjustmentReference.type || "sale adjustment")}">
+        <p>${escapeHtml(item.text)}</p>
+        <span>MS2.0 / ${escapeHtml(item.time)} · Tap to open adjustment</span>
+      </button>
+    `;
+  }
   const saleReference = item.saleReference || saleReferenceFromReceipt(item.text);
   if (saleReference) {
     return `
@@ -587,6 +598,7 @@ function cardTemplate(card) {
   if (card.type === "ActivityHubCard") return activityHubCardTemplate(card);
   if (card.type === "CompletedSaleDetailCard") return completedSaleDetailCardTemplate(card);
   if (card.type === "SaleAdjustmentReviewCard") return saleAdjustmentReviewCardTemplate(card);
+  if (card.type === "SaleAdjustmentDetailCard") return saleAdjustmentDetailCardTemplate(card);
   const fields = cardFieldsFor(card.type);
   const displayed = fields.length ? fields : Object.keys(card.fields || {});
   const progressiveMedicine = PROGRESSIVE_MEDICINE_CARD_TYPES.has(card.type);
@@ -629,6 +641,7 @@ function cardTemplate(card) {
 
 function completedSaleDetailCardTemplate(card) {
   const fields = card.fields || {};
+  const linked = saleAdjustmentEngine.list().filter((item) => item.original_transaction_id === fields.transaction_id);
   return `
     <article class="card-message ready sale-detail-card" data-card-id="${escapeHtml(card.id)}">
       <div class="card-top">
@@ -652,6 +665,9 @@ function completedSaleDetailCardTemplate(card) {
         <button type="button" data-action="start-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-adjustment-type="return">Return</button>
         <button type="button" data-action="start-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-adjustment-type="credit">Credit</button>
       </div>
+      ${linked.length ? `<section class="linked-adjustments"><strong>Linked adjustments</strong>${linked.map((item) =>
+        `<button type="button" data-action="open-sale-adjustment" data-adjustment-id="${escapeHtml(item.id)}">${escapeHtml(item.adjustment_type)} ${item.adjustment_number} · KES ${item.financial_adjustment}</button>`
+      ).join("")}</section>` : ""}
       <div class="card-bottom-close">${cardCloseButtonTemplate(card, "bottom")}</div>
     </article>
   `;
@@ -675,14 +691,48 @@ function saleAdjustmentReviewCardTemplate(card) {
         ["Unit price", fields.unit_price ? `KES ${fields.unit_price}` : ""],
         ["Financial adjustment", `KES ${fields.financial_adjustment}`],
         ["Stock to restore", fields.stock_to_restore],
+        ["Payment impact", fields.payment_impact],
         ["Original sale", fields.original_sale_status]
       ])}
+      <div class="quantity-toolbar" aria-label="Adjustment quantity">
+        <button type="button" data-action="bump-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-delta="-1">-1</button>
+        <button type="button" data-action="bump-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-delta="1">+1</button>
+      </div>
+      ${fields.adjustment_type === "refund" ? `<fieldset class="refund-stock-choice"><legend>Does returned stock come back into inventory?</legend>
+        <button type="button" data-action="set-refund-stock" data-card-id="${escapeHtml(card.id)}" data-restore-stock="false" aria-pressed="${!fields.restore_stock}">Money only</button>
+        <button type="button" data-action="set-refund-stock" data-card-id="${escapeHtml(card.id)}" data-restore-stock="true" aria-pressed="${fields.restore_stock}">Money + returned stock</button>
+      </fieldset>` : ""}
       <p class="card-note">${escapeHtml(fields.review_status)}. The original sale has not been deleted or edited.</p>
       <div class="card-actions">
         <button type="button" data-action="dismiss-card" data-card-id="${escapeHtml(card.id)}">Cancel review</button>
+        <button type="button" data-action="confirm-sale-adjustment" data-card-id="${escapeHtml(card.id)}">Confirm ${escapeHtml(typeLabel)}</button>
       </div>
     </article>
   `;
+}
+
+function saleAdjustmentDetailCardTemplate(card) {
+  const fields = card.fields || {};
+  const typeLabel = String(fields.adjustment_type || "adjustment").replace(/^./, (letter) => letter.toUpperCase());
+  return `
+    <article class="card-message ready sale-adjustment-review-card" data-card-id="${escapeHtml(card.id)}">
+      <div class="card-top"><span class="card-heading"><span class="card-type">Completed ${escapeHtml(typeLabel)}</span><strong>${escapeHtml(typeLabel)} ${fields.adjustment_number}</strong></span>${cardCloseButtonTemplate(card, "top")}</div>
+      ${saleDetailList([
+        ["Original sale", `Sale ${fields.original_sale_number}`],
+        ["Medicine", fields.medicine], ["Unit", fields.unit],
+        ["Quantity adjusted", fields.adjustment_quantity],
+        ["Financial adjustment", `KES ${fields.financial_adjustment}`],
+        ["Stock restored", fields.stock_to_restore],
+        ["Payment impact", fields.payment_impact],
+        ["Status", fields.status],
+        ["Confirmed", fields.confirmed_at],
+        ["Staff", fields.staff_identity]
+      ])}
+      <p class="card-note">This permanent adjustment is linked to the immutable original sale.</p>
+      <div class="card-actions">
+        <button type="button" data-action="open-adjustment-original" data-sale-number="${fields.original_sale_number}" data-transaction-id="${escapeHtml(fields.original_transaction_id)}">Open original Sale ${fields.original_sale_number}</button>
+      </div>
+    </article>`;
 }
 
 function safeCardTemplate(card) {
@@ -1363,6 +1413,26 @@ function handleAction(dataset) {
   }
   if (action === "start-sale-adjustment") {
     startSaleAdjustment(dataset.cardId, dataset.adjustmentType);
+    return;
+  }
+  if (action === "open-sale-adjustment") {
+    openSaleAdjustment(dataset.adjustmentId);
+    return;
+  }
+  if (action === "open-adjustment-original") {
+    openCompletedSale({ saleNumber: Number(dataset.saleNumber), transactionId: dataset.transactionId || "" });
+    return;
+  }
+  if (action === "bump-sale-adjustment") {
+    updateSaleAdjustmentReview(dataset.cardId, { delta: Number(dataset.delta) });
+    return;
+  }
+  if (action === "set-refund-stock") {
+    updateSaleAdjustmentReview(dataset.cardId, { restoreStock: dataset.restoreStock === "true" });
+    return;
+  }
+  if (action === "confirm-sale-adjustment") {
+    confirmSaleAdjustment(dataset.cardId);
     return;
   }
   if (action === "open-chat") {
@@ -3176,7 +3246,7 @@ function openCompletedSale(reference) {
     render();
     return;
   }
-  state.cards = state.cards.filter((card) => !["CompletedSaleDetailCard", "SaleAdjustmentReviewCard"].includes(card.type));
+  state.cards = state.cards.filter((card) => !["CompletedSaleDetailCard", "SaleAdjustmentReviewCard", "SaleAdjustmentDetailCard"].includes(card.type));
   const fields = saleDetailFields(transaction);
   const card = createEditableCard({
     type: "CompletedSaleDetailCard",
@@ -3199,7 +3269,7 @@ function startSaleAdjustment(cardId, adjustmentType) {
     saleNumber: detailCard.fields?.sale_number,
     transactionId: detailCard.fields?.transaction_id
   });
-  const fields = createSaleAdjustmentReview(transaction, adjustmentType, 1);
+  const fields = saleAdjustmentEngine.review(transaction, adjustmentType, 1);
   if (!fields) return;
   const card = createEditableCard({
     type: "SaleAdjustmentReviewCard",
@@ -3210,6 +3280,86 @@ function startSaleAdjustment(cardId, adjustmentType) {
     validation: "Review only. No stock or finance mutation has occurred."
   });
   state.cards = state.cards.filter((item) => item.id !== detailCard.id && item.type !== "SaleAdjustmentReviewCard");
+  state.cards.push(card);
+  persistActiveCards();
+  render();
+  focusCard(card.id);
+}
+
+function updateSaleAdjustmentReview(cardId, patch = {}) {
+  const card = state.cards.find((item) => item.id === cardId && item.type === "SaleAdjustmentReviewCard");
+  if (!card) return;
+  const transaction = completedSaleByReference(transactionEngine.list(), {
+    saleNumber: card.fields.original_sale_number,
+    transactionId: card.fields.original_transaction_id
+  });
+  const quantity = Math.max(1, Math.min(card.fields.remaining_quantity, Number(card.fields.adjustment_quantity) + Number(patch.delta || 0)));
+  const fields = saleAdjustmentEngine.review(transaction, card.fields.adjustment_type, quantity, {
+    reviewId: card.fields.review_id,
+    restoreStock: patch.restoreStock ?? card.fields.restore_stock
+  });
+  if (!fields) return;
+  card.fields = fields;
+  persistActiveCards();
+  render();
+}
+
+function confirmSaleAdjustment(cardId) {
+  const card = state.cards.find((item) => item.id === cardId && item.type === "SaleAdjustmentReviewCard");
+  if (!card || card.submitting) return;
+  card.submitting = true;
+  const result = saleAdjustmentEngine.confirm(card.fields);
+  if (result.rejected) {
+    card.submitting = false;
+    card.validation = "This quantity exceeds the remaining unadjusted quantity.";
+    render();
+    return;
+  }
+  const record = result.record;
+  if (result.created && Number(record.base_stock_to_restore) > 0) {
+    const match = pharmacyBrain.findMedicine(record.medicine);
+    if (match.status === "matched") {
+      const medicine = match.matches[0];
+      const current = Number(medicine.stockLeft);
+      if (Number.isFinite(current)) {
+        medicine.stockLeft = current + Number(record.base_stock_to_restore);
+        state.catalog.items = pharmacyBrain.catalog;
+        safeLocalStorage()?.setItem(CATALOG_KEY, JSON.stringify(state.catalog.items));
+        void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);
+      }
+    }
+  }
+  syncAdapter.queueAction({
+    id: `action-${record.id}`,
+    type: "SaleAdjustment",
+    fields: record,
+    localFirst: true,
+    aiUsed: false
+  });
+  state.cards = state.cards.filter((item) => item.id !== cardId);
+  addFeed("system", `${String(record.adjustment_type).replace(/^./, (letter) => letter.toUpperCase())} ${record.adjustment_number}\n✅ Sale ${record.original_sale_number} · ${record.medicine} x${record.adjustment_quantity}\nKES ${record.financial_adjustment} adjusted · Stock restored: ${record.stock_to_restore}`, {
+    adjustmentReference: { adjustmentId: record.id, type: record.adjustment_type }
+  });
+  persistActiveCards();
+  render();
+}
+
+function openSaleAdjustment(adjustmentId) {
+  const record = saleAdjustmentEngine.list().find((item) => item.id === adjustmentId);
+  if (!record) {
+    addFeed("system", "This sale adjustment could not be found locally. Nothing was changed.");
+    render();
+    return;
+  }
+  state.cards = state.cards.filter((card) => !["CompletedSaleDetailCard", "SaleAdjustmentReviewCard", "SaleAdjustmentDetailCard"].includes(card.type));
+  const card = createEditableCard({
+    type: "SaleAdjustmentDetailCard",
+    title: `${record.adjustment_type} ${record.adjustment_number}`,
+    source: "Local adjustment ledger",
+    fields: record,
+    confidence: 1,
+    validation: "Confirmed linked sale adjustment."
+  });
   state.cards.push(card);
   persistActiveCards();
   render();

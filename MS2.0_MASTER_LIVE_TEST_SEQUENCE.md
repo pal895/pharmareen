@@ -86,7 +86,7 @@ Evidence abbreviations: `CVS` = `docs/engineering-memory/current-live-validation
 | 52 | Request & Verify success | Queue non-cash request, continue serving and complete only after verified success. | 51 | PASS / PROTECTED | Passed | Yes | 12 min | CVS; TCE; TCE/UI verifiers |
 | 53 | Concurrent payment completion | Keep multiple waiting payments isolated, support out-of-order success and prevent duplicate stock effects. | 52 | PASS / PROTECTED | Passed | Yes | 12 min | TCE quiet-concurrency evidence |
 | 54 | Payment failure/cancellation notification | Preserve stock/paid records and create one durable action-needed Notification without chat noise. | 52–53 | PASS / PROTECTED | Passed 2026-07-29: owner mobile screenshots prove Zinc Sale 1 supporting flow evidence and authoritative Septrin Sale 2 stock-preservation evidence. Septrin began and ended at numeric stock 12, quantity 1, bottle/suspension, KES 180 selling price and M-Pesa; Waiting became failed after one Simulate failed action, Payment Queue returned to 0 waiting, history retained one failed not paid/completed sale, one distinct unread actionable Sale 2 notification stated stock and paid records were unchanged, and Review payment returned to the same failed record. Zinc had blank stock and is supporting flow evidence only; its separate Sale 1 alert is not a duplicate of Septrin Sale 2. | Yes | 8 min | TCE; ARCH; `notificationCenter.js`; `verify-payment-failure-notification.mjs`; 2026-07-29 owner 24-screenshot chronological package; Septrin 12-to-12 authoritative stock proof; Zinc preliminary fixture correction preserved; a76215e |
-| 55 | Refunds, returns and credits | Record linked financial/stock adjustments without deleting original history. | 51–54 | Partial implementation | Owner test blocked 2026-07-31: completed Sale 1 rendered as inert text with no discoverable adjustment entry point; shared interactive receipt/detail/review repair awaits owner retest. | No | 15 min | 2026-07-31 owner screenshots; interactive completed-sale receipt and linked adjustment-review verifier; TCE; issue-return tests; intake history |
+| 55 | Refunds, returns and credits | Record linked financial/stock adjustments without deleting original history. | 51–54 | Implemented — awaiting owner live test | Owner evidence proved receipt/detail/review, then exposed missing Confirm. Shared adjustment confirmation, ledger, stock/payment rules, idempotency, offline queue and reciprocal links now await one owner Return retest. | No | 15 min | 2026-07-31 owner screenshots; shared Sale Adjustment workflow verifier; Production Sales Card; TCE; consistency gate |
 | 56 | Undo/reversal reconciliation | Reconcile stock, finance, receipt, reports and audit exactly once for visible sale numbers. | 51–55 | Partial implementation | Basic cancellation/undo passed; full TCE reconciliation untested | No | 15 min | TCE; ledger/intake tests |
 | 57 | Supplier/restock payments | Support supplier payment, credit and future settlement flows through the adapter/TCE boundary. | 29, 50, 55 | Planned / approved | Not started | No | 15 min | TCE permanent scope; supplier workflows |
 
@@ -199,8 +199,8 @@ This ledger deliberately accounts for owner-facing domains discovered across cur
 
 - Total checkpoints: **84**
 - PASS / PROTECTED: **46**
-- Implemented — awaiting owner live test: **7**
-- Partial implementation: **9**
+- Implemented — awaiting owner live test: **8**
+- Partial implementation: **8**
 - Planned / approved: **17**
 - External qualification: **3**
 - Deprecated with repository evidence: **2**
@@ -1066,13 +1066,13 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **Checkpoint ID:** MS2-LT-055
 - **Name:** Refunds, returns and credits
 - **Category:** Financial & Payment Validation
-- **Current status:** Partial implementation
-- **Repository evidence:** 2026-07-31 owner screenshots; interactive completed-sale receipt and linked adjustment-review verifier; TCE; issue-return tests; intake history
+- **Current status:** Implemented — awaiting owner live test
+- **Repository evidence:** 2026-07-31 owner screenshots; shared Sale Adjustment workflow verifier; Production Sales Card; TCE; consistency gate
 - **Implementation commit(s):** Repository evidence not yet available.
 - **Primary implementation files/modules:** `app/intake.py`; `ms20-main-app/src/services/transactionCompletionEngine.js`; `ms20-main-app/src/services/saleAdjustmentReview.js`; `ms20-main-app/src/app.js`
-- **Owner live-test evidence:** Owner test blocked 2026-07-31: completed Sale 1 rendered as inert text with no discoverable adjustment entry point; shared interactive receipt/detail/review repair awaits owner retest.; source: 2026-07-31 owner screenshots; interactive completed-sale receipt and linked adjustment-review verifier; TCE; issue-return tests; intake history
+- **Owner live-test evidence:** Owner evidence proved receipt/detail/review, then exposed missing Confirm. Shared adjustment confirmation, ledger, stock/payment rules, idempotency, offline queue and reciprocal links now await one owner Return retest.; source: 2026-07-31 owner screenshots; shared Sale Adjustment workflow verifier; Production Sales Card; TCE; consistency gate
 - **PASS / PROTECTED confirmation:** Not applicable.
-- **Remaining implementation work:** Complete the unimplemented portion and owner-validate: Record linked financial/stock adjustments without deleting original history.
+- **Remaining implementation work:** Complete decisive owner live validation for: Record linked financial/stock adjustments without deleting original history.
 - **Prerequisite checkpoints:** 51–54
 - **Dependent checkpoints:** MS2-LT-056, MS2-LT-057, MS2-LT-074
 

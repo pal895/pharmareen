@@ -331,6 +331,8 @@ The resolver now includes a bounded phrase-level phonetic skeleton for accent- a
 
 MS2.0 uses one Transaction Completion Engine rather than a standalone Payment Engine. Sales, subscriptions, supplier/restock payments, refunds, reversals, credits, and future settlement workflows share this completion boundary.
 
+Completed sales and all Refund/Return/Credit outcomes use one deterministic Sale Adjustment engine. Reviews share remaining-quantity enforcement, explicit stock/payment consequences and a single idempotent Confirm boundary. Confirmed adjustments persist locally with permanent original linkage, audit identity/timestamps, proportional base-stock restoration where authorized, and stable offline queue IDs. Refund never assumes stock restoration; Credit never claims a cash/M-Pesa refund. Adjustment receipts and original sales provide reciprocal navigation, and original transactions remain immutable.
+
 - Completion modes: Always Fast Record, Always Request & Verify, or Always Ask.
 - Providers are isolated behind Payment Adapters.
 - Simulator-first development is mandatory before official M-PESA/card adapters.
