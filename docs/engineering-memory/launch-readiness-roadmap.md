@@ -184,6 +184,6 @@ All backlog work keeps its canonical checkpoint/evidence relationship. New appro
 
 ## Active launch priority
 
-**MS2-LT-049 — Exact form/unit/pack/price truth**
+**MS2-LT-050 — Payment modes, splits and discounts**
 
-Status: `NOT STARTED — NEXT OWNER LIVE TEST`. Its prerequisites MS2-LT-010–015 and the Production Sales Card prerequisite are protected, and MS2-LT-054 is closed. It is the next dependency-valid Launch Critical milestone because unit/strength/pack/price mistakes can corrupt every later payment, refund, report, multiuser and loyalty workflow. Begin only its first ordered focused case: typed known-unit sale.
+Status: `IMPLEMENTED — NEXT OWNER LIVE TEST`. MS2-LT-049 passed from the 2026-07-31 owner screenshot package and is protected; MS2-LT-014 is also protected, so both prerequisites are satisfied. MS2-LT-050 is the next dependency-valid Launch Critical milestone because launch transactions must preserve truthful payment state. Begin only its first focused case and stop for owner screenshots.

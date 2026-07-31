@@ -80,7 +80,7 @@ Evidence abbreviations: `CVS` = `docs/engineering-memory/current-live-validation
 
 | # | Checkpoint | Objective | Prerequisite(s) | Implementation state | Owner validation | Protected | Est. live test | Evidence/document source |
 |---:|---|---|---|---|---|---|---|---|
-| 49 | Exact form/unit/pack/price truth | Prevent unit/strength price leakage and preserve conversions across all inputs and consumers. | 10–15 | Planned / approved | Not started | No | 20 min | LATP Improvement 2; OI prerequisite |
+| 49 | Exact form/unit/pack/price truth | Prevent unit/strength price leakage and preserve conversions across all inputs and consumers. | 10–15 | PASS / PROTECTED | Passed 2026-07-31: owner screenshots of the typed `Ibuprofen 1 tablet cash` review proved exact tablet form/unit, KES 18 unit/total, cash, projected stock 27 → 26, strength 200 mg, buying price KES 9, supplier Afya Wholesale Ltd, batch IBU-200C, expiry 2028-12, truthful absent optional traceability, all three Production Sales Card tabs, and no confirmed or persisted mutation. | Yes | 20 min | Owner screenshot package supplied through CODEX BRIDGE v5.0; protected Production Sales Card standard; focused production-sale-card and sale-fixture verifiers |
 | 50 | Payment modes, splits and discounts | Handle Cash, M-Pesa, Card, Credit, Mixed, payment corrections and supported discounts truthfully. | 14, 49 | Implemented — awaiting owner live test | Only narrower payment paths passed | No | 15 min | `intake.py`; day-2/intake tests; commit history |
 | 51 | TCE Fast Record | Record owner-confirmed transactions immediately with daily numbering and exact one-time stock/finance effects. | 14 | PASS / PROTECTED | Passed | Yes | 10 min | CVS; TCE |
 | 52 | Request & Verify success | Queue non-cash request, continue serving and complete only after verified success. | 51 | PASS / PROTECTED | Passed | Yes | 12 min | CVS; TCE; TCE/UI verifiers |
@@ -148,7 +148,7 @@ This ledger deliberately accounts for owner-facing domains discovered across cur
 | Sales, receipts and daily numbering | PASS / PROTECTED | 14, 51 | Sales/TCE owner evidence and tests |
 | Catalog, medicine editing, search and Activity History | PASS / PROTECTED | 10–11, 31–32, 66 | Catalog Search Mic and Activity Compaction owner evidence; catalog/activity verifiers |
 | Stock management, stock checks, fixes and restocking | PASS / PROTECTED | 15–18, 24–25 | Stock Fix owner sequence; stock/restock tests |
-| Exact unit, form, pack, conversion and price truth | Planned / approved | 49 | LATP ordered Improvement 2 |
+| Exact unit, form, pack, conversion and price truth | PASS / PROTECTED | 49 | 2026-07-31 owner Ibuprofen known-unit screenshot package; Production Sales Card regression verifiers |
 | Supplier ordering, fulfilment and supplier payments | Planned / approved | 29, 48, 57 | LATP ordered Improvement 1; TCE permanent scope |
 | Reorder, stock-out, demand, fast/slow/dead-stock and expiry intelligence | Planned / approved | 26–30 | OI; OM Future rules |
 | Operational metrics, analytics, dashboard and decision support | Partial implementation | 21–23, 30 | Protected reports plus unqualified/partial intelligence renderers |
@@ -198,16 +198,16 @@ This ledger deliberately accounts for owner-facing domains discovered across cur
 ## Canonical status totals
 
 - Total checkpoints: **84**
-- PASS / PROTECTED: **44**
+- PASS / PROTECTED: **45**
 - Implemented — awaiting owner live test: **8**
 - Partial implementation: **9**
-- Planned / approved: **18**
+- Planned / approved: **17**
 - External qualification: **3**
 - Deprecated with repository evidence: **2**
 
 ## Current execution pointer
 
-The only current open checkpoint is **#49 Exact form/unit/pack/price truth**. The prerequisite Production Sales Card recovery/simplification hold passed owner validation on 2026-07-30 and its exact compact three-tab, voice/manual, viewport-stable, catalog-preserving and safe pack-conversion behavior is now protected. This does not pass #49. It is selected by the dependency-aware Launch Critical queue in `docs/engineering-memory/launch-readiness-roadmap.md`, not by the former ascending sequence. Checkpoints #14–#21 and the protected Sales Card prerequisite must not be repeated without regression evidence. After one focused owner test, stop and wait for evidence. The former automatic linear progression is historical and must never resume.
+The only current open checkpoint is **#50 Payment modes, splits and discounts**. MS2-LT-049 passed owner validation on 2026-07-31 from the typed Ibuprofen known-unit screenshot package and is protected together with the Production Sales Card regression contract. It must not be repeated without regression evidence. MS2-LT-050 is selected by the dependency-aware Launch Critical queue because prerequisites #14 and #49 are protected; the former automatic linear progression is historical and must never resume. Issue only its first focused owner test, then stop and wait for evidence.
 
 ## Canonical synchronization invariants
 
@@ -976,13 +976,13 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **Checkpoint ID:** MS2-LT-049
 - **Name:** Exact form/unit/pack/price truth
 - **Category:** Financial & Payment Validation
-- **Current status:** Planned / approved
-- **Repository evidence:** LATP Improvement 2; OI prerequisite
+- **Current status:** PASS / PROTECTED
+- **Repository evidence:** Owner screenshot package supplied through CODEX BRIDGE v5.0; protected Production Sales Card standard; focused production-sale-card and sale-fixture verifiers
 - **Implementation commit(s):** Repository evidence not yet available.
 - **Primary implementation files/modules:** Repository evidence not yet available.
-- **Owner live-test evidence:** Repository evidence not yet available.
-- **PASS / PROTECTED confirmation:** Not applicable.
-- **Remaining implementation work:** Implement and owner-validate: Prevent unit/strength price leakage and preserve conversions across all inputs and consumers.
+- **Owner live-test evidence:** Passed 2026-07-31: owner screenshots of the typed `Ibuprofen 1 tablet cash` review proved exact tablet form/unit, KES 18 unit/total, cash, projected stock 27 → 26, strength 200 mg, buying price KES 9, supplier Afya Wholesale Ltd, batch IBU-200C, expiry 2028-12, truthful absent optional traceability, all three Production Sales Card tabs, and no confirmed or persisted mutation.; source: Owner screenshot package supplied through CODEX BRIDGE v5.0; protected Production Sales Card standard; focused production-sale-card and sale-fixture verifiers
+- **PASS / PROTECTED confirmation:** Confirmed — Owner validation: Passed 2026-07-31: owner screenshots of the typed `Ibuprofen 1 tablet cash` review proved exact tablet form/unit, KES 18 unit/total, cash, projected stock 27 → 26, strength 200 mg, buying price KES 9, supplier Afya Wholesale Ltd, batch IBU-200C, expiry 2028-12, truthful absent optional traceability, all three Production Sales Card tabs, and no confirmed or persisted mutation.; Protected: Yes.
+- **Remaining implementation work:** None; preserve against regression.
 - **Prerequisite checkpoints:** 10–15
 - **Dependent checkpoints:** MS2-LT-027, MS2-LT-028, MS2-LT-029, MS2-LT-050, MS2-LT-074
 

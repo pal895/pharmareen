@@ -24,7 +24,7 @@ This is the reconciled engineering standard for the one shared MS2.0 Production 
 | Read exposes the shared local segmented Read/Pause/Resume/Stop lifecycle | Protected generic editable-card narration | Reused; no new reader variant | `speechControlsTemplate` |
 | Cancel causes no sale, stock, payment, sync or downstream reward action | Review-first/confirmation and TCE rules | Implemented and source-regression protected | `rejectCard`; `recordCard` only after Confirm |
 | Pack-photo facts retain field provenance and never invent or duplicate | Protected medicine-pack onboarding; LATP 821 | Existing shared acquisition rule; not reimplemented in this recovery | visual/catalog pipeline |
-| Typed/voice/barcode/camera/photo/file/catalog/quick-add and ledger/stock/report/history/undo/offline/export consumers retain exact truth | LATP 821–823; Engineering Memory line 468 | Shared canonical fields and transaction metadata implemented; the ordered MS2-LT-049 cross-input matrix remains not started | shared model, TCE metadata, queue/sync adapters |
+| Typed/voice/barcode/camera/photo/file/catalog/quick-add and ledger/stock/report/history/undo/offline/export consumers retain exact truth | LATP 821–823; Engineering Memory line 468 | Shared canonical fields and transaction metadata implemented; MS2-LT-049 owner validation passed 2026-07-31 and the shared contract remains protected for dependent workflows | shared model, TCE metadata, queue/sync adapters |
 | Multiuser attribution, loyalty triggers and Demo Mode must consume this same SaleCard | Launch roadmap | Architectural requirement preserved; those future milestones remain not started | integration adapters; no alternate SaleCard permitted |
 
 ## Failure and root correction
@@ -37,7 +37,7 @@ The first recovery implementation also flattened the card. The authoritative des
 
 The 2026-07-30 owner evidence passes and protects the Production Sales Card recovery checkpoint exactly as rendered and behaved. The compact cream surface, Fast action / Stock & details / Traceability tabs, concise summary, quantity/payment controls, Confirm/Read/Correct/Cancel actions, full correction mode, every inline microphone, manual fallback, viewport/conversation-position stability, catalog context, safe Unknown state, natural missing-conversion question and deterministic stock conversion are one indivisible regression contract.
 
-Future work must not redesign, further simplify, split, duplicate or reinterpret this card. It must not remove fields, tabs, microphones, traceability, correction capability or safety blocking. Typed, voice, review, queue, verification, failure recovery, notifications and future fixtures continue through this shared implementation. This approval closes only the Sales Card recovery hold; it does not pass MS2-LT-049. The authoritative sequence now resumes with that single pending checkpoint.
+Future work must not redesign, further simplify, split, duplicate or reinterpret this card. It must not remove fields, tabs, microphones, traceability, correction capability or safety blocking. Typed, voice, review, queue, verification, failure recovery, notifications and future fixtures continue through this shared implementation. MS2-LT-049 subsequently passed on 2026-07-31 from owner screenshots of the exact typed Ibuprofen known-unit review; the authoritative sequence now routes to MS2-LT-050.
 
 ## Compact production presentation
 

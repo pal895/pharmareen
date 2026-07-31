@@ -588,14 +588,20 @@ The next evidence set passes Slide 3 voice updates, packet/strip preservation, m
 
 The final owner screenshot package passes and protects the Production Sales Card recovery checkpoint exactly as implemented. It proves the compact cream three-tab card; stable quantity, payment, tab, typing and voice interaction; Slide 3 voice editing; full Correct/manual editing; close/cancel conversation-position recovery; separate medicine/quantity/requested-unit/payment parsing; packet/strip/box preservation; safe Unknown blocking; retained Paracetamol catalog and traceability context; natural “How many tablets are in one box?” clarification; microphone entry of conversion 12 and price KES 100; correct KES 100 recalculation; no duplicate medicine; and unchanged configured-tablet calculations.
 
-This is PASS / PROTECTED and ends the temporary Sales Card hold. The exact current implementation is the permanent regression contract; do not redesign, split or weaken it. The dependency-aware sequence resumes at the already-selected **MS2-LT-049 — Exact form/unit/pack/price truth**. That checkpoint remains not started until the next focused owner test.
+This is PASS / PROTECTED and ends the temporary Sales Card hold. The exact current implementation is the permanent regression contract; do not redesign, split or weaken it.
+
+## MS2-LT-049 owner closure — 2026-07-31
+
+MS2-LT-049 is **OWNER-VALIDATED PASS / FROZEN / PROTECTED**. The owner typed `Ibuprofen 1 tablet cash`; screenshots proved Medicine Ibuprofen, Form tablet, Base unit tablet, Requested selling unit tablet, Quantity 1, Unit price KES 18, Total KES 18, Payment cash, projected stock `27 → 26`, Strength 200 mg, Buying price KES 9, Supplier Afya Wholesale Ltd, Batch IBU-200C and Expiry 2028-12. Barcode, Aliases and Notes were truthfully `Not recorded`; no incorrect Unknown value or pack-price leakage appeared; all three protected Production Sales Card tabs rendered correctly.
+
+The sale was not confirmed, so no sale or stock mutation persisted. This evidence closes MS2-LT-049 without repeating it and adds no implementation change. Focused Production Sales Card and sale-fixture verifiers remain the regression evidence. The dependency-aware sequence now selects **MS2-LT-050 — Payment modes, splits and discounts**, whose prerequisites MS2-LT-014 and MS2-LT-049 are protected. Issue only its first focused owner test and wait for screenshots.
 
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-049 — Exact form/unit/pack/price truth
+- Current: MS2-LT-050 — Payment modes, splits and discounts
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.

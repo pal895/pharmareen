@@ -3,8 +3,8 @@
   "authority": "MS2.0_MASTER_LIVE_TEST_SEQUENCE.md",
   "checkpoint_count": 84,
   "current_checkpoint": {
-    "id": "MS2-LT-049",
-    "name": "Exact form/unit/pack/price truth"
+    "id": "MS2-LT-050",
+    "name": "Payment modes, splits and discounts"
   },
   "protected_checkpoint_ids": [
     "MS2-LT-001",
@@ -41,6 +41,7 @@
     "MS2-LT-045",
     "MS2-LT-046",
     "MS2-LT-047",
+    "MS2-LT-049",
     "MS2-LT-051",
     "MS2-LT-052",
     "MS2-LT-053",
@@ -60,6 +61,6 @@
     "status": "ACTIVE",
     "document": "docs/engineering-memory/token-execution-policy.md"
   },
-  "master_sha256": "f5c02bcca903547e1aedc79a02945ca7333e063a7882a8073b48e938ab4edd80",
+  "master_sha256": "deb7c37410e7ae695109481218b66093e8502eddcc05f2bfe21e75748f16b20f",
   "rule": "Load the master and its Engineering Traceability Index; never reconstruct or maintain a parallel sequence."
 }

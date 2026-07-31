@@ -820,7 +820,7 @@ Dependency position: later active-sales, shared editable-card and cross-input co
 
 Implement once across typed, voice, barcode, camera, pack photo, file, catalog, quick add, onboarding, duplicates, corrections, undo, offline, ledger, stock, reports, history and exports. Pack-photo processing follows local recognition -> Pharmacy Catalog -> Source Brain -> OCR -> cache -> approved AI fallback only, extracting every visibly supported brand/generic/strength/form/unit/pack/quantity/barcode/batch/expiry/manufacturer/distributor/registration/printed-price field and labeling image/catalog/suggested/confirmed/unknown provenance without invention or duplicate creation.
 
-Ordered focused live checkpoints, one at a time: typed known-unit sale; voice equivalent; multiple units; unit-specific prices; ambiguous unit; wrong unit-price; missing conversion; box-strip and strip-tablet conversion; supported liquid handling; barcode; camera; pack photo; file; catalog; quick add; duplicate detection; photo completeness; unreadable fields unknown; exact stock/ledger/report/history; correction; undo; offline; shared-card regression; three-step/rush-hour clarity; optional deterministic read-back; zero-unjustified-LLM protection.
+MS2-LT-049 closed **OWNER-VALIDATED PASS / FROZEN / PROTECTED** on 2026-07-31. The typed `Ibuprofen 1 tablet cash` owner screenshots proved exact form, base/requested unit, price, total, payment, projected stock and full catalog/traceability truth on all three protected Production Sales Card tabs without confirmation or persisted mutation. Do not repeat this checkpoint. Its shared exact-truth requirements remain regression contracts for voice, multiple units, ambiguity, conversion, supported acquisition sources, persistence, correction, undo, offline behavior and downstream consumers. Dependency-aware routing advances to MS2-LT-050 only.
 
 ## Ordered approved improvement 3 - Export IP, privacy and compliance safeguards
 
@@ -955,7 +955,7 @@ Pass only after owner-device evidence shows the file opens in a compatible prese
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-049 — Exact form/unit/pack/price truth
+- Current: MS2-LT-050 — Payment modes, splits and discounts
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.

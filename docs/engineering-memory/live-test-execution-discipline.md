@@ -65,7 +65,7 @@ When evidence differs between attempts, record the visible input, active card, t
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-049 — Exact form/unit/pack/price truth
+- Current: MS2-LT-050 — Payment modes, splits and discounts
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.
