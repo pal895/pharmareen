@@ -620,6 +620,8 @@ The same evidence records, but does not yet authorize early implementation of, t
 
 The complete 2026-08-01 owner package closes original 055-C as OWNER-VERIFIED PASSED / FROZEN / PROTECTED. Sale 2 recorded Ibuprofen x1 Cash and reduced stock 17 → 16. The green/checkmarked stock-restoring Refund review showed Money back KES 18, Stock added back 1, Cash reversal and original completed. Confirm created Refund record #5; its detail and immutable Sale 2 linked reciprocally; exactly one tablet returned and the catalog independently showed 17. No duplicate or incorrect stock effect appeared. Do not repeat 055-C. Queued status-card, compact-layout and direct-command improvements remain locked until all original cases finish. The exact next original test is 055-D Credit only.
 
+The complete 2026-08-01 owner package closes original 055-D as OWNER-VERIFIED PASSED / FROZEN / PROTECTED. Sale 3 recorded Ibuprofen x1 Cash and reduced stock 17 → 16. Credit review showed Account credit KES 18, Stock added back 0, no cash refund and the original sale completed. Confirm created Credit record #6; its permanent detail and immutable Sale 3 linked reciprocally; the catalog independently remained at 16. No duplicate stock or accounting effect appeared. Do not repeat 055-D. The exact next original case is 055-E partial/full/repeat safety only. Its shared review now exposes previously adjusted and remaining quantities, disables quantity controls at safe bounds and gives an explicit no-change message when a fully adjusted sale is attempted. Queued compact-selector, status-history and direct-command improvements remain locked through 055-F.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

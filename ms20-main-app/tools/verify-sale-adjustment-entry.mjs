@@ -44,8 +44,12 @@ for (const marker of [
 ]) assert.match(app, new RegExp(marker));
 for (const text of [
   "Should this medicine go back into stock?", "Money back + medicine back in stock",
-  "Stock added back", "record #", "for Sale"
+  "Stock added back", "record #", "for Sale", "Previously adjusted",
+  "Remaining before this adjustment", "Remaining after confirmation",
+  "is already fully adjusted. No stock or money changed."
 ]) assert.ok(app.includes(text), `Missing shared adjustment wording: ${text}`);
+assert.match(app, /adjustmentQuantity <= 1 \? "disabled"/);
+assert.match(app, /adjustmentQuantity >= remainingQuantity \? "disabled"/);
 
 const css = fs.readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
 assert.match(css, /\.refund-stock-choice button\[aria-pressed="true"\][\s\S]*background:\s*var\(--accent\)/);

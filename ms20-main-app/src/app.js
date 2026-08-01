@@ -682,6 +682,9 @@ function completedSaleDetailCardTemplate(card) {
 function saleAdjustmentReviewCardTemplate(card) {
   const fields = card.fields || {};
   const typeLabel = String(fields.adjustment_type || "adjustment").replace(/^./, (letter) => letter.toUpperCase());
+  const adjustmentQuantity = Number(fields.adjustment_quantity || 0);
+  const remainingQuantity = Number(fields.remaining_quantity || 0);
+  const remainingAfter = Math.max(0, remainingQuantity - adjustmentQuantity);
   return `
     <article class="card-message ready sale-adjustment-review-card" data-card-id="${escapeHtml(card.id)}">
       <div class="card-top">
@@ -693,7 +696,10 @@ function saleAdjustmentReviewCardTemplate(card) {
         ["Medicine", fields.medicine],
         ["Unit", fields.unit],
         ["Quantity sold", fields.sold_quantity],
+        ["Previously adjusted", fields.previously_adjusted_quantity ?? 0],
+        ["Remaining before this adjustment", remainingQuantity],
         ["Quantity to adjust", fields.adjustment_quantity],
+        ["Remaining after confirmation", remainingAfter],
         ["Unit price", fields.unit_price ? `KES ${fields.unit_price}` : ""],
         [fields.adjustment_type === "credit" ? "Account credit" : "Money back", `KES ${fields.financial_adjustment}`],
         ["Stock added back", String(fields.stock_to_restore ?? 0)],
@@ -701,8 +707,8 @@ function saleAdjustmentReviewCardTemplate(card) {
         ["Original sale", fields.original_sale_status]
       ])}
       <div class="quantity-toolbar" aria-label="Adjustment quantity">
-        <button type="button" data-action="bump-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-delta="-1">-1</button>
-        <button type="button" data-action="bump-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-delta="1">+1</button>
+        <button type="button" data-action="bump-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-delta="-1" aria-label="Reduce adjustment quantity" ${adjustmentQuantity <= 1 ? "disabled" : ""}>-1</button>
+        <button type="button" data-action="bump-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-delta="1" aria-label="Increase adjustment quantity" ${adjustmentQuantity >= remainingQuantity ? "disabled" : ""}>+1</button>
       </div>
       ${fields.adjustment_type === "refund" ? `<fieldset class="refund-stock-choice"><legend>Should this medicine go back into stock?</legend>
         <button type="button" data-action="set-refund-stock" data-card-id="${escapeHtml(card.id)}" data-restore-stock="false" aria-pressed="${!fields.restore_stock}"><span aria-hidden="true">✓</span> Money only</button>
@@ -3276,7 +3282,11 @@ function startSaleAdjustment(cardId, adjustmentType) {
     transactionId: detailCard.fields?.transaction_id
   });
   const fields = saleAdjustmentEngine.review(transaction, adjustmentType, 1);
-  if (!fields) return;
+  if (!fields) {
+    addFeed("system", `Sale ${detailCard.fields?.sale_number} is already fully adjusted. No stock or money changed. Open the sale to review its linked adjustments.`);
+    render();
+    return;
+  }
   const card = createEditableCard({
     type: "SaleAdjustmentReviewCard",
     title: `${String(adjustmentType).replace(/^./, (letter) => letter.toUpperCase())} Sale ${fields.original_sale_number}`,
