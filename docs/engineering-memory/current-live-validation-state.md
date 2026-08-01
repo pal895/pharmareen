@@ -618,6 +618,8 @@ The corrected ten-image package closes original 055-B. Sale 5 completed as Ibupr
 
 The same evidence records, but does not yet authorize early implementation of, the mandatory post-original usability programme: restore compact side-by-side Refund choices while retaining selected feedback; replace accumulating adjustment receipts with one updating Latest Adjustment status plus Open Latest Adjustment and complete Adjustment History; and generalize the singleton latest-plus-history contract across Catalog Activity, Export and future system statuses without deleting audit records. This programme and the previously approved direct-command programme begin only after original 055-C through 055-F pass, receive their own one-at-a-time owner tests, and must pass before checkpoint closure.
 
+The complete 2026-08-01 owner package closes original 055-C as OWNER-VERIFIED PASSED / FROZEN / PROTECTED. Sale 2 recorded Ibuprofen x1 Cash and reduced stock 17 → 16. The green/checkmarked stock-restoring Refund review showed Money back KES 18, Stock added back 1, Cash reversal and original completed. Confirm created Refund record #5; its detail and immutable Sale 2 linked reciprocally; exactly one tablet returned and the catalog independently showed 17. No duplicate or incorrect stock effect appeared. Do not repeat 055-C. Queued status-card, compact-layout and direct-command improvements remain locked until all original cases finish. The exact next original test is 055-D Credit only.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
