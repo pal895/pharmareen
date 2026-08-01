@@ -648,6 +648,7 @@ function cardTemplate(card) {
 function completedSaleDetailCardTemplate(card) {
   const fields = card.fields || {};
   const linked = saleAdjustmentEngine.list().filter((item) => item.original_transaction_id === fields.transaction_id);
+  const adjustmentsBlocked = fields.adjustment_available === false;
   return `
     <article class="card-message ready sale-detail-card" data-card-id="${escapeHtml(card.id)}">
       <div class="card-top">
@@ -665,11 +666,13 @@ function completedSaleDetailCardTemplate(card) {
         ["Stock after sale", fields.stock_after_sale],
         ["Status", fields.status]
       ])}
-      <p class="card-note">Choose one adjustment. The original Sale ${escapeHtml(String(fields.sale_number))} remains in history. Nothing changes until a later confirmation.</p>
+      <p class="card-note">${adjustmentsBlocked
+        ? escapeHtml(fields.adjustment_block_message)
+        : `Choose one adjustment. The original Sale ${escapeHtml(String(fields.sale_number))} remains in history. Nothing changes until a later confirmation.`}</p>
       <div class="card-actions sale-adjustment-actions" aria-label="Sale adjustment options">
-        <button type="button" data-action="start-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-adjustment-type="refund">Refund</button>
-        <button type="button" data-action="start-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-adjustment-type="return">Return</button>
-        <button type="button" data-action="start-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-adjustment-type="credit">Credit</button>
+        <button type="button" data-action="start-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-adjustment-type="refund" ${adjustmentsBlocked ? "disabled" : ""}>Refund</button>
+        <button type="button" data-action="start-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-adjustment-type="return" ${adjustmentsBlocked ? "disabled" : ""}>Return</button>
+        <button type="button" data-action="start-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-adjustment-type="credit" ${adjustmentsBlocked ? "disabled" : ""}>Credit</button>
       </div>
       ${linked.length ? `<section class="linked-adjustments"><strong>Linked adjustments</strong>${linked.map((item) =>
         `<button type="button" data-action="open-sale-adjustment" data-adjustment-id="${escapeHtml(item.id)}">${escapeHtml(adjustmentTypeLabel(item.adjustment_type))} for Sale ${fields.sale_number}<small>Record #${item.adjustment_number} · KES ${item.financial_adjustment}</small></button>`
@@ -696,10 +699,10 @@ function saleAdjustmentReviewCardTemplate(card) {
         ["Medicine", fields.medicine],
         ["Unit", fields.unit],
         ["Quantity sold", fields.sold_quantity],
-        ["Previously adjusted", fields.previously_adjusted_quantity ?? 0],
-        ["Remaining before this adjustment", remainingQuantity],
+        ["Previously adjusted", String(fields.previously_adjusted_quantity ?? 0)],
+        ["Remaining before this adjustment", String(remainingQuantity)],
         ["Quantity to adjust", fields.adjustment_quantity],
-        ["Remaining after confirmation", remainingAfter],
+        ["Remaining after confirmation", String(remainingAfter)],
         ["Unit price", fields.unit_price ? `KES ${fields.unit_price}` : ""],
         [fields.adjustment_type === "credit" ? "Account credit" : "Money back", `KES ${fields.financial_adjustment}`],
         ["Stock added back", String(fields.stock_to_restore ?? 0)],
@@ -3260,6 +3263,10 @@ function openCompletedSale(reference) {
   }
   state.cards = state.cards.filter((card) => !["CompletedSaleDetailCard", "SaleAdjustmentReviewCard", "SaleAdjustmentDetailCard"].includes(card.type));
   const fields = saleDetailFields(transaction);
+  const availability = saleAdjustmentEngine.availability(transaction);
+  fields.adjustment_available = availability.available;
+  fields.adjustment_remaining_quantity = availability.remaining_quantity;
+  fields.adjustment_block_message = availability.message;
   const card = createEditableCard({
     type: "CompletedSaleDetailCard",
     title: `Sale ${fields.sale_number}`,
@@ -3281,12 +3288,18 @@ function startSaleAdjustment(cardId, adjustmentType) {
     saleNumber: detailCard.fields?.sale_number,
     transactionId: detailCard.fields?.transaction_id
   });
-  const fields = saleAdjustmentEngine.review(transaction, adjustmentType, 1);
-  if (!fields) {
-    addFeed("system", `Sale ${detailCard.fields?.sale_number} is already fully adjusted. No stock or money changed. Open the sale to review its linked adjustments.`);
+  const availability = saleAdjustmentEngine.availability(transaction);
+  if (!availability.available) {
+    detailCard.fields.adjustment_available = false;
+    detailCard.fields.adjustment_remaining_quantity = availability.remaining_quantity;
+    detailCard.fields.adjustment_block_message = availability.message;
+    persistActiveCards();
     render();
+    focusCard(detailCard.id);
     return;
   }
+  const fields = saleAdjustmentEngine.review(transaction, adjustmentType, 1);
+  if (!fields) return;
   const card = createEditableCard({
     type: "SaleAdjustmentReviewCard",
     title: `${String(adjustmentType).replace(/^./, (letter) => letter.toUpperCase())} Sale ${fields.original_sale_number}`,

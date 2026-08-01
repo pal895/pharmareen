@@ -75,6 +75,23 @@ export function createSaleAdjustmentReview(transaction, type, quantity = 1, exis
   };
 }
 
+export function saleAdjustmentAvailability(transaction, existing = []) {
+  if (!transaction) return { available: false, remaining_quantity: 0, message: "This completed sale could not be found. Nothing changed." };
+  const originalId = transaction.permanentId || transaction.id;
+  const soldQuantity = Number(transaction.metadata?.quantity || 0);
+  const adjustedQuantity = existing
+    .filter((item) => item.original_transaction_id === originalId && item.status === "confirmed")
+    .reduce((sum, item) => sum + Number(item.adjustment_quantity || 0), 0);
+  const remainingQuantity = Math.max(0, soldQuantity - adjustedQuantity);
+  return {
+    available: remainingQuantity > 0,
+    sold_quantity: soldQuantity,
+    adjusted_quantity: adjustedQuantity,
+    remaining_quantity: remainingQuantity,
+    message: remainingQuantity > 0 ? "" : "This sale has already been fully adjusted. No stock or money changed."
+  };
+}
+
 export class SaleAdjustmentEngine {
   constructor({ storage = null, now = () => new Date(), staffIdentity = () => "Owner" } = {}) {
     this.storage = storage;
@@ -95,6 +112,10 @@ export class SaleAdjustmentEngine {
 
   review(transaction, type, quantity = 1, options = {}) {
     return createSaleAdjustmentReview(transaction, type, quantity, this.list(), options);
+  }
+
+  availability(transaction) {
+    return saleAdjustmentAvailability(transaction, this.list());
   }
 
   confirm(review) {

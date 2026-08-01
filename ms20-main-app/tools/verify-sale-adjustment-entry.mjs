@@ -3,6 +3,7 @@ import fs from "node:fs";
 import {
   completedSaleByReference,
   createSaleAdjustmentReview,
+  saleAdjustmentAvailability,
   SaleAdjustmentEngine,
   saleDetailFields,
   saleReferenceFromReceipt
@@ -34,8 +35,17 @@ assert.equal(engine.confirm(first.record).duplicate, true, "double confirmation 
 assert.equal(engine.review(transaction, "credit", 4).remaining_quantity, 4);
 engine.confirm(engine.review(transaction, "credit", 4, { reviewId: "adjust-2" }));
 assert.equal(engine.review(transaction, "return", 1), null, "fully adjusted sale must be blocked");
+const blocked = engine.availability(transaction);
+assert.equal(blocked.available, false);
+assert.equal(blocked.remaining_quantity, 0);
+assert.match(blocked.message, /already been fully adjusted/);
+for (const type of ["return", "refund", "credit"]) {
+  assert.equal(engine.review(transaction, type, 1), null, `${type} must share the full-adjustment block`);
+}
+assert.equal(saleAdjustmentAvailability(transaction, []).remaining_quantity, 6);
 
 const app = fs.readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+const service = fs.readFileSync(new URL("../src/services/saleAdjustmentReview.js", import.meta.url), "utf8");
 for (const marker of [
   'data-action="open-completed-sale"', 'data-adjustment-type="refund"',
   'data-adjustment-type="return"', 'data-adjustment-type="credit"',
@@ -45,9 +55,10 @@ for (const marker of [
 for (const text of [
   "Should this medicine go back into stock?", "Money back + medicine back in stock",
   "Stock added back", "record #", "for Sale", "Previously adjusted",
-  "Remaining before this adjustment", "Remaining after confirmation",
-  "is already fully adjusted. No stock or money changed."
+  "Remaining before this adjustment", "Remaining after confirmation"
 ]) assert.ok(app.includes(text), `Missing shared adjustment wording: ${text}`);
+assert.ok(service.includes("has already been fully adjusted. No stock or money changed."));
+assert.match(app, /adjustmentsBlocked \? "disabled"/);
 assert.match(app, /adjustmentQuantity <= 1 \? "disabled"/);
 assert.match(app, /adjustmentQuantity >= remainingQuantity \? "disabled"/);
 

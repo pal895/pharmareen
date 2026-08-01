@@ -78,6 +78,8 @@ Advanced missions, badges, personalized challenges, seasonal campaigns, leaderbo
 
 Impala is a separate community area, never mixed into operational pharmacy chat. Onboarding assigns collision-safe sequential pharmacy/community IDs (`001`, `002`, `003`, …). Pharmacy identity is primary; permitted staff nicknames appear beneath it, for example `Mary · Impala Pharmacy 001`.
 
+Deferred design-system direction: the owner selected the clear blue used by the catalog search-field clear icon as the future MS2.0 signature accent and the intended Impala Community identity accent. Preserve this request as a shared theme-token migration for the later UI/theming improvement programme; do not roll it out widget-by-widget or during the ordered MS2-LT-055 original sequence. Exact accessible token values and contrast states require dedicated owner validation before adoption.
+
 Version 1 includes a pharmacy-focused feed, text/photo posts, questions/answers, appreciation, comments, business promotion, birthdays, MS2.0 usage milestones, referral recognition, clear rules, reporting, moderation, restriction and banning. Content remains centered on pharmacy operations, entrepreneurship, service, professional health discussion, motivation, celebrations, community support and business education.
 
 Themes, streaks, AI prompts/missions, voice/video/live calls, events, mentorship, marketplace, regional groups, contact exchange/Impala Connect and community games are Continuous Improvement. Future owner community ideas remain under this improvement unless repository evidence places them elsewhere.
