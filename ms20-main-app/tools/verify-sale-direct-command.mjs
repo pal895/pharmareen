@@ -8,6 +8,10 @@ assert.deepEqual(parseSaleDirectCommand("  OPEN   SALE 42 "), { action: "open", 
 assert.deepEqual(parseSaleDirectCommand("sale 1"), { action: "open", target: "number", saleNumber: 1 });
 assert.deepEqual(parseSaleDirectCommand("open cell one"), { action: "open", target: "number", saleNumber: 1 });
 assert.deepEqual(parseSaleDirectCommand("return sale 2"), { action: "return", target: "number", saleNumber: 2 });
+assert.deepEqual(parseSaleDirectCommand("refund sale 3"), { action: "refund", target: "number", saleNumber: 3 });
+assert.equal(parseSaleDirectCommand("return cell to"), null);
+assert.equal(parseSaleDirectCommand("return cell two"), null);
+assert.equal(parseSaleDirectCommand("refund cell three"), null);
 assert.equal(parseSaleDirectCommand("open sale 0"), null);
 assert.equal(parseSaleDirectCommand("open 1"), null);
 assert.equal(parseSaleDirectCommand("open last sale"), null);
@@ -35,9 +39,10 @@ assert.match(app, /function handleVoiceTranscript\(text\)[\s\S]*?if \(routePrior
 assert.match(app, /direct\.action === "open"/);
 assert.match(app, /openCompletedSale\(\{ saleNumber: direct\.saleNumber \}\)/);
 assert.match(app, /direct\.action === "return"[\s\S]*?openCompletedSale\(\{ saleNumber: direct\.saleNumber \}, \{ adjustmentType: "return" \}\)/);
+assert.match(app, /direct\.action === "refund"[\s\S]*?openCompletedSale\(\{ saleNumber: direct\.saleNumber \}, \{ adjustmentType: "refund" \}\)/);
 assert.match(app, /This completed sale could not be found in local transaction history\. Nothing was changed\./);
 assert.doesNotMatch(app, /completedSaleByReference\(state\.transactions/);
 assert.match(app, /function openCompletedSale\(reference, options = \{\}\)[\s\S]*?completedSaleByReference\(transactionEngine\.list\(\), reference\)/);
-assert.match(app, /options\.adjustmentType === "return"[\s\S]*?startSaleAdjustment\(card\.id, "return"\)/);
+assert.match(app, /\["return", "refund"\]\.includes\(options\.adjustmentType\)[\s\S]*?startSaleAdjustment\(card\.id, options\.adjustmentType\)/);
 
-console.log("SALE_DIRECT_COMMAND_OK cases=open-sale-1,open-sale-4,sale-1,return-sale-2 voice=shared-priority medicine=fallback return=review-only mutation=none");
+console.log("SALE_DIRECT_COMMAND_OK cases=open-sale-1,open-sale-4,sale-1,return-sale-2,refund-sale-3 voice=shared-priority medicine=fallback adjustments=review-only mutation=none");

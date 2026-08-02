@@ -6,10 +6,11 @@ const SPOKEN_NUMBERS = new Map([
 
 export function normalizeSaleDirectCommand(text = "") {
   const words = String(text).trim().toLowerCase().replace(/\s+/g, " ").split(" ");
-  return words.map((word, index) => {
-    if (index > 0 && word === "cell") return "sale";
-    return SPOKEN_NUMBERS.get(word) || word;
-  }).join(" ");
+  const normalized = words.map((word) => SPOKEN_NUMBERS.get(word) || word);
+  if (normalized.length === 3 && normalized[0] === "open" && normalized[1] === "cell" && /^\d+$/.test(normalized[2])) {
+    normalized[1] = "sale";
+  }
+  return normalized.join(" ");
 }
 
 export function parseSaleDirectCommand(text = "") {
