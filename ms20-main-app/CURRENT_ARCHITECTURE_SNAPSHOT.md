@@ -123,6 +123,8 @@ The approved post-original Sale Direct Command programme begins through one dete
 
 Direct-command priority is one shared pre-medicine boundary for both typed composer input and microphone transcripts. It recognizes the narrow sale-navigation grammar before stock/catalog/medicine parsing, including `open sale N`, shorthand `sale N`, and bounded speech normalization such as `open cell one`. Text outside that grammar falls through to the existing parsers unchanged. This fixes routing ownership without changing the sales, onboarding, catalog, editable-card or adjustment engines.
 
+All sale navigation now resolves through `openCompletedSale()` and `transactionEngine.list()`, the same persisted immutable ledger root used by receipt and reciprocal adjustment links. Command routes do not precheck transient UI/demo transaction arrays. Exact transaction IDs retain historical identity; an unqualified daily Sale number deterministically resolves the latest completed, non-reversed matching ledger record, consistent with the existing transaction lookup/undo convention. Missing records remain read-only safe failures.
+
 Local app URL used during verification:
 
 ```text

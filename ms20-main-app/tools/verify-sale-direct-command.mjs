@@ -14,8 +14,9 @@ assert.equal(parseSaleDirectCommand("ibuprofen"), null);
 assert.equal(parseSaleDirectCommand("open capsules"), null);
 
 const immutableSales = [
-  { id: "sale-1", permanentId: "sale-1", kind: "sale", status: "completed", saleNumber: 1 },
-  { id: "sale-4", permanentId: "sale-4", kind: "sale", status: "completed", saleNumber: 4 }
+  { id: "sale-1-old", permanentId: "sale-1-old", kind: "sale", status: "completed", saleNumber: 1, businessDay: "2026-08-01" },
+  { id: "sale-4", permanentId: "sale-4", kind: "sale", status: "completed", saleNumber: 4, businessDay: "2026-08-01", metadata: { fullyAdjusted: true } },
+  { id: "sale-1", permanentId: "sale-1", kind: "sale", status: "completed", saleNumber: 1, businessDay: "2026-08-02", syncStatus: "synced" }
 ];
 for (const [text, expectedId] of [["open sale 1", "sale-1"], ["open sale 4", "sale-4"], ["sale 1", "sale-1"]]) {
   const command = parseSaleDirectCommand(text);
@@ -23,6 +24,8 @@ for (const [text, expectedId] of [["open sale 1", "sale-1"], ["open sale 4", "sa
   assert.equal(completedSaleByReference(immutableSales, { saleNumber: command.saleNumber })?.id, expectedId);
   assert.equal(JSON.stringify(immutableSales), before, `${text} must be read-only`);
 }
+assert.equal(completedSaleByReference(immutableSales, { saleNumber: 99 }), null);
+assert.equal(completedSaleByReference(immutableSales, { transactionId: "sale-1-old" })?.id, "sale-1-old");
 
 const app = fs.readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
 assert.match(app, /function routePriorityCommand\(text\)/);
@@ -30,6 +33,8 @@ assert.match(app, /if \(routePriorityCommand\(trimmed\)\) return/);
 assert.match(app, /function handleVoiceTranscript\(text\)[\s\S]*?if \(routePriorityCommand\(text\)\) return;[\s\S]*?buildCommandCard\(text\)/);
 assert.match(app, /direct\.action === "open"/);
 assert.match(app, /openCompletedSale\(\{ saleNumber: direct\.saleNumber \}\)/);
-assert.match(app, /No completed Sale/);
+assert.match(app, /This completed sale could not be found in local transaction history\. Nothing was changed\./);
+assert.doesNotMatch(app, /completedSaleByReference\(state\.transactions/);
+assert.match(app, /function openCompletedSale\(reference\)[\s\S]*?completedSaleByReference\(transactionEngine\.list\(\), reference\)/);
 
 console.log("SALE_DIRECT_COMMAND_OK cases=open-sale-1,open-sale-4,sale-1 voice=shared-priority medicine=fallback mutation=none");

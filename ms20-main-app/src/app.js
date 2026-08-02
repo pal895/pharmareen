@@ -1703,12 +1703,6 @@ function routePriorityCommand(text) {
   if (!direct) return false;
   addFeed("owner", String(text || "").trim());
   if (direct.action === "open") {
-    const sale = completedSaleByReference(state.transactions, { saleNumber: direct.saleNumber });
-    if (!sale) {
-      addFeed("system", `No completed Sale ${direct.saleNumber} was found. Nothing changed.`);
-      render();
-      return true;
-    }
     openCompletedSale({ saleNumber: direct.saleNumber });
     return true;
   }
