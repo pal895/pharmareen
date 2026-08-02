@@ -9,9 +9,14 @@ assert.deepEqual(parseSaleDirectCommand("sale 1"), { action: "open", target: "nu
 assert.deepEqual(parseSaleDirectCommand("open cell one"), { action: "open", target: "number", saleNumber: 1 });
 assert.deepEqual(parseSaleDirectCommand("return sale 2"), { action: "return", target: "number", saleNumber: 2 });
 assert.deepEqual(parseSaleDirectCommand("refund sale 3"), { action: "refund", target: "number", saleNumber: 3 });
+assert.deepEqual(parseSaleDirectCommand("refund sale four"), { action: "refund", target: "number", saleNumber: 4 });
+assert.deepEqual(parseSaleDirectCommand("refund sale number 4"), { action: "refund", target: "number", saleNumber: 4 });
+assert.deepEqual(parseSaleDirectCommand("refund sale number four"), { action: "refund", target: "number", saleNumber: 4 });
 assert.equal(parseSaleDirectCommand("return cell to"), null);
 assert.equal(parseSaleDirectCommand("return cell two"), null);
 assert.equal(parseSaleDirectCommand("refund cell three"), null);
+assert.equal(parseSaleDirectCommand("refund sale number"), null);
+assert.equal(parseSaleDirectCommand("refund medicine 4"), null);
 assert.equal(parseSaleDirectCommand("open sale 0"), null);
 assert.equal(parseSaleDirectCommand("open 1"), null);
 assert.equal(parseSaleDirectCommand("open last sale"), null);

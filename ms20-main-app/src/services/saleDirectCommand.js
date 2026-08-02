@@ -15,7 +15,7 @@ export function normalizeSaleDirectCommand(text = "") {
 
 export function parseSaleDirectCommand(text = "") {
   const normalized = normalizeSaleDirectCommand(text);
-  const match = normalized.match(/^(?:(open|return|refund|credit|undo) )?sale (\d+)$/);
+  const match = normalized.match(/^(?:(open|return|refund|credit|undo) )?sale (?:number )?(\d+)$/);
   if (!match) return null;
   const action = match[1] || "open";
   const saleNumber = Number(match[2]);
