@@ -125,6 +125,8 @@ Direct-command priority is one shared pre-medicine boundary for both typed compo
 
 All sale navigation now resolves through `openCompletedSale()` and `transactionEngine.list()`, the same persisted immutable ledger root used by receipt and reciprocal adjustment links. Command routes do not precheck transient UI/demo transaction arrays. Exact transaction IDs retain historical identity; an unqualified daily Sale number deterministically resolves the latest completed, non-reversed matching ledger record, consistent with the existing transaction lookup/undo convention. Missing records remain read-only safe failures.
 
+Permanent interaction architecture: **Voice first → fast tap/action second → typing last**. Every supported typed operational command must accept voice transcripts wherever platform speech is available. Both inputs converge before business interpretation on the same deterministic command router and shared workflow services; no voice-only business fork and no LLM routing for deterministic commands are permitted. Typed input remains a protected fallback for accessibility, noise, unsupported platforms, offline phone speech limitations, transcript correction and owner choice. Common flows target three steps or fewer.
+
 Local app URL used during verification:
 
 ```text

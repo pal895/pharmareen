@@ -186,6 +186,10 @@ All backlog work keeps its canonical checkpoint/evidence relationship. New appro
 
 ## Active launch priority
 
+Permanent launch interaction gate: every supported operational command follows **Voice first → fast tap/action second → typing last**, uses one shared deterministic router after transcription, retains typed fallback and stays within three steps where possible. Launch evidence and future live-test instructions must demonstrate voice first when the platform allows it; separate voice-only workflow logic and unnecessary AI routing fail this gate.
+
 **MS2-LT-055 — Refunds, returns and credits**
 
 Status: `IMPLEMENTED — STAGED OWNER VALIDATION`. Original MS2-LT-055 cases 055-A through 055-F are owner-verified passed/frozen/protected. The 2026-08-02 055-F evidence proves one offline Return persisted locally, restored stock once, retained reciprocal immutable linkage and survived a single reconnect/sync without duplication; the historical device queue synchronized from 53 to 0. The original programme is complete. MS2-LT-055 remains active only for the approved post-original shared status-card/layout and deterministic direct-command programme, tested one case at a time before checkpoint closure.
+
+Post-original 055-G / Direct Command 1 is owner-verified passed/frozen/protected: direct Sale 1/Sale 4 navigation reuses persisted immutable ledger lookup, preserves linked adjustments and causes no mutation. Later 055 work inherits the permanent voice-first gate and remains owner-screenshot-gated one case at a time.

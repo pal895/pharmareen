@@ -1,5 +1,9 @@
 # MS2.0 Pharmacy Operating Intelligence Platform
 
+## Permanent interaction priority
+
+MS2.0 is voice-first, minimal-typing and rush-hour safe. For every supported owner workflow, the permanent priority is **Voice first → fast tap/action second → typing last**, with common workflows kept to three steps or fewer whenever possible. Typed and voice commands must converge on the same deterministic router after transcription; a separate voice-only business path and unnecessary AI routing are prohibited. Typing remains an essential fallback for accessibility, noisy environments, unsupported voice platforms, offline phones whose speech recognition needs internet, correction of misheard text and deliberate owner choice. Future live tests use voice first whenever the route is available and test typing as fallback/parity, unless the owner explicitly changes this rule.
+
 ## Permanent Production Sales Card standard
 
 MS2.0 has exactly one authoritative Production Sales Card. Typed sales, voice sales, review/correction, payment verification, Payment Queue, failure recovery, notifications and future sale fixtures must use the shared `SaleCard` model in `ms20-main-app/src/services/productionSaleCard.js` and its single renderer in `ms20-main-app/src/app.js`. `VoiceReviewCard` and bespoke queue sale cards are retired.

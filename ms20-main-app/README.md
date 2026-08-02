@@ -90,11 +90,13 @@ The first-run owner path is designed around three steps:
 2. Complete the setup card.
 3. Choose how to add medicines, then review and approve.
 
-The daily owner path stays three steps or less:
+The daily owner path stays three steps or less and follows the permanent interaction priority **Voice first → fast tap/action second → typing last**:
 
 1. Open the MS2.0 Assistant conversation.
-2. Type, speak, scan, or upload in the chat.
+2. Speak first where the device/platform supports it; otherwise use the fastest tap/action, scan or upload, with typing retained as fallback.
 3. Get an instant receipt, or review the editable card only when MS2.0 needs owner judgement.
+
+Every supported typed operational command must have voice parity wherever device/platform speech is available. After transcription, voice and typed text use the same deterministic router and business roots; do not create voice-only workflow logic or invoke AI when local routing is sufficient. Typing remains available for accessibility, noise, unsupported browsers, offline speech limitations, transcript correction and deliberate fallback.
 
 Complete known-medicine sale commands skip cards and return a concise sale receipt. Unknown medicines show a clean editable learning card so the pharmacy catalog improves safely. The owner home and chat flow should not show backend, Sheets, queue, token, route, or adapter details. Those belong in Settings, Diagnostics, Admin, or Developer Mode.
 
