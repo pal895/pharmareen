@@ -129,7 +129,7 @@ Permanent interaction architecture: **Voice first → fast tap/action second →
 
 Direct Return routing reuses those same roots: `return sale N` resolves via `transactionEngine.list()` and `openCompletedSale()`, then delegates to `startSaleAdjustment(..., "return")`. It opens the established review-only card and does not introduce a command-specific adjustment engine or confirmation boundary.
 
-MS2-LT-055-H is the latest owner-verified passed/frozen/protected checkpoint. Its voice-first evidence confirms that direct Return routing reaches the correct immutable sale review without mutation. MS2-LT-055-I is the only active owner case and validates one confirmation through the unchanged shared adjustment engine. Permanent interaction priority remains **Voice first → fast tap/action second → typing last**; typing is fallback, never the primary workflow.
+MS2-LT-055-I is the latest owner-verified passed/frozen/protected checkpoint. Voice-routed direct Return confirmation delegates once to the unchanged shared adjustment engine, producing one linked adjustment, stock restoration and financial reversal while preserving immutable completed-sale history and fully-adjusted controls. The phone misrecognition `return cell to` caused no mutation and does not authorize broad `cell`-to-`sale` normalization. No later owner case is active until explicit authorization. Permanent interaction priority remains **Voice first → fast tap/action second → typing last**; typing is fallback, never the primary workflow.
 
 Local app URL used during verification:
 
