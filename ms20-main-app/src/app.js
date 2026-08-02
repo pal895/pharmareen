@@ -1661,23 +1661,7 @@ function handleCommand(text) {
     render();
     return;
   }
-  const direct = parseSaleDirectCommand(trimmed);
-  if (direct) {
-    addFeed("owner", trimmed);
-    if (direct.action === "open") {
-      const sale = completedSaleByReference(state.transactions, { saleNumber: direct.saleNumber });
-      if (!sale) {
-        addFeed("system", `No completed Sale ${direct.saleNumber} was found. Nothing changed.`);
-        render();
-        return;
-      }
-      openCompletedSale({ saleNumber: direct.saleNumber });
-      return;
-    }
-    addFeed("system", `${direct.action[0].toUpperCase()}${direct.action.slice(1)} by command is not enabled yet. Nothing changed.`);
-    render();
-    return;
-  }
+  if (routePriorityCommand(trimmed)) return;
   if (isCatalogNavigationIntent(trimmed)) {
     addFeed("owner", trimmed);
     navigateToCatalogWorkspace();
@@ -1714,6 +1698,25 @@ function handleCommand(text) {
   }
 }
 
+function routePriorityCommand(text) {
+  const direct = parseSaleDirectCommand(text);
+  if (!direct) return false;
+  addFeed("owner", String(text || "").trim());
+  if (direct.action === "open") {
+    const sale = completedSaleByReference(state.transactions, { saleNumber: direct.saleNumber });
+    if (!sale) {
+      addFeed("system", `No completed Sale ${direct.saleNumber} was found. Nothing changed.`);
+      render();
+      return true;
+    }
+    openCompletedSale({ saleNumber: direct.saleNumber });
+    return true;
+  }
+  addFeed("system", `${direct.action[0].toUpperCase()}${direct.action.slice(1)} by command is not enabled yet. Nothing changed.`);
+  render();
+  return true;
+}
+
 function isCatalogNavigationIntent(text) {
   const normalized = String(text || "").trim().toLowerCase().replace(/\s+/g, " ");
   return ["show me", "show catalog", "show my catalog", "open catalog", "pharmacy catalog"].includes(normalized);
@@ -1739,6 +1742,7 @@ function handleVoiceTranscript(text) {
     render();
     return;
   }
+  if (routePriorityCommand(text)) return;
   const stockFixCard = state.cards.find((card) => card.type === "StockCorrectionCard");
   if (stockFixCard) {
     handleStockFixVoice(stockFixCard, text);

@@ -628,6 +628,8 @@ The complete 2026-08-02 owner package closes original 055-F as **OWNER-VERIFIED 
 
 Post-original Direct Command case 1 is now prepared and awaiting owner evidence. One deterministic local parser recognizes only `open sale N`; the typed composer resolves an existing completed sale through the same shared lookup and opens the canonical immutable sale-detail card. A missing completed sale returns an explicit no-change message. No adjustment command, last-sale shortcut, microphone route, stock mutation or financial mutation is enabled by this case. Test only typed `open sale 1` against the existing 055-F Sale 1 and stop for screenshots.
 
+The first Direct Command 1 owner attempt is an early **FAIL** with no mutation. Screenshots show the microphone transcript `open cell one` opened an unsaved Add new medicine card for `Open sale`; selling price remained required and no medicine was saved. Root cause: command priority existed only in `handleCommand()`, while `handleVoiceTranscript()` went directly to medicine parsing. The shared root now places `routePriorityCommand()` before every medicine parser for typed and microphone input, recognizes canonical `open sale N` plus approved shorthand `sale N`, and normalizes the bounded speech form `open cell one` inside command grammar only. Ordinary medicine names remain outside that grammar. Restart only Direct Command 1 with `open sale 1`, `open sale 4`, and `sale 1`; later commands remain blocked.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

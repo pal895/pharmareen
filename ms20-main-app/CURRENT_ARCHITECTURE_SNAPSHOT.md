@@ -121,6 +121,8 @@ Completed sales now retain a stable local transaction reference at the conversat
 
 The approved post-original Sale Direct Command programme begins through one deterministic parser and the existing completed-sale lookup/detail root. Its first isolated case accepts typed `open sale N` only, resolves an existing completed sale locally and opens the canonical immutable detail card without stock, finance, queue or adjustment mutation. Missing sales fail explicitly with no change. Adjustment actions, last-sale resolution and microphone parity remain disabled until their separately owner-gated cases.
 
+Direct-command priority is one shared pre-medicine boundary for both typed composer input and microphone transcripts. It recognizes the narrow sale-navigation grammar before stock/catalog/medicine parsing, including `open sale N`, shorthand `sale N`, and bounded speech normalization such as `open cell one`. Text outside that grammar falls through to the existing parsers unchanged. This fixes routing ownership without changing the sales, onboarding, catalog, editable-card or adjustment engines.
+
 Local app URL used during verification:
 
 ```text

@@ -1,17 +1,35 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { parseSaleDirectCommand } from "../src/services/saleDirectCommand.js";
+import { completedSaleByReference } from "../src/services/saleAdjustmentReview.js";
 
 assert.deepEqual(parseSaleDirectCommand("open sale 1"), { action: "open", target: "number", saleNumber: 1 });
 assert.deepEqual(parseSaleDirectCommand("  OPEN   SALE 42 "), { action: "open", target: "number", saleNumber: 42 });
+assert.deepEqual(parseSaleDirectCommand("sale 1"), { action: "open", target: "number", saleNumber: 1 });
+assert.deepEqual(parseSaleDirectCommand("open cell one"), { action: "open", target: "number", saleNumber: 1 });
 assert.equal(parseSaleDirectCommand("open sale 0"), null);
 assert.equal(parseSaleDirectCommand("open 1"), null);
 assert.equal(parseSaleDirectCommand("open last sale"), null);
+assert.equal(parseSaleDirectCommand("ibuprofen"), null);
+assert.equal(parseSaleDirectCommand("open capsules"), null);
+
+const immutableSales = [
+  { id: "sale-1", permanentId: "sale-1", kind: "sale", status: "completed", saleNumber: 1 },
+  { id: "sale-4", permanentId: "sale-4", kind: "sale", status: "completed", saleNumber: 4 }
+];
+for (const [text, expectedId] of [["open sale 1", "sale-1"], ["open sale 4", "sale-4"], ["sale 1", "sale-1"]]) {
+  const command = parseSaleDirectCommand(text);
+  const before = JSON.stringify(immutableSales);
+  assert.equal(completedSaleByReference(immutableSales, { saleNumber: command.saleNumber })?.id, expectedId);
+  assert.equal(JSON.stringify(immutableSales), before, `${text} must be read-only`);
+}
 
 const app = fs.readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
-assert.match(app, /parseSaleDirectCommand\(trimmed\)/);
+assert.match(app, /function routePriorityCommand\(text\)/);
+assert.match(app, /if \(routePriorityCommand\(trimmed\)\) return/);
+assert.match(app, /function handleVoiceTranscript\(text\)[\s\S]*?if \(routePriorityCommand\(text\)\) return;[\s\S]*?buildCommandCard\(text\)/);
 assert.match(app, /direct\.action === "open"/);
 assert.match(app, /openCompletedSale\(\{ saleNumber: direct\.saleNumber \}\)/);
 assert.match(app, /No completed Sale/);
 
-console.log("SALE_DIRECT_COMMAND_OK case=open-by-number route=shared-sale-detail mutation=none");
+console.log("SALE_DIRECT_COMMAND_OK cases=open-sale-1,open-sale-4,sale-1 voice=shared-priority medicine=fallback mutation=none");
