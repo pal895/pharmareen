@@ -61,6 +61,7 @@ import { applyStockCorrectionVoice, PharmacyPronunciationMemory, reviewStockCorr
 import { executeStockCorrection, replayPendingStockCorrections } from "./services/stockCorrectionExecution.js";
 import { prepareProductionSaleCard, productionSaleSummary, saleFieldsFromTransaction } from "./services/productionSaleCard.js";
 import { completedSaleByReference, SaleAdjustmentEngine, saleDetailFields, saleReferenceFromReceipt } from "./services/saleAdjustmentReview.js";
+import { parseSaleDirectCommand } from "./services/saleDirectCommand.js";
 import { hydrateStockFixDraft, normalizeStockFixEvidence } from "./services/stockFixEvidencePipeline.js";
 import { readXlsxInventory } from "./services/excelInventory.js";
 import { listRouteSlots, resolveOfflineSlot } from "./routes/routeRegistry.js";
@@ -1657,6 +1658,23 @@ function handleCommand(text) {
   }
   if (!trimmed) {
     addFeed("system", "Type a sale, stock question, report request, or paste a medicine list.");
+    render();
+    return;
+  }
+  const direct = parseSaleDirectCommand(trimmed);
+  if (direct) {
+    addFeed("owner", trimmed);
+    if (direct.action === "open") {
+      const sale = completedSaleByReference(state.transactions, { saleNumber: direct.saleNumber });
+      if (!sale) {
+        addFeed("system", `No completed Sale ${direct.saleNumber} was found. Nothing changed.`);
+        render();
+        return;
+      }
+      openCompletedSale({ saleNumber: direct.saleNumber });
+      return;
+    }
+    addFeed("system", `${direct.action[0].toUpperCase()}${direct.action.slice(1)} by command is not enabled yet. Nothing changed.`);
     render();
     return;
   }

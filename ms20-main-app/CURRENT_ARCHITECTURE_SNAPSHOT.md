@@ -119,6 +119,8 @@ Replit redirects backend stdout/stderr to `server.log`, so the truthful backgrou
 
 Completed sales now retain a stable local transaction reference at the conversation boundary. The shared receipt renderer makes each numbered completion explicitly openable, including persisted numbered receipts recoverable by Sale number. One detail card owns the Refund, Return and Credit entry points and creates linked, non-mutating adjustment reviews; it does not alter or duplicate the protected Production Sales Card.
 
+The approved post-original Sale Direct Command programme begins through one deterministic parser and the existing completed-sale lookup/detail root. Its first isolated case accepts typed `open sale N` only, resolves an existing completed sale locally and opens the canonical immutable detail card without stock, finance, queue or adjustment mutation. Missing sales fail explicitly with no change. Adjustment actions, last-sale resolution and microphone parity remain disabled until their separately owner-gated cases.
+
 Local app URL used during verification:
 
 ```text
