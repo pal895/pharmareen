@@ -86,7 +86,7 @@ Evidence abbreviations: `CVS` = `docs/engineering-memory/current-live-validation
 | 52 | Request & Verify success | Queue non-cash request, continue serving and complete only after verified success. | 51 | PASS / PROTECTED | Passed | Yes | 12 min | CVS; TCE; TCE/UI verifiers |
 | 53 | Concurrent payment completion | Keep multiple waiting payments isolated, support out-of-order success and prevent duplicate stock effects. | 52 | PASS / PROTECTED | Passed | Yes | 12 min | TCE quiet-concurrency evidence |
 | 54 | Payment failure/cancellation notification | Preserve stock/paid records and create one durable action-needed Notification without chat noise. | 52–53 | PASS / PROTECTED | Passed 2026-07-29: owner mobile screenshots prove Zinc Sale 1 supporting flow evidence and authoritative Septrin Sale 2 stock-preservation evidence. Septrin began and ended at numeric stock 12, quantity 1, bottle/suspension, KES 180 selling price and M-Pesa; Waiting became failed after one Simulate failed action, Payment Queue returned to 0 waiting, history retained one failed not paid/completed sale, one distinct unread actionable Sale 2 notification stated stock and paid records were unchanged, and Review payment returned to the same failed record. Zinc had blank stock and is supporting flow evidence only; its separate Sale 1 alert is not a duplicate of Septrin Sale 2. | Yes | 8 min | TCE; ARCH; `notificationCenter.js`; `verify-payment-failure-notification.mjs`; 2026-07-29 owner 24-screenshot chronological package; Septrin 12-to-12 authoritative stock proof; Zinc preliminary fixture correction preserved; a76215e |
-| 55 | Refunds, returns and credits | Record linked financial/stock adjustments without deleting original history, then validate approved status-card and direct-command improvements without replacing the tappable route. | 51–54 | Implemented — staged owner validation | Original 055-A through 055-D passed/protected. 055-E proves correct split Return records 1 + 2, KES 18 + 36 and stock 13 → 14 → 16, but remains pending one focused owner retest of the repaired visible fully-adjusted block across Return/Refund/Credit. 055-F remains ordered after it. Post-original improvements remain postponed. | No | Staged | 2026-07-31 and 2026-08-01 owner screenshots; shared Sale Adjustment workflow verifier; Production Sales Card; TCE; consistency gate; LATP ordered 055 programme |
+| 55 | Refunds, returns and credits | Record linked financial/stock adjustments without deleting original history, then validate approved status-card and direct-command improvements without replacing the tappable route. | 51–54 | Implemented — awaiting owner live test | Original 055-A through 055-E passed/protected. The 2026-08-02 focused 055-E retest proves the visible fully-adjusted block, disabled Return/Refund/Credit entry, inert repeated taps, linked Return records #7 and #8, no new review or record, and final Ibuprofen stock 16 with no stock or money change. Historical duplicate protection messages predate the repaired controls and are not a current retest failure. 055-F remains ordered next but has not begun. Post-original improvements remain postponed. | No | Staged | 2026-07-31 through 2026-08-02 owner screenshots; shared Sale Adjustment workflow verifier; Production Sales Card; TCE; consistency gate; LATP ordered 055 programme |
 | 56 | Undo/reversal reconciliation | Reconcile stock, finance, receipt, reports and audit exactly once for visible sale numbers. | 51–55 | Partial implementation | Basic cancellation/undo passed; full TCE reconciliation untested | No | 15 min | TCE; ledger/intake tests |
 | 57 | Supplier/restock payments | Support supplier payment, credit and future settlement flows through the adapter/TCE boundary. | 29, 50, 55 | Planned / approved | Not started | No | 15 min | TCE permanent scope; supplier workflows |
 
@@ -199,7 +199,7 @@ This ledger deliberately accounts for owner-facing domains discovered across cur
 
 - Total checkpoints: **84**
 - PASS / PROTECTED: **46**
-- Implemented — awaiting owner live test: **7**
+- Implemented — awaiting owner live test: **8**
 - Partial implementation: **8**
 - Planned / approved: **17**
 - External qualification: **3**
@@ -1066,13 +1066,13 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **Checkpoint ID:** MS2-LT-055
 - **Name:** Refunds, returns and credits
 - **Category:** Financial & Payment Validation
-- **Current status:** Implemented — staged owner validation
-- **Repository evidence:** 2026-07-31 and 2026-08-01 owner screenshots; shared Sale Adjustment workflow verifier; Production Sales Card; TCE; consistency gate; LATP ordered 055 programme
+- **Current status:** Implemented — awaiting owner live test
+- **Repository evidence:** 2026-07-31 through 2026-08-02 owner screenshots; shared Sale Adjustment workflow verifier; Production Sales Card; TCE; consistency gate; LATP ordered 055 programme
 - **Implementation commit(s):** Repository evidence not yet available.
 - **Primary implementation files/modules:** `app/intake.py`; `ms20-main-app/src/services/transactionCompletionEngine.js`; `ms20-main-app/src/services/saleAdjustmentReview.js`; `ms20-main-app/src/app.js`
-- **Owner live-test evidence:** Repository evidence not yet available.
+- **Owner live-test evidence:** Original 055-A through 055-E passed/protected. The 2026-08-02 focused 055-E retest proves the visible fully-adjusted block, disabled Return/Refund/Credit entry, inert repeated taps, linked Return records #7 and #8, no new review or record, and final Ibuprofen stock 16 with no stock or money change. Historical duplicate protection messages predate the repaired controls and are not a current retest failure. 055-F remains ordered next but has not begun. Post-original improvements remain postponed.; source: 2026-07-31 through 2026-08-02 owner screenshots; shared Sale Adjustment workflow verifier; Production Sales Card; TCE; consistency gate; LATP ordered 055 programme
 - **PASS / PROTECTED confirmation:** Not applicable.
-- **Remaining implementation work:** None; retain only for evidence-backed historical compatibility.
+- **Remaining implementation work:** Complete decisive owner live validation for: Record linked financial/stock adjustments without deleting original history, then validate approved status-card and direct-command improvements without replacing the tappable route.
 - **Prerequisite checkpoints:** 51–54
 - **Dependent checkpoints:** MS2-LT-056, MS2-LT-057, MS2-LT-074
 
