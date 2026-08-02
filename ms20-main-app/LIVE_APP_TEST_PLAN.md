@@ -847,6 +847,8 @@ The second owner attempt proves parser priority and ordinary medicine fallback a
 
 The final 2026-08-02 package passes and freezes **MS2-LT-055-G / Direct Command 1**. `open sale 1` and `sale 1` opened the same immutable fully-adjusted Sale 1 with linked Return #9; `open sale 4` opened immutable fully-adjusted Sale 4 with linked Returns #7/#8. Ordinary `ibuprofen 1 tablet cash` still opened Sale Review, catalog stock remained 16, queue remained 0 and navigation created no mutation. Do not repeat this case. All later direct-command tests use voice first where supported, then typed fallback/parity, through the same deterministic router.
 
+**MS2-LT-055-H / Direct Command 2 — Return routing only:** create one ordinary completed one-tablet sale, then use voice `return sale N` with its displayed number. The command must open the shared Return review with correct immutable-sale values and no mutation. Do not confirm in this case; confirmed direct Return is the next separately gated case. Stop for owner screenshots.
+
 The post-original improvement phase also includes the approved shared System Status architecture: compact side-by-side adjustment choices; one updating `Latest Adjustment` conversation card with `Open Latest Adjustment` and `View Adjustment History`; complete history retained outside the daily feed; and one reusable singleton/latest-plus-history contract for Catalog Activity, Export and future status cards. These changes must be implemented from shared roots after 055-F, then tested separately one case at a time alongside the already-approved direct-command programme. They may not replace or overlap any original 055 case.
 
 ## Ordered approved improvement 3 - Export IP, privacy and compliance safeguards

@@ -1706,6 +1706,10 @@ function routePriorityCommand(text) {
     openCompletedSale({ saleNumber: direct.saleNumber });
     return true;
   }
+  if (direct.action === "return") {
+    openCompletedSale({ saleNumber: direct.saleNumber }, { adjustmentType: "return" });
+    return true;
+  }
   addFeed("system", `${direct.action[0].toUpperCase()}${direct.action.slice(1)} by command is not enabled yet. Nothing changed.`);
   render();
   return true;
@@ -3270,7 +3274,7 @@ function addFeed(type, text, metadata = {}) {
   persistFeed();
 }
 
-function openCompletedSale(reference) {
+function openCompletedSale(reference, options = {}) {
   const transaction = completedSaleByReference(transactionEngine.list(), reference);
   if (!transaction) {
     addFeed("system", "This completed sale could not be found in local transaction history. Nothing was changed.");
@@ -3293,6 +3297,10 @@ function openCompletedSale(reference) {
   });
   state.cards.push(card);
   persistActiveCards();
+  if (options.adjustmentType === "return") {
+    startSaleAdjustment(card.id, "return");
+    return;
+  }
   render();
   focusCard(card.id);
 }

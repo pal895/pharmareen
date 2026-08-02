@@ -7,6 +7,7 @@ assert.deepEqual(parseSaleDirectCommand("open sale 1"), { action: "open", target
 assert.deepEqual(parseSaleDirectCommand("  OPEN   SALE 42 "), { action: "open", target: "number", saleNumber: 42 });
 assert.deepEqual(parseSaleDirectCommand("sale 1"), { action: "open", target: "number", saleNumber: 1 });
 assert.deepEqual(parseSaleDirectCommand("open cell one"), { action: "open", target: "number", saleNumber: 1 });
+assert.deepEqual(parseSaleDirectCommand("return sale 2"), { action: "return", target: "number", saleNumber: 2 });
 assert.equal(parseSaleDirectCommand("open sale 0"), null);
 assert.equal(parseSaleDirectCommand("open 1"), null);
 assert.equal(parseSaleDirectCommand("open last sale"), null);
@@ -33,8 +34,10 @@ assert.match(app, /if \(routePriorityCommand\(trimmed\)\) return/);
 assert.match(app, /function handleVoiceTranscript\(text\)[\s\S]*?if \(routePriorityCommand\(text\)\) return;[\s\S]*?buildCommandCard\(text\)/);
 assert.match(app, /direct\.action === "open"/);
 assert.match(app, /openCompletedSale\(\{ saleNumber: direct\.saleNumber \}\)/);
+assert.match(app, /direct\.action === "return"[\s\S]*?openCompletedSale\(\{ saleNumber: direct\.saleNumber \}, \{ adjustmentType: "return" \}\)/);
 assert.match(app, /This completed sale could not be found in local transaction history\. Nothing was changed\./);
 assert.doesNotMatch(app, /completedSaleByReference\(state\.transactions/);
-assert.match(app, /function openCompletedSale\(reference\)[\s\S]*?completedSaleByReference\(transactionEngine\.list\(\), reference\)/);
+assert.match(app, /function openCompletedSale\(reference, options = \{\}\)[\s\S]*?completedSaleByReference\(transactionEngine\.list\(\), reference\)/);
+assert.match(app, /options\.adjustmentType === "return"[\s\S]*?startSaleAdjustment\(card\.id, "return"\)/);
 
-console.log("SALE_DIRECT_COMMAND_OK cases=open-sale-1,open-sale-4,sale-1 voice=shared-priority medicine=fallback mutation=none");
+console.log("SALE_DIRECT_COMMAND_OK cases=open-sale-1,open-sale-4,sale-1,return-sale-2 voice=shared-priority medicine=fallback return=review-only mutation=none");

@@ -127,6 +127,8 @@ All sale navigation now resolves through `openCompletedSale()` and `transactionE
 
 Permanent interaction architecture: **Voice first → fast tap/action second → typing last**. Every supported typed operational command must accept voice transcripts wherever platform speech is available. Both inputs converge before business interpretation on the same deterministic command router and shared workflow services; no voice-only business fork and no LLM routing for deterministic commands are permitted. Typed input remains a protected fallback for accessibility, noise, unsupported platforms, offline phone speech limitations, transcript correction and owner choice. Common flows target three steps or fewer.
 
+Direct Return routing reuses those same roots: `return sale N` resolves via `transactionEngine.list()` and `openCompletedSale()`, then delegates to `startSaleAdjustment(..., "return")`. It opens the established review-only card and does not introduce a command-specific adjustment engine or confirmation boundary.
+
 Local app URL used during verification:
 
 ```text
