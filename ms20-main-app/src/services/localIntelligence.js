@@ -101,6 +101,8 @@ export function parseLocalCommand(input, catalog = []) {
         cost_price: known.cost_price ?? "",
         selling_price: known.selling_price ?? "",
         supplier: known.supplier || "",
+        supplier_terms: "paid_cash",
+        settlement_date: "",
         batch: known.batch || "",
         expiry: known.expiry || "",
         barcode: known.barcode || "",

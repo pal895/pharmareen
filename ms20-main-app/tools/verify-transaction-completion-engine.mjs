@@ -1,4 +1,4 @@
-import { CashPaymentAdapter, ManualPaymentAdapter, SimulatorPaymentAdapter } from "../src/services/paymentAdapters.js";
+import { CashPaymentAdapter, DeferredPaymentAdapter, ManualPaymentAdapter, SimulatorPaymentAdapter } from "../src/services/paymentAdapters.js";
 import { saleReversalFor, saleReversalReconciliation, TransactionCompletionEngine } from "../src/services/transactionCompletionEngine.js";
 
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
@@ -10,6 +10,7 @@ const engine = new TransactionCompletionEngine({
   adapters: {
     cash: new CashPaymentAdapter(),
     manual: new ManualPaymentAdapter(),
+    deferred: new DeferredPaymentAdapter(),
     simulator
   }
 });
@@ -18,6 +19,15 @@ const first = engine.start({ id: "sale-a", kind: "sale", amount: 120, paymentMet
 assert(first.transaction.status === "completed" && first.transaction.saleLabel === "Sale 1", "Fast cash sale must complete with daily numbering");
 const duplicate = engine.start({ id: "sale-a", kind: "sale", amount: 120, paymentMethod: "cash" });
 assert(duplicate.duplicate && engine.list().length === 1, "Transaction IDs must be idempotent");
+
+const supplierEngine = new TransactionCompletionEngine({ storage: null, now: () => current, adapters: { cash: new CashPaymentAdapter(), manual: new ManualPaymentAdapter(), deferred: new DeferredPaymentAdapter() } });
+const paidSupplier = supplierEngine.start({ id: "supplier-paid-a", kind: "supplier_payment", amount: 180, paymentMethod: "cash", adapter: "cash", metadata: { financialDirection: "outflow", supplier: "AfyaLink" } });
+assert(paidSupplier.transaction.status === "completed" && paidSupplier.transaction.metadata.financialDirection === "outflow", "Paid supplier restock must cross the TCE boundary as a completed outflow");
+const supplierCredit = supplierEngine.start({ id: "supplier-credit-a", kind: "supplier_credit", amount: 180, paymentMethod: "supplier_credit", adapter: "manual", metadata: { financialDirection: "outflow", supplier: "AfyaLink" } });
+assert(supplierCredit.transaction.status === "completed" && supplierCredit.transaction.paymentMethod === "supplier_credit", "Supplier credit must be recorded as an explicit completed liability event");
+const futureSupplier = supplierEngine.start({ id: "supplier-due-a", kind: "supplier_settlement_due", amount: 180, paymentMethod: "pay_later", mode: "request_verify", adapter: "deferred", metadata: { financialDirection: "outflow", settlementDate: "2026-08-10" } });
+assert(futureSupplier.transaction.status === "pending" && futureSupplier.transaction.metadata.settlementDate === "2026-08-10", "Future supplier settlement must remain pending with its explicit due date");
+assert(supplierEngine.start({ id: "supplier-due-a", kind: "supplier_settlement_due", amount: 180, adapter: "deferred" }).duplicate, "Supplier payment records must remain idempotent");
 
 const stableOriginal = { id: "runtime-sale-a", permanentId: "sale-a", kind: "sale" };
 const stableReversal = { id: "undo-old-runtime-sale-a", permanentId: "undo-sale-a", kind: "sale_reversal", reversalOf: "old-runtime-sale-a" };

@@ -30,6 +30,9 @@ export function medicineReviewBlocker(card = {}) {
     if (!Number.isFinite(quantity) || quantity <= 0) return "Add the stock quantity before confirming. Nothing has been saved.";
     if (!Number.isFinite(bonus) || bonus < 0) return "Bonus stock cannot be below zero. Check it before confirming.";
     if (!String(card.fields?.unit || "").trim()) return "Add the unit, such as tablet, bottle, pack, or box, before confirming.";
+    const terms = String(card.fields?.supplier_terms || "");
+    if (!["paid_cash", "supplier_credit", "pay_later"].includes(terms)) return "Choose how this supplier restock will be paid. Nothing has been saved.";
+    if (terms === "pay_later" && !/^\d{4}-\d{2}-\d{2}$/.test(String(card.fields?.settlement_date || ""))) return "Add the future settlement date before confirming. Nothing has been saved.";
   }
   return "";
 }

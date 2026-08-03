@@ -1009,6 +1009,10 @@ The prior generic ad-supported Android Office app is not a compatibility authori
 
 Pass only after owner-device evidence shows the file opens in a compatible presentation app and the one-card/history behavior is correct.
 
+## MS2-LT-057-A — Paid-now supplier restock review
+
+Use Mic and say `restock ibuprofen 2`. Verify the dedicated Restock review shows canonical Ibuprofen, stock to add 2, tablet, the saved buying price and supplier, and `Paid now · Cash` selected. The review must state that stock and supplier finances change only after `Add stock`. Do not tap `Add stock`; close the review and verify catalog stock and Queue are unchanged. Supplier credit and future settlement are later isolated cases.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

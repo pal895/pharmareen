@@ -461,6 +461,8 @@ Planned at their proper test stages:
 - Export completion is routed through `recordExportEvent`. It updates the single durable `ExportHubCard` instead of appending feed messages. Newest-first metadata is stored under `ms20-main-app:export-history:<pharmacy-id>`, deduped by record id and bounded to 50 entries. Files remain owner-device downloads; browser storage retains metadata only.
 - Production Sale resolution keeps catalog medicine identity independent from requested selling unit. Common and pharmacy-configured units—including irregular box/boxes—are parsed locally before matching. An unconfigured unit preserves the matched medicine’s complete catalog context, blocks confirmation only on missing conversion/price, and saves approved pack facts back to that existing pharmacy-isolated record.
 
+Supplier/restock finance now crosses the shared Transaction Completion Engine boundary. The existing RestockCard exposes paid-now Cash (completed outflow), supplier credit (recorded liability), and pay-on-future-date (pending settlement with required ISO date). TCE and queued restock records are idempotent; stock still changes only through the established confirmation path. Voice and typed restock input share the deterministic local parser, preserving Voice first → fast tap/action second → typing last.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

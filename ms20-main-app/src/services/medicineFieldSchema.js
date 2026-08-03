@@ -21,6 +21,8 @@ export const MEDICINE_FIELD_DEFINITIONS = Object.freeze({
   reorder_level: field("reorder_level", "Reorder level", 110, "decimal"),
   aliases: field("aliases", "Aliases", 140),
   delivery_reference: field("delivery_reference", "Invoice or delivery reference", 170),
+  supplier_terms: field("supplier_terms", "Supplier payment", 150),
+  settlement_date: field("settlement_date", "Settlement date", 150),
   note: field("note", "Note", 180),
   voice_transcript: field("voice_transcript", "Heard", 180)
 });
@@ -44,7 +46,7 @@ export const MEDICINE_DETAIL_FIELD_ORDER = Object.freeze([
 
 export const MEDICINE_CARD_FIELD_KEYS = Object.freeze({
   InvoiceCard: ["supplier", "medicine", "strength", "form", "quantity", "unit", "cost_price", "selling_price", "barcode", "batch", "expiry", "total", "payment"],
-  RestockCard: ["medicine", "quantity", "bonus_quantity", "unit", "pack_size", "strength", "form", "cost_price", "selling_price", "supplier", "batch", "expiry", "barcode", "shelf", "delivery_reference", "note"],
+  RestockCard: ["medicine", "quantity", "bonus_quantity", "unit", "pack_size", "strength", "form", "cost_price", "selling_price", "supplier", "supplier_terms", "settlement_date", "batch", "expiry", "barcode", "shelf", "delivery_reference", "note"],
   PhotoReviewCard: ["file", "medicine", "strength", "form", "unit", "pack_size", "barcode", "batch", "expiry", "shelf"],
   MedicineMatchCard: ["message", "medicine", "strength", "form", "unit", "selling_price", "quantity", "payment", "stock", "cost_price", "supplier", "barcode", "batch", "expiry", "alias"],
   VisualScanCard: ["scan_type", "medicine", "strength", "form", "unit", "pack_size", "quantity", "selling_price", "cost_price", "supplier", "barcode", "batch", "expiry", "shelf", "category"]

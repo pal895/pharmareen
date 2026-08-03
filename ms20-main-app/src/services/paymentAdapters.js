@@ -36,6 +36,20 @@ export class ManualPaymentAdapter extends PaymentAdapter {
   }
 }
 
+export class DeferredPaymentAdapter extends PaymentAdapter {
+  constructor() {
+    super("deferred");
+  }
+
+  request({ transactionId }) {
+    return {
+      providerReference: `deferred-${transactionId}`,
+      status: "pending",
+      reason: "supplier_settlement_due"
+    };
+  }
+}
+
 export class SimulatorPaymentAdapter extends PaymentAdapter {
   constructor({ scenario = "success" } = {}) {
     super("simulator");

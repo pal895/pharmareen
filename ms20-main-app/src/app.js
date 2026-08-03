@@ -55,7 +55,7 @@ import { resolveStockCheck } from "./services/localIntelligence.js";
 import { matchMedicine } from "./services/medicineMatcher.js";
 import { catalogReviewCapabilities, reorderedCatalogRows } from "./services/catalogReviewPolicy.js";
 import { medicineReviewBlocker } from "./services/medicineReviewReadiness.js";
-import { CashPaymentAdapter, ManualPaymentAdapter, SimulatorPaymentAdapter } from "./services/paymentAdapters.js";
+import { CashPaymentAdapter, DeferredPaymentAdapter, ManualPaymentAdapter, SimulatorPaymentAdapter } from "./services/paymentAdapters.js";
 import { saleReversalFor, saleReversalReconciliation, TransactionCompletionEngine } from "./services/transactionCompletionEngine.js";
 import { applyStockCorrectionVoice, PharmacyPronunciationMemory, reviewStockCorrection, stockCorrectionGuidance, trustedCatalogStock } from "./services/stockCorrectionPolicy.js";
 import { executeStockCorrection, replayPendingStockCorrections } from "./services/stockCorrectionExecution.js";
@@ -82,6 +82,7 @@ const transactionEngine = new TransactionCompletionEngine({
   adapters: {
     cash: new CashPaymentAdapter(),
     manual: new ManualPaymentAdapter(),
+    deferred: new DeferredPaymentAdapter(),
     simulator: paymentSimulator
   }
 });
@@ -175,6 +176,8 @@ const FIELD_LABELS = {
   scan_type: "Scan type",
   total: "Total",
   payment: "Payment",
+  supplier_terms: "Supplier payment",
+  settlement_date: "Settlement date",
   message: "Note",
   transcript: "Transcript",
   backend_route: "Backend route",
@@ -1048,7 +1051,7 @@ function medicineDetailTemplate(card, displayed) {
   const slideTwoFields = (restock
     ? ["pack_size", "strength", "form", "cost_price", "selling_price", "supplier"]
     : ["stock", "current_stock", "strength", "form", "unit", "cost_price", "expiry", "pack_size", "reorder_level"]).filter((field) => fieldSet.has(field));
-  const used = new Set([...slideOneFields, ...slideTwoFields, "payment"]);
+  const used = new Set([...slideOneFields, ...slideTwoFields, "payment", "supplier_terms", "settlement_date"]);
   const slideThreeFields = (restock
     ? ["batch", "expiry", "barcode", "shelf", "delivery_reference", "note"]
     : ["supplier", "barcode", "batch", "alias", "aliases", "message", "shelf", "category", "reason", "file", "scan_type", "total", "correct_stock"]).filter((field) => fieldSet.has(field) && !used.has(field));
@@ -1070,6 +1073,7 @@ function medicineDetailTemplate(card, displayed) {
           <div class="medicine-slide-fields">${slideOneFields.map((field) => fieldTemplate(card, field)).join("")}</div>
           ${fieldSet.has("quantity") ? quantityToolbar(card) : ""}
           ${fieldSet.has("payment") ? paymentToolbar(card) : ""}
+          ${restock && fieldSet.has("supplier_terms") ? supplierPaymentToolbar(card) : ""}
           ${card.type === "StockCorrectionCard" ? "" : activeActionsTemplate(card)}
         </section>
         <section class="medicine-slide" aria-label="Stock and medicine details">
@@ -1321,6 +1325,23 @@ function paymentToolbar(card) {
       `).join("")}
     </div>
   `;
+}
+
+function supplierPaymentToolbar(card) {
+  const options = [
+    ["paid_cash", "Paid now · Cash"],
+    ["supplier_credit", "Supplier credit"],
+    ["pay_later", "Pay on a future date"]
+  ];
+  return `
+    <fieldset class="supplier-payment-review">
+      <legend>How will this supplier be paid?</legend>
+      <div class="button-row" aria-label="Supplier payment options">
+        ${options.map(([value, label]) => `<button type="button" data-action="set-supplier-terms" data-card-id="${card.id}" data-supplier-terms="${value}" class="${card.fields?.supplier_terms === value ? "selected" : ""}">${label}</button>`).join("")}
+      </div>
+      ${card.fields?.supplier_terms === "pay_later" ? fieldTemplate(card, "settlement_date") : ""}
+      <p>Review only. Stock and supplier finances change only after Add stock.</p>
+    </fieldset>`;
 }
 
 function quantityToolbar(card) {
@@ -1634,6 +1655,7 @@ function handleAction(dataset) {
   if (action === "reject-card") rejectCard(dataset.cardId);
   if (action === "dismiss-card") dismissCard(dataset.cardId);
   if (action === "set-payment") setPayment(dataset.cardId, dataset.payment);
+  if (action === "set-supplier-terms") setSupplierTerms(dataset.cardId, dataset.supplierTerms);
   if (action === "bump-quantity") bumpQuantity(dataset.cardId, Number(dataset.amount));
   if (action === "show-medicine-slide") showMedicineSlide(dataset.cardId, Number(dataset.slide));
 }
@@ -4715,7 +4737,25 @@ function recordCard(card) {
         paymentRequestId: `request-${card.id}`
       }
     })
-    : null;
+    : card.type === "RestockCard" ? transactionEngine.start({
+      id: `supplier-${card.id}`,
+      kind: card.fields?.supplier_terms === "supplier_credit" ? "supplier_credit" : card.fields?.supplier_terms === "pay_later" ? "supplier_settlement_due" : "supplier_payment",
+      amount: restockSupplierAmount(card),
+      paymentMethod: card.fields?.supplier_terms === "paid_cash" ? "cash" : card.fields?.supplier_terms || "supplier_credit",
+      mode: card.fields?.supplier_terms === "pay_later" ? "request_verify" : "fast_record",
+      adapter: card.fields?.supplier_terms === "pay_later" ? "deferred" : card.fields?.supplier_terms === "paid_cash" ? "cash" : "manual",
+      reference: card.fields?.delivery_reference || card.id,
+      metadata: {
+        medicine: card.fields?.medicine || "",
+        supplier: card.fields?.supplier || "",
+        quantity: Number(card.fields?.quantity || 0),
+        unitCost: Number(card.fields?.cost_price || 0),
+        financialDirection: "outflow",
+        settlementDate: card.fields?.settlement_date || "",
+        pharmacyId: state.pharmacy.id,
+        branchId: state.pharmacy.branch
+      }
+    }) : null;
   if (transactionResult?.transaction?.status === "completed") {
     card.fields.sale_number = transactionResult.transaction.saleNumber;
     card.fields.transaction_id = transactionResult.transaction.permanentId;
@@ -4739,7 +4779,9 @@ function recordCard(card) {
     applyLocalRestockStock(card);
   }
   const reply = result.duplicate ? "Already saved." : transactionResult?.transaction?.status === "pending"
-    ? `Today's ${transactionResult.transaction.saleLabel} is waiting for simulated ${paymentLabel(paymentMethod)} confirmation. You can keep serving. Open Payment Queue to finish it.`
+    ? card.type === "RestockCard"
+      ? `Stock added. Supplier payment of KES ${transactionResult.transaction.amount} is due on ${card.fields?.settlement_date}.`
+      : `Today's ${transactionResult.transaction.saleLabel} is waiting for simulated ${paymentLabel(paymentMethod)} confirmation. You can keep serving. Open Payment Queue to finish it.`
     : savedReplyFor(card);
   const completedSale = transactionResult?.transaction?.status === "completed" ? transactionResult.transaction : null;
   addFeed("system", reply, completedSale ? {
@@ -4882,6 +4924,12 @@ function saleTransactionAmount(card) {
   return Number.isFinite(savedPrice) && savedPrice > 0 ? quantity * savedPrice : 0;
 }
 
+function restockSupplierAmount(card) {
+  const quantity = Number(card.fields?.quantity || 0);
+  const unitCost = Number(card.fields?.cost_price || 0);
+  return Number.isFinite(quantity) && quantity > 0 && Number.isFinite(unitCost) && unitCost >= 0 ? quantity * unitCost : 0;
+}
+
 function applyLocalSaleStock(card) {
   if (card.type === "MedicineMatchCard") return;
   const match = pharmacyBrain.findMedicine(card.fields?.medicine);
@@ -5018,6 +5066,15 @@ function removeCardsByPredicate(predicate) {
 
 function setPayment(cardId, payment) {
   updateCardField(cardId, "payment", payment);
+  render();
+}
+
+function setSupplierTerms(cardId, supplierTerms) {
+  const card = state.cards.find((item) => item.id === cardId);
+  if (!card || card.type !== "RestockCard") return;
+  card.fields.supplier_terms = supplierTerms;
+  if (supplierTerms !== "pay_later") card.fields.settlement_date = "";
+  persistActiveCards();
   render();
 }
 
@@ -5205,6 +5262,9 @@ function savedReplyFor(card) {
     const totalAdded = Number(quantity) + bonusQuantity;
     const lines = [`✅ ${medicine} +${totalAdded} ${unit}${totalAdded === 1 ? "" : "s"} added`];
     if (bonusQuantity > 0) lines.push(`${quantity} bought + ${bonusQuantity} bonus`);
+    const supplierAmount = restockSupplierAmount(card);
+    const terms = card.fields?.supplier_terms;
+    lines.push(terms === "paid_cash" ? `Supplier paid: KES ${supplierAmount} cash` : terms === "supplier_credit" ? `Supplier credit recorded: KES ${supplierAmount}` : `Supplier payment due: KES ${supplierAmount} on ${card.fields?.settlement_date}`);
     const stockLine = stockReplyLine(card);
     if (stockLine) lines.push(stockLine);
     return lines.join("\n");
