@@ -14,6 +14,8 @@ assert.deepEqual(parseSaleDirectCommand("refund sale number 4"), { action: "refu
 assert.deepEqual(parseSaleDirectCommand("refund sale number four"), { action: "refund", target: "number", saleNumber: 4 });
 assert.deepEqual(parseSaleDirectCommand("credit sale 5"), { action: "credit", target: "number", saleNumber: 5 });
 assert.deepEqual(parseSaleDirectCommand("credit sale number five"), { action: "credit", target: "number", saleNumber: 5 });
+assert.deepEqual(parseSaleDirectCommand("undo sale 6"), { action: "undo", target: "number", saleNumber: 6 });
+assert.deepEqual(parseSaleDirectCommand("undo sale number six"), { action: "undo", target: "number", saleNumber: 6 });
 assert.equal(parseSaleDirectCommand("return cell to"), null);
 assert.equal(parseSaleDirectCommand("return cell two"), null);
 assert.equal(parseSaleDirectCommand("refund cell three"), null);
@@ -48,9 +50,13 @@ assert.match(app, /openCompletedSale\(\{ saleNumber: direct\.saleNumber \}\)/);
 assert.match(app, /direct\.action === "return"[\s\S]*?openCompletedSale\(\{ saleNumber: direct\.saleNumber \}, \{ adjustmentType: "return" \}\)/);
 assert.match(app, /direct\.action === "refund"[\s\S]*?openCompletedSale\(\{ saleNumber: direct\.saleNumber \}, \{ adjustmentType: "refund" \}\)/);
 assert.match(app, /direct\.action === "credit"[\s\S]*?openCompletedSale\(\{ saleNumber: direct\.saleNumber \}, \{ adjustmentType: "credit" \}\)/);
+assert.match(app, /direct\.action === "undo"[\s\S]*?openCompletedSale\(\{ saleNumber: direct\.saleNumber \}, \{ undoReview: true \}\)/);
 assert.match(app, /This completed sale could not be found in local transaction history\. Nothing was changed\./);
 assert.doesNotMatch(app, /completedSaleByReference\(state\.transactions/);
 assert.match(app, /function openCompletedSale\(reference, options = \{\}\)[\s\S]*?completedSaleByReference\(transactionEngine\.list\(\), reference\)/);
 assert.match(app, /\["return", "refund", "credit"\]\.includes\(options\.adjustmentType\)[\s\S]*?startSaleAdjustment\(card\.id, options\.adjustmentType\)/);
+assert.match(app, /function confirmSaleUndo\(cardId\)[\s\S]*?transactionEngine\.undoSale\(original\.saleNumber, "owner_direct_command"\)/);
+assert.match(app, /if \(result\.created\)[\s\S]*?stockToRestore[\s\S]*?type: "SaleUndo"/);
+assert.match(app, /if \(reversal\)[\s\S]*?fields\.adjustment_available = false[\s\S]*?linked Undo/);
 
-console.log("SALE_DIRECT_COMMAND_OK cases=open-sale-1,open-sale-4,sale-1,return-sale-2,refund-sale-3,credit-sale-5 voice=shared-priority medicine=fallback adjustments=review-only mutation=none");
+console.log("SALE_DIRECT_COMMAND_OK cases=open-sale-1,open-sale-4,sale-1,return-sale-2,refund-sale-3,credit-sale-5,undo-sale-6 voice=shared-priority medicine=fallback undo=review-confirm-linked-idempotent");

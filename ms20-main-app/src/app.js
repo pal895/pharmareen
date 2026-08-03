@@ -650,6 +650,7 @@ function completedSaleDetailCardTemplate(card) {
   const fields = card.fields || {};
   const linked = saleAdjustmentEngine.list().filter((item) => item.original_transaction_id === fields.transaction_id);
   const adjustmentsBlocked = fields.adjustment_available === false;
+  const undoReview = fields.undo_review === true;
   return `
     <article class="card-message ready sale-detail-card" data-card-id="${escapeHtml(card.id)}">
       <div class="card-top">
@@ -667,14 +668,20 @@ function completedSaleDetailCardTemplate(card) {
         ["Stock after sale", fields.stock_after_sale],
         ["Status", fields.status]
       ])}
-      <p class="card-note">${adjustmentsBlocked
+      <p class="card-note">${undoReview
+        ? `Review only — nothing has changed. Confirming creates one linked reversal and keeps original Sale ${escapeHtml(String(fields.sale_number))} in history.`
+        : adjustmentsBlocked
         ? escapeHtml(fields.adjustment_block_message)
         : `Choose one adjustment. The original Sale ${escapeHtml(String(fields.sale_number))} remains in history. Nothing changes until a later confirmation.`}</p>
-      <div class="card-actions sale-adjustment-actions" aria-label="Sale adjustment options">
+      ${undoReview ? `<div class="card-actions">
+        <button type="button" data-action="dismiss-card" data-card-id="${escapeHtml(card.id)}">Cancel review</button>
+        <button type="button" data-action="confirm-sale-undo" data-card-id="${escapeHtml(card.id)}">Confirm Undo</button>
+      </div>` : `<div class="card-actions sale-adjustment-actions" aria-label="Sale adjustment options">
         <button type="button" data-action="start-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-adjustment-type="refund" ${adjustmentsBlocked ? "disabled" : ""}>Refund</button>
         <button type="button" data-action="start-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-adjustment-type="return" ${adjustmentsBlocked ? "disabled" : ""}>Return</button>
         <button type="button" data-action="start-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-adjustment-type="credit" ${adjustmentsBlocked ? "disabled" : ""}>Credit</button>
-      </div>
+      </div>`}
+      ${fields.undo_record_id ? `<section class="linked-adjustments"><strong>Linked reversal</strong><p>Undo Sale ${escapeHtml(String(fields.sale_number))} · ${escapeHtml(fields.undo_record_id)} · KES ${escapeHtml(String(fields.total || 0))} reversed</p></section>` : ""}
       ${linked.length ? `<section class="linked-adjustments"><strong>Linked adjustments</strong>${linked.map((item) =>
         `<button type="button" data-action="open-sale-adjustment" data-adjustment-id="${escapeHtml(item.id)}">${escapeHtml(adjustmentTypeLabel(item.adjustment_type))} for Sale ${fields.sale_number}<small>Record #${item.adjustment_number} · KES ${item.financial_adjustment}</small></button>`
       ).join("")}</section>` : ""}
@@ -1431,6 +1438,10 @@ function handleAction(dataset) {
     startSaleAdjustment(dataset.cardId, dataset.adjustmentType);
     return;
   }
+  if (action === "confirm-sale-undo") {
+    confirmSaleUndo(dataset.cardId);
+    return;
+  }
   if (action === "open-sale-adjustment") {
     openSaleAdjustment(dataset.adjustmentId);
     return;
@@ -1716,6 +1727,10 @@ function routePriorityCommand(text) {
   }
   if (direct.action === "credit") {
     openCompletedSale({ saleNumber: direct.saleNumber }, { adjustmentType: "credit" });
+    return true;
+  }
+  if (direct.action === "undo") {
+    openCompletedSale({ saleNumber: direct.saleNumber }, { undoReview: true });
     return true;
   }
   addFeed("system", `${direct.action[0].toUpperCase()}${direct.action.slice(1)} by command is not enabled yet. Nothing changed.`);
@@ -3292,9 +3307,19 @@ function openCompletedSale(reference, options = {}) {
   state.cards = state.cards.filter((card) => !["CompletedSaleDetailCard", "SaleAdjustmentReviewCard", "SaleAdjustmentDetailCard"].includes(card.type));
   const fields = saleDetailFields(transaction);
   const availability = saleAdjustmentEngine.availability(transaction);
+  const reversal = transactionEngine.list().find((item) => item.reversalOf === transaction.id);
   fields.adjustment_available = availability.available;
   fields.adjustment_remaining_quantity = availability.remaining_quantity;
   fields.adjustment_block_message = availability.message;
+  fields.undo_record_id = reversal?.permanentId || reversal?.id || "";
+  fields.undo_review = options.undoReview === true && !reversal && availability.adjusted_quantity === 0;
+  if (reversal) {
+    fields.adjustment_available = false;
+    fields.adjustment_block_message = "This sale has a linked Undo. The original remains in history. No further stock or money change is allowed.";
+  } else if (options.undoReview === true && availability.adjusted_quantity > 0) {
+    fields.adjustment_available = false;
+    fields.adjustment_block_message = "This sale already has a linked adjustment and cannot be undone. Nothing changed.";
+  }
   const card = createEditableCard({
     type: "CompletedSaleDetailCard",
     title: `Sale ${fields.sale_number}`,
@@ -3311,6 +3336,49 @@ function openCompletedSale(reference, options = {}) {
   }
   render();
   focusCard(card.id);
+}
+
+function confirmSaleUndo(cardId) {
+  const card = state.cards.find((item) => item.id === cardId && item.type === "CompletedSaleDetailCard" && item.fields?.undo_review === true);
+  if (!card || card.submitting) return;
+  card.submitting = true;
+  const original = completedSaleByReference(transactionEngine.list(), {
+    saleNumber: card.fields.sale_number,
+    transactionId: card.fields.transaction_id
+  });
+  if (!original || saleAdjustmentEngine.availability(original).adjusted_quantity > 0) {
+    card.submitting = false;
+    card.fields.undo_review = false;
+    card.fields.adjustment_available = false;
+    card.fields.adjustment_block_message = "This sale cannot be undone because it is missing or already adjusted. Nothing changed.";
+    persistActiveCards();
+    render();
+    return;
+  }
+  const result = transactionEngine.undoSale(original.saleNumber, "owner_direct_command");
+  if (result.created) {
+    const stockToRestore = Number(original.metadata?.baseStockDeduction || original.metadata?.quantity || 0);
+    const match = pharmacyBrain.findMedicine(original.metadata?.medicine || "");
+    if (stockToRestore > 0 && match.status === "matched") {
+      const medicine = match.matches[0];
+      const current = Number(medicine.stockLeft);
+      if (Number.isFinite(current)) {
+        medicine.stockLeft = current + stockToRestore;
+        state.catalog.items = pharmacyBrain.catalog;
+        safeLocalStorage()?.setItem(CATALOG_KEY, JSON.stringify(state.catalog.items));
+        void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);
+      }
+    }
+    syncAdapter.queueAction({
+      id: `action-${result.transaction.id}`,
+      type: "SaleUndo",
+      fields: { ...result.transaction, stock_restored: stockToRestore },
+      localFirst: true,
+      aiUsed: false
+    });
+    addFeed("system", `Undo Sale ${original.saleNumber} recorded. Original sale kept. KES ${Math.abs(Number(original.amount || 0))} reversed. Stock restored: ${stockToRestore}.`);
+  }
+  openCompletedSale({ transactionId: original.permanentId || original.id });
 }
 
 function startSaleAdjustment(cardId, adjustmentType) {
