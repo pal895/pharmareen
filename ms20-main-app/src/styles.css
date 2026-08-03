@@ -1497,6 +1497,24 @@ input:disabled {
   color: var(--warn);
 }
 
+.queue-sync-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.queue-sync-item {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.9rem;
+  border: 1px solid var(--line, #d8e2de);
+  border-radius: 1rem;
+  background: #fff;
+}
+
+.queue-sync-item p {
+  margin: 0;
+}
+
 .developer-mode {
   margin-top: 2px;
 }

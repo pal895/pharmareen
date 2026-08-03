@@ -610,6 +610,7 @@ function adminMenuTemplate() {
 }
 
 function cardTemplate(card) {
+  if (card.type === "QueueSyncCard") return queueSyncCardTemplate(card);
   if (card.type === "ExportHubCard") return exportHubCardTemplate(card);
   if (card.type === "ActivityHubCard") return activityHubCardTemplate(card);
   if (card.type === "CompletedSaleDetailCard") return completedSaleDetailCardTemplate(card);
@@ -653,6 +654,39 @@ function cardTemplate(card) {
       </div>
     </article>
   `;
+}
+
+function queueItemSummary(item) {
+  const fields = item?.fields || {};
+  const medicine = String(fields.medicine || "Saved item").trim();
+  if (item?.type === "SaleCard") return `Sale: ${medicine}, ${Number(fields.quantity || 0)} ${fields.unit || "item"}`;
+  if (item?.type === "RestockCard") return `Restock: ${medicine}, ${Number(fields.quantity || 0)} ${fields.unit || "item"}`;
+  return `${medicine}: this kind is not ready to send yet`;
+}
+
+function queueSyncCardTemplate(card) {
+  const waiting = queue.list().filter((item) => item.status === "pending");
+  return `
+    <article class="card-message ready queue-sync-card" data-card-id="${escapeHtml(card.id)}">
+      <div class="card-top">
+        <span class="card-heading"><span class="card-type">Sync</span><strong>Send saved work</strong></span>
+        ${cardCloseButtonTemplate(card, "top")}
+      </div>
+      <p class="card-note">Check one item, then send it. Only that item will be sent.</p>
+      <div class="queue-sync-list">
+        ${waiting.length ? waiting.map((item) => {
+          const supported = ["SaleCard", "RestockCard"].includes(item.type);
+          const busy = card.syncingId === item.id;
+          return `<section class="queue-sync-item">
+            <strong>${escapeHtml(queueItemSummary(item))}</strong>
+            ${item.lastSyncError ? `<p role="alert">${escapeHtml(item.lastSyncError)}</p>` : ""}
+            <button class="primary-action" data-action="sync-one" data-card-id="${escapeHtml(card.id)}" data-sync-id="${escapeHtml(item.id)}" ${supported && !busy ? "" : "disabled"}>${busy ? "Sending…" : supported ? "Send this item" : "Not ready"}</button>
+          </section>`;
+        }).join("") : "<p>Nothing is waiting.</p>"}
+      </div>
+      ${card.resultMessage ? `<p class="card-note" role="status">${escapeHtml(card.resultMessage)}</p>` : ""}
+      <div class="card-actions"><button data-action="dismiss-card" data-card-id="${escapeHtml(card.id)}">Close</button></div>
+    </article>`;
 }
 
 function completedSaleDetailCardTemplate(card) {
@@ -1672,6 +1706,7 @@ function handleAction(dataset) {
   if (action === "forget-stock-fix-pronunciation") forgetStockFixPronunciation(dataset.cardId);
   if (action === "refresh-live-status") void refreshLiveStatus();
   if (action === "sync-now") syncNow();
+  if (action === "sync-one") void syncOneQueuedItem(dataset.cardId, dataset.syncId);
   if (action === "reset-onboarding") resetOnboarding();
   if (action === "decrease-card-font") adjustCardFontScale(-CARD_FONT_SCALE_STEP);
   if (action === "increase-card-font") adjustCardFontScale(CARD_FONT_SCALE_STEP);
@@ -5139,8 +5174,40 @@ function bumpQuantity(cardId, amount) {
 }
 
 async function syncNow() {
-  addSyncCard();
+  addQueueSyncCard();
   addFeed("system", "Check the waiting items first. Nothing was sent.");
+}
+
+function addQueueSyncCard() {
+  removeCardsByType(["QueueSyncCard"]);
+  addCard(createEditableCard({
+    type: "QueueSyncCard",
+    title: "Send saved work",
+    source: "Offline queue",
+    fields: {},
+    confidence: 1,
+    validation: "One reviewed item can be sent at a time."
+  }));
+}
+
+async function syncOneQueuedItem(cardId, actionId) {
+  const card = state.cards.find((item) => item.id === cardId && item.type === "QueueSyncCard");
+  if (!card || card.syncingId) return;
+  card.syncingId = actionId;
+  card.resultMessage = "";
+  render();
+  const result = await syncAdapter.syncOne(actionId);
+  card.syncingId = "";
+  if (result.synced) {
+    state.sync.lastSync = result.lastSync;
+    card.resultMessage = result.result?.message || "This item was saved.";
+    addFeed("system", card.resultMessage);
+  } else {
+    card.resultMessage = `${result.message} Nothing was removed from the waiting list.`;
+  }
+  persistActiveCards();
+  render();
+  focusCard(card.id);
 }
 
 async function refreshLiveStatus({ silent = false } = {}) {
