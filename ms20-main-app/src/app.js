@@ -1714,6 +1714,10 @@ function routePriorityCommand(text) {
     openCompletedSale({ saleNumber: direct.saleNumber }, { adjustmentType: "refund" });
     return true;
   }
+  if (direct.action === "credit") {
+    openCompletedSale({ saleNumber: direct.saleNumber }, { adjustmentType: "credit" });
+    return true;
+  }
   addFeed("system", `${direct.action[0].toUpperCase()}${direct.action.slice(1)} by command is not enabled yet. Nothing changed.`);
   render();
   return true;
@@ -3301,7 +3305,7 @@ function openCompletedSale(reference, options = {}) {
   });
   state.cards.push(card);
   persistActiveCards();
-  if (["return", "refund"].includes(options.adjustmentType)) {
+  if (["return", "refund", "credit"].includes(options.adjustmentType)) {
     startSaleAdjustment(card.id, options.adjustmentType);
     return;
   }

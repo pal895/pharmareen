@@ -12,6 +12,8 @@ assert.deepEqual(parseSaleDirectCommand("refund sale 3"), { action: "refund", ta
 assert.deepEqual(parseSaleDirectCommand("refund sale four"), { action: "refund", target: "number", saleNumber: 4 });
 assert.deepEqual(parseSaleDirectCommand("refund sale number 4"), { action: "refund", target: "number", saleNumber: 4 });
 assert.deepEqual(parseSaleDirectCommand("refund sale number four"), { action: "refund", target: "number", saleNumber: 4 });
+assert.deepEqual(parseSaleDirectCommand("credit sale 5"), { action: "credit", target: "number", saleNumber: 5 });
+assert.deepEqual(parseSaleDirectCommand("credit sale number five"), { action: "credit", target: "number", saleNumber: 5 });
 assert.equal(parseSaleDirectCommand("return cell to"), null);
 assert.equal(parseSaleDirectCommand("return cell two"), null);
 assert.equal(parseSaleDirectCommand("refund cell three"), null);
@@ -45,9 +47,10 @@ assert.match(app, /direct\.action === "open"/);
 assert.match(app, /openCompletedSale\(\{ saleNumber: direct\.saleNumber \}\)/);
 assert.match(app, /direct\.action === "return"[\s\S]*?openCompletedSale\(\{ saleNumber: direct\.saleNumber \}, \{ adjustmentType: "return" \}\)/);
 assert.match(app, /direct\.action === "refund"[\s\S]*?openCompletedSale\(\{ saleNumber: direct\.saleNumber \}, \{ adjustmentType: "refund" \}\)/);
+assert.match(app, /direct\.action === "credit"[\s\S]*?openCompletedSale\(\{ saleNumber: direct\.saleNumber \}, \{ adjustmentType: "credit" \}\)/);
 assert.match(app, /This completed sale could not be found in local transaction history\. Nothing was changed\./);
 assert.doesNotMatch(app, /completedSaleByReference\(state\.transactions/);
 assert.match(app, /function openCompletedSale\(reference, options = \{\}\)[\s\S]*?completedSaleByReference\(transactionEngine\.list\(\), reference\)/);
-assert.match(app, /\["return", "refund"\]\.includes\(options\.adjustmentType\)[\s\S]*?startSaleAdjustment\(card\.id, options\.adjustmentType\)/);
+assert.match(app, /\["return", "refund", "credit"\]\.includes\(options\.adjustmentType\)[\s\S]*?startSaleAdjustment\(card\.id, options\.adjustmentType\)/);
 
-console.log("SALE_DIRECT_COMMAND_OK cases=open-sale-1,open-sale-4,sale-1,return-sale-2,refund-sale-3 voice=shared-priority medicine=fallback adjustments=review-only mutation=none");
+console.log("SALE_DIRECT_COMMAND_OK cases=open-sale-1,open-sale-4,sale-1,return-sale-2,refund-sale-3,credit-sale-5 voice=shared-priority medicine=fallback adjustments=review-only mutation=none");
