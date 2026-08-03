@@ -475,6 +475,8 @@ Checkpoint 59 begins with a read-only connected-readiness boundary. Main App `Ch
 
 MS2-LT-059-A is owner-verified passed/frozen/protected. Owner evidence confirms the connected backend/Sheets/registry readiness projection and complete saved Ibuprofen record without any edit or Queue change. MS2-LT-059-B moves only to the existing read-only `SyncReviewCard`, which projects pending count, last sync, conflict and adapter readiness without invoking `syncPending`; sending queued actions remains a separate explicit action.
 
+The first MS2-LT-059-B run exposed generic editable-card actions on SyncReviewCard even though the projection itself did not sync. SyncReviewCard now has a specialized action boundary: visible read-only/idempotent guidance, optional Read, and Close only. It cannot render Confirm or Correct; `syncPending` remains reachable only from the separate explicit `Sync N` action.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

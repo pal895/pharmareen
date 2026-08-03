@@ -1041,6 +1041,10 @@ Owner screenshots pass and freeze **MS2-LT-059-A**. One system check showed Onli
 
 Open Menu and tap `Sync review` once. Verify the `Check sync` card shows Pending 7, Last sync `Not synced`, Conflict `None`, Backend `detected`, Sheets `connected`, Baileys `confirmed`, and idempotent-action-ID guidance. Do not tap `Sync 7`, confirm, correct, edit, or provision anything. Close the card, reopen Menu, verify Queue remains 7, capture both states, and stop. Controlled write isolation and unavailable-Sheets recovery are later cases.
 
+The first owner run safely fails the read-only presentation contract. All six Sync review facts were correct and Queue remained 7, but the card exposed Confirm and Correct while hiding the idempotent guidance. The shared repair removes mutation controls and displays explicit read-only/idempotent guidance with Read and Close only.
+
+Retest only MS2-LT-059-B after deploying the repair. Open Sync review once; require the same six facts, the visible sentence `Read only. Queued actions keep idempotent action IDs and nothing syncs from this review.`, and only Read plus Close actions. Close, verify Queue remains 7, capture both states, and stop.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

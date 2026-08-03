@@ -1264,6 +1264,15 @@ function activeActionsTemplate(card) {
       </div>
     `;
   }
+  if (card.type === "SyncReviewCard") {
+    return `
+      <div class="card-actions sync-review-actions">
+        <p role="status">Read only. Queued actions keep idempotent action IDs and nothing syncs from this review.</p>
+        ${speechControlsTemplate(card)}
+        <button data-action="dismiss-card" data-card-id="${card.id}">Close</button>
+      </div>
+    `;
+  }
   if (card.type === "ReportCard" || card.type === "DocumentExportCard") {
     return `
       <div class="card-actions">

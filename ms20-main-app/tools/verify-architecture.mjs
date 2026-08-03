@@ -75,6 +75,8 @@ assert(!appSource.includes(oldBrand), "User-facing app source still contains old
 assert(!html.includes(oldBrand), "HTML still contains old brand");
 assert(css.includes("@media (max-width: 720px)"), "Mobile responsive layout missing");
 assert(appSource.includes('data-action="open-catalog"'), "Saved catalog is not directly accessible from the home screen");
+assert(appSource.includes('card.type === "SyncReviewCard"') && appSource.includes("nothing syncs from this review"), "Sync review must expose an explicit read-only boundary");
+assert(appSource.includes('data-action="dismiss-card"') && !/card\.type === "SyncReviewCard"[\s\S]{0,500}data-action="confirm-card"/.test(appSource), "Sync review must close without confirmation or mutation controls");
 assert(appSource.includes("showCatalogWorkspace();"), "Successful onboarding does not lead into the catalog workspace");
 assert(css.includes(".catalog-workspace-list") && css.includes("grid-template-columns: 1fr"), "Catalog workspace mobile layout protection missing");
 assert(css.includes("repeat(2, minmax(0, 1fr))"), "Catalog workspace desktop layout protection missing");
