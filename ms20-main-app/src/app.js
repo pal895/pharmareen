@@ -2,6 +2,7 @@ import { demoState, nowLabel } from "./data/demoState.js";
 import { CloudMemoryGateway } from "./services/cloudGateway.js";
 import { OfflineQueue } from "./services/offlineQueue.js";
 import { SyncAdapter } from "./services/syncAdapter.js";
+import { OfflineSyncGateway } from "./services/offlineSyncGateway.js";
 import { BackendAdapterRegistry } from "./services/backendAdapters.js";
 import { PharmacyBrain, SourceBrain, AIFallbackAdapter } from "./services/brainAdapters.js";
 import { findBarcodeTestFixture } from "./data/barcodeTestFixtures.js";
@@ -76,8 +77,12 @@ import {
 const state = structuredClone(demoState);
 const cloudGateway = new CloudMemoryGateway();
 const queue = new OfflineQueue();
-const syncAdapter = new SyncAdapter({ queue, cloudGateway });
 const backendAdapters = new BackendAdapterRegistry();
+const offlineSyncGateway = new OfflineSyncGateway({
+  backendGateway: backendAdapters.liveBackendGateway,
+  pharmacy: state.pharmacy
+});
+const syncAdapter = new SyncAdapter({ queue, cloudGateway: offlineSyncGateway });
 const paymentSimulator = new SimulatorPaymentAdapter({ scenario: "delayed_confirmation" });
 const transactionEngine = new TransactionCompletionEngine({
   adapters: {
@@ -5134,11 +5139,8 @@ function bumpQuantity(cardId, amount) {
 }
 
 async function syncNow() {
-  syncPendingStockCorrections();
-  const result = await syncAdapter.syncPending({ excludeTypes: ["StockCorrectionCard"] });
-  state.sync.lastSync = result.lastSync || "Not synced";
-  addFeed("system", `Synced ${result.synced.length} saved item(s).`);
-  render();
+  addSyncCard();
+  addFeed("system", "Check the waiting items first. Nothing was sent.");
 }
 
 async function refreshLiveStatus({ silent = false } = {}) {

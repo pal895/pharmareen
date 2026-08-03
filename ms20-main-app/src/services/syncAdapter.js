@@ -31,6 +31,24 @@ export class SyncAdapter {
     };
   }
 
+  async syncOne(actionId) {
+    const action = this.queue.list().find((item) => item.id === actionId && item.status === "pending");
+    if (!action) return { synced: false, actionId, message: "This item is not waiting." };
+    try {
+      const result = await this.cloudGateway.saveAction(action);
+      const syncedAt = new Date().toISOString();
+      this.queue.update(action.id, { status: "synced", syncedAt, syncMessage: result.message || "Saved." });
+      this.lastSync = syncedAt;
+      this.lastConflict = null;
+      return { synced: true, actionId, lastSync: syncedAt, result };
+    } catch (error) {
+      const message = error?.message || "The item was not sent. It is still waiting safely.";
+      this.queue.update(action.id, { status: "pending", lastSyncError: message });
+      this.createConflictReview(action, message);
+      return { synced: false, actionId, message };
+    }
+  }
+
   createConflictReview(action, reason) {
     this.lastConflict = {
       id: `conflict-${Date.now()}`,

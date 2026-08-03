@@ -18,7 +18,8 @@
     "verify:activity": "node tools/verify-activity-history.mjs",
     "verify:voice-viewport": "node tools/verify-voice-viewport.mjs",
     "verify:consistency": "node tools/verify-consistency-gate.mjs",
-    "verify": "node tools/verify-architecture.mjs",
+    "verify:sync-gateway": "node tools/verify-offline-sync-gateway.mjs",
+    "verify": "node tools/verify-architecture.mjs && node tools/verify-offline-sync-gateway.mjs",
     "serve": "node tools/serve.mjs"
   }
 }
