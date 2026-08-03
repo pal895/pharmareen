@@ -465,6 +465,8 @@ Supplier/restock finance now crosses the shared Transaction Completion Engine bo
 
 MS2-LT-057-A is owner-verified passed/frozen/protected. Owner-device evidence confirms the paid-now Cash review preserves canonical Ibuprofen, quantity 2 tablets, buying price KES 9 and supplier Afya Wholesale Ltd, while explicit review-only guidance prevents stock and supplier-finance effects before `Add stock`. Closing without confirmation left stock 13 and Queue 7. MS2-LT-057-B supplier credit is the sole active owner case; 057-C remains inactive.
 
+MS2-LT-057-B is owner-verified passed/frozen/protected. Owner-device evidence confirms selecting supplier credit preserves the same canonical restock facts and review-only boundary; closing without confirmation left stock 13 and Queue 7 with no liability or transaction mutation. MS2-LT-057-C future settlement is the sole active owner case.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

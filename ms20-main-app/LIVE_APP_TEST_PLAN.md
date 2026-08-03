@@ -1019,6 +1019,12 @@ Owner screenshots pass and freeze **MS2-LT-057-A**. Voice `restock ibuprofen 2` 
 
 Use Mic and say `restock ibuprofen 2`. Select `Supplier credit`. Verify the review still shows canonical Ibuprofen, stock to add 2, tablet, saved buying price KES 9 and saved supplier Afya Wholesale Ltd, with `Supplier credit` selected and clear review-only guidance that stock and supplier finances change only after `Add stock`. Do not tap `Add stock`; close the review and verify Ibuprofen stock remains 13 and Queue remains 7. Do not test future settlement.
 
+Owner screenshots pass and freeze **MS2-LT-057-B**. The Restock review retained Ibuprofen, stock to add 2, tablet, buying price KES 9 and Afya Wholesale Ltd with `Supplier credit` selected and review-only guidance visible. The owner closed without tapping `Add stock`; Ibuprofen stock remained 13 and Queue remained 7. No mutation occurred. Do not repeat 057-B without verified regression.
+
+## MS2-LT-057-C — Future settlement restock review
+
+Use Mic and say `restock ibuprofen 2`. Select `Pay on a future date` and enter settlement date `2026-08-10`. Verify the review still shows canonical Ibuprofen, stock to add 2, tablet, buying price KES 9 and supplier Afya Wholesale Ltd, with the future-date option selected, `2026-08-10` visible, and clear review-only guidance that stock and supplier finances change only after `Add stock`. Do not tap `Add stock`; close the review and verify Ibuprofen stock remains 13 and Queue remains 7. Do not begin another checkpoint.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
