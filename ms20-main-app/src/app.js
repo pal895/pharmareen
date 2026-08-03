@@ -56,7 +56,7 @@ import { matchMedicine } from "./services/medicineMatcher.js";
 import { catalogReviewCapabilities, reorderedCatalogRows } from "./services/catalogReviewPolicy.js";
 import { medicineReviewBlocker } from "./services/medicineReviewReadiness.js";
 import { CashPaymentAdapter, ManualPaymentAdapter, SimulatorPaymentAdapter } from "./services/paymentAdapters.js";
-import { TransactionCompletionEngine } from "./services/transactionCompletionEngine.js";
+import { saleReversalFor, TransactionCompletionEngine } from "./services/transactionCompletionEngine.js";
 import { applyStockCorrectionVoice, PharmacyPronunciationMemory, reviewStockCorrection, stockCorrectionGuidance, trustedCatalogStock } from "./services/stockCorrectionPolicy.js";
 import { executeStockCorrection, replayPendingStockCorrections } from "./services/stockCorrectionExecution.js";
 import { prepareProductionSaleCard, productionSaleSummary, saleFieldsFromTransaction } from "./services/productionSaleCard.js";
@@ -3314,7 +3314,7 @@ function openCompletedSale(reference, options = {}) {
   state.cards = state.cards.filter((card) => !["CompletedSaleDetailCard", "SaleAdjustmentReviewCard", "SaleAdjustmentDetailCard"].includes(card.type));
   const fields = saleDetailFields(transaction);
   const availability = saleAdjustmentEngine.availability(transaction);
-  const reversal = transactionEngine.list().find((item) => item.reversalOf === transaction.id);
+  const reversal = saleReversalFor(transactionEngine.list(), transaction);
   fields.adjustment_available = availability.available;
   fields.adjustment_remaining_quantity = availability.remaining_quantity;
   fields.adjustment_block_message = availability.message;
@@ -3395,6 +3395,16 @@ function startSaleAdjustment(cardId, adjustmentType) {
     saleNumber: detailCard.fields?.sale_number,
     transactionId: detailCard.fields?.transaction_id
   });
+  const reversal = saleReversalFor(transactionEngine.list(), transaction);
+  if (reversal) {
+    detailCard.fields.adjustment_available = false;
+    detailCard.fields.adjustment_remaining_quantity = 0;
+    detailCard.fields.adjustment_block_message = "This sale has a linked Undo. The original remains in history. No further stock or money change is allowed.";
+    persistActiveCards();
+    render();
+    focusCard(detailCard.id);
+    return;
+  }
   const availability = saleAdjustmentEngine.availability(transaction);
   if (!availability.available) {
     detailCard.fields.adjustment_available = false;

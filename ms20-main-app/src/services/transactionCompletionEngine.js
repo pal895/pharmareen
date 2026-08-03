@@ -9,6 +9,17 @@ function safeStorage() {
   }
 }
 
+export function saleReversalFor(transactions = [], original = null) {
+  if (!original) return null;
+  const originalIds = new Set([original.id, original.permanentId].filter(Boolean).map(String));
+  const undoIds = new Set([...originalIds].map((id) => `undo-${id}`));
+  return transactions.find((item) => {
+    if (item.kind !== "sale_reversal") return false;
+    if (item.reversalOf && originalIds.has(String(item.reversalOf))) return true;
+    return [item.id, item.permanentId].filter(Boolean).some((id) => undoIds.has(String(id)));
+  }) || null;
+}
+
 export class TransactionCompletionEngine {
   constructor({ adapters = {}, storage = safeStorage(), now = () => new Date() } = {}) {
     this.adapters = new Map(Object.entries(adapters));
@@ -126,7 +137,7 @@ export class TransactionCompletionEngine {
       item.kind === "sale" && item.saleNumber === Number(saleNumber) && item.status === "completed" && !item.reversalOf
     );
     if (!original) return { created: false, missing: true };
-    const existing = transactions.find((item) => item.reversalOf === original.id);
+    const existing = saleReversalFor(transactions, original);
     if (existing) return { created: false, duplicate: true, transaction: existing };
     const createdAt = this.now().toISOString();
     const reversal = {

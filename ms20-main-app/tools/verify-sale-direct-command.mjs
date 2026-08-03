@@ -71,5 +71,6 @@ assert.match(app, /\["return", "refund", "credit"\]\.includes\(options\.adjustme
 assert.match(app, /function confirmSaleUndo\(cardId\)[\s\S]*?transactionEngine\.undoSale\(original\.saleNumber, "owner_direct_command"\)/);
 assert.match(app, /if \(result\.created\)[\s\S]*?stockToRestore[\s\S]*?type: "SaleUndo"/);
 assert.match(app, /if \(reversal\)[\s\S]*?fields\.adjustment_available = false[\s\S]*?linked Undo/);
+assert.match(app, /function startSaleAdjustment\(cardId, adjustmentType\)[\s\S]*?saleReversalFor\(transactionEngine\.list\(\), transaction\)[\s\S]*?No further stock or money change is allowed\.[\s\S]*?return;/);
 
 console.log("SALE_DIRECT_COMMAND_OK cases=open-sale-1,open-sale-4,sale-1,return-sale-2,refund-sale-3,credit-sale-5,undo-sale-6,open-return-refund-undo-last-sale voice=shared-priority medicine=fallback undo=review-confirm-linked-idempotent");

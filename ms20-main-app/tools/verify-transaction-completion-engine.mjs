@@ -1,5 +1,5 @@
 import { CashPaymentAdapter, ManualPaymentAdapter, SimulatorPaymentAdapter } from "../src/services/paymentAdapters.js";
-import { TransactionCompletionEngine } from "../src/services/transactionCompletionEngine.js";
+import { saleReversalFor, TransactionCompletionEngine } from "../src/services/transactionCompletionEngine.js";
 
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 let current = new Date("2026-07-16T08:00:00.000Z");
@@ -18,6 +18,10 @@ const first = engine.start({ id: "sale-a", kind: "sale", amount: 120, paymentMet
 assert(first.transaction.status === "completed" && first.transaction.saleLabel === "Sale 1", "Fast cash sale must complete with daily numbering");
 const duplicate = engine.start({ id: "sale-a", kind: "sale", amount: 120, paymentMethod: "cash" });
 assert(duplicate.duplicate && engine.list().length === 1, "Transaction IDs must be idempotent");
+
+const stableOriginal = { id: "runtime-sale-a", permanentId: "sale-a", kind: "sale" };
+const stableReversal = { id: "undo-old-runtime-sale-a", permanentId: "undo-sale-a", kind: "sale_reversal", reversalOf: "old-runtime-sale-a" };
+assert(saleReversalFor([stableReversal], stableOriginal) === stableReversal, "Linked Undo lookup must survive runtime ID rehydration through permanent identity");
 
 simulator.setScenario("delayed_confirmation");
 const second = engine.start({
