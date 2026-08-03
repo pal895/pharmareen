@@ -95,7 +95,7 @@ Evidence abbreviations: `CVS` = `docs/engineering-memory/current-live-validation
 | # | Checkpoint | Objective | Prerequisite(s) | Implementation state | Owner validation | Protected | Est. live test | Evidence/document source |
 |---:|---|---|---|---|---|---|---|---|
 | 58 | Main App/backend adapter gateway | Serve `/main-app/`, probe backend safely and keep writes behind explicit adapters/queues. | 1 | PASS / PROTECTED | Passed on Replit | Yes | 8 min | CVS; ARCH; backend adapter/route tests |
-| 59 | Google Sheets pharmacy persistence | Provision/read/write isolated pharmacy sheets and recover safely when unavailable. | 2, 20 | Implemented — awaiting owner live test | **MS2-LT-059-A connected Sheets/registry readiness is OWNER-VERIFIED PASSED/FROZEN/PROTECTED.** Corrected 059-B showed all six queue/adapter facts, Read and Close only, and unchanged Queue 7, but its owner message used hard engineering words (`queued`, `idempotent`, `action IDs`, `syncs`). The protected behavior remains technical internally; the owner-facing sentence is now plain: `This page only shows what is waiting. Nothing is sent from here. The app will not send the same item twice.` **Plain-language MS2-LT-059-B retest is the only active case.** | No | 15 min | 2026-08-03 owner screenshots; `/live/readiness`; Main App Sync review; read-only and plain-language regression; onboarding/sheets tests; TRAIN |
+| 59 | Google Sheets pharmacy persistence | Provision/read/write isolated pharmacy sheets and recover safely when unavailable. | 2, 20 | Partial implementation | **MS2-LT-059-A connected readiness and corrected MS2-LT-059-B read-only Sync review are OWNER-VERIFIED PASSED/FROZEN/PROTECTED.** The final 059-B card showed Pending 7, Not synced, no conflict, backend detected, Sheets connected, Baileys confirmed, simple duplicate-safe wording, and Read/Close only; Queue remained 7. Repository audit proves `Sync 7` still targets `CloudMemoryGateway`, an in-browser placeholder, not the live Sheets backend. **No owner write case is active.** Implement and verify the real backend adapter plus per-item safety before preparing 059-C. | No | 15 min | 2026-08-03 owner screenshots; `/live/readiness`; Main App Sync review; `CloudMemoryGateway`; `SyncAdapter`; offline sync backend; onboarding/sheets tests; TRAIN |
 | 60 | WhatsApp/Baileys optional channel | Route text/voice/media through shared pharmacy logic without making it the Main App proof path. | 31, 58–59 | Implemented — awaiting owner live test | Historical bridge tests; current optional channel not requalified | No | 15 min | bridge docs/tests; commit history |
 | 61 | Offline PWA and media bridge | Save offline actions/media, resume, synchronize and deliver confirmations to the correct owner. | 20, 58 | PASS / PROTECTED | Passed during offline programme | Yes | 15 min | TRAIN; offline/bridge tests |
 | 62 | Meta/Twilio legacy webhook channels | Preserve historical webhook compatibility without treating it as the active product channel. | 58 | Deprecated with repository evidence | Historical only | No | 5 min | README; Meta webhook tests; Baileys migration commits |
@@ -199,8 +199,8 @@ This ledger deliberately accounts for owner-facing domains discovered across cur
 
 - Total checkpoints: **84**
 - PASS / PROTECTED: **49**
-- Implemented — awaiting owner live test: **7**
-- Partial implementation: **7**
+- Implemented — awaiting owner live test: **6**
+- Partial implementation: **8**
 - Planned / approved: **16**
 - External qualification: **3**
 - Deprecated with repository evidence: **2**
@@ -1126,13 +1126,13 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **Checkpoint ID:** MS2-LT-059
 - **Name:** Google Sheets pharmacy persistence
 - **Category:** Integration Validation
-- **Current status:** Implemented — awaiting owner live test
-- **Repository evidence:** 2026-08-03 owner screenshots; `/live/readiness`; Main App Sync review; read-only and plain-language regression; onboarding/sheets tests; TRAIN
+- **Current status:** Partial implementation
+- **Repository evidence:** 2026-08-03 owner screenshots; `/live/readiness`; Main App Sync review; `CloudMemoryGateway`; `SyncAdapter`; offline sync backend; onboarding/sheets tests; TRAIN
 - **Implementation commit(s):** c306c33 Wire production pharmacy registry onboarding; e0a23f3 Complete pre-demo pharmacy engine upgrade; 6b9c37c Use admin workbook tabs for pharmacy onboarding
 - **Primary implementation files/modules:** `app/sheets.py`; `app/services/pharmacy_onboarding.py`
-- **Owner live-test evidence:** **MS2-LT-059-A connected Sheets/registry readiness is OWNER-VERIFIED PASSED/FROZEN/PROTECTED.** Corrected 059-B showed all six queue/adapter facts, Read and Close only, and unchanged Queue 7, but its owner message used hard engineering words (`queued`, `idempotent`, `action IDs`, `syncs`). The protected behavior remains technical internally; the owner-facing sentence is now plain: `This page only shows what is waiting. Nothing is sent from here. The app will not send the same item twice.` **Plain-language MS2-LT-059-B retest is the only active case.**; source: 2026-08-03 owner screenshots; `/live/readiness`; Main App Sync review; read-only and plain-language regression; onboarding/sheets tests; TRAIN
+- **Owner live-test evidence:** Repository evidence not yet available.
 - **PASS / PROTECTED confirmation:** Not applicable.
-- **Remaining implementation work:** Complete decisive owner live validation for: Provision/read/write isolated pharmacy sheets and recover safely when unavailable.
+- **Remaining implementation work:** Complete the unimplemented portion and owner-validate: Provision/read/write isolated pharmacy sheets and recover safely when unavailable.
 - **Prerequisite checkpoints:** 2, 20
 - **Dependent checkpoints:** MS2-LT-060, MS2-LT-067, MS2-LT-073, MS2-LT-077
 

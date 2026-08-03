@@ -479,6 +479,8 @@ The first MS2-LT-059-B run exposed generic editable-card actions on SyncReviewCa
 
 The 059-B control repair is mutation-safe, but owner evidence rejected its technical sentence as too difficult. SyncReviewCard now explains the same internal idempotency boundary in plain owner language: the page only shows waiting work, sends nothing, and will not send the same item twice. Technical action IDs remain internal and unchanged.
 
+MS2-LT-059-B is owner-verified passed/frozen/protected with simple wording, Read/Close only and Queue 7 unchanged. The next persistence boundary is not owner-ready: `SyncAdapter` currently receives `CloudMemoryGateway`, whose `saveAction()` stores actions in browser memory. `LiveBackendRoutes.syncQueue` names `/api/ms20/sync`, but no live gateway call or backend route is wired. A true Sheets write claim requires a pharmacy-isolated server adapter, durable duplicate protection, explicit per-item outcomes and retry-safe queue updates; existing Queue 7 must not be sent until those facts are reviewable.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

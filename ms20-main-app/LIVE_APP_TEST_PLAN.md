@@ -1049,6 +1049,10 @@ The corrected controls pass: the six facts are correct, Read and Close are the o
 
 After the plain-language repair, retest only that Sync review shows: `This page only shows what is waiting. Nothing is sent from here. The app will not send the same item twice.` Confirm Read and Close remain the only actions, close it, verify Queue remains 7, capture both states, and stop.
 
+The final retest passes and freezes **MS2-LT-059-B**. The simple sentence is visible, Read and Close are the only actions, all six status facts remain correct, and Queue remains 7 after Close. No mutation occurred.
+
+Do not begin 059-C on the current build. Repository inspection confirms `Sync 7` still writes to the browser-memory `CloudMemoryGateway`, not the live Sheets backend. Engineering must wire and verify a real pharmacy-isolated, duplicate-safe backend adapter with per-item review/results before any owner write instruction is issued. Do not tap Sync 7.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
