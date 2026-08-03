@@ -668,6 +668,8 @@ The complete 2026-08-03 owner sequence closes **MS2-LT-055-N / Direct Command 8 
 
 **Latest protected resume point: MS2-LT-055-N.** No later case is active until explicit owner authorization.
 
+**MS2-LT-055-O / Direct Command 9 — Safe errors is the only active owner case.** The shared priority router now intercepts incomplete or unsafe adjustment-command lookalikes before medicine parsing and answers that it could not safely identify one completed sale and that nothing changed. Valid but nonexistent references use the existing local-history not-found boundary; already-adjusted Sale 2 remains immutable and blocks further adjustment. Capture baseline stock 13 and Queue 7, then use Mic for `refund sale number`, `return cell two`, `open sale 999` and `return sale 2`. None may open a medicine sales card or create/confirm anything. Confirm final stock 13 and Queue 7, then stop for owner screenshots.
+
 Permanent owner rule: MS2.0 is **Voice first → fast tap/action second → typing last**, minimal-typing and three-steps-or-fewer whenever possible. Every supported typed operational command must have voice parity wherever device/platform speech is available. Transcripts and typed input converge on the same deterministic router and shared workflow roots; no voice-only business implementation and no unjustified AI routing are allowed. Typing remains a protected fallback for accessibility, noisy environments, unsupported voice, offline phone speech limitations, correction and deliberate choice. Future live-test instructions default to voice where available, then verify typed fallback/parity. Only the owner may change this rule.
 
 <!-- VALIDATION_CONTRACT_SYNC_START -->

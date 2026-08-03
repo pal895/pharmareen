@@ -61,7 +61,7 @@ import { applyStockCorrectionVoice, PharmacyPronunciationMemory, reviewStockCorr
 import { executeStockCorrection, replayPendingStockCorrections } from "./services/stockCorrectionExecution.js";
 import { prepareProductionSaleCard, productionSaleSummary, saleFieldsFromTransaction } from "./services/productionSaleCard.js";
 import { completedSaleByReference, SaleAdjustmentEngine, saleDetailFields, saleReferenceFromReceipt } from "./services/saleAdjustmentReview.js";
-import { parseSaleDirectCommand } from "./services/saleDirectCommand.js";
+import { isUnsafeSaleDirectCommandLookalike, parseSaleDirectCommand } from "./services/saleDirectCommand.js";
 import { hydrateStockFixDraft, normalizeStockFixEvidence } from "./services/stockFixEvidencePipeline.js";
 import { readXlsxInventory } from "./services/excelInventory.js";
 import { listRouteSlots, resolveOfflineSlot } from "./routes/routeRegistry.js";
@@ -1711,7 +1711,13 @@ function handleCommand(text) {
 
 function routePriorityCommand(text) {
   const direct = parseSaleDirectCommand(text);
-  if (!direct) return false;
+  if (!direct) {
+    if (!isUnsafeSaleDirectCommandLookalike(text)) return false;
+    addFeed("owner", String(text || "").trim());
+    addFeed("system", "I could not safely identify one completed sale from that command. Nothing changed.");
+    render();
+    return true;
+  }
   const reference = direct.target === "last" ? { latest: true } : { saleNumber: direct.saleNumber };
   addFeed("owner", String(text || "").trim());
   if (direct.action === "open") {

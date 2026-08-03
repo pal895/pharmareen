@@ -25,4 +25,13 @@ export function parseSaleDirectCommand(text = "") {
   return { action, target: "number", saleNumber };
 }
 
+export function isUnsafeSaleDirectCommandLookalike(text = "") {
+  const normalized = normalizeSaleDirectCommand(text);
+  if (!normalized || parseSaleDirectCommand(normalized)) return false;
+  const [action, second = ""] = normalized.split(" ");
+  if (![...DIRECT_SALE_ACTIONS].includes(action)) return false;
+  if (action !== "open") return true;
+  return ["sale", "cell", "last", "number"].includes(second) || /^\d+$/.test(second);
+}
+
 export { DIRECT_SALE_ACTIONS };

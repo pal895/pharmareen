@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { parseSaleDirectCommand } from "../src/services/saleDirectCommand.js";
+import { isUnsafeSaleDirectCommandLookalike, parseSaleDirectCommand } from "../src/services/saleDirectCommand.js";
 import { completedSaleByReference } from "../src/services/saleAdjustmentReview.js";
 
 assert.deepEqual(parseSaleDirectCommand("open sale 1"), { action: "open", target: "number", saleNumber: 1 });
@@ -30,6 +30,12 @@ assert.equal(parseSaleDirectCommand("open sale 0"), null);
 assert.equal(parseSaleDirectCommand("open 1"), null);
 assert.equal(parseSaleDirectCommand("ibuprofen"), null);
 assert.equal(parseSaleDirectCommand("open capsules"), null);
+for (const text of ["refund sale number", "refund medicine 4", "return cell two", "open sale 0", "open 1"]) {
+  assert.equal(isUnsafeSaleDirectCommandLookalike(text), true, `${text} must be intercepted before medicine parsing`);
+}
+for (const text of ["ibuprofen", "open capsules", "open catalog"]) {
+  assert.equal(isUnsafeSaleDirectCommandLookalike(text), false, `${text} must remain available to normal routing`);
+}
 
 const immutableSales = [
   { id: "sale-1-old", permanentId: "sale-1-old", kind: "sale", status: "completed", saleNumber: 1, businessDay: "2026-08-01" },
@@ -49,6 +55,7 @@ assert.equal(completedSaleByReference(immutableSales, { latest: true })?.id, "sa
 const app = fs.readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
 assert.match(app, /function routePriorityCommand\(text\)/);
 assert.match(app, /if \(routePriorityCommand\(trimmed\)\) return/);
+assert.match(app, /isUnsafeSaleDirectCommandLookalike\(text\)[\s\S]*?Nothing changed\./);
 assert.match(app, /function handleVoiceTranscript\(text\)[\s\S]*?if \(routePriorityCommand\(text\)\) return;[\s\S]*?buildCommandCard\(text\)/);
 assert.match(app, /direct\.action === "open"/);
 assert.match(app, /direct\.target === "last" \? \{ latest: true \} : \{ saleNumber: direct\.saleNumber \}/);
