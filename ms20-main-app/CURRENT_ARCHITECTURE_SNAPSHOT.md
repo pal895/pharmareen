@@ -129,7 +129,7 @@ Permanent interaction architecture: **Voice first → fast tap/action second →
 
 Direct Return routing reuses those same roots: `return sale N` resolves via `transactionEngine.list()` and `openCompletedSale()`, then delegates to `startSaleAdjustment(..., "return")`. It opens the established review-only card and does not introduce a command-specific adjustment engine or confirmation boundary.
 
-MS2-LT-055-M is the latest owner-verified passed/frozen/protected checkpoint. MS2-LT-055-N is the only active owner case. Typed composer input and microphone transcripts converge on `routePriorityCommand()` before medicine parsing and share the same persisted immutable-sale resolver and workflow roots. The focused parity case compares read-only voice and typed `open sale 2`; both must produce identical state and no mutation. Permanent interaction priority remains **Voice first → fast tap/action second → typing last**.
+MS2-LT-055-N is the latest owner-verified passed/frozen/protected checkpoint. Owner evidence proves typed composer input and microphone transcripts converge on `routePriorityCommand()` before medicine parsing and share the same persisted immutable-sale resolver and workflow roots: both `open sale 2` paths displayed the identical completed immutable Sale 2 with its linked Undo and blocked adjustments. Catalog stock remained 13 and Queue remained 7, with no mutation. No later case is active until explicit owner authorization. Permanent interaction priority remains **Voice first → fast tap/action second → typing last**.
 
 Local app URL used during verification:
 
