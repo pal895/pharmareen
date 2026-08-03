@@ -686,6 +686,10 @@ The corrected owner retest closes **MS2-LT-056-A as OWNER-VERIFIED PASSED / FROZ
 
 **MS2-LT-057-A — Paid-now Cash supplier/restock review is the only active owner case.** The shared RestockCard now carries explicit supplier-payment terms into the Transaction Completion Engine: paid-now Cash is a completed outflow, supplier credit is a recorded liability event, and a future settlement remains pending with a required date. All paths are idempotent and remain review-only until `Add stock`; existing stock arithmetic and the permanent Voice first → fast tap/action second → typing last rule are unchanged. Use Mic `restock ibuprofen 2`, verify the saved medicine/unit/buying-price/supplier facts and selected `Paid now · Cash`, then stop without adding stock. 057-B and 057-C are not active.
 
+Owner screenshots close **MS2-LT-057-A as OWNER-VERIFIED PASSED / FROZEN / PROTECTED**. Voice `restock ibuprofen 2` opened the dedicated Restock review with canonical Ibuprofen, stock to add 2, unit tablet, saved buying price KES 9, saved supplier Afya Wholesale Ltd, and `Paid now · Cash` selected. The review explicitly stated that stock and supplier finances change only after `Add stock`. The owner did not add stock and closed the review; Ibuprofen stock remained 13 and Queue remained 7. No stock, supplier-finance, transaction, or queue mutation occurred. Do not repeat 057-A without verified regression.
+
+**Latest protected resume point: MS2-LT-057-A. MS2-LT-057-B — Supplier credit review is the only active owner case.** Use Mic `restock ibuprofen 2`, select `Supplier credit`, verify the same saved medicine, quantity, unit, buying price and supplier remain intact and the review remains explicit that nothing changes until `Add stock`. Do not tap `Add stock`; close the review and confirm Ibuprofen stock remains 13 and Queue remains 7. MS2-LT-057-C and all later checkpoints are inactive.
+
 Permanent owner rule: MS2.0 is **Voice first → fast tap/action second → typing last**, minimal-typing and three-steps-or-fewer whenever possible. Every supported typed operational command must have voice parity wherever device/platform speech is available. Transcripts and typed input converge on the same deterministic router and shared workflow roots; no voice-only business implementation and no unjustified AI routing are allowed. Typing remains a protected fallback for accessibility, noisy environments, unsupported voice, offline phone speech limitations, correction and deliberate choice. Future live-test instructions default to voice where available, then verify typed fallback/parity. Only the owner may change this rule.
 
 <!-- VALIDATION_CONTRACT_SYNC_START -->
@@ -693,7 +697,7 @@ Permanent owner rule: MS2.0 is **Voice first → fast tap/action second → typi
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-055 — Refunds, returns and credits
+- Current: MS2-LT-057 — Supplier/restock payments
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.

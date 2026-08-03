@@ -3,8 +3,8 @@
   "authority": "MS2.0_MASTER_LIVE_TEST_SEQUENCE.md",
   "checkpoint_count": 84,
   "current_checkpoint": {
-    "id": "MS2-LT-055",
-    "name": "Refunds, returns and credits"
+    "id": "MS2-LT-057",
+    "name": "Supplier/restock payments"
   },
   "protected_checkpoint_ids": [
     "MS2-LT-001",
@@ -64,6 +64,6 @@
     "status": "ACTIVE",
     "document": "docs/engineering-memory/token-execution-policy.md"
   },
-  "master_sha256": "acf98f81b1dfee830dc6476ea32f6a28449fa62ca5d663fe54347a890bce2180",
+  "master_sha256": "a35a22853509f2cf294cd503fbc05e0074af3598070be41640e7d45fbd85eedd",
   "rule": "Load the master and its Engineering Traceability Index; never reconstruct or maintain a parallel sequence."
 }

@@ -463,12 +463,14 @@ Planned at their proper test stages:
 
 Supplier/restock finance now crosses the shared Transaction Completion Engine boundary. The existing RestockCard exposes paid-now Cash (completed outflow), supplier credit (recorded liability), and pay-on-future-date (pending settlement with required ISO date). TCE and queued restock records are idempotent; stock still changes only through the established confirmation path. Voice and typed restock input share the deterministic local parser, preserving Voice first → fast tap/action second → typing last.
 
+MS2-LT-057-A is owner-verified passed/frozen/protected. Owner-device evidence confirms the paid-now Cash review preserves canonical Ibuprofen, quantity 2 tablets, buying price KES 9 and supplier Afya Wholesale Ltd, while explicit review-only guidance prevents stock and supplier-finance effects before `Add stock`. Closing without confirmation left stock 13 and Queue 7. MS2-LT-057-B supplier credit is the sole active owner case; 057-C remains inactive.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-055 — Refunds, returns and credits
+- Current: MS2-LT-057 — Supplier/restock payments
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.

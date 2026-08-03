@@ -1013,12 +1013,18 @@ Pass only after owner-device evidence shows the file opens in a compatible prese
 
 Use Mic and say `restock ibuprofen 2`. Verify the dedicated Restock review shows canonical Ibuprofen, stock to add 2, tablet, the saved buying price and supplier, and `Paid now · Cash` selected. The review must state that stock and supplier finances change only after `Add stock`. Do not tap `Add stock`; close the review and verify catalog stock and Queue are unchanged. Supplier credit and future settlement are later isolated cases.
 
+Owner screenshots pass and freeze **MS2-LT-057-A**. Voice `restock ibuprofen 2` opened the dedicated review with Ibuprofen, stock to add 2, tablet, saved buying price KES 9, saved supplier Afya Wholesale Ltd, and `Paid now · Cash` selected. The review-only guidance was visible. The owner closed without tapping `Add stock`; Ibuprofen stock remained 13 and Queue remained 7. No mutation occurred. Do not repeat 057-A without verified regression.
+
+## MS2-LT-057-B — Supplier credit restock review
+
+Use Mic and say `restock ibuprofen 2`. Select `Supplier credit`. Verify the review still shows canonical Ibuprofen, stock to add 2, tablet, saved buying price KES 9 and saved supplier Afya Wholesale Ltd, with `Supplier credit` selected and clear review-only guidance that stock and supplier finances change only after `Add stock`. Do not tap `Add stock`; close the review and verify Ibuprofen stock remains 13 and Queue remains 7. Do not test future settlement.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-055 — Refunds, returns and credits
+- Current: MS2-LT-057 — Supplier/restock payments
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.
