@@ -129,7 +129,7 @@ Permanent interaction architecture: **Voice first → fast tap/action second →
 
 Direct Return routing reuses those same roots: `return sale N` resolves via `transactionEngine.list()` and `openCompletedSale()`, then delegates to `startSaleAdjustment(..., "return")`. It opens the established review-only card and does not introduce a command-specific adjustment engine or confirmation boundary.
 
-MS2-LT-055-L is the latest owner-verified passed/frozen/protected checkpoint. Numbered Undo remains confirmation-gated, immutable, linked and idempotent. MS2-LT-055-M is the only active owner case: approved `open|return|refund|undo last sale` grammar resolves the newest persisted completed sale through the same shared immutable-sale resolver as numbered commands; Credit last-sale remains unsupported. The focused owner case is read-only `open last sale`. Permanent interaction priority remains **Voice first → fast tap/action second → typing last**.
+MS2-LT-055-M is the latest owner-verified passed/frozen/protected checkpoint. Approved open, return, refund and undo last-sale grammar resolves the newest persisted completed sale through the same shared immutable-sale resolver as numbered commands; Credit last-sale remains unsupported. Read-only open-last-sale navigation writes no transaction, adjustment, reversal, stock, money or queue state. No later owner case is active until explicit authorization. Permanent interaction priority remains **Voice first → fast tap/action second → typing last**.
 
 Local app URL used during verification:
 
