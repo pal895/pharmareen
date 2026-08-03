@@ -29,6 +29,7 @@ import {
 import { EXPORT_FORMATS, exportCompletionSummary, exportFormat } from "./services/exportFormatMetadata.js";
 import { appendActivity, createCatalogActivityEntry } from "./services/activityHistory.js";
 import { createVoiceViewportAnchor, restoreVoiceViewportAnchor, settleVoiceViewportAnchor } from "./services/voiceViewportAnchor.js";
+import { normalizeSpokenSettlementDate } from "./services/spokenSettlementDate.js";
 import {
   CATALOG_EDIT_FIELDS,
   applyCatalogEditVoice,
@@ -1025,6 +1026,15 @@ function fieldTemplate(card, field) {
   const control = longFields.has(field)
     ? `<textarea data-card-id="${card.id}" data-field="${field}" rows="${field === "items_text" ? 8 : 3}">${escapeHtml(String(value))}</textarea>`
     : `<input data-card-id="${card.id}" data-field="${field}" ${inputMode ? `inputmode="${inputMode}"` : ""} value="${escapeHtml(String(value))}">`;
+  if (card.type === "RestockCard" && field === "settlement_date") return `
+    <div class="catalog-edit-field medicine-voice-field">
+      <div class="catalog-edit-field-heading">
+        <label for="settlement-date-${card.id}">Settlement date</label>
+        <button type="button" data-action="medicine-field-voice" data-card-id="${card.id}" data-field="settlement_date" aria-label="Speak settlement date" ${state.voice.starting || state.voice.listening ? "disabled" : ""}>Mic</button>
+      </div>
+      <input id="settlement-date-${card.id}" data-card-id="${card.id}" data-field="settlement_date" value="${escapeHtml(String(value))}" placeholder="YYYY-MM-DD">
+      <p role="status">${escapeHtml(card.fields?.voice_feedback || "Use Mic first. Say a full date, for example 10 August 2026. Typing is available as fallback.")}</p>
+    </div>`;
   return `
     <label>
       <span>${escapeHtml(card.type === "RestockCard" && field === "quantity" ? "Stock to add" : card.type === "StockCorrectionCard" && field === "reason" ? "Reason (optional)" : card.type === "ReportCard" && field === "report_date" ? "Displayed Report Date" : card.type === "ReportCard" && field === "generated_at" ? "Last Generated At" : fieldLabel(field))}</span>
@@ -1435,7 +1445,7 @@ function bindActionElements(scope) {
 function preserveInlineCardViewport(element) {
   const card = element?.closest?.(".card-message[data-card-id]");
   if (!card) return;
-  if (!["sale-edit-field-voice", "catalog-edit-field-voice", "catalog-edit-voice"].includes(element.dataset.action)) {
+  if (!["sale-edit-field-voice", "catalog-edit-field-voice", "catalog-edit-voice", "medicine-field-voice"].includes(element.dataset.action)) {
     activeVoiceViewportAnchor = null;
   }
   activeCardViewportAnchor = createVoiceViewportAnchor(root, {
@@ -1532,6 +1542,7 @@ function handleAction(dataset) {
     startCatalogEditVoice(dataset.cardId);
   }
   if (action === "sale-edit-field-voice") startSaleEditFieldVoice(dataset.cardId, dataset.field);
+  if (action === "medicine-field-voice") startMedicineFieldVoice(dataset.cardId, dataset.field);
   if (action === "catalog-search-voice") startCatalogSearchVoice(dataset.cardId, dataset.searchPlacement);
   if (action === "back-home") {
     state.ui.screen = "home";
@@ -4030,6 +4041,31 @@ function startSaleEditFieldVoice(cardId, field) {
       }
       updateCardField(card.id, field, value);
       card.fields.voice_feedback = `Heard “${transcript}”. ${fieldLabel(field)} updated. Review before confirming.`;
+      persistActiveCards();
+      render();
+    },
+    (message) => {
+      card.fields.voice_feedback = message;
+      persistActiveCards();
+    }
+  );
+}
+
+function startMedicineFieldVoice(cardId, field) {
+  const card = state.cards.find((item) => item.id === cardId && item.type === "RestockCard");
+  if (!card || field !== "settlement_date") return;
+  card.fields.voice_feedback = "Settlement date selected. Say the full future date.";
+  activeVoiceViewportAnchor = createVoiceViewportAnchor(root, {
+    cardId,
+    field,
+    selector: `input[data-card-id="${CSS.escape(cardId)}"][data-field="settlement_date"]`
+  });
+  persistActiveCards();
+  startVoiceCapture(
+    (transcript) => {
+      const result = normalizeSpokenSettlementDate(transcript);
+      card.fields.voice_feedback = `Heard “${transcript}”. ${result.feedback}`;
+      if (result.applied) updateCardField(card.id, field, result.value);
       persistActiveCards();
       render();
     },

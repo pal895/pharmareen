@@ -1025,6 +1025,10 @@ Owner screenshots pass and freeze **MS2-LT-057-B**. The Restock review retained 
 
 Use Mic and say `restock ibuprofen 2`. Select `Pay on a future date` and enter settlement date `2026-08-10`. Verify the review still shows canonical Ibuprofen, stock to add 2, tablet, buying price KES 9 and supplier Afya Wholesale Ltd, with the future-date option selected, `2026-08-10` visible, and clear review-only guidance that stock and supplier finances change only after `Add stock`. Do not tap `Add stock`; close the review and verify Ibuprofen stock remains 13 and Queue remains 7. Do not begin another checkpoint.
 
+The first owner run safely fails the Voice-first interaction requirement. The future-date option and blank-date blocker worked, nothing was saved, and final stock 13 plus Queue 7 prove no mutation; however, Settlement date had no Mic and forced typed fallback. The shared repair adds a field-level Mic with deterministic spoken full-date normalization into the same field used by typing.
+
+Retest only MS2-LT-057-C after deploying the repair. Use Mic `restock ibuprofen 2`, select `Pay on a future date`, then use the **Settlement date Mic** and say `10 August 2026`. Verify `2026-08-10` appears, all saved restock facts remain intact, and the review-only warning remains. Do not tap `Add stock`; close and reconfirm stock 13 and Queue 7. Typing remains fallback only.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

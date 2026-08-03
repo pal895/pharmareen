@@ -467,6 +467,8 @@ MS2-LT-057-A is owner-verified passed/frozen/protected. Owner-device evidence co
 
 MS2-LT-057-B is owner-verified passed/frozen/protected. Owner-device evidence confirms selecting supplier credit preserves the same canonical restock facts and review-only boundary; closing without confirmation left stock 13 and Queue 7 with no liability or transaction mutation. MS2-LT-057-C future settlement is the sole active owner case.
 
+The first MS2-LT-057-C run exposed a field-level voice gap without mutation. Future settlement correctly required a date, but typing was the only entry control. Settlement date now uses the shared microphone capture boundary plus a deterministic full-date normalizer, writing the normalized ISO value into the same `settlement_date` field used by typed fallback. Invalid and non-future spoken dates remain blocked; the Transaction Completion Engine and confirmation boundary are unchanged.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
