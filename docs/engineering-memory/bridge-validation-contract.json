@@ -47,6 +47,7 @@
     "MS2-LT-052",
     "MS2-LT-053",
     "MS2-LT-054",
+    "MS2-LT-055",
     "MS2-LT-058",
     "MS2-LT-061",
     "MS2-LT-065",
@@ -62,6 +63,6 @@
     "status": "ACTIVE",
     "document": "docs/engineering-memory/token-execution-policy.md"
   },
-  "master_sha256": "d4d52b57340f9efbbdb852df8ec795e2e593dbd1b6696383cee6426acfbd86f4",
+  "master_sha256": "43dd38d77c944f62ed5bad02ca7a89337fd7b1186ca20b969d956de40ecdf1d2",
   "rule": "Load the master and its Engineering Traceability Index; never reconstruct or maintain a parallel sequence."
 }
