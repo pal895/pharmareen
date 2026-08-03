@@ -712,6 +712,10 @@ The first 059-B owner run is a safe presentation **FAIL**. The Sync review corre
 
 The root repair specializes SyncReviewCard actions at the shared card boundary: it now visibly states `Read only. Queued actions keep idempotent action IDs and nothing syncs from this review.`, retains Read, and offers Close only. Confirm, Correct and mutation-style Cancel are absent. Retest only 059-B after deployment; do not tap Sync 7. Controlled write isolation and unavailable-Sheets recovery remain inactive.
 
+The corrected action-boundary retest proves Pending 7, Last sync Not synced, Conflict None, Backend detected, Sheets connected and Baileys confirmed; only Read and Close are present, and closing leaves Queue 7. The behavior is correct and mutation-free, but the owner rejected the sentence `Read only. Queued actions keep idempotent action IDs and nothing syncs from this review.` as too difficult. This is a valid plain-language **FAIL** under the permanent 12-year-old-owner rule. The engineering protection remains unchanged internally.
+
+The owner-facing sentence is replaced with: `This page only shows what is waiting. Nothing is sent from here. The app will not send the same item twice.` Retest only the visible 059-B wording plus Read/Close and unchanged Queue 7. Do not repeat the already-proven adapter facts beyond one screenshot and do not tap Sync 7.
+
 Permanent owner rule: MS2.0 is **Voice first → fast tap/action second → typing last**, minimal-typing and three-steps-or-fewer whenever possible. Every supported typed operational command must have voice parity wherever device/platform speech is available. Transcripts and typed input converge on the same deterministic router and shared workflow roots; no voice-only business implementation and no unjustified AI routing are allowed. Typing remains a protected fallback for accessibility, noisy environments, unsupported voice, offline phone speech limitations, correction and deliberate choice. Future live-test instructions default to voice where available, then verify typed fallback/parity. Only the owner may change this rule.
 
 <!-- VALIDATION_CONTRACT_SYNC_START -->

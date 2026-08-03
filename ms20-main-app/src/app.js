@@ -1267,7 +1267,7 @@ function activeActionsTemplate(card) {
   if (card.type === "SyncReviewCard") {
     return `
       <div class="card-actions sync-review-actions">
-        <p role="status">Read only. Queued actions keep idempotent action IDs and nothing syncs from this review.</p>
+        <p role="status">This page only shows what is waiting. Nothing is sent from here. The app will not send the same item twice.</p>
         ${speechControlsTemplate(card)}
         <button data-action="dismiss-card" data-card-id="${card.id}">Close</button>
       </div>

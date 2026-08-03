@@ -1045,6 +1045,10 @@ The first owner run safely fails the read-only presentation contract. All six Sy
 
 Retest only MS2-LT-059-B after deploying the repair. Open Sync review once; require the same six facts, the visible sentence `Read only. Queued actions keep idempotent action IDs and nothing syncs from this review.`, and only Read plus Close actions. Close, verify Queue remains 7, capture both states, and stop.
 
+The corrected controls pass: the six facts are correct, Read and Close are the only actions, and Queue remains 7. The wording fails the owner's 12-year-old-understanding rule because `queued`, `idempotent`, `action IDs`, and `syncs` are engineering terms.
+
+After the plain-language repair, retest only that Sync review shows: `This page only shows what is waiting. Nothing is sent from here. The app will not send the same item twice.` Confirm Read and Close remain the only actions, close it, verify Queue remains 7, capture both states, and stop.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

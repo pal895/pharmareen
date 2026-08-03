@@ -477,6 +477,8 @@ MS2-LT-059-A is owner-verified passed/frozen/protected. Owner evidence confirms 
 
 The first MS2-LT-059-B run exposed generic editable-card actions on SyncReviewCard even though the projection itself did not sync. SyncReviewCard now has a specialized action boundary: visible read-only/idempotent guidance, optional Read, and Close only. It cannot render Confirm or Correct; `syncPending` remains reachable only from the separate explicit `Sync N` action.
 
+The 059-B control repair is mutation-safe, but owner evidence rejected its technical sentence as too difficult. SyncReviewCard now explains the same internal idempotency boundary in plain owner language: the page only shows waiting work, sends nothing, and will not send the same item twice. Technical action IDs remain internal and unchanged.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
