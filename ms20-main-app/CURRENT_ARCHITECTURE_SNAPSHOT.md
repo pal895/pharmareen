@@ -469,12 +469,16 @@ MS2-LT-057-B is owner-verified passed/frozen/protected. Owner-device evidence co
 
 The first MS2-LT-057-C run exposed a field-level voice gap without mutation. Future settlement correctly required a date, but typing was the only entry control. Settlement date now uses the shared microphone capture boundary plus a deterministic full-date normalizer, writing the normalized ISO value into the same `settlement_date` field used by typed fallback. Invalid and non-future spoken dates remain blocked; the Transaction Completion Engine and confirmation boundary are unchanged.
 
+Checkpoint 57 is owner-verified passed/frozen/protected through corrected MS2-LT-057-C. The field-level Mic normalized `10th August 2026` to `2026-08-10` in the shared settlement field while preserving all canonical restock facts. Closing without confirmation left stock 13 and Queue 7, proving the supplier finance, pending settlement, transaction and stock boundaries remained mutation-free.
+
+Checkpoint 59 begins with a read-only connected-readiness boundary. Main App `Check system` calls the shared live-status adapter; `/live/readiness` derives Google Sheets availability from the configured store and confirms the pharmacy registry schema before the UI reports `Sheets: OK`. MS2-LT-059-A observes only this readiness state plus the preserved catalog record. Queue sync, provisioning, isolated writes and unavailable-Sheets recovery remain outside 059-A.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-057 — Supplier/restock payments
+- Current: MS2-LT-059 — Google Sheets pharmacy persistence
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.

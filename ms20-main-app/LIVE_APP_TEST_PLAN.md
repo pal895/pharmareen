@@ -1029,12 +1029,18 @@ The first owner run safely fails the Voice-first interaction requirement. The fu
 
 Retest only MS2-LT-057-C after deploying the repair. Use Mic `restock ibuprofen 2`, select `Pay on a future date`, then use the **Settlement date Mic** and say `10 August 2026`. Verify `2026-08-10` appears, all saved restock facts remain intact, and the review-only warning remains. Do not tap `Add stock`; close and reconfirm stock 13 and Queue 7. Typing remains fallback only.
 
+The corrected owner retest passes and freezes **MS2-LT-057-C and checkpoint 57**. The field-level Mic heard `10th August 2026` and populated `2026-08-10`; the review retained the canonical Ibuprofen quantity/unit, KES 9 buying price, Afya Wholesale Ltd supplier and traceability facts. The owner closed without tapping `Add stock`; Ibuprofen stock remained 13 and Queue remained 7. No mutation occurred. MS2-LT-057-A through 057-C are OWNER-VERIFIED PASSED/FROZEN/PROTECTED and must not be repeated without verified regression.
+
+## MS2-LT-059-A — Connected Sheets and registry readiness
+
+After deploying the verified revision, open Menu and tap `Check system` once. Verify the diagnostic panel shows Online, `Backend: OK`, `Sheets: OK`, and `Queue: 7`. Do not tap `Sync 7` or Reset setup. Close Menu, use the catalog Mic and say `ibuprofen`, and verify the preserved saved record remains Ibuprofen 200 mg tablet with stock 13. Capture the diagnostic panel plus unchanged catalog/queue and stop. Do not provision, edit, sync, test writes, or simulate unavailable Sheets; those are later isolated checkpoint-59 cases.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-057 — Supplier/restock payments
+- Current: MS2-LT-059 — Google Sheets pharmacy persistence
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.

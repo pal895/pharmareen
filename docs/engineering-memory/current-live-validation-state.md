@@ -698,6 +698,12 @@ The first 057-C owner run is a safe **FAIL** against the permanent Voice first r
 
 The root repair adds a field-level Mic beside Settlement date and sends its transcript through a deterministic spoken-date normalizer into the same `settlement_date` field used by typing. It accepts explicit full forms such as `10 August 2026` and `August tenth twenty twenty-six`, rejects invalid or non-future dates, preserves the card viewport, and keeps typing available as fallback. Focused supplier/restock, shared voice-viewport, consistency, syntax, validation-contract, and protection gates cover the repair. Retest only 057-C after deployment; use the field Mic and say `10 August 2026`. Do not type unless voice is technically unavailable.
 
+The corrected retest closes **MS2-LT-057-C and checkpoint 57 as OWNER-VERIFIED PASSED / FROZEN / PROTECTED**. The field-level Mic was visible and identified typing as fallback. It heard `10th August 2026`, normalized the shared Settlement date field to `2026-08-10`, and preserved Ibuprofen, stock to add 2 tablets, buying price KES 9, supplier Afya Wholesale Ltd, batch IBU-200C, expiry 2028-12 and shelf C3. The owner did not tap `Add stock`; after closing, Ibuprofen stock remained 13 and Queue remained 7. No stock, supplier-finance, pending-settlement, transaction, or queue mutation occurred. Do not repeat 057-A, 057-B, or 057-C without verified regression.
+
+**Latest protected resume point: MS2-LT-057-C / checkpoint 57.** Checkpoint 58 remains protected. The next repository candidate is MS2-LT-059 Google Sheets pharmacy persistence; no checkpoint-59 owner action is authorized until its first focused route is prepared from repository evidence.
+
+**MS2-LT-059-A — Connected Google Sheets/registry readiness is the only active owner case.** The Main App `Check system` action reads the shared backend health and `/live/readiness` snapshot. That backend route reports Google Sheets availability and verifies the pharmacy registry schema; the UI renders the results as `Backend: OK` and `Sheets: OK`. After deployment, open Menu, tap `Check system` once, and verify Online, Backend OK, Sheets OK, and Queue 7. Close Menu, use catalog Mic and say `ibuprofen`, and verify the preserved saved Ibuprofen record remains stock 13. Do not tap `Sync 7`, Reset setup, Open & edit, or any transaction action. Capture the diagnostic state and unchanged catalog/queue, then stop. Write isolation and unavailable-Sheets recovery are later separate 059 cases.
+
 Permanent owner rule: MS2.0 is **Voice first → fast tap/action second → typing last**, minimal-typing and three-steps-or-fewer whenever possible. Every supported typed operational command must have voice parity wherever device/platform speech is available. Transcripts and typed input converge on the same deterministic router and shared workflow roots; no voice-only business implementation and no unjustified AI routing are allowed. Typing remains a protected fallback for accessibility, noisy environments, unsupported voice, offline phone speech limitations, correction and deliberate choice. Future live-test instructions default to voice where available, then verify typed fallback/parity. Only the owner may change this rule.
 
 <!-- VALIDATION_CONTRACT_SYNC_START -->
@@ -705,7 +711,7 @@ Permanent owner rule: MS2.0 is **Voice first → fast tap/action second → typi
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-057 — Supplier/restock payments
+- Current: MS2-LT-059 — Google Sheets pharmacy persistence
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.
