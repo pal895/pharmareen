@@ -75,5 +75,6 @@ assert.match(app, /function startSaleAdjustment\(cardId, adjustmentType\)[\s\S]*
 for (const label of ["Stock reconciliation", "Finance reconciliation", "Receipt reconciliation", "Report reconciliation", "Audit"]) {
   assert.ok(app.includes(label), `Completed linked-Undo detail must expose ${label}`);
 }
+assert.doesNotMatch(app, /summaryGrid\(/, "Reconciliation rendering must use the established sale-detail list renderer");
 
 console.log("SALE_DIRECT_COMMAND_OK cases=open-sale-1,open-sale-4,sale-1,return-sale-2,refund-sale-3,credit-sale-5,undo-sale-6,open-return-refund-undo-last-sale voice=shared-priority medicine=fallback undo=review-confirm-linked-idempotent");

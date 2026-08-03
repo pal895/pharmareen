@@ -133,6 +133,8 @@ MS2-LT-055-O is the latest owner-verified passed/frozen/protected checkpoint, an
 
 MS2-LT-056-A is the only active owner case. `saleReversalReconciliation()` is a read-only TCE projection over the immutable original sale and stable linked reversal. It exposes stock restoration, financial reversal, original/reversal receipt identities, net report impact and audit facts without creating another ledger, receipt, report record or queue action. The completed-sale detail is the single owner-facing reconciliation surface. Permanent interaction priority remains **Voice first → fast tap/action second → typing last**.
 
+The first owner render exposed an undefined presentation helper, which the existing isolated-card fallback safely contained. Reconciliation now renders through the established escaped `saleDetailList()` component; focused verification forbids the nonexistent helper. The TCE projection and all mutation boundaries are unchanged.
+
 Local app URL used during verification:
 
 ```text
