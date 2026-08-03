@@ -1712,25 +1712,26 @@ function handleCommand(text) {
 function routePriorityCommand(text) {
   const direct = parseSaleDirectCommand(text);
   if (!direct) return false;
+  const reference = direct.target === "last" ? { latest: true } : { saleNumber: direct.saleNumber };
   addFeed("owner", String(text || "").trim());
   if (direct.action === "open") {
-    openCompletedSale({ saleNumber: direct.saleNumber });
+    openCompletedSale(reference);
     return true;
   }
   if (direct.action === "return") {
-    openCompletedSale({ saleNumber: direct.saleNumber }, { adjustmentType: "return" });
+    openCompletedSale(reference, { adjustmentType: "return" });
     return true;
   }
   if (direct.action === "refund") {
-    openCompletedSale({ saleNumber: direct.saleNumber }, { adjustmentType: "refund" });
+    openCompletedSale(reference, { adjustmentType: "refund" });
     return true;
   }
   if (direct.action === "credit") {
-    openCompletedSale({ saleNumber: direct.saleNumber }, { adjustmentType: "credit" });
+    openCompletedSale(reference, { adjustmentType: "credit" });
     return true;
   }
   if (direct.action === "undo") {
-    openCompletedSale({ saleNumber: direct.saleNumber }, { undoReview: true });
+    openCompletedSale(reference, { undoReview: true });
     return true;
   }
   addFeed("system", `${direct.action[0].toUpperCase()}${direct.action.slice(1)} by command is not enabled yet. Nothing changed.`);

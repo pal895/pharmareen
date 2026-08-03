@@ -4,9 +4,11 @@ const STORAGE_KEY = "ms20-main-app:sale-adjustments";
 export function completedSaleByReference(transactions = [], reference = {}) {
   const saleNumber = Number(reference.saleNumber);
   const transactionId = String(reference.transactionId || "");
+  const latest = reference.latest === true;
   return [...transactions].reverse().find((item) =>
     item.kind === "sale" && item.status === "completed" && !item.reversalOf
-    && ((transactionId && [item.id, item.permanentId].includes(transactionId))
+    && (latest
+      || (transactionId && [item.id, item.permanentId].includes(transactionId))
       || (Number.isFinite(saleNumber) && item.saleNumber === saleNumber))
   ) || null;
 }
