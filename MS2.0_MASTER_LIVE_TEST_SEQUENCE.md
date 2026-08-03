@@ -87,7 +87,7 @@ Evidence abbreviations: `CVS` = `docs/engineering-memory/current-live-validation
 | 53 | Concurrent payment completion | Keep multiple waiting payments isolated, support out-of-order success and prevent duplicate stock effects. | 52 | PASS / PROTECTED | Passed | Yes | 12 min | TCE quiet-concurrency evidence |
 | 54 | Payment failure/cancellation notification | Preserve stock/paid records and create one durable action-needed Notification without chat noise. | 52–53 | PASS / PROTECTED | Passed 2026-07-29: owner mobile screenshots prove Zinc Sale 1 supporting flow evidence and authoritative Septrin Sale 2 stock-preservation evidence. Septrin began and ended at numeric stock 12, quantity 1, bottle/suspension, KES 180 selling price and M-Pesa; Waiting became failed after one Simulate failed action, Payment Queue returned to 0 waiting, history retained one failed not paid/completed sale, one distinct unread actionable Sale 2 notification stated stock and paid records were unchanged, and Review payment returned to the same failed record. Zinc had blank stock and is supporting flow evidence only; its separate Sale 1 alert is not a duplicate of Septrin Sale 2. | Yes | 8 min | TCE; ARCH; `notificationCenter.js`; `verify-payment-failure-notification.mjs`; 2026-07-29 owner 24-screenshot chronological package; Septrin 12-to-12 authoritative stock proof; Zinc preliminary fixture correction preserved; a76215e |
 | 55 | Refunds, returns and credits | Record linked financial/stock adjustments without deleting original history, then validate approved status-card and direct-command improvements without replacing the tappable route. | 51–54 | PASS / PROTECTED | Original 055-A through 055-F and post-original 055-G through **MS2-LT-055-O/Direct Command 9 are OWNER-VERIFIED PASSED/FROZEN/PROTECTED; 055-O is the latest protected resume point**. The final safe-error package proves incomplete `refund sale number` and unsafe `return cell 2` are intercepted before medicine parsing, nonexistent `open sale 999` fails read-only, and linked-Undo `return sale 2` displays immutable completed Sale 2 with blocked adjustments and no further stock/money permission. Stock remained 13 and Queue remained 7. No sale, adjustment, reversal, stock, money or queue mutation occurred. Do not repeat 055-O. No later case is active until explicit owner authorization. Voice first → fast tap/action second → typing last remains permanent. | Yes | Passed | 2026-07-31 through 2026-08-03 owner screenshots; shared Sale Adjustment and Sale Direct Command verifiers; Production Sales Card; TCE; offline queue/sync; consistency gate; LATP ordered 055 programme |
-| 56 | Undo/reversal reconciliation | Reconcile stock, finance, receipt, reports and audit exactly once for visible sale numbers. | 51–55 | Partial implementation | Basic cancellation/undo passed; full TCE reconciliation untested | No | 15 min | TCE; ledger/intake tests |
+| 56 | Undo/reversal reconciliation | Reconcile stock, finance, receipt, reports and audit exactly once for visible sale numbers. | 51–55 | Implemented — awaiting owner live test | **MS2-LT-056-A — Existing linked-Undo reconciliation is the only active owner case.** Voice `open sale 2` must show immutable completed Sale 2, its linked Undo and one read-only reconciliation summary: stock 1 restored once, finance KES 18 reversed once, Sale 2 plus Undo Sale 2 receipts, report net KES 0 and reversal audit identity/status/time. Independent stock must remain 13 and Queue 7. Do not create or confirm anything. | No | Staged | TCE; stable reversal resolver and reconciliation projection; Sale Direct Command verifier; ledger/intake tests |
 | 57 | Supplier/restock payments | Support supplier payment, credit and future settlement flows through the adapter/TCE boundary. | 29, 50, 55 | Planned / approved | Not started | No | 15 min | TCE permanent scope; supplier workflows |
 
 ## 6. Integration Validation
@@ -199,8 +199,8 @@ This ledger deliberately accounts for owner-facing domains discovered across cur
 
 - Total checkpoints: **84**
 - PASS / PROTECTED: **47**
-- Implemented — awaiting owner live test: **7**
-- Partial implementation: **8**
+- Implemented — awaiting owner live test: **8**
+- Partial implementation: **7**
 - Planned / approved: **17**
 - External qualification: **3**
 - Deprecated with repository evidence: **2**
@@ -1081,13 +1081,13 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **Checkpoint ID:** MS2-LT-056
 - **Name:** Undo/reversal reconciliation
 - **Category:** Financial & Payment Validation
-- **Current status:** Partial implementation
-- **Repository evidence:** TCE; ledger/intake tests
+- **Current status:** Implemented — awaiting owner live test
+- **Repository evidence:** TCE; stable reversal resolver and reconciliation projection; Sale Direct Command verifier; ledger/intake tests
 - **Implementation commit(s):** Repository evidence not yet available.
 - **Primary implementation files/modules:** `app/intake.py`; `ms20-main-app/src/services/transactionCompletionEngine.js`
-- **Owner live-test evidence:** Basic cancellation/undo passed; full TCE reconciliation untested; source: TCE; ledger/intake tests
+- **Owner live-test evidence:** **MS2-LT-056-A — Existing linked-Undo reconciliation is the only active owner case.** Voice `open sale 2` must show immutable completed Sale 2, its linked Undo and one read-only reconciliation summary: stock 1 restored once, finance KES 18 reversed once, Sale 2 plus Undo Sale 2 receipts, report net KES 0 and reversal audit identity/status/time. Independent stock must remain 13 and Queue 7. Do not create or confirm anything.; source: TCE; stable reversal resolver and reconciliation projection; Sale Direct Command verifier; ledger/intake tests
 - **PASS / PROTECTED confirmation:** Not applicable.
-- **Remaining implementation work:** Complete the unimplemented portion and owner-validate: Reconcile stock, finance, receipt, reports and audit exactly once for visible sale numbers.
+- **Remaining implementation work:** Complete decisive owner live validation for: Reconcile stock, finance, receipt, reports and audit exactly once for visible sale numbers.
 - **Prerequisite checkpoints:** 51–55
 - **Dependent checkpoints:** MS2-LT-074
 

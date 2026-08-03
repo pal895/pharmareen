@@ -1,5 +1,5 @@
 import { CashPaymentAdapter, ManualPaymentAdapter, SimulatorPaymentAdapter } from "../src/services/paymentAdapters.js";
-import { saleReversalFor, TransactionCompletionEngine } from "../src/services/transactionCompletionEngine.js";
+import { saleReversalFor, saleReversalReconciliation, TransactionCompletionEngine } from "../src/services/transactionCompletionEngine.js";
 
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 let current = new Date("2026-07-16T08:00:00.000Z");
@@ -22,6 +22,11 @@ assert(duplicate.duplicate && engine.list().length === 1, "Transaction IDs must 
 const stableOriginal = { id: "runtime-sale-a", permanentId: "sale-a", kind: "sale" };
 const stableReversal = { id: "undo-old-runtime-sale-a", permanentId: "undo-sale-a", kind: "sale_reversal", reversalOf: "old-runtime-sale-a" };
 assert(saleReversalFor([stableReversal], stableOriginal) === stableReversal, "Linked Undo lookup must survive runtime ID rehydration through permanent identity");
+const reconciliation = saleReversalReconciliation([
+  { ...stableReversal, amount: -18, paymentStatus: "reversed", status: "completed", reason: "owner_direct_command", createdAt: "2026-08-03T08:00:00.000Z", saleLabel: "Undo Sale 2" }
+], { ...stableOriginal, saleNumber: 2, saleLabel: "Sale 2", status: "completed", amount: 18, metadata: { quantity: 1, baseStockDeduction: 1 } });
+assert(reconciliation.stock_restored === 1 && reconciliation.finance_reversed === 18 && reconciliation.report_net === 0, "Reversal reconciliation must balance stock, finance and report impact exactly once");
+assert(reconciliation.original_receipt === "Sale 2" && reconciliation.reversal_receipt === "Undo Sale 2" && reconciliation.payment_status === "reversed", "Reversal reconciliation must retain receipt and audit truth");
 
 simulator.setScenario("delayed_confirmation");
 const second = engine.start({

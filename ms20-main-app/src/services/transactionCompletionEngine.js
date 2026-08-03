@@ -20,6 +20,28 @@ export function saleReversalFor(transactions = [], original = null) {
   }) || null;
 }
 
+export function saleReversalReconciliation(transactions = [], original = null) {
+  const reversal = saleReversalFor(transactions, original);
+  if (!original || !reversal) return null;
+  const saleAmount = Math.abs(Number(original.amount || 0));
+  const reversalAmount = Number(reversal.amount || 0);
+  const stockRestored = Number(original.metadata?.baseStockDeduction || original.metadata?.quantity || 0);
+  return {
+    original_sale_number: Number(original.saleNumber || 0),
+    original_status: original.status || "",
+    reversal_id: reversal.permanentId || reversal.id || "",
+    reversal_status: reversal.status || "",
+    payment_status: reversal.paymentStatus || "",
+    finance_reversed: Math.abs(reversalAmount),
+    stock_restored: stockRestored,
+    original_receipt: original.saleLabel || `Sale ${original.saleNumber || ""}`,
+    reversal_receipt: reversal.saleLabel || `Undo Sale ${original.saleNumber || ""}`,
+    report_net: saleAmount + reversalAmount,
+    reason: reversal.reason || "",
+    recorded_at: reversal.createdAt || reversal.updatedAt || ""
+  };
+}
+
 export class TransactionCompletionEngine {
   constructor({ adapters = {}, storage = safeStorage(), now = () => new Date() } = {}) {
     this.adapters = new Map(Object.entries(adapters));

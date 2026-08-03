@@ -56,7 +56,7 @@ import { matchMedicine } from "./services/medicineMatcher.js";
 import { catalogReviewCapabilities, reorderedCatalogRows } from "./services/catalogReviewPolicy.js";
 import { medicineReviewBlocker } from "./services/medicineReviewReadiness.js";
 import { CashPaymentAdapter, ManualPaymentAdapter, SimulatorPaymentAdapter } from "./services/paymentAdapters.js";
-import { saleReversalFor, TransactionCompletionEngine } from "./services/transactionCompletionEngine.js";
+import { saleReversalFor, saleReversalReconciliation, TransactionCompletionEngine } from "./services/transactionCompletionEngine.js";
 import { applyStockCorrectionVoice, PharmacyPronunciationMemory, reviewStockCorrection, stockCorrectionGuidance, trustedCatalogStock } from "./services/stockCorrectionPolicy.js";
 import { executeStockCorrection, replayPendingStockCorrections } from "./services/stockCorrectionExecution.js";
 import { prepareProductionSaleCard, productionSaleSummary, saleFieldsFromTransaction } from "./services/productionSaleCard.js";
@@ -681,7 +681,13 @@ function completedSaleDetailCardTemplate(card) {
         <button type="button" data-action="start-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-adjustment-type="return" ${adjustmentsBlocked ? "disabled" : ""}>Return</button>
         <button type="button" data-action="start-sale-adjustment" data-card-id="${escapeHtml(card.id)}" data-adjustment-type="credit" ${adjustmentsBlocked ? "disabled" : ""}>Credit</button>
       </div>`}
-      ${fields.undo_record_id ? `<section class="linked-adjustments"><strong>Linked reversal</strong><p>Undo Sale ${escapeHtml(String(fields.sale_number))} · ${escapeHtml(fields.undo_record_id)} · KES ${escapeHtml(String(fields.total || 0))} reversed</p></section>` : ""}
+      ${fields.undo_record_id ? `<section class="linked-adjustments"><strong>Linked reversal</strong><p>Undo Sale ${escapeHtml(String(fields.sale_number))} · ${escapeHtml(fields.undo_record_id)} · KES ${escapeHtml(String(fields.total || 0))} reversed</p>${fields.reversal_reconciliation ? `<div class="summary-grid">${summaryGrid([
+        ["Stock reconciliation", `${fields.reversal_reconciliation.stock_restored} restored once`],
+        ["Finance reconciliation", `KES ${fields.reversal_reconciliation.finance_reversed} reversed once`],
+        ["Receipt reconciliation", `${fields.reversal_reconciliation.original_receipt} + ${fields.reversal_reconciliation.reversal_receipt}`],
+        ["Report reconciliation", `Net KES ${fields.reversal_reconciliation.report_net}`],
+        ["Audit", `${fields.reversal_reconciliation.payment_status} · ${fields.reversal_reconciliation.reason} · ${fields.reversal_reconciliation.recorded_at}`]
+      ])}</div>` : ""}</section>` : ""}
       ${linked.length ? `<section class="linked-adjustments"><strong>Linked adjustments</strong>${linked.map((item) =>
         `<button type="button" data-action="open-sale-adjustment" data-adjustment-id="${escapeHtml(item.id)}">${escapeHtml(adjustmentTypeLabel(item.adjustment_type))} for Sale ${fields.sale_number}<small>Record #${item.adjustment_number} · KES ${item.financial_adjustment}</small></button>`
       ).join("")}</section>` : ""}
@@ -3315,10 +3321,12 @@ function openCompletedSale(reference, options = {}) {
   const fields = saleDetailFields(transaction);
   const availability = saleAdjustmentEngine.availability(transaction);
   const reversal = saleReversalFor(transactionEngine.list(), transaction);
+  const reversalReconciliation = saleReversalReconciliation(transactionEngine.list(), transaction);
   fields.adjustment_available = availability.available;
   fields.adjustment_remaining_quantity = availability.remaining_quantity;
   fields.adjustment_block_message = availability.message;
   fields.undo_record_id = reversal?.permanentId || reversal?.id || "";
+  fields.reversal_reconciliation = reversalReconciliation;
   fields.undo_review = options.undoReview === true && !reversal && availability.adjusted_quantity === 0;
   if (reversal) {
     fields.adjustment_available = false;

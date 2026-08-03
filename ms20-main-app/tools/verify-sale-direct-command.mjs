@@ -72,5 +72,8 @@ assert.match(app, /function confirmSaleUndo\(cardId\)[\s\S]*?transactionEngine\.
 assert.match(app, /if \(result\.created\)[\s\S]*?stockToRestore[\s\S]*?type: "SaleUndo"/);
 assert.match(app, /if \(reversal\)[\s\S]*?fields\.adjustment_available = false[\s\S]*?linked Undo/);
 assert.match(app, /function startSaleAdjustment\(cardId, adjustmentType\)[\s\S]*?saleReversalFor\(transactionEngine\.list\(\), transaction\)[\s\S]*?No further stock or money change is allowed\.[\s\S]*?return;/);
+for (const label of ["Stock reconciliation", "Finance reconciliation", "Receipt reconciliation", "Report reconciliation", "Audit"]) {
+  assert.ok(app.includes(label), `Completed linked-Undo detail must expose ${label}`);
+}
 
 console.log("SALE_DIRECT_COMMAND_OK cases=open-sale-1,open-sale-4,sale-1,return-sale-2,refund-sale-3,credit-sale-5,undo-sale-6,open-return-refund-undo-last-sale voice=shared-priority medicine=fallback undo=review-confirm-linked-idempotent");
