@@ -1035,6 +1035,12 @@ The corrected owner retest passes and freezes **MS2-LT-057-C and checkpoint 57**
 
 After deploying the verified revision, open Menu and tap `Check system` once. Verify the diagnostic panel shows Online, `Backend: OK`, `Sheets: OK`, and `Queue: 7`. Do not tap `Sync 7` or Reset setup. Close Menu, use the catalog Mic and say `ibuprofen`, and verify the preserved saved record remains Ibuprofen 200 mg tablet with stock 13. Capture the diagnostic panel plus unchanged catalog/queue and stop. Do not provision, edit, sync, test writes, or simulate unavailable Sheets; those are later isolated checkpoint-59 cases.
 
+Owner screenshots pass and freeze **MS2-LT-059-A**. One system check showed Online, Backend OK, Sheets OK, Baileys OK and Queue 7. Voice `ibuprofen` retained the complete saved catalog record including stock 13, KES 18 selling price, KES 9 buying price, Afya Wholesale Ltd, shelf C3, batch IBU-200C and expiry 2028-12. The editor showed no changes, and nothing was saved or synced. Do not repeat 059-A without verified regression.
+
+## MS2-LT-059-B — Read-only Sync review
+
+Open Menu and tap `Sync review` once. Verify the `Check sync` card shows Pending 7, Last sync `Not synced`, Conflict `None`, Backend `detected`, Sheets `connected`, Baileys `confirmed`, and idempotent-action-ID guidance. Do not tap `Sync 7`, confirm, correct, edit, or provision anything. Close the card, reopen Menu, verify Queue remains 7, capture both states, and stop. Controlled write isolation and unavailable-Sheets recovery are later cases.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

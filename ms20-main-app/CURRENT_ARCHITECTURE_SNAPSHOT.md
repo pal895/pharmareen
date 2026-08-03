@@ -473,6 +473,8 @@ Checkpoint 57 is owner-verified passed/frozen/protected through corrected MS2-LT
 
 Checkpoint 59 begins with a read-only connected-readiness boundary. Main App `Check system` calls the shared live-status adapter; `/live/readiness` derives Google Sheets availability from the configured store and confirms the pharmacy registry schema before the UI reports `Sheets: OK`. MS2-LT-059-A observes only this readiness state plus the preserved catalog record. Queue sync, provisioning, isolated writes and unavailable-Sheets recovery remain outside 059-A.
 
+MS2-LT-059-A is owner-verified passed/frozen/protected. Owner evidence confirms the connected backend/Sheets/registry readiness projection and complete saved Ibuprofen record without any edit or Queue change. MS2-LT-059-B moves only to the existing read-only `SyncReviewCard`, which projects pending count, last sync, conflict and adapter readiness without invoking `syncPending`; sending queued actions remains a separate explicit action.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
