@@ -1051,7 +1051,9 @@ After the plain-language repair, retest only that Sync review shows: `This page 
 
 The final retest passes and freezes **MS2-LT-059-B**. The simple sentence is visible, Read and Close are the only actions, all six status facts remain correct, and Queue remains 7 after Close. No mutation occurred.
 
-Do not begin 059-C on the current build. Repository inspection confirms `Sync 7` still writes to the browser-memory `CloudMemoryGateway`, not the live Sheets backend. Engineering must wire and verify a real pharmacy-isolated, duplicate-safe backend adapter with per-item review/results before any owner write instruction is issued. Do not tap Sync 7.
+## MS2-LT-059-C — Safe Google Sheets write
+
+Engineering commits `be391ac`, `6e6220d`, and `61c6c5f` add the guarded backend gateway, one-item review screen, and harmless Google Sheets connection test. Deploy the latest build. Open Menu and tap `Sync 7`; this must open `Send saved work` and must not send the queue. Tap `Run safe test` once. Require: `Google Sheets saved the safe test. No medicine data changed.` Verify Menu still shows Queue 7, capture the result, and stop. Do not tap any `Send this item` button. The test may add only one `connection_test` line with blank medicine and quantity to `Offline_Sync_Log`; it must not change catalog, stock, prices, sales, supplier money, or the seven queued actions.
 
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
