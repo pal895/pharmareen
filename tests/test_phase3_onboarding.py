@@ -10,6 +10,8 @@ from app.config import Settings
 from app.demo_store import DemoPharmacyStore
 from app.intake import IntakeService
 from app.routes import admin
+from app.access_control import require_admin_actor
+from app.actor_context import ActorContext
 from app.services.pharmacy_onboarding import (
     PHASE3_SHEETS,
     PharmacyOnboardingService,
@@ -203,6 +205,11 @@ def test_admin_routes_create_list_and_show_pharmacy(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(admin, "get_settings", lambda: Settings(_env_file=None, GOOGLE_SERVICE_ACCOUNT_JSON=""))
 
+    main.app.dependency_overrides[require_admin_actor] = lambda: ActorContext(
+        pharmacy_id="platform",
+        actor_id="test-admin",
+        role="admin",
+    )
     with TestClient(main.app) as client:
         page = client.get("/admin/onboard")
         created = client.post(
@@ -219,6 +226,7 @@ def test_admin_routes_create_list_and_show_pharmacy(tmp_path, monkeypatch):
         pharmacy_id = created.json()["pharmacy_id"]
         shown = client.get(f"/admin/pharmacy/{pharmacy_id}")
         placeholder = client.post("/admin/photo-onboard-placeholder")
+    main.app.dependency_overrides.pop(require_admin_actor, None)
 
     assert page.status_code == 200
     assert "MS2.0 Pharmacy Onboarding" in page.text

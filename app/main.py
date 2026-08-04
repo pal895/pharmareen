@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from fastapi import FastAPI, File, Header, HTTPException, Query, Request, Response, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -31,6 +31,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.branding import APP_BRAND
+from app.access_control import ADMIN_CAPABILITIES, authenticate_admin, require_admin_actor
+from app.actor_context import ActorContext
 from app.ai import AIService, ai_usage_snapshot, log_ai_route_decision
 from app.config import Settings, get_settings
 from app.correction_learning import CorrectionLearningEngine
@@ -205,6 +207,17 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+
+@app.get("/api/ms20/auth/session")
+async def ms20_auth_session(actor: ActorContext = Depends(require_admin_actor)) -> dict[str, Any]:
+    return {
+        "authenticated": True,
+        "actor_id": actor.actor_id,
+        "role": actor.role,
+        "pharmacy_id": actor.pharmacy_id,
+        "capabilities": list(ADMIN_CAPABILITIES),
+    }
 
 
 @app.get("/offline-app", include_in_schema=False)
@@ -4618,7 +4631,7 @@ try:
     def phase13_admin_onboarding(session_id: str, action: str, corrections_requested: str | None = _Query(default=None), authorization: str | None = _Header(default=None)):
         settings, _err = _phase13_settings_safe()
         if settings is not None and "authorize_report_trigger" in globals():
-            authorize_report_trigger(settings, authorization)
+            authenticate_admin(settings, authorization)
         result = _phase13_router().admin_review_unknown_session(session_id=session_id, action=action, admin_id="admin_http", source="admin_http", corrections_requested=corrections_requested)
         return result.as_dict()
     @app.get("/live/runtime-status")
@@ -4644,7 +4657,7 @@ try:
     def phase13_admin_deployment(action: str, authorization: str | None = _Header(default=None), reason: str | None = _Query(default=None)):
         settings, _err = _phase13_settings_safe()
         if settings is not None and "authorize_report_trigger" in globals():
-            authorize_report_trigger(settings, authorization)
+            authenticate_admin(settings, authorization)
         deployment = get_deployment_engine()
         clean_action = action.strip().lower()
         if clean_action == "activate":

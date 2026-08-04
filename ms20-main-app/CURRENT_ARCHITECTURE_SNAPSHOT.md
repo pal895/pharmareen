@@ -483,7 +483,9 @@ MS2-LT-059-B is owner-verified passed/frozen/protected with simple wording, Read
 
 MS2-LT-059-C is owner-verified passed/frozen/protected after `c977ac0` repaired omitted pharmacy identity at the shared endpoint boundary. The stable per-pharmacy safe-test ID produced one duplicate-protected `connection_test` row in `Offline_Sync_Log`, with blank medicine and quantity, and Google Sheets read-back confirmed persistence. Queue remained 7 and no catalog, stock, price, sale, supplier-money, or queued-business record changed.
 
-MS2-LT-059-D and checkpoint 59 are owner-verified passed/frozen/protected. The same safe endpoint failed closed under an unavailable Sheet configuration, retained Queue 7, recovered connected readiness after restart, and rejected the recovery retry as already saved instead of duplicating the test row. Checkpoint 67 is next, but `authSessionAdapter` remains null; its shared session/role boundary requires engineering and focused protection before any owner live test.
+MS2-LT-059-D and checkpoint 59 are owner-verified passed/frozen/protected. The same safe endpoint failed closed under an unavailable Sheet configuration, retained Queue 7, recovered connected readiness after restart, and rejected the recovery retry as already saved instead of duplicating the test row.
+
+MS2-LT-067-A adds the first shared access boundary. `app/access_control.py` authenticates a configured bearer secret with constant-time comparison, fails closed when the secret is absent, rejects invalid credentials, and projects a fixed minimum-necessary admin capability set. The same dependency protects `/api/ms20/auth/session` and the whole `/admin` router; phase-13 admin onboarding/deployment routes converge on the same authenticator. The Main App `authSessionAdapter` now represents this live shared boundary. Staff, branch, UI and download authorization remain later separate 067 cases.
 
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference

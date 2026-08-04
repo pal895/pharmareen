@@ -108,7 +108,7 @@ Evidence abbreviations: `CVS` = `docs/engineering-memory/current-live-validation
 |---:|---|---|---|---|---|---|---|---|
 | 65 | Pharmacy/branch isolation | Prevent cross-pharmacy catalog, learning, notification, payment, export and credential leakage. | Implemented pharmacy-scoped data workflows | PASS / PROTECTED | Passed in protected workflows and automated gates | Yes | 15 min | CVS; ARCH; isolation tests/verifiers |
 | 66 | Idempotency, audit and duplicate prevention | Ensure retries/callbacks/imports/actions cannot duplicate mutations and every protected correction remains traceable. | 14–20, 51–53 | PASS / PROTECTED | Passed across protected workflows | Yes | 15 min | CVS; TCE; activity/export/offline verifiers |
-| 67 | Authentication, roles and access controls | Enforce owner/admin/branch authorization and minimum-necessary access across UI, routes and downloads. | 2, 58–65 | Partial implementation | Not owner-qualified end to end | No | 15 min | registry/admin/routes; ARCH; compliance plan |
+| 67 | Authentication, roles and access controls | Enforce owner/admin/branch authorization and minimum-necessary access across UI, routes and downloads. | 2, 58–65 | Implemented — awaiting owner live test | **MS2-LT-067-A authenticated admin-session boundary is the only active owner case.** The shared bearer dependency fails closed when unconfigured, rejects missing/wrong tokens, returns fixed minimum-necessary admin capabilities for the valid secret, and protects every `/admin` onboarding route. The test is read-only and must not create, list, edit, deploy, or expose the secret. | No | 15 min | `app/access_control.py`; `/api/ms20/auth/session`; protected admin router; focused access tests; ARCH; compliance plan |
 | 68 | Export IP/privacy/compliance safeguards | Register assets/licences, fail closed, redact/anonymize, control IDs/sharing/retention and avoid false endorsement. | 40–48, 65–67 | Planned / approved | Not started | No | Repository evidence not yet available. | LATP Improvement 3 |
 | 69 | Product-secrecy and quiet-UI audit | Remove unnecessary internal implementation disclosures while preserving legal/safety/privacy truth. | All functional/intelligence tests | Planned / approved | Not started | No | Repository evidence not yet available. | CVS; LATP future audit |
 
@@ -199,15 +199,15 @@ This ledger deliberately accounts for owner-facing domains discovered across cur
 
 - Total checkpoints: **84**
 - PASS / PROTECTED: **50**
-- Implemented — awaiting owner live test: **6**
-- Partial implementation: **7**
+- Implemented — awaiting owner live test: **7**
+- Partial implementation: **6**
 - Planned / approved: **16**
 - External qualification: **3**
 - Deprecated with repository evidence: **2**
 
 ## Current execution pointer
 
-The only current open checkpoint is **#67 Authentication, roles and access controls**. MS2-LT-059-A through MS2-LT-059-D are owner-verified passed/frozen/protected, so checkpoint 59 is closed and must not be repeated without verified regression. Checkpoint 67 is selected by the dependency-aware Launch Gate order, but no owner case is active until its currently absent authentication-session boundary is implemented and focused regression protection passes. All other later unprotected checkpoints remain inactive. The former automatic linear progression is historical and must never resume.
+The only current open checkpoint is **#67 Authentication, roles and access controls**. MS2-LT-059-A through MS2-LT-059-D are owner-verified passed/frozen/protected, so checkpoint 59 is closed and must not be repeated without verified regression. **MS2-LT-067-A authenticated admin-session boundary is the only active owner case.** All other 067 role/branch/download cases and later unprotected checkpoints remain inactive. The dependency-aware Launch Gate milestone order remains authoritative; the former automatic linear progression is historical and must never resume.
 
 ## Canonical synchronization invariants
 
@@ -1246,13 +1246,13 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **Checkpoint ID:** MS2-LT-067
 - **Name:** Authentication, roles and access controls
 - **Category:** Security / Privacy / Compliance Validation
-- **Current status:** Partial implementation
-- **Repository evidence:** registry/admin/routes; ARCH; compliance plan
+- **Current status:** Implemented — awaiting owner live test
+- **Repository evidence:** `app/access_control.py`; `/api/ms20/auth/session`; protected admin router; focused access tests; ARCH; compliance plan
 - **Implementation commit(s):** Repository evidence not yet available.
 - **Primary implementation files/modules:** `app/actor_context.py`; `app/routes/admin.py`
-- **Owner live-test evidence:** Repository evidence not yet available.
+- **Owner live-test evidence:** **MS2-LT-067-A authenticated admin-session boundary is the only active owner case.** The shared bearer dependency fails closed when unconfigured, rejects missing/wrong tokens, returns fixed minimum-necessary admin capabilities for the valid secret, and protects every `/admin` onboarding route. The test is read-only and must not create, list, edit, deploy, or expose the secret.; source: `app/access_control.py`; `/api/ms20/auth/session`; protected admin router; focused access tests; ARCH; compliance plan
 - **PASS / PROTECTED confirmation:** Not applicable.
-- **Remaining implementation work:** Complete the unimplemented portion and owner-validate: Enforce owner/admin/branch authorization and minimum-necessary access across UI, routes and downloads.
+- **Remaining implementation work:** Complete decisive owner live validation for: Enforce owner/admin/branch authorization and minimum-necessary access across UI, routes and downloads.
 - **Prerequisite checkpoints:** 2, 58–65
 - **Dependent checkpoints:** MS2-LT-068, MS2-LT-073, MS2-LT-074, MS2-LT-076, MS2-LT-077, MS2-LT-079, MS2-LT-084
 

@@ -2,16 +2,21 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from app.branding import APP_BRAND
+from app.access_control import require_admin_actor
 from app.config import get_settings
 from app.services.pharmacy_onboarding import PharmacyOnboardingService, PharmacyPayload
 
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(
+    prefix="/admin",
+    tags=["admin"],
+    dependencies=[Depends(require_admin_actor)],
+)
 
 
 class PharmacyCreateRequest(BaseModel):

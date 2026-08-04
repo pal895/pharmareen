@@ -18,7 +18,7 @@ export class BackendAdapterRegistry {
       invoiceEngineAdapter: liveSlot("invoiceEngineAdapter", "Invoice/photo review foundation without AI by default"),
       onboardingEngineAdapter: liveSlot("onboardingEngineAdapter", "Registry, owner approval, pharmacy and branch setup"),
       syncEngineAdapter: liveSlot("syncEngineAdapter", "Offline queue, idempotency, retry and recovery safety"),
-      authSessionAdapter: null,
+      authSessionAdapter: liveSlot("authSessionAdapter", "Authenticated session and minimum-necessary fixed-role capabilities"),
       cloudStorageAdapter: liveSlot("cloudStorageAdapter", "Google Sheets cloud memory and registry adapter"),
       externalChannelAdapter: liveSlot("externalChannelAdapter", "Baileys WhatsApp bridge status adapter")
     };

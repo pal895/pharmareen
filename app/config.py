@@ -69,6 +69,10 @@ class Settings(BaseSettings):
     demo_mode: bool = False
 
     report_trigger_token: str | None = None
+    admin_access_token: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("PHARMAREEN_ADMIN_ACCESS_TOKEN", "ADMIN_ACCESS_TOKEN"),
+    )
     enable_live_onboarding: bool = True
     live_test_number: str = "+254721149472"
     admin_whatsapp_numbers: str | None = None

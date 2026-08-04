@@ -1063,7 +1063,9 @@ This owner case is complete. The unavailable process showed `Sheets: Check`, the
 
 ## MS2-LT-067 — Authentication, roles and access controls
 
-This is the next dependency-ready Launch Gate checkpoint, but no owner case is active yet. The repository's backend-adapter registry still has `authSessionAdapter: null`; therefore the shared authentication-session and minimum-necessary role boundary must be implemented and pass focused regression protection before owner instructions are issued. Existing admin routes are not acceptable owner evidence while that boundary is absent.
+### MS2-LT-067-A — Authenticated admin session
+
+This is the only active owner case. Add a private Replit Secret named `PHARMAREEN_ADMIN_ACCESS_TOKEN` with a long random value; never paste or display that value in screenshots. Pull and restart the app. In Shell, run the focused access test, then request `/api/ms20/auth/session` once without authorization and require HTTP 401. Request the same endpoint with the secret supplied from the environment and require `authenticated: true`, role `admin`, the configured pharmacy ID, and only the five fixed capabilities. Do not open `/admin/onboard`, call any `/admin` mutation route, change a pharmacy, or run a deployment action. Capture the focused tests, 401 result, and redacted authenticated JSON, then stop.
 
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
