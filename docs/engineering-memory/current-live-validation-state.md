@@ -726,6 +726,10 @@ The corrected owner retest closes **MS2-LT-059-C as OWNER-VERIFIED PASSED / FROZ
 
 **Latest protected resume point: MS2-LT-059-C. MS2-LT-059-D unavailable-Sheets recovery is the only active owner case.** Start one temporary backend process with an intentionally invalid `GOOGLE_SHEET_ID`, verify Sheets is unavailable, run only the same safe test, require `Google Sheets is not ready. Nothing was changed. No medicine data changed.`, and verify Queue remains 7. Restore the normal connected backend immediately and verify Sheets returns OK with Queue 7. Do not alter credentials, clear browser data, or tap any `Send this item` button.
 
+Owner screenshots close **MS2-LT-059-D and checkpoint 59 as OWNER-VERIFIED PASSED / FROZEN / PROTECTED**. Under the temporary invalid Sheet ID, Main App truthfully showed `Sheets: Check`; the safe test returned `Google Sheets is not ready. Nothing was changed. No medicine data changed.`; and Queue remained 7. After the ordinary backend restart, Sheets returned OK with Queue 7. A later safe retry returned `This test was already saved. It was not added twice.`, confirming duplicate protection without an additional row. No queued business item, medicine, stock, price, sale, or supplier-money record changed. Do not repeat 059-A through 059-D without verified regression.
+
+**Latest protected resume point: checkpoint 59. Checkpoint 67 Authentication, roles and access controls is the next dependency-ready Launch Gate milestone.** Repository inspection still shows `authSessionAdapter: null`, so no owner live test is active yet. Prepare the shared authentication-session and minimum-necessary role boundary, prove it with focused automated regression tests, then issue only the first narrow owner case. Do not expose the existing admin routes as an owner test while that boundary is absent.
+
 Permanent owner rule: MS2.0 is **Voice first → fast tap/action second → typing last**, minimal-typing and three-steps-or-fewer whenever possible. Every supported typed operational command must have voice parity wherever device/platform speech is available. Transcripts and typed input converge on the same deterministic router and shared workflow roots; no voice-only business implementation and no unjustified AI routing are allowed. Typing remains a protected fallback for accessibility, noisy environments, unsupported voice, offline phone speech limitations, correction and deliberate choice. Future live-test instructions default to voice where available, then verify typed fallback/parity. Only the owner may change this rule.
 
 <!-- VALIDATION_CONTRACT_SYNC_START -->
@@ -733,7 +737,7 @@ Permanent owner rule: MS2.0 is **Voice first → fast tap/action second → typi
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-059 — Google Sheets pharmacy persistence
+- Current: MS2-LT-067 — Authentication, roles and access controls
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.

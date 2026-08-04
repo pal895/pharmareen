@@ -3,8 +3,8 @@
   "authority": "MS2.0_MASTER_LIVE_TEST_SEQUENCE.md",
   "checkpoint_count": 84,
   "current_checkpoint": {
-    "id": "MS2-LT-059",
-    "name": "Google Sheets pharmacy persistence"
+    "id": "MS2-LT-067",
+    "name": "Authentication, roles and access controls"
   },
   "protected_checkpoint_ids": [
     "MS2-LT-001",
@@ -51,6 +51,7 @@
     "MS2-LT-056",
     "MS2-LT-057",
     "MS2-LT-058",
+    "MS2-LT-059",
     "MS2-LT-061",
     "MS2-LT-065",
     "MS2-LT-066",
@@ -65,6 +66,6 @@
     "status": "ACTIVE",
     "document": "docs/engineering-memory/token-execution-policy.md"
   },
-  "master_sha256": "e88c98afc1d736bd8666357483c00cbd4883c8e0cb2506a78723b19f65393d64",
+  "master_sha256": "66e7f45a13723a5195c1015d29d9fcf634362f2bcd7142d7c1aade1472268849",
   "rule": "Load the master and its Engineering Traceability Index; never reconstruct or maintain a parallel sequence."
 }

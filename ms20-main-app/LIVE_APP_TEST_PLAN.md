@@ -1059,14 +1059,18 @@ The first run failed safely at pharmacy binding: omitted `pharmacy_id` became li
 
 ## MS2-LT-059-D — Unavailable Google Sheets recovery
 
-This is the only active owner case. Start the backend with a temporary intentionally invalid `GOOGLE_SHEET_ID`; do not edit or remove credentials. In the Main App, verify Sheets is unavailable, open `Sync 7`, and tap only `Run safe test` once. Require: `Google Sheets is not ready. Nothing was changed. No medicine data changed.` Close and verify Queue remains 7. In a separate Replit Shell, restart the ordinary `bash start.sh`, reopen the app, and verify Sheets returns OK and Queue remains 7. Do not tap any `Send this item` button. No connection-test row, catalog fact, stock, price, sale, supplier-money record, or queued business action may change during the unavailable run.
+This owner case is complete. The unavailable process showed `Sheets: Check`, the safe test reported that Sheets was not ready and nothing changed, Queue remained 7, and the normal restart restored `Sheets: OK` with Queue 7. The recovery retry was duplicate-safe and was not added twice. **MS2-LT-059-D and checkpoint 59 are OWNER-VERIFIED PASSED/FROZEN/PROTECTED** and must not be repeated without verified regression.
+
+## MS2-LT-067 — Authentication, roles and access controls
+
+This is the next dependency-ready Launch Gate checkpoint, but no owner case is active yet. The repository's backend-adapter registry still has `authSessionAdapter: null`; therefore the shared authentication-session and minimum-necessary role boundary must be implemented and pass focused regression protection before owner instructions are issued. Existing admin routes are not acceptable owner evidence while that boundary is absent.
 
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-059 — Google Sheets pharmacy persistence
+- Current: MS2-LT-067 — Authentication, roles and access controls
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.

@@ -481,14 +481,16 @@ The 059-B control repair is mutation-safe, but owner evidence rejected its techn
 
 MS2-LT-059-B is owner-verified passed/frozen/protected with simple wording, Read/Close only and Queue 7 unchanged. `OfflineSyncGateway` now connects `SyncAdapter` to the guarded backend: one reviewed SaleCard or RestockCard may be sent at a time, unsupported items remain blocked, failure retains pending state, and backend-confirmed success updates only that item. The main Sync control cannot send the queue wholesale.
 
-MS2-LT-059-C is owner-verified passed/frozen/protected after `c977ac0` repaired omitted pharmacy identity at the shared endpoint boundary. The stable per-pharmacy safe-test ID produced one duplicate-protected `connection_test` row in `Offline_Sync_Log`, with blank medicine and quantity, and Google Sheets read-back confirmed persistence. Queue remained 7 and no catalog, stock, price, sale, supplier-money, or queued-business record changed. MS2-LT-059-D unavailable-Sheets recovery is the only active owner case; it uses the same non-business test path, must return a clear nothing-changed result, retain Queue 7, and restore connected readiness afterward.
+MS2-LT-059-C is owner-verified passed/frozen/protected after `c977ac0` repaired omitted pharmacy identity at the shared endpoint boundary. The stable per-pharmacy safe-test ID produced one duplicate-protected `connection_test` row in `Offline_Sync_Log`, with blank medicine and quantity, and Google Sheets read-back confirmed persistence. Queue remained 7 and no catalog, stock, price, sale, supplier-money, or queued-business record changed.
+
+MS2-LT-059-D and checkpoint 59 are owner-verified passed/frozen/protected. The same safe endpoint failed closed under an unavailable Sheet configuration, retained Queue 7, recovered connected readiness after restart, and rejected the recovery retry as already saved instead of duplicating the test row. Checkpoint 67 is next, but `authSessionAdapter` remains null; its shared session/role boundary requires engineering and focused protection before any owner live test.
 
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-059 — Google Sheets pharmacy persistence
+- Current: MS2-LT-067 — Authentication, roles and access controls
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.
