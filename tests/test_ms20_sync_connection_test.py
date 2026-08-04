@@ -16,6 +16,10 @@ class FakeSheetStore:
         self.rows.append(dict(row))
 
 
+class UnavailableSheetStore:
+    is_available = False
+
+
 def test_connection_test_writes_once_without_medicine_data(monkeypatch):
     store = FakeSheetStore()
     monkeypatch.setattr(main, "get_sheet_store", lambda: store)
@@ -60,3 +64,18 @@ def test_connection_test_binds_omitted_pharmacy_to_live_configuration(monkeypatc
     assert response["pharmacy_id"] == "pharmacy_one"
     assert len(store.rows) == 1
     assert store.rows[0]["source"] == "ms20_main_app:pharmacy_one"
+
+
+def test_connection_test_waits_without_write_when_sheets_are_unavailable(monkeypatch):
+    monkeypatch.setattr(main, "get_sheet_store", lambda: UnavailableSheetStore())
+    monkeypatch.setattr(main, "live_pharmacy_id", lambda: "pharmacy-one")
+
+    response = TestClient(main.app).post(
+        "/api/ms20/sync/connection-test",
+        json={"action_id": "ms20-connection-test-004"},
+    ).json()
+
+    assert response == {
+        "status": "waiting",
+        "message": "Google Sheets is not ready. Nothing was changed.",
+    }

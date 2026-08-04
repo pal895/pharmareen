@@ -1055,6 +1055,12 @@ The final retest passes and freezes **MS2-LT-059-B**. The simple sentence is vis
 
 Engineering commits `be391ac`, `6e6220d`, and `61c6c5f` add the guarded backend gateway, one-item review screen, and harmless Google Sheets connection test. Deploy the latest build. Open Menu and tap `Sync 7`; this must open `Send saved work` and must not send the queue. Tap `Run safe test` once. Require: `Google Sheets saved the safe test. No medicine data changed.` Verify Menu still shows Queue 7, capture the result, and stop. Do not tap any `Send this item` button. The test may add only one `connection_test` line with blank medicine and quantity to `Offline_Sync_Log`; it must not change catalog, stock, prices, sales, supplier money, or the seven queued actions.
 
+The first run failed safely at pharmacy binding: omitted `pharmacy_id` became literal `none`, the backend rejected it before Sheets access, and Queue remained 7. Commit `c977ac0` repairs the shared normalization boundary and adds omitted-identity regression protection while retaining wrong-pharmacy rejection. The corrected owner retest passed: the safe test produced the required saved/no-medicine-change message and Queue remained 7. **MS2-LT-059-C is OWNER-VERIFIED PASSED/FROZEN/PROTECTED.**
+
+## MS2-LT-059-D — Unavailable Google Sheets recovery
+
+This is the only active owner case. Start the backend with a temporary intentionally invalid `GOOGLE_SHEET_ID`; do not edit or remove credentials. In the Main App, verify Sheets is unavailable, open `Sync 7`, and tap only `Run safe test` once. Require: `Google Sheets is not ready. Nothing was changed. No medicine data changed.` Close and verify Queue remains 7. In a separate Replit Shell, restart the ordinary `bash start.sh`, reopen the app, and verify Sheets returns OK and Queue remains 7. Do not tap any `Send this item` button. No connection-test row, catalog fact, stock, price, sale, supplier-money record, or queued business action may change during the unavailable run.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
