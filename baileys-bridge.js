@@ -29,6 +29,7 @@ const allowedLids = parseAllowedLids(
   `${process.env.ALLOWED_DIRECT_CHAT_LIDS || ''},${process.env.ALLOWED_WHATSAPP_LIDS || ''}`
 );
 const offlineConfirmationPollMs = Number(process.env.OFFLINE_CONFIRMATION_POLL_MS || 10000);
+const bridgeInternalToken = String(process.env.MS20_BRIDGE_INTERNAL_TOKEN || '');
 let offlineConfirmationPoller = null;
 let reconnectTimer = null;
 const phoneByLid = new Map();
@@ -631,7 +632,10 @@ async function sendOfflineConfirmation(sock, target, text, itemId) {
 
 async function pollOfflineConfirmations(sock) {
   try {
-    const response = await axios.get(`${backendUrl}/offline/whatsapp-confirmations`, { timeout: 10000 });
+    const response = await axios.get(`${backendUrl}/offline/whatsapp-confirmations`, {
+      timeout: 10000,
+      headers: bridgeInternalToken ? { 'X-MS20-Bridge-Token': bridgeInternalToken } : {}
+    });
     const payload = response.data || {};
     const confirmations = Array.isArray(payload.confirmations)
       ? payload.confirmations

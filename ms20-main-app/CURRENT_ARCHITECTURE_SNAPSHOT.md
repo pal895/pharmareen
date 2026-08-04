@@ -485,7 +485,9 @@ MS2-LT-059-C is owner-verified passed/frozen/protected after `c977ac0` repaired 
 
 MS2-LT-059-D and checkpoint 59 are owner-verified passed/frozen/protected. The same safe endpoint failed closed under an unavailable Sheet configuration, retained Queue 7, recovered connected readiness after restart, and rejected the recovery retry as already saved instead of duplicating the test row.
 
-MS2-LT-067-A adds the first shared access boundary. `app/access_control.py` authenticates a configured bearer secret with constant-time comparison, fails closed when the secret is absent, rejects invalid credentials, and projects a fixed minimum-necessary admin capability set. The same dependency protects `/api/ms20/auth/session` and the whole `/admin` router; phase-13 admin onboarding/deployment routes converge on the same authenticator. The Main App `authSessionAdapter` now represents this live shared boundary. Staff, branch, UI and download authorization remain later separate 067 cases.
+The initial platform-bearer proposal for MS2-LT-067-A was withdrawn before owner execution. Platform bearer access remains emergency/bootstrap only and protects internal `/admin` routes.
+
+Revised MS2-LT-067-A uses `app/owner_auth.py` as the shared customer authentication root. It resolves an active owner through the pharmacy registry, delivers a one-time code through the Baileys bridge's internally authenticated sensitive outbox, issues an opaque 15-minute Secure/HttpOnly/SameSite=Strict cookie, and projects a fixed owner role/capability set bound to one pharmacy. Central authorization rejects missing, wrong-pharmacy, wrong-role, expired and revoked sessions. The sign-in page retains challenge state only in memory, clears phone/code fields, uses no local/session storage and never receives a session token. Staff invite link/QR enrollment, staff roles and owner revocation controls remain later 067 cases built on this same root.
 
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference

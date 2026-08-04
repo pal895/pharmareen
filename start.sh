@@ -11,6 +11,13 @@ BRIDGE_LOG="${BRIDGE_LOG:-bridge.log}"
 WHATSAPP_BRIDGE_ENABLED="${WHATSAPP_BRIDGE_ENABLED:-false}"
 BRIDGE_SCRIPT="${BRIDGE_SCRIPT:-local_whatsapp_bridge.js}"
 
+# Generate one internal per-process bridge credential. It is shared only by the
+# backend and bridge processes and is never an owner/customer login credential.
+if [ -z "${MS20_BRIDGE_INTERNAL_TOKEN:-}" ]; then
+  MS20_BRIDGE_INTERNAL_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+  export MS20_BRIDGE_INTERNAL_TOKEN
+fi
+
 if ! command -v tesseract >/dev/null 2>&1 && [ "${MS20_NIX_OCR_READY:-false}" != "true" ]; then
   if command -v nix-shell >/dev/null 2>&1; then
     echo "Loading the local invoice reader..."

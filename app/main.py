@@ -2,6 +2,7 @@
 
 import base64
 import hashlib
+import hmac
 import json
 import logging
 import os
@@ -22,7 +23,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, Request, Response, UploadFile
+from fastapi import Cookie, Depends, FastAPI, File, Header, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -33,6 +34,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from app.branding import APP_BRAND
 from app.access_control import ADMIN_CAPABILITIES, authenticate_admin, require_admin_actor
 from app.actor_context import ActorContext
+from app.owner_auth import OWNER_CAPABILITIES, OWNER_SESSION_COOKIE, owner_auth_service, require_owner_actor
 from app.ai import AIService, ai_usage_snapshot, log_ai_route_decision
 from app.config import Settings, get_settings
 from app.correction_learning import CorrectionLearningEngine
@@ -122,6 +124,33 @@ MAIN_APP_NO_CACHE_HEADERS = {
     "Expires": "0",
     "X-MS20-Main-App": "true",
 }
+OWNER_SIGN_IN_HTML = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MS2.0 Owner sign in</title>
+  <style>
+    body{font-family:Arial,sans-serif;background:#f4f8f6;color:#142d27;margin:0;padding:24px}
+    main{max-width:440px;margin:8vh auto;background:#fff;border:1px solid #d6e2de;border-radius:24px;padding:28px}
+    label{display:block;font-weight:700;margin:18px 0 8px}input,button{box-sizing:border-box;width:100%;font-size:18px;padding:14px;border-radius:14px}
+    input{border:1px solid #b9c9c4}button{margin-top:16px;border:0;background:#176d5d;color:#fff;font-weight:700}.hidden{display:none}#status{min-height:48px}
+  </style>
+</head>
+<body><main>
+  <h1>Owner sign in</h1>
+  <p>Use the WhatsApp number registered to your pharmacy. We will send a one-time code.</p>
+  <section id="phoneStep"><label for="phone">Registered WhatsApp number</label><input id="phone" inputmode="tel" autocomplete="tel"><button id="send">Send code</button></section>
+  <section id="codeStep" class="hidden"><label for="code">One-time code</label><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"><button id="verify">Sign in</button></section>
+  <p id="status" role="status"></p>
+</main><script>
+let challengeId = "";
+const statusBox=document.getElementById("status"), phoneStep=document.getElementById("phoneStep"), codeStep=document.getElementById("codeStep");
+document.getElementById("send").onclick=async()=>{statusBox.textContent="Sending code…";const phone=document.getElementById("phone").value;const response=await fetch("/api/ms20/auth/owner/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone}),credentials:"same-origin"});const data=await response.json();challengeId=data.challenge_id||"";document.getElementById("phone").value="";phoneStep.classList.add("hidden");codeStep.classList.remove("hidden");statusBox.textContent="Enter the code sent to your registered WhatsApp number.";};
+document.getElementById("verify").onclick=async()=>{statusBox.textContent="Signing in…";const code=document.getElementById("code").value;const response=await fetch("/api/ms20/auth/owner/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({challenge_id:challengeId,code}),credentials:"same-origin"});document.getElementById("code").value="";challengeId="";if(!response.ok){statusBox.textContent="That code did not work or expired. Start again.";return;}statusBox.textContent="Signed in safely.";window.location.assign("/main-app/");};
+</script></body></html>
+"""
 whatsapp_bridge_runtime_status: dict[str, Any] = {
     "state": "unknown",
     "connected": False,
@@ -210,14 +239,84 @@ app = FastAPI(
 
 
 @app.get("/api/ms20/auth/session")
-async def ms20_auth_session(actor: ActorContext = Depends(require_admin_actor)) -> dict[str, Any]:
+async def ms20_auth_session(actor: ActorContext = Depends(require_owner_actor)) -> dict[str, Any]:
+    return {
+        "authenticated": True,
+        "actor_id": actor.actor_id,
+        "role": actor.role,
+        "pharmacy_id": actor.pharmacy_id,
+        "capabilities": list(OWNER_CAPABILITIES),
+    }
+
+
+@app.get("/api/ms20/admin/session")
+async def ms20_admin_session(actor: ActorContext = Depends(require_admin_actor)) -> dict[str, Any]:
     return {
         "authenticated": True,
         "actor_id": actor.actor_id,
         "role": actor.role,
         "pharmacy_id": actor.pharmacy_id,
         "capabilities": list(ADMIN_CAPABILITIES),
+        "customer_flow": False,
     }
+
+
+@app.post("/api/ms20/auth/owner/start")
+async def ms20_owner_login_start(request: Request) -> dict[str, object]:
+    payload = await request.json()
+    phone = str(payload.get("phone") or "") if isinstance(payload, dict) else ""
+
+    def deliver_code(recipient: str, code: str) -> None:
+        queued = queue_offline_whatsapp_confirmation(
+            recipient,
+            f"Your {APP_BRAND} sign-in code is {code}. It expires in 10 minutes. Do not share it.",
+            sensitive=True,
+        )
+        if not queued:
+            raise HTTPException(status_code=503, detail="Sign-in delivery is temporarily unavailable.")
+
+    return owner_auth_service.start_login(
+        phone,
+        find_owner=lambda value: get_pharmacy_registry().find_by_phone(value, active_only=True),
+        deliver_code=deliver_code,
+    )
+
+
+@app.post("/api/ms20/auth/owner/verify")
+async def ms20_owner_login_verify(request: Request) -> JSONResponse:
+    payload = await request.json()
+    challenge_id = str(payload.get("challenge_id") or "") if isinstance(payload, dict) else ""
+    code = str(payload.get("code") or "") if isinstance(payload, dict) else ""
+    token, session = owner_auth_service.verify_login(challenge_id, code)
+    response = JSONResponse({
+        "authenticated": True,
+        "role": session.role,
+        "pharmacy_id": session.pharmacy_id,
+        "expires_in": owner_auth_service.session_ttl_seconds,
+    })
+    response.set_cookie(
+        OWNER_SESSION_COOKIE,
+        token,
+        max_age=owner_auth_service.session_ttl_seconds,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        path="/",
+    )
+    return response
+
+
+@app.post("/api/ms20/auth/logout")
+async def ms20_owner_logout(ms20_owner_session: str | None = Cookie(default=None)) -> JSONResponse:
+    owner_auth_service.revoke(ms20_owner_session)
+    response = JSONResponse({"authenticated": False})
+    response.delete_cookie(OWNER_SESSION_COOKIE, path="/")
+    return response
+
+
+@app.get("/main-app/sign-in", response_class=HTMLResponse, include_in_schema=False)
+async def ms20_owner_sign_in_page() -> str:
+    return OWNER_SIGN_IN_HTML
 
 
 @app.get("/offline-app", include_in_schema=False)
@@ -1117,7 +1216,7 @@ def has_explicit_offline_confirmation_recipient(payload: dict[str, Any]) -> bool
     )
 
 
-def queue_offline_whatsapp_confirmation(recipient: str, message: str, *, dedupe_key: str = "") -> dict[str, Any] | None:
+def queue_offline_whatsapp_confirmation(recipient: str, message: str, *, dedupe_key: str = "", sensitive: bool = False) -> dict[str, Any] | None:
     if not recipient or not message.strip():
         return None
     load_offline_confirmation_state()
@@ -1134,6 +1233,7 @@ def queue_offline_whatsapp_confirmation(recipient: str, message: str, *, dedupe_
         "attempts": 0,
         "last_error": "",
         "dedupe_key": dedupe_key,
+        "sensitive": sensitive,
     }
     offline_whatsapp_outbox.append(item)
     save_offline_confirmation_state()
@@ -1142,12 +1242,18 @@ def queue_offline_whatsapp_confirmation(recipient: str, message: str, *, dedupe_
 
 
 @app.get("/offline/whatsapp-confirmations")
-def offline_whatsapp_confirmations(limit: int = Query(default=10, ge=1, le=50)) -> dict[str, Any]:
+def offline_whatsapp_confirmations(
+    limit: int = Query(default=10, ge=1, le=50),
+    x_ms20_bridge_token: str | None = Header(default=None),
+) -> dict[str, Any]:
     load_offline_confirmation_state()
-    pending = offline_whatsapp_outbox[:limit]
+    expected = str(get_settings().bridge_internal_token or "")
+    bridge_authenticated = bool(expected and x_ms20_bridge_token and hmac.compare_digest(expected, x_ms20_bridge_token))
+    visible = [item for item in offline_whatsapp_outbox if bridge_authenticated or not item.get("sensitive")]
+    pending = visible[:limit]
     return {
         "status": "ok",
-        "pending_count": len(offline_whatsapp_outbox),
+        "pending_count": len(visible),
         "confirmations": pending,
         "pending": pending,
     }
@@ -1163,7 +1269,7 @@ def debug_offline_confirmations() -> dict[str, Any]:
             {
                 "id": str(item.get("id") or ""),
                 "to": mask_phone(str(item.get("to") or "")),
-                "message_preview": str(item.get("message") or "")[:120],
+                "message_preview": "[sensitive message hidden]" if item.get("sensitive") else str(item.get("message") or "")[:120],
                 "created_at": str(item.get("created_at") or ""),
                 "attempts": int(item.get("attempts") or 0),
                 "last_error": str(item.get("last_error") or ""),
@@ -1177,7 +1283,7 @@ def debug_offline_confirmations() -> dict[str, Any]:
                 "id": str(item.get("id") or ""),
                 "to": mask_phone(str(item.get("to") or "")),
                 "status": str(item.get("status") or ""),
-                "message_preview": str(item.get("message") or "")[:120],
+                "message_preview": "[sensitive message hidden]" if item.get("sensitive") else str(item.get("message") or "")[:120],
                 "created_at": str(item.get("created_at") or ""),
                 "updated_at": str(item.get("updated_at") or ""),
                 "last_error": str(item.get("last_error") or ""),

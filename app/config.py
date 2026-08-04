@@ -73,6 +73,10 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("PHARMAREEN_ADMIN_ACCESS_TOKEN", "ADMIN_ACCESS_TOKEN"),
     )
+    bridge_internal_token: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MS20_BRIDGE_INTERNAL_TOKEN", "PHARMAREEN_BRIDGE_INTERNAL_TOKEN"),
+    )
     enable_live_onboarding: bool = True
     live_test_number: str = "+254721149472"
     admin_whatsapp_numbers: str | None = None

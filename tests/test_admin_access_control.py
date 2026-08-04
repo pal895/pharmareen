@@ -12,7 +12,7 @@ def test_admin_session_and_routes_fail_closed_without_configured_secret():
     )
     try:
         with TestClient(main.app) as client:
-            session = client.get("/api/ms20/auth/session")
+            session = client.get("/api/ms20/admin/session")
             admin_page = client.get("/admin/onboard")
     finally:
         main.app.dependency_overrides.pop(get_settings, None)
@@ -31,13 +31,13 @@ def test_admin_session_rejects_wrong_token_and_returns_fixed_capabilities_for_va
     )
     try:
         with TestClient(main.app) as client:
-            missing = client.get("/api/ms20/auth/session")
+            missing = client.get("/api/ms20/admin/session")
             wrong = client.get(
-                "/api/ms20/auth/session",
+                "/api/ms20/admin/session",
                 headers={"Authorization": "Bearer wrong-secret"},
             )
             valid = client.get(
-                "/api/ms20/auth/session",
+                "/api/ms20/admin/session",
                 headers={"Authorization": "Bearer ms20-test-admin-secret"},
             )
             admin_page = client.get(
@@ -63,5 +63,6 @@ def test_admin_session_rejects_wrong_token_and_returns_fixed_capabilities_for_va
             "onboarding:review",
             "deployment:manage",
         ],
+        "customer_flow": False,
     }
     assert admin_page.status_code == 200
