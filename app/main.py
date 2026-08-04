@@ -1589,6 +1589,12 @@ async def ms20_sync_connection_test(request: Request) -> dict[str, Any]:
     if not action_id.startswith("ms20-connection-test-") or len(action_id) > 100:
         return {"status": "error", "message": "The connection test ID is not valid."}
     if pharmacy_id and pharmacy_id != expected_pharmacy_id:
+        logger.warning(
+            "MS20_CONNECTION_TEST_PHARMACY_MISMATCH supplied=%s expected=%s payload_keys=%s",
+            pharmacy_id,
+            expected_pharmacy_id,
+            sorted(payload.keys()) if isinstance(payload, dict) else [],
+        )
         return {"status": "error", "message": "This test is for a different pharmacy."}
     store = get_sheet_store()
     if not bool(getattr(store, "is_available", False)):
