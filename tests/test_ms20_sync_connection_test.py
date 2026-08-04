@@ -44,3 +44,19 @@ def test_connection_test_blocks_other_pharmacy(monkeypatch):
     ).json()
     assert response["status"] == "error"
     assert store.rows == []
+
+
+def test_connection_test_binds_omitted_pharmacy_to_live_configuration(monkeypatch):
+    store = FakeSheetStore()
+    monkeypatch.setattr(main, "get_sheet_store", lambda: store)
+    monkeypatch.setattr(main, "live_pharmacy_id", lambda: "pharmacy-one")
+
+    response = TestClient(main.app).post(
+        "/api/ms20/sync/connection-test",
+        json={"action_id": "ms20-connection-test-003"},
+    ).json()
+
+    assert response["status"] == "saved"
+    assert response["pharmacy_id"] == "pharmacy_one"
+    assert len(store.rows) == 1
+    assert store.rows[0]["source"] == "ms20_main_app:pharmacy_one"
