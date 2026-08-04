@@ -984,6 +984,15 @@ class GoogleSheetsStore:
             value_input_option="USER_ENTERED",
         )
 
+    def find_offline_sync_action(self, action_id: str) -> dict[str, Any] | None:
+        wanted = str(action_id or "").strip()
+        if not wanted:
+            return None
+        for record in reversed(self._records(OFFLINE_SYNC_LOG, OFFLINE_SYNC_HEADERS)):
+            if str(record.get("action_id") or "").strip() == wanted:
+                return record
+        return None
+
     def get_daily_report_text(self, report_date: str) -> str | None:
         records = self._records(DAILY_REPORTS, DAILY_REPORT_HEADERS)
         for record in reversed(records):

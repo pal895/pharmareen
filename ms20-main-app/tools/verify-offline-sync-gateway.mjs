@@ -25,6 +25,13 @@ assert.equal(calls.length, 1);
 assert.equal(calls[0].path, "/offline/sync");
 assert.equal(calls[0].options.body.entries.length, 1, "one review must send one item only");
 
+const testGateway = new OfflineSyncGateway({
+  pharmacy: { id: "pharmacy-1" },
+  backendGateway: { async requestJson(path, options) { return { ok: true, data: { status: "saved", action_id: options.body.action_id, message: "Safe test saved." } }; } }
+});
+const connectionTest = await testGateway.testConnection("ms20-connection-test-001");
+assert.equal(connectionTest.status, "saved");
+
 const failingStorage = { value: "[]", getItem() { return this.value; }, setItem(_key, value) { this.value = value; } };
 const failingQueue = new OfflineQueue(failingStorage);
 failingQueue.add({ ...sale, id: "action-sale-2" });

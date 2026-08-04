@@ -1576,6 +1576,55 @@ async def offline_sync_entries(request: Request) -> dict[str, Any]:
     }
 
 
+@app.post("/api/ms20/sync/connection-test")
+async def ms20_sync_connection_test(request: Request) -> dict[str, Any]:
+    """Write one harmless, duplicate-safe connection record to Google Sheets."""
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    action_id = str(payload.get("action_id") if isinstance(payload, dict) else "").strip()
+    pharmacy_id = normalize_runtime_id(str(payload.get("pharmacy_id") if isinstance(payload, dict) else ""))
+    expected_pharmacy_id = normalize_runtime_id(live_pharmacy_id())
+    if not action_id.startswith("ms20-connection-test-") or len(action_id) > 100:
+        return {"status": "error", "message": "The connection test ID is not valid."}
+    if pharmacy_id and pharmacy_id != expected_pharmacy_id:
+        return {"status": "error", "message": "This test is for a different pharmacy."}
+    store = get_sheet_store()
+    if not bool(getattr(store, "is_available", False)):
+        return {"status": "waiting", "message": "Google Sheets is not ready. Nothing was changed."}
+    find_action = getattr(store, "find_offline_sync_action", None)
+    if not callable(find_action):
+        return {"status": "error", "message": "The safe connection test is not ready."}
+    previous = find_action(action_id)
+    if previous:
+        return {"status": "already_saved", "action_id": action_id, "message": "This test was already saved. It was not added twice."}
+    created_at = now_in_timezone(get_settings().timezone).isoformat(timespec="seconds")
+    store.append_offline_sync_log(
+        {
+            "action_id": action_id,
+            "action_type": "connection_test",
+            "drug_name": "",
+            "quantity": "",
+            "created_by": "MS2.0 owner",
+            "created_at": created_at,
+            "sync_status": "confirmed",
+            "retry_count": 0,
+            "last_error": "",
+            "source": f"ms20_main_app:{expected_pharmacy_id}",
+        }
+    )
+    saved = find_action(action_id)
+    if not saved:
+        return {"status": "waiting", "action_id": action_id, "message": "The test was not confirmed. No medicine data changed."}
+    return {
+        "status": "saved",
+        "action_id": action_id,
+        "pharmacy_id": expected_pharmacy_id,
+        "message": "Google Sheets saved the safe test. No medicine data changed.",
+    }
+
+
 @app.get("/status", response_class=HTMLResponse)
 def startup_status_page() -> str:
     settings = get_settings()

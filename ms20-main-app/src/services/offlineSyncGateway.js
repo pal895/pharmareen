@@ -80,4 +80,19 @@ export class OfflineSyncGateway {
       message: clean(synced.result_summary || synced.reply) || "Saved to the pharmacy records."
     };
   }
+
+  async testConnection(actionId) {
+    const response = await this.backendGateway.requestJson("/api/ms20/sync/connection-test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: { action_id: actionId },
+      timeoutMs: 15000
+    });
+    if (!response.ok) throw new Error("The safe test could not reach the backend.");
+    const data = response.data || {};
+    if (!["saved", "already_saved"].includes(data.status)) {
+      throw new Error(clean(data.message) || "The safe test was not confirmed.");
+    }
+    return data;
+  }
 }

@@ -1502,6 +1502,19 @@ input:disabled {
   gap: 0.8rem;
 }
 
+.queue-sync-test {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+  padding: 0.9rem;
+  border-radius: 1rem;
+  background: var(--good-soft);
+}
+
+.queue-sync-test p {
+  margin: 0;
+}
+
 .queue-sync-item {
   display: grid;
   gap: 0.65rem;

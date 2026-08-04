@@ -107,6 +107,7 @@ const INVOICE_MEMORY_KEY = "ms20-main-app:invoice-memory";
 const QUARANTINED_CARDS_KEY = "ms20-main-app:quarantined-cards";
 const EXPORT_HISTORY_KEY_PREFIX = "ms20-main-app:export-history";
 const ACTIVITY_HISTORY_KEY_PREFIX = "ms20-main-app:activity-history";
+const SYNC_CONNECTION_TEST_KEY_PREFIX = "ms20-main-app:sync-connection-test";
 const EXPORT_HISTORY_LIMIT = 50;
 const FEED_RESUME_LIMIT = 40;
 const ACTIVE_CARD_RESUME_LIMIT = 12;
@@ -673,6 +674,11 @@ function queueSyncCardTemplate(card) {
         ${cardCloseButtonTemplate(card, "top")}
       </div>
       <p class="card-note">Check one item, then send it. Only that item will be sent.</p>
+      <section class="queue-sync-test">
+        <strong>Safe Google Sheets test</strong>
+        <p>This adds one test line. It does not change medicines, stock, prices, sales, or supplier money.</p>
+        <button data-action="test-sheets-connection" data-card-id="${escapeHtml(card.id)}" ${card.testingConnection ? "disabled" : ""}>${card.testingConnection ? "Testing…" : "Run safe test"}</button>
+      </section>
       <div class="queue-sync-list">
         ${waiting.length ? waiting.map((item) => {
           const supported = ["SaleCard", "RestockCard"].includes(item.type);
@@ -1707,6 +1713,7 @@ function handleAction(dataset) {
   if (action === "refresh-live-status") void refreshLiveStatus();
   if (action === "sync-now") syncNow();
   if (action === "sync-one") void syncOneQueuedItem(dataset.cardId, dataset.syncId);
+  if (action === "test-sheets-connection") void testSheetsConnection(dataset.cardId);
   if (action === "reset-onboarding") resetOnboarding();
   if (action === "decrease-card-font") adjustCardFontScale(-CARD_FONT_SCALE_STEP);
   if (action === "increase-card-font") adjustCardFontScale(CARD_FONT_SCALE_STEP);
@@ -5208,6 +5215,33 @@ async function syncOneQueuedItem(cardId, actionId) {
   persistActiveCards();
   render();
   focusCard(card.id);
+}
+
+async function testSheetsConnection(cardId) {
+  const card = state.cards.find((item) => item.id === cardId && item.type === "QueueSyncCard");
+  if (!card || card.testingConnection) return;
+  const storage = safeLocalStorage();
+  const key = `${SYNC_CONNECTION_TEST_KEY_PREFIX}:${state.pharmacy.id}`;
+  let actionId = storage?.getItem(key) || "";
+  if (!actionId) {
+    const unique = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    actionId = `ms20-connection-test-${unique}`;
+    storage?.setItem(key, actionId);
+  }
+  card.testingConnection = true;
+  card.resultMessage = "";
+  render();
+  try {
+    const result = await offlineSyncGateway.testConnection(actionId);
+    card.resultMessage = result.message || "Google Sheets saved the safe test. No medicine data changed.";
+  } catch (error) {
+    card.resultMessage = `${error?.message || "The safe test did not finish."} No medicine data changed.`;
+  } finally {
+    card.testingConnection = false;
+    persistActiveCards();
+    render();
+    focusCard(card.id);
+  }
 }
 
 async function refreshLiveStatus({ silent = false } = {}) {

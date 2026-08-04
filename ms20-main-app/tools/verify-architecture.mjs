@@ -80,6 +80,7 @@ assert(appSource.includes('const offlineSyncGateway = new OfflineSyncGateway') &
 assert(!/async function syncNow\(\)[\s\S]{0,300}syncPending\(/.test(appSource), "The main Sync button must open review and must not send the whole queue");
 assert(appSource.includes('data-action="sync-one"') && appSource.includes("Only that item will be sent."), "Queue sync must require a one-item review action in simple language");
 assert(appSource.includes("await syncAdapter.syncOne(actionId)"), "Queue review must call the guarded one-item sync path");
+assert(appSource.includes('data-action="test-sheets-connection"') && appSource.includes("It does not change medicines, stock, prices, sales, or supplier money."), "Sync review must provide a clearly bounded safe Sheets test");
 assert(appSource.includes('data-action="dismiss-card"') && !/card\.type === "SyncReviewCard"[\s\S]{0,500}data-action="confirm-card"/.test(appSource), "Sync review must close without confirmation or mutation controls");
 assert(appSource.includes("showCatalogWorkspace();"), "Successful onboarding does not lead into the catalog workspace");
 assert(css.includes(".catalog-workspace-list") && css.includes("grid-template-columns: 1fr"), "Catalog workspace mobile layout protection missing");
