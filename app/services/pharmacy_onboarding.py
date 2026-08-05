@@ -197,7 +197,7 @@ def local_registry_path() -> Path:
 def has_google_credentials(settings: Settings) -> bool:
     raw = (
         os.environ.get("GOOGLE_SHEETS_CREDENTIALS")
-        or str(settings.google_service_account_json or "")
+        or str(getattr(settings, "google_service_account_json", "") or "")
     ).strip()
     return raw.startswith("{") or bool(raw and Path(raw).expanduser().exists())
 
@@ -205,7 +205,7 @@ def has_google_credentials(settings: Settings) -> bool:
 def admin_sheet_id(settings: Settings) -> str:
     return (
         os.environ.get("PHARMAREEN_ADMIN_SHEET_ID")
-        or str(settings.pharmareen_admin_sheet_id or "")
+        or str(getattr(settings, "pharmareen_admin_sheet_id", "") or "")
     ).strip()
 
 

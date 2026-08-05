@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from typing import Any
+import base64
+import os
+from io import BytesIO
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
@@ -10,6 +13,7 @@ from app.branding import APP_BRAND
 from app.access_control import require_admin_actor
 from app.config import get_settings
 from app.services.pharmacy_onboarding import PharmacyOnboardingService, PharmacyPayload
+from app.owner_auth import owner_auth_service
 
 
 router = APIRouter(
@@ -62,6 +66,27 @@ def get_pharmacy(pharmacy_id: str) -> dict[str, Any]:
     if not record:
         raise HTTPException(status_code=404, detail="Pharmacy not found")
     return {"ok": True, "pharmacy": record}
+
+
+@router.post("/pharmacy/{pharmacy_id}/owner-activation")
+def create_owner_activation(pharmacy_id: str, request: Request) -> dict[str, Any]:
+    allowed_pharmacy = os.getenv("PHARMAREEN_OWNER_ACTIVATION_PHARMACY_ID", "").strip()
+    if allowed_pharmacy and pharmacy_id != allowed_pharmacy:
+        raise HTTPException(status_code=403, detail="Owner activation is restricted to the staging test pharmacy.")
+    record = service().get_pharmacy(pharmacy_id)
+    if not record or str(record.get("active") or "").lower() in {"no", "false", "0", "inactive"}:
+        raise HTTPException(status_code=404, detail="Active pharmacy owner not found")
+    raw_token, invitation = owner_auth_service.create_activation(record)
+    activation_url = f"{str(request.base_url).rstrip('/')}/main-app/activate#token={raw_token}"
+    try:
+        import qrcode
+        image = qrcode.make(activation_url)
+        buffer = BytesIO()
+        image.save(buffer, format="PNG")
+        qr_data_uri = "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
+    except ImportError as exc:
+        raise HTTPException(status_code=503, detail="Local QR generation is unavailable") from exc
+    return {"ok": True, "pharmacy_id": invitation.pharmacy_id, "pharmacy_name": invitation.pharmacy_name, "owner_name": invitation.owner_name, "expires_in": owner_auth_service.activation_ttl_seconds, "activation_url": activation_url, "qr_data_uri": qr_data_uri}
 
 
 @router.post("/photo-onboard-placeholder")
@@ -136,6 +161,10 @@ ADMIN_HTML = """
     <div id="pharmacies"></div>
   </section>
 
+  <section id="activation" style="display:none">
+    <h2>One-time Owner Activation</h2><p id="activationIdentity"></p><img id="activationQr" alt="Owner activation QR" width="260" height="260"><button class="secondary" onclick="copyActivation()">Copy activation link</button><p>Expires in 15 minutes and can be used once. Do not screenshot or share the QR.</p>
+  </section>
+
   <section>
     <h2>Result Log</h2>
     <div id="log" class="log">Ready.</div>
@@ -143,6 +172,7 @@ ADMIN_HTML = """
 </main>
 <script>
 const logBox = document.getElementById('log');
+let activationLink = '';
 function log(value) { logBox.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2); }
 function rowToPharmacy(line) {
   const parts = line.split(',').map(x => x.trim());
@@ -169,9 +199,11 @@ async function createBulk() {
 async function loadPharmacies() {
   const res = await fetch('/admin/pharmacies');
   const data = await res.json();
-  const rows = (data.pharmacies || []).map(p => `<tr><td>${p.pharmacy_name || ''}</td><td>${p.pharmacy_id || ''}</td><td>${p.phone || ''}</td><td><a href="${p.spreadsheet_url || '#'}" target="_blank">${p.spreadsheet_id || ''}</a></td><td>${p.status || ''}</td></tr>`).join('');
-  document.getElementById('pharmacies').innerHTML = `<table><thead><tr><th>Pharmacy</th><th>ID</th><th>Phone</th><th>Spreadsheet</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+  const rows = (data.pharmacies || []).map(p => `<tr><td>${p.pharmacy_name || ''}</td><td>${p.pharmacy_id || ''}</td><td>${p.phone || ''}</td><td><a href="${p.spreadsheet_url || '#'}" target="_blank">${p.spreadsheet_id || ''}</a></td><td>${p.status || ''}</td><td><button onclick="createActivation('${p.pharmacy_id || ''}')">Owner QR</button></td></tr>`).join('');
+  document.getElementById('pharmacies').innerHTML = `<table><thead><tr><th>Pharmacy</th><th>ID</th><th>Phone</th><th>Spreadsheet</th><th>Status</th><th>Owner access</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
+async function createActivation(pharmacyId){const res=await fetch(`/admin/pharmacy/${encodeURIComponent(pharmacyId)}/owner-activation`,{method:'POST'});const data=await res.json();if(!res.ok){log({ok:false,message:data.detail||'Activation unavailable'});return;}activationLink=data.activation_url;document.getElementById('activationIdentity').textContent=`${data.pharmacy_name} — ${data.owner_name}`;document.getElementById('activationQr').src=data.qr_data_uri;document.getElementById('activation').style.display='block';log('One-time owner activation created safely.');}
+async function copyActivation(){await navigator.clipboard.writeText(activationLink);log('Activation link copied. Keep it private and use it once.');}
 loadPharmacies();
 </script>
 </body>

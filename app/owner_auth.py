@@ -4,9 +4,12 @@ import hashlib
 import hmac
 import secrets
 import time
+import json
+import os
+from pathlib import Path
 from dataclasses import dataclass
 from threading import RLock
-from typing import Callable
+from typing import Any, Callable
 
 from fastapi import Cookie, HTTPException, status
 
@@ -46,13 +49,193 @@ class OwnerSession:
     revoked: bool = False
 
 
+@dataclass
+class ActivationInvitation:
+    token_digest: str
+    owner_id: str
+    phone_key: str
+    pharmacy_id: str
+    pharmacy_name: str
+    owner_name: str
+    expires_at: float
+    used_at: float = 0.0
+
+
+@dataclass
+class OwnerCredential:
+    owner_id: str
+    phone_key: str
+    pharmacy_id: str
+    pharmacy_name: str
+    owner_name: str
+    pin_hash: str
+    failed_attempts: int = 0
+    locked_until: float = 0.0
+
+
 class OwnerAuthService:
-    def __init__(self, *, challenge_ttl_seconds: int = 600, session_ttl_seconds: int = 900):
+    def __init__(self, *, challenge_ttl_seconds: int = 600, activation_ttl_seconds: int = 900, session_ttl_seconds: int = 900, state_path: str | Path | None = None):
         self.challenge_ttl_seconds = challenge_ttl_seconds
+        self.activation_ttl_seconds = activation_ttl_seconds
         self.session_ttl_seconds = session_ttl_seconds
         self._challenges: dict[str, LoginChallenge] = {}
         self._sessions: dict[str, OwnerSession] = {}
+        self._activations: dict[str, ActivationInvitation] = {}
+        self._credentials: dict[str, OwnerCredential] = {}
+        self._state_path = Path(state_path) if state_path else None
+        self._state_loader: Callable[[], dict[str, Any]] | None = None
+        self._state_saver: Callable[[dict[str, Any]], None] | None = None
+        self._persistence_available = True
         self._lock = RLock()
+        self._load_state()
+
+    def configure_persistence(
+        self,
+        *,
+        loader: Callable[[], dict[str, Any]],
+        saver: Callable[[dict[str, Any]], None],
+    ) -> None:
+        """Switch to a shared durable store and refresh state from it."""
+        with self._lock:
+            data = loader()
+            activations, credentials = self._decode_state(data)
+            self._state_loader = loader
+            self._state_saver = saver
+            self._activations = activations
+            self._credentials = credentials
+            self._persistence_available = True
+
+    def mark_persistence_unavailable(self) -> None:
+        with self._lock:
+            self._persistence_available = False
+
+    def _require_persistence(self) -> None:
+        if not self._persistence_available:
+            raise HTTPException(status_code=503, detail="Owner access is temporarily unavailable.")
+
+    def create_activation(self, owner: dict[str, str], *, now: float | None = None) -> tuple[str, ActivationInvitation]:
+        self._require_persistence()
+        current = time.time() if now is None else now
+        pharmacy_id = str(owner.get("pharmacy_id") or "").strip()
+        phone_key = registry_phone_key(owner.get("phone_number") or owner.get("phone"))
+        if not pharmacy_id or not phone_key:
+            raise HTTPException(status_code=400, detail="An active pharmacy owner is required.")
+        raw_token = secrets.token_urlsafe(32)
+        owner_id = str(owner.get("owner_id") or f"owner_{phone_key}")
+        invitation = ActivationInvitation(
+            token_digest=self._digest(raw_token), owner_id=owner_id, phone_key=phone_key,
+            pharmacy_id=pharmacy_id, pharmacy_name=str(owner.get("pharmacy_name") or pharmacy_id),
+            owner_name=str(owner.get("owner_name") or "Owner"), expires_at=current + self.activation_ttl_seconds,
+        )
+        with self._lock:
+            self._activations[invitation.token_digest] = invitation
+            self._save_state()
+        return raw_token, invitation
+
+    def inspect_activation(self, raw_token: str, *, now: float | None = None) -> dict[str, str]:
+        self._require_persistence()
+        invitation = self._valid_activation(raw_token, now=now)
+        return {"pharmacy_id": invitation.pharmacy_id, "pharmacy_name": invitation.pharmacy_name, "owner_name": invitation.owner_name, "role": "owner"}
+
+    def activate(self, raw_token: str, pin: str, *, now: float | None = None) -> tuple[str, OwnerSession]:
+        self._require_persistence()
+        current = time.time() if now is None else now
+        self._validate_pin(pin)
+        with self._lock:
+            invitation = self._valid_activation(raw_token, now=current)
+            credential = OwnerCredential(
+                owner_id=invitation.owner_id, phone_key=invitation.phone_key,
+                pharmacy_id=invitation.pharmacy_id, pharmacy_name=invitation.pharmacy_name,
+                owner_name=invitation.owner_name, pin_hash=self._hash_pin(pin),
+            )
+            self._credentials[credential.phone_key] = credential
+            invitation.used_at = current
+            self._save_state()
+            return self._issue_session(credential, now=current)
+
+    def sign_in_with_pin(self, phone: str, pin: str, *, now: float | None = None) -> tuple[str, OwnerSession]:
+        self._require_persistence()
+        current = time.time() if now is None else now
+        phone_key = registry_phone_key(phone)
+        with self._lock:
+            credential = self._credentials.get(phone_key)
+            if not credential or credential.locked_until > current:
+                raise self._unauthorized("The phone number or PIN is incorrect.")
+            if not self._verify_pin(pin, credential.pin_hash):
+                credential.failed_attempts += 1
+                if credential.failed_attempts >= 5:
+                    credential.locked_until = current + 900
+                    credential.failed_attempts = 0
+                self._save_state()
+                raise self._unauthorized("The phone number or PIN is incorrect.")
+            credential.failed_attempts = 0
+            credential.locked_until = 0.0
+            self._save_state()
+            return self._issue_session(credential, now=current)
+
+    def _valid_activation(self, raw_token: str, *, now: float | None = None) -> ActivationInvitation:
+        current = time.time() if now is None else now
+        invitation = self._activations.get(self._digest(raw_token))
+        if not invitation or invitation.used_at or invitation.expires_at <= current:
+            raise self._unauthorized("This activation invitation is invalid or expired.")
+        return invitation
+
+    def _issue_session(self, credential: OwnerCredential, *, now: float) -> tuple[str, OwnerSession]:
+        token = secrets.token_urlsafe(32)
+        session = OwnerSession(self._digest(token), credential.owner_id, credential.pharmacy_id, "owner", credential.owner_name, now + self.session_ttl_seconds)
+        self._sessions[session.session_digest] = session
+        return token, session
+
+    @staticmethod
+    def _validate_pin(pin: str) -> None:
+        if len(pin) < 8 or not any(c.isdigit() for c in pin) or not any(c.isalpha() for c in pin):
+            raise HTTPException(status_code=400, detail="Choose a PIN with at least 8 characters, including letters and numbers.")
+
+    @staticmethod
+    def _hash_pin(pin: str) -> str:
+        salt = secrets.token_bytes(16)
+        derived = hashlib.pbkdf2_hmac("sha256", pin.encode(), salt, 600_000)
+        return f"pbkdf2_sha256$600000${salt.hex()}${derived.hex()}"
+
+    @staticmethod
+    def _verify_pin(pin: str, stored: str) -> bool:
+        try:
+            _, rounds, salt_hex, digest_hex = stored.split("$", 3)
+            actual = hashlib.pbkdf2_hmac("sha256", pin.encode(), bytes.fromhex(salt_hex), int(rounds)).hex()
+            return hmac.compare_digest(actual, digest_hex)
+        except (TypeError, ValueError):
+            return False
+
+    def _load_state(self) -> None:
+        try:
+            if self._state_path and self._state_path.exists():
+                data = json.loads(self._state_path.read_text(encoding="utf-8"))
+            else:
+                return
+            self._activations, self._credentials = self._decode_state(data)
+        except Exception:
+            self._activations, self._credentials = {}, {}
+
+    @staticmethod
+    def _decode_state(data: dict[str, Any]) -> tuple[dict[str, ActivationInvitation], dict[str, OwnerCredential]]:
+        activations = {k: ActivationInvitation(**v) for k, v in data.get("activations", {}).items()}
+        credentials = {k: OwnerCredential(**v) for k, v in data.get("credentials", {}).items()}
+        return activations, credentials
+
+    def _save_state(self) -> None:
+        payload = {
+            "activations": {k: vars(v) for k, v in self._activations.items()},
+            "credentials": {k: vars(v) for k, v in self._credentials.items()},
+        }
+        if self._state_saver:
+            self._state_saver(payload)
+            return
+        if not self._state_path:
+            return
+        self._state_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self._state_path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+        temporary.replace(self._state_path)
 
     def start_login(
         self,
@@ -150,7 +333,7 @@ class OwnerAuthService:
         )
 
 
-owner_auth_service = OwnerAuthService()
+owner_auth_service = OwnerAuthService(state_path=os.getenv("PHARMAREEN_OWNER_AUTH_STORE", "data/owner_auth.json"))
 
 
 def require_owner_actor(ms20_owner_session: str | None = Cookie(default=None)) -> ActorContext:

@@ -76,6 +76,8 @@ from app.services.photo_intake import (
     save_photo_upload,
 )
 from app.services.pharmacy_engine import parse_payment_method
+from app.services.owner_auth_persistence import GoogleSheetsOwnerAuthStateStore
+from app.services.pharmacy_onboarding import admin_sheet_id, has_google_credentials
 from app.sheets import GoogleSheetsStore, SHEETS_UNAVAILABLE_MESSAGE, SheetsUnavailableError
 from app.training_store import TrainingStore
 from app.transcription import TranscriptionService, TranscriptionUnavailableError
@@ -140,17 +142,16 @@ OWNER_SIGN_IN_HTML = """
 </head>
 <body><main>
   <h1>Owner sign in</h1>
-  <p>Use the WhatsApp number registered to your pharmacy. We will send a one-time code.</p>
-  <section id="phoneStep"><label for="phone">Registered WhatsApp number</label><input id="phone" inputmode="tel" autocomplete="tel"><button id="send">Send code</button></section>
-  <section id="codeStep" class="hidden"><label for="code">One-time code</label><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"><button id="verify">Sign in</button></section>
+  <p>Use the phone number registered to your pharmacy and your private owner PIN.</p>
+  <section><label for="phone">Registered phone number</label><input id="phone" inputmode="tel" autocomplete="tel"><label for="pin">Owner PIN</label><input id="pin" type="password" autocomplete="current-password"><button id="send">Sign in</button></section>
   <p id="status" role="status"></p>
 </main><script>
-let challengeId = "";
-const statusBox=document.getElementById("status"), phoneStep=document.getElementById("phoneStep"), codeStep=document.getElementById("codeStep");
-document.getElementById("send").onclick=async()=>{statusBox.textContent="Sending code…";const phone=document.getElementById("phone").value;const response=await fetch("/api/ms20/auth/owner/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone}),credentials:"same-origin"});const data=await response.json();challengeId=data.challenge_id||"";document.getElementById("phone").value="";phoneStep.classList.add("hidden");codeStep.classList.remove("hidden");statusBox.textContent="Enter the code sent to your registered WhatsApp number.";};
-document.getElementById("verify").onclick=async()=>{statusBox.textContent="Signing in…";const code=document.getElementById("code").value;const response=await fetch("/api/ms20/auth/owner/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({challenge_id:challengeId,code}),credentials:"same-origin"});document.getElementById("code").value="";challengeId="";if(!response.ok){statusBox.textContent="That code did not work or expired. Start again.";return;}statusBox.textContent="Signed in safely.";window.location.assign("/main-app/");};
+const statusBox=document.getElementById("status");
+document.getElementById("send").onclick=async()=>{statusBox.textContent="Signing in…";const phone=document.getElementById("phone").value,pin=document.getElementById("pin").value;const response=await fetch("/api/ms20/auth/owner/pin",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone,pin}),credentials:"same-origin"});document.getElementById("phone").value="";document.getElementById("pin").value="";if(!response.ok){statusBox.textContent="The phone number or PIN is incorrect.";return;}statusBox.textContent="Signed in safely.";window.location.assign("/main-app/");};
 </script></body></html>
 """
+
+OWNER_ACTIVATION_HTML = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Activate pharmacy owner</title><style>body{font-family:Arial;background:#f4f8f6;color:#142d27;padding:24px}main{max-width:440px;margin:6vh auto;background:white;padding:28px;border-radius:24px}input,button{box-sizing:border-box;width:100%;font-size:18px;padding:14px;margin-top:12px;border-radius:14px}button{border:0;background:#176d5d;color:white;font-weight:bold}.hidden{display:none}</style></head><body><main><h1>Activate owner access</h1><p id="identity">Checking this invitation safely…</p><section id="form" class="hidden"><label for="pin">Create a private owner PIN</label><input id="pin" type="password" autocomplete="new-password"><label for="confirm">Confirm PIN</label><input id="confirm" type="password" autocomplete="new-password"><button id="activate">Activate and open Main App</button></section><p id="status" role="status"></p></main><script>let activationToken="";const identity=document.getElementById("identity"),form=document.getElementById("form"),statusBox=document.getElementById("status");const params=new URLSearchParams(location.hash.slice(1));activationToken=params.get("token")||"";history.replaceState(null,"",location.pathname);(async()=>{const r=await fetch("/api/ms20/auth/owner/activation/inspect",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:activationToken}),credentials:"same-origin"});if(!r.ok){activationToken="";identity.textContent="This invitation is invalid or expired.";return;}const d=await r.json();identity.textContent=`Pharmacy: ${d.pharmacy_name}. Owner: ${d.owner_name}. Role: owner.`;form.classList.remove("hidden");})();document.getElementById("activate").onclick=async()=>{const pin=document.getElementById("pin").value,confirm=document.getElementById("confirm").value;if(pin!==confirm){statusBox.textContent="The PINs do not match.";return;}const r=await fetch("/api/ms20/auth/owner/activation/complete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:activationToken,pin}),credentials:"same-origin"});document.getElementById("pin").value="";document.getElementById("confirm").value="";activationToken="";if(!r.ok){statusBox.textContent="Activation failed. Check the PIN rules or request a new invitation.";return;}statusBox.textContent="Owner access activated safely.";location.replace("/main-app/");};</script></body></html>"""
 whatsapp_bridge_runtime_status: dict[str, Any] = {
     "state": "unknown",
     "connected": False,
@@ -216,6 +217,15 @@ def save_offline_confirmation_state() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     load_offline_confirmation_state()
+    settings = get_settings()
+    if has_google_credentials(settings) and admin_sheet_id(settings):
+        try:
+            owner_store = GoogleSheetsOwnerAuthStateStore(settings)
+            owner_auth_service.configure_persistence(loader=owner_store.load, saver=owner_store.save)
+            logger.info("Owner authentication durable store initialized")
+        except Exception:
+            owner_auth_service.mark_persistence_unavailable()
+            logger.exception("Owner authentication durable store unavailable; activation remains disabled")
     print_startup_console_status()
     print("PHASE6_ROUTES_LOADED /offline-app /debug/offline-app")
     try:
@@ -306,6 +316,37 @@ async def ms20_owner_login_verify(request: Request) -> JSONResponse:
     return response
 
 
+def owner_session_response(token: str, session: Any) -> JSONResponse:
+    response = JSONResponse({"authenticated": True, "role": session.role, "pharmacy_id": session.pharmacy_id, "expires_in": owner_auth_service.session_ttl_seconds})
+    response.set_cookie(OWNER_SESSION_COOKIE, token, max_age=owner_auth_service.session_ttl_seconds, httponly=True, secure=True, samesite="strict", path="/")
+    return response
+
+
+@app.post("/api/ms20/auth/owner/activation/inspect")
+async def ms20_owner_activation_inspect(request: Request) -> dict[str, str]:
+    payload = await request.json()
+    token = str(payload.get("token") or "") if isinstance(payload, dict) else ""
+    return owner_auth_service.inspect_activation(token)
+
+
+@app.post("/api/ms20/auth/owner/activation/complete")
+async def ms20_owner_activation_complete(request: Request) -> JSONResponse:
+    payload = await request.json()
+    token = str(payload.get("token") or "") if isinstance(payload, dict) else ""
+    pin = str(payload.get("pin") or "") if isinstance(payload, dict) else ""
+    session_token, session = owner_auth_service.activate(token, pin)
+    return owner_session_response(session_token, session)
+
+
+@app.post("/api/ms20/auth/owner/pin")
+async def ms20_owner_pin_sign_in(request: Request) -> JSONResponse:
+    payload = await request.json()
+    phone = str(payload.get("phone") or "") if isinstance(payload, dict) else ""
+    pin = str(payload.get("pin") or "") if isinstance(payload, dict) else ""
+    token, session = owner_auth_service.sign_in_with_pin(phone, pin)
+    return owner_session_response(token, session)
+
+
 @app.post("/api/ms20/auth/logout")
 async def ms20_owner_logout(ms20_owner_session: str | None = Cookie(default=None)) -> JSONResponse:
     owner_auth_service.revoke(ms20_owner_session)
@@ -317,6 +358,11 @@ async def ms20_owner_logout(ms20_owner_session: str | None = Cookie(default=None
 @app.get("/main-app/sign-in", response_class=HTMLResponse, include_in_schema=False)
 async def ms20_owner_sign_in_page() -> str:
     return OWNER_SIGN_IN_HTML
+
+
+@app.get("/main-app/activate", response_class=HTMLResponse, include_in_schema=False)
+async def ms20_owner_activation_page() -> HTMLResponse:
+    return HTMLResponse(OWNER_ACTIVATION_HTML, headers={"Referrer-Policy": "no-referrer", "Cache-Control": "no-store"})
 
 
 @app.get("/offline-app", include_in_schema=False)

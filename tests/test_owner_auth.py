@@ -2,11 +2,12 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 import re
+from pathlib import Path
 
 from app import main
 from app import owner_auth as owner_auth_module
 from app.config import Settings
-from app.main import OWNER_SIGN_IN_HTML
+from app.main import OWNER_ACTIVATION_HTML, OWNER_SIGN_IN_HTML
 from app.owner_auth import OWNER_CAPABILITIES, OwnerAuthService
 
 
@@ -155,3 +156,95 @@ def test_owner_facing_flow_sets_secure_http_only_cookie_and_allows_session(monke
     assert allowed.status_code == 200
     assert allowed.json()["role"] == "owner"
     assert allowed.json()["pharmacy_id"] == "pharmacy-a"
+
+
+def test_activation_is_bound_hashed_single_use_and_persistent():
+    path = Path("tests/.owner-auth-state-test.json")
+    path.unlink(missing_ok=True)
+    service = OwnerAuthService(state_path=path, activation_ttl_seconds=10)
+    raw, invitation = service.create_activation({**OWNER, "pharmacy_name": "Afya Pharmacy"}, now=100)
+
+    assert raw not in path.read_text(encoding="utf-8")
+    assert invitation.pharmacy_id == OWNER["pharmacy_id"]
+    assert service.inspect_activation(raw, now=101)["owner_name"] == "Mary"
+    token, session = service.activate(raw, "Owner1234", now=102)
+    assert session.pharmacy_id == "pharmacy-a"
+    assert service.authenticate(token, now=103).role == "owner"
+    assert_http_error(401, lambda: service.inspect_activation(raw, now=104))
+    stored = path.read_text(encoding="utf-8")
+    assert raw not in stored
+    assert "Owner1234" not in stored
+    assert "pbkdf2_sha256$600000$" in stored
+    path.unlink(missing_ok=True)
+
+
+def test_activation_rejects_changed_unknown_expired_and_weak_pin():
+    service = OwnerAuthService(activation_ttl_seconds=10)
+    raw, _ = service.create_activation(OWNER, now=100)
+    assert_http_error(401, lambda: service.inspect_activation(raw + "changed", now=101))
+    assert_http_error(401, lambda: service.inspect_activation("unknown", now=101))
+    assert_http_error(401, lambda: service.inspect_activation(raw, now=111))
+    raw, _ = service.create_activation(OWNER, now=200)
+    assert_http_error(400, lambda: service.activate(raw, "1234", now=201))
+
+
+def test_pin_sign_in_and_lockout_are_fail_closed():
+    service = OwnerAuthService()
+    raw, _ = service.create_activation(OWNER, now=100)
+    service.activate(raw, "Owner1234", now=101)
+    assert_http_error(401, lambda: service.sign_in_with_pin(OWNER["phone_number"], "Wrong1234", now=102))
+    for second in range(103, 107):
+        assert_http_error(401, lambda second=second: service.sign_in_with_pin(OWNER["phone_number"], "Wrong1234", now=second))
+    assert_http_error(401, lambda: service.sign_in_with_pin(OWNER["phone_number"], "Owner1234", now=107))
+    token, session = service.sign_in_with_pin(OWNER["phone_number"], "Owner1234", now=1008)
+    assert service.authenticate(token, pharmacy_id=session.pharmacy_id, now=1009).role == "owner"
+
+
+def test_activation_and_pin_routes_set_secure_cookie_without_client_secrets(monkeypatch):
+    service = OwnerAuthService()
+    raw, _ = service.create_activation({**OWNER, "pharmacy_name": "Afya Pharmacy"}, now=100)
+    monkeypatch.setattr(main, "owner_auth_service", service)
+    monkeypatch.setattr(owner_auth_module, "owner_auth_service", service)
+    monkeypatch.setattr(owner_auth_module.time, "time", lambda: 101)
+    with TestClient(main.app, base_url="https://ms20.test") as client:
+        inspected = client.post("/api/ms20/auth/owner/activation/inspect", json={"token": raw})
+        activated = client.post("/api/ms20/auth/owner/activation/complete", json={"token": raw, "pin": "Owner1234"})
+        client.post("/api/ms20/auth/logout")
+        signed_in = client.post("/api/ms20/auth/owner/pin", json={"phone": OWNER["phone_number"], "pin": "Owner1234"})
+        session = client.get("/api/ms20/auth/session")
+    assert inspected.json() == {"pharmacy_id": "pharmacy-a", "pharmacy_name": "Afya Pharmacy", "owner_name": "Mary", "role": "owner"}
+    for response in (activated, signed_in):
+        cookie = response.headers["set-cookie"].lower()
+        assert "httponly" in cookie and "secure" in cookie and "samesite=strict" in cookie
+        assert raw not in response.text and "Owner1234" not in response.text
+    assert session.json()["authenticated"] is True
+    assert "localStorage" not in OWNER_ACTIVATION_HTML and "sessionStorage" not in OWNER_ACTIVATION_HTML
+    assert "ms20_owner_session" not in OWNER_ACTIVATION_HTML
+
+
+def test_owner_auth_fails_closed_when_durable_store_is_unavailable():
+    service = OwnerAuthService()
+    service.mark_persistence_unavailable()
+    assert_http_error(503, lambda: service.create_activation(OWNER))
+    assert_http_error(503, lambda: service.sign_in_with_pin(OWNER["phone_number"], "Owner1234"))
+
+
+def test_configured_persistence_receives_only_digests_and_hashes():
+    saved: list[dict] = []
+    service = OwnerAuthService()
+    service.configure_persistence(loader=lambda: {"activations": {}, "credentials": {}}, saver=lambda payload: saved.append(payload))
+    raw, _ = service.create_activation(OWNER, now=100)
+    service.activate(raw, "Owner1234", now=101)
+    serialized = repr(saved)
+    assert raw not in serialized
+    assert "Owner1234" not in serialized
+    assert "pbkdf2_sha256$600000$" in serialized
+
+
+def test_durable_store_load_failure_is_not_treated_as_empty_valid_state():
+    service = OwnerAuthService()
+    with pytest.raises(RuntimeError, match="workbook unavailable"):
+        service.configure_persistence(
+            loader=lambda: (_ for _ in ()).throw(RuntimeError("workbook unavailable")),
+            saver=lambda _payload: None,
+        )
