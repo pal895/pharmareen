@@ -239,6 +239,16 @@ def test_first_owner_bootstrap_is_pharmacy_bound_single_use_and_persistent():
     path.unlink(missing_ok=True)
 
 
+def test_owner_state_requires_exact_single_registry_binding():
+    service = OwnerAuthService()
+    owner = {**OWNER, "pharmacy_name": "Afya Pharmacy"}
+    assert service.pharmacy_owner_state(owner) == "uninitialized"
+    service.initialize_first_owner(owner, "Owner1234", now=100)
+    assert service.pharmacy_owner_state(owner) == "initialized"
+    changed_phone = {**owner, "phone_number": "+254722222222", "phone": "+254722222222"}
+    assert_http_error(503, lambda: service.pharmacy_owner_state(changed_phone))
+
+
 def test_first_owner_bootstrap_page_switches_permanently_to_sign_in(monkeypatch):
     owner = {**OWNER, "pharmacy_name": "Afya Pharmacy", "active": "yes", "status": "active"}
 
@@ -313,6 +323,26 @@ def test_owner_auth_fails_closed_when_durable_store_is_unavailable():
     service.mark_persistence_unavailable()
     assert_http_error(503, lambda: service.create_activation(OWNER))
     assert_http_error(503, lambda: service.sign_in_with_pin(OWNER["phone_number"], "Owner1234"))
+
+
+def test_sign_in_page_does_not_mask_configuration_or_store_failure(monkeypatch):
+    service = OwnerAuthService()
+    service.mark_persistence_unavailable()
+    owner = {**OWNER, "pharmacy_name": "Afya Pharmacy", "active": "yes", "status": "active"}
+
+    class Registry:
+        def find_by_id(self, pharmacy_id, active_only=True):
+            return owner if pharmacy_id == "pharmacy-a" and active_only else None
+
+    monkeypatch.setenv("PHARMAREEN_DEFAULT_PHARMACY_ID", "pharmacy-a")
+    monkeypatch.setattr(main, "get_pharmacy_registry", lambda: Registry())
+    monkeypatch.setattr(main, "owner_auth_service", service)
+    with TestClient(main.app, base_url="https://ms20.test", raise_server_exceptions=False) as client:
+        response = client.get("/main-app/sign-in")
+
+    assert response.status_code == 503
+    assert "Owner sign in" not in response.text
+    assert "Activate first owner" not in response.text
 
 
 def test_configured_persistence_receives_only_digests_and_hashes():

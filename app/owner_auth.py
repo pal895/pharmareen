@@ -144,6 +144,33 @@ class OwnerAuthService:
             self._refresh_persistent_state()
             return any(item.pharmacy_id == wanted for item in self._credentials.values())
 
+    def pharmacy_owner_state(self, owner: dict[str, str]) -> str:
+        """Return the canonical bootstrap state for one registry-bound pharmacy.
+
+        An existing credential is valid only when both its pharmacy and normalized
+        registered phone still match the active registry record. Conflicting or
+        duplicate durable rows are never treated as either safe bootstrap or safe
+        sign-in state.
+        """
+        self._require_persistence()
+        pharmacy_id = str(owner.get("pharmacy_id") or "").strip()
+        phone_key = registry_phone_key(owner.get("phone_number") or owner.get("phone"))
+        if not pharmacy_id or not phone_key:
+            raise HTTPException(status_code=503, detail="Owner initialization is not configured.")
+        with self._lock:
+            self._refresh_persistent_state()
+            pharmacy_credentials = [
+                item for item in self._credentials.values() if item.pharmacy_id == pharmacy_id
+            ]
+            if not pharmacy_credentials:
+                return "uninitialized"
+            if len(pharmacy_credentials) == 1 and pharmacy_credentials[0].phone_key == phone_key:
+                return "initialized"
+            raise HTTPException(
+                status_code=503,
+                detail="Owner access state does not match the active pharmacy registry.",
+            )
+
     def initialize_first_owner(self, owner: dict[str, str], pin: str, *, now: float | None = None) -> tuple[str, OwnerSession]:
         """Create the sole bootstrap credential, only while this pharmacy is uninitialized."""
         self._require_persistence()

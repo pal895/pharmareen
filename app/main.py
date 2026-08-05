@@ -351,7 +351,7 @@ def first_owner_registry_record() -> dict[str, str]:
 @app.get("/api/ms20/auth/owner/bootstrap")
 async def ms20_owner_bootstrap_status() -> dict[str, Any]:
     record = first_owner_registry_record()
-    requires_initialization = not owner_auth_service.pharmacy_has_owner(record["pharmacy_id"])
+    requires_initialization = owner_auth_service.pharmacy_owner_state(record) == "uninitialized"
     if not requires_initialization:
         return {"requires_initialization": False}
     return {
@@ -405,11 +405,9 @@ async def ms20_owner_logout(ms20_owner_session: str | None = Cookie(default=None
 
 @app.get("/main-app/sign-in", response_class=HTMLResponse, include_in_schema=False)
 async def ms20_owner_sign_in_page() -> HTMLResponse:
-    try:
-        record = first_owner_registry_record()
-        html = OWNER_FIRST_SETUP_HTML if not owner_auth_service.pharmacy_has_owner(record["pharmacy_id"]) else OWNER_SIGN_IN_HTML
-    except HTTPException:
-        html = OWNER_SIGN_IN_HTML
+    record = first_owner_registry_record()
+    state = owner_auth_service.pharmacy_owner_state(record)
+    html = OWNER_FIRST_SETUP_HTML if state == "uninitialized" else OWNER_SIGN_IN_HTML
     return HTMLResponse(html, headers={"Referrer-Policy": "no-referrer", "Cache-Control": "no-store"})
 
 
