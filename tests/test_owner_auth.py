@@ -7,7 +7,12 @@ from pathlib import Path
 from app import main
 from app import owner_auth as owner_auth_module
 from app.config import Settings
-from app.main import OWNER_ACTIVATION_HTML, OWNER_SIGN_IN_HTML
+from app.main import (
+    OWNER_ACTIVATION_CLIENT_ACTIONS,
+    OWNER_ACTIVATION_HTML,
+    OWNER_SIGN_IN_CLIENT_ACTIONS,
+    OWNER_SIGN_IN_HTML,
+)
 from app.owner_auth import OWNER_CAPABILITIES, OwnerAuthService
 
 
@@ -92,6 +97,26 @@ def test_unknown_phone_is_not_enumerated_and_no_secret_uses_client_storage_or_ui
     assert "sessionStorage" not in OWNER_SIGN_IN_HTML
     assert "PHARMAREEN_ADMIN_ACCESS_TOKEN" not in OWNER_SIGN_IN_HTML
     assert "ms20_owner_session" not in OWNER_SIGN_IN_HTML
+
+
+def test_owner_activation_and_repeat_sign_in_remain_within_three_client_actions():
+    assert OWNER_ACTIVATION_CLIENT_ACTIONS == (
+        "Scan or open the secure pharmacy activation invitation.",
+        "Confirm the pharmacy and create the private PIN.",
+        "Enter the Main App.",
+    )
+    assert OWNER_SIGN_IN_CLIENT_ACTIONS == (
+        "Open MS2.0.",
+        "Enter the registered phone number and private PIN.",
+        "Enter the Main App.",
+    )
+    assert len(OWNER_ACTIVATION_CLIENT_ACTIONS) <= 3
+    assert len(OWNER_SIGN_IN_CLIENT_ACTIONS) <= 3
+    assert 'location.replace("/main-app/")' in OWNER_ACTIVATION_HTML
+    assert 'window.location.assign("/main-app/")' in OWNER_SIGN_IN_HTML
+    for customer_html in (OWNER_ACTIVATION_HTML, OWNER_SIGN_IN_HTML):
+        assert "ADMIN_ACCESS_TOKEN" not in customer_html
+        assert "Authorization" not in customer_html
 
 
 def test_sensitive_login_code_is_hidden_from_public_outbox_and_debug(monkeypatch):

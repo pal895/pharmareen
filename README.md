@@ -541,6 +541,12 @@ Presentation is a nine-slide owner/management decision briefing, not another inv
 
 Export activity updates one compact Export Hub card in the main chat. Newest-first pharmacy-isolated metadata history lives inside Export Hub; retries are deduplicated, failures can be generated again, and generated binaries are never retained in browser storage.
 
+## Permanent client-action and infrastructure boundary
+
+Normal pharmacy-client workflows must reach their intended result in no more than three clear client actions whenever technically possible. Automatic server processing, security checks, session creation, and page transitions are not client actions. Any exception requires a documented security or legal reason.
+
+Infrastructure-only setup must never appear as a pharmacy-owner task. The platform-admin credential protects internal administration only: it is configured once by an authorized deployment operator, is never used for owner activation or sign-in, and remains fail-closed when absent. MS2-LT-067-A begins only after the operator has privately prepared the pharmacy-bound activation invitation.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

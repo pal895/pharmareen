@@ -126,6 +126,18 @@ MAIN_APP_NO_CACHE_HEADERS = {
     "Expires": "0",
     "X-MS20-Main-App": "true",
 }
+OWNER_ACTIVATION_CLIENT_ACTIONS = (
+    "Scan or open the secure pharmacy activation invitation.",
+    "Confirm the pharmacy and create the private PIN.",
+    "Enter the Main App.",
+)
+
+OWNER_SIGN_IN_CLIENT_ACTIONS = (
+    "Open MS2.0.",
+    "Enter the registered phone number and private PIN.",
+    "Enter the Main App.",
+)
+
 OWNER_SIGN_IN_HTML = """
 <!doctype html>
 <html lang="en">

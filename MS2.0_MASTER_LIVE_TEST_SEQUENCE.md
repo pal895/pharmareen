@@ -209,6 +209,8 @@ This ledger deliberately accounts for owner-facing domains discovered across cur
 
 The only current open checkpoint is **#67 Authentication, roles and access controls**. MS2-LT-059-A through MS2-LT-059-D are owner-verified passed/frozen/protected, so checkpoint 59 is closed and must not be repeated without verified regression. **Revised MS2-LT-067-A first-owner activation, repeat phone-plus-PIN sign-in and session is the only active owner case.** The earlier admin-secret and WhatsApp-OTP owner tests were withdrawn before completion. All later staff invitation, staff-role, revocation-management, branch and download cases remain inactive. The dependency-aware Launch Gate milestone order remains authoritative; the former automatic linear progression is historical and must never resume.
 
+Permanent client rule: infrastructure-only prerequisites are performed once and privately by an authorized operator and never appear as pharmacy-owner actions. Platform-admin access remains separate and fail-closed, and is never owner authentication. Normal client workflows must take no more than three meaningful actions whenever technically possible; automatic server processing, session creation, security checks and redirects do not count. MS2-LT-067-A first activation is invitation open/scan → confirm pharmacy and create PIN → Main App. Repeat sign-in is open MS2.0 → registered phone plus PIN → Main App. A longer client path is allowed only for a documented security or legal requirement.
+
 ## Canonical synchronization invariants
 
 1. No Project Brain, Engineering Memory, architecture snapshot, test plan, handoff, bridge or synchronization package may publish an independent checkpoint list, count, order, prerequisite or status.
