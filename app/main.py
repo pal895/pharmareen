@@ -127,7 +127,7 @@ MAIN_APP_NO_CACHE_HEADERS = {
     "X-MS20-Main-App": "true",
 }
 OWNER_ACTIVATION_CLIENT_ACTIONS = (
-    "Scan or open the secure pharmacy activation invitation.",
+    "Open MS2.0 for the uninitialized pharmacy.",
     "Confirm the pharmacy and create the private PIN.",
     "Enter the Main App.",
 )
@@ -161,6 +161,10 @@ OWNER_SIGN_IN_HTML = """
 const statusBox=document.getElementById("status");
 document.getElementById("send").onclick=async()=>{statusBox.textContent="Signing in…";const phone=document.getElementById("phone").value,pin=document.getElementById("pin").value;const response=await fetch("/api/ms20/auth/owner/pin",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone,pin}),credentials:"same-origin"});document.getElementById("phone").value="";document.getElementById("pin").value="";if(!response.ok){statusBox.textContent="The phone number or PIN is incorrect.";return;}statusBox.textContent="Signed in safely.";window.location.assign("/main-app/");};
 </script></body></html>
+"""
+
+OWNER_FIRST_SETUP_HTML = """
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Activate first owner</title><style>body{font-family:Arial,sans-serif;background:#f4f8f6;color:#142d27;margin:0;padding:24px}main{max-width:440px;margin:6vh auto;background:#fff;border:1px solid #d6e2de;border-radius:24px;padding:28px}label{display:block;font-weight:700;margin:18px 0 8px}input,button{box-sizing:border-box;width:100%;font-size:18px;padding:14px;border-radius:14px}input{border:1px solid #b9c9c4}button{margin-top:16px;border:0;background:#176d5d;color:#fff;font-weight:700}#status{min-height:48px}</style></head><body><main><h1>Activate first owner</h1><p id="identity">Checking this pharmacy safely…</p><section id="form" hidden><label for="pin">Create a private owner PIN</label><input id="pin" type="password" autocomplete="new-password"><label for="confirm">Confirm PIN</label><input id="confirm" type="password" autocomplete="new-password"><button id="activate">Activate and open Main App</button></section><p id="status" role="status"></p></main><script>const identity=document.getElementById("identity"),form=document.getElementById("form"),statusBox=document.getElementById("status");(async()=>{const r=await fetch("/api/ms20/auth/owner/bootstrap",{credentials:"same-origin",cache:"no-store"});if(!r.ok){identity.textContent="Owner setup is temporarily unavailable.";return;}const d=await r.json();if(!d.requires_initialization){location.replace("/main-app/sign-in");return;}identity.textContent=`Confirm pharmacy: ${d.pharmacy_name}. First owner: ${d.owner_name}.`;form.hidden=false;})();document.getElementById("activate").onclick=async()=>{const pin=document.getElementById("pin").value,confirm=document.getElementById("confirm").value;if(pin!==confirm){statusBox.textContent="The PINs do not match.";return;}statusBox.textContent="Activating securely…";const r=await fetch("/api/ms20/auth/owner/bootstrap",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pin}),credentials:"same-origin"});document.getElementById("pin").value="";document.getElementById("confirm").value="";if(r.status===409){location.replace("/main-app/sign-in");return;}if(!r.ok){statusBox.textContent="Activation failed. Choose at least 8 characters with letters and numbers.";return;}location.replace("/main-app/");};</script></body></html>
 """
 
 OWNER_ACTIVATION_HTML = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Activate pharmacy owner</title><style>body{font-family:Arial;background:#f4f8f6;color:#142d27;padding:24px}main{max-width:440px;margin:6vh auto;background:white;padding:28px;border-radius:24px}input,button{box-sizing:border-box;width:100%;font-size:18px;padding:14px;margin-top:12px;border-radius:14px}button{border:0;background:#176d5d;color:white;font-weight:bold}.hidden{display:none}</style></head><body><main><h1>Activate owner access</h1><p id="identity">Checking this invitation safely…</p><section id="form" class="hidden"><label for="pin">Create a private owner PIN</label><input id="pin" type="password" autocomplete="new-password"><label for="confirm">Confirm PIN</label><input id="confirm" type="password" autocomplete="new-password"><button id="activate">Activate and open Main App</button></section><p id="status" role="status"></p></main><script>let activationToken="";const identity=document.getElementById("identity"),form=document.getElementById("form"),statusBox=document.getElementById("status");const params=new URLSearchParams(location.hash.slice(1));activationToken=params.get("token")||"";history.replaceState(null,"",location.pathname);(async()=>{const r=await fetch("/api/ms20/auth/owner/activation/inspect",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:activationToken}),credentials:"same-origin"});if(!r.ok){activationToken="";identity.textContent="This invitation is invalid or expired.";return;}const d=await r.json();identity.textContent=`Pharmacy: ${d.pharmacy_name}. Owner: ${d.owner_name}. Role: owner.`;form.classList.remove("hidden");})();document.getElementById("activate").onclick=async()=>{const pin=document.getElementById("pin").value,confirm=document.getElementById("confirm").value;if(pin!==confirm){statusBox.textContent="The PINs do not match.";return;}const r=await fetch("/api/ms20/auth/owner/activation/complete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:activationToken,pin}),credentials:"same-origin"});document.getElementById("pin").value="";document.getElementById("confirm").value="";activationToken="";if(!r.ok){statusBox.textContent="Activation failed. Check the PIN rules or request a new invitation.";return;}statusBox.textContent="Owner access activated safely.";location.replace("/main-app/");};</script></body></html>"""
@@ -334,6 +338,38 @@ def owner_session_response(token: str, session: Any) -> JSONResponse:
     return response
 
 
+def first_owner_registry_record() -> dict[str, str]:
+    pharmacy_id = str(os.getenv("PHARMAREEN_DEFAULT_PHARMACY_ID") or "").strip()
+    if not pharmacy_id:
+        raise HTTPException(status_code=503, detail="Owner initialization is not configured.")
+    record = get_pharmacy_registry().find_by_id(pharmacy_id, active_only=True)
+    if not record or not registry_phone_key(record.get("phone_number") or record.get("phone")):
+        raise HTTPException(status_code=503, detail="Owner initialization is not configured.")
+    return record
+
+
+@app.get("/api/ms20/auth/owner/bootstrap")
+async def ms20_owner_bootstrap_status() -> dict[str, Any]:
+    record = first_owner_registry_record()
+    requires_initialization = not owner_auth_service.pharmacy_has_owner(record["pharmacy_id"])
+    if not requires_initialization:
+        return {"requires_initialization": False}
+    return {
+        "requires_initialization": True,
+        "pharmacy_name": record.get("pharmacy_name") or record["pharmacy_id"],
+        "owner_name": record.get("owner_name") or "Owner",
+    }
+
+
+@app.post("/api/ms20/auth/owner/bootstrap")
+async def ms20_owner_bootstrap_complete(request: Request) -> JSONResponse:
+    payload = await request.json()
+    pin = str(payload.get("pin") or "") if isinstance(payload, dict) else ""
+    record = first_owner_registry_record()
+    token, session = owner_auth_service.initialize_first_owner(record, pin)
+    return owner_session_response(token, session)
+
+
 @app.post("/api/ms20/auth/owner/activation/inspect")
 async def ms20_owner_activation_inspect(request: Request) -> dict[str, str]:
     payload = await request.json()
@@ -368,8 +404,13 @@ async def ms20_owner_logout(ms20_owner_session: str | None = Cookie(default=None
 
 
 @app.get("/main-app/sign-in", response_class=HTMLResponse, include_in_schema=False)
-async def ms20_owner_sign_in_page() -> str:
-    return OWNER_SIGN_IN_HTML
+async def ms20_owner_sign_in_page() -> HTMLResponse:
+    try:
+        record = first_owner_registry_record()
+        html = OWNER_FIRST_SETUP_HTML if not owner_auth_service.pharmacy_has_owner(record["pharmacy_id"]) else OWNER_SIGN_IN_HTML
+    except HTTPException:
+        html = OWNER_SIGN_IN_HTML
+    return HTMLResponse(html, headers={"Referrer-Policy": "no-referrer", "Cache-Control": "no-store"})
 
 
 @app.get("/main-app/activate", response_class=HTMLResponse, include_in_schema=False)

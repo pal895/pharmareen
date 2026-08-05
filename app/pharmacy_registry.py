@@ -130,6 +130,19 @@ class GoogleSheetsPharmacyRegistry:
             return normalize_registry_record(record)
         return None
 
+    def find_by_id(self, pharmacy_id: Any, *, active_only: bool = True) -> dict[str, str] | None:
+        wanted = str(pharmacy_id or "").strip()
+        if not wanted:
+            return None
+        for record in self.list_records():
+            normalized = normalize_registry_record(record)
+            if normalized["pharmacy_id"] != wanted:
+                continue
+            if active_only and not registry_record_is_active(normalized):
+                continue
+            return normalized
+        return None
+
     def list_records(self) -> list[dict[str, str]]:
         if not self.is_available:
             self.last_error = "google_sheets_store_unavailable"

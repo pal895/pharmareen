@@ -10,6 +10,7 @@ from app.config import Settings
 from app.main import (
     OWNER_ACTIVATION_CLIENT_ACTIONS,
     OWNER_ACTIVATION_HTML,
+    OWNER_FIRST_SETUP_HTML,
     OWNER_SIGN_IN_CLIENT_ACTIONS,
     OWNER_SIGN_IN_HTML,
 )
@@ -101,7 +102,7 @@ def test_unknown_phone_is_not_enumerated_and_no_secret_uses_client_storage_or_ui
 
 def test_owner_activation_and_repeat_sign_in_remain_within_three_client_actions():
     assert OWNER_ACTIVATION_CLIENT_ACTIONS == (
-        "Scan or open the secure pharmacy activation invitation.",
+        "Open MS2.0 for the uninitialized pharmacy.",
         "Confirm the pharmacy and create the private PIN.",
         "Enter the Main App.",
     )
@@ -114,7 +115,8 @@ def test_owner_activation_and_repeat_sign_in_remain_within_three_client_actions(
     assert len(OWNER_SIGN_IN_CLIENT_ACTIONS) <= 3
     assert 'location.replace("/main-app/")' in OWNER_ACTIVATION_HTML
     assert 'window.location.assign("/main-app/")' in OWNER_SIGN_IN_HTML
-    for customer_html in (OWNER_ACTIVATION_HTML, OWNER_SIGN_IN_HTML):
+    assert 'location.replace("/main-app/")' in OWNER_FIRST_SETUP_HTML
+    for customer_html in (OWNER_ACTIVATION_HTML, OWNER_FIRST_SETUP_HTML, OWNER_SIGN_IN_HTML):
         assert "ADMIN_ACCESS_TOKEN" not in customer_html
         assert "Authorization" not in customer_html
 
@@ -213,6 +215,65 @@ def test_activation_rejects_changed_unknown_expired_and_weak_pin():
     assert_http_error(400, lambda: service.activate(raw, "1234", now=201))
 
 
+def test_first_owner_bootstrap_is_pharmacy_bound_single_use_and_persistent():
+    path = Path("tests/.owner-bootstrap-state-test.json")
+    path.unlink(missing_ok=True)
+    service = OwnerAuthService(state_path=path)
+    owner = {**OWNER, "pharmacy_name": "Afya Pharmacy"}
+
+    legacy_invitation, _ = service.create_activation(owner, now=99)
+    assert service.pharmacy_has_owner("pharmacy-a") is False
+    token, session = service.initialize_first_owner(owner, "Owner1234", now=100)
+
+    assert session.pharmacy_id == "pharmacy-a"
+    assert service.authenticate(token, pharmacy_id="pharmacy-a", now=101).role == "owner"
+    assert service.pharmacy_has_owner("pharmacy-a") is True
+    assert "Owner1234" not in path.read_text(encoding="utf-8")
+    assert_http_error(409, lambda: service.initialize_first_owner(owner, "Another1234", now=102))
+    assert_http_error(409, lambda: service.activate(legacy_invitation, "Another1234", now=102))
+    assert_http_error(409, lambda: service.create_activation(owner, now=102))
+
+    reloaded = OwnerAuthService(state_path=path)
+    assert reloaded.pharmacy_has_owner("pharmacy-a") is True
+    assert_http_error(409, lambda: reloaded.initialize_first_owner(owner, "Another1234", now=103))
+    path.unlink(missing_ok=True)
+
+
+def test_first_owner_bootstrap_page_switches_permanently_to_sign_in(monkeypatch):
+    owner = {**OWNER, "pharmacy_name": "Afya Pharmacy", "active": "yes", "status": "active"}
+
+    class Registry:
+        def find_by_id(self, pharmacy_id, active_only=True):
+            return owner if pharmacy_id == "pharmacy-a" and active_only else None
+
+    path = Path("tests/.owner-bootstrap-route-state-test.json")
+    path.unlink(missing_ok=True)
+    service = OwnerAuthService(state_path=path)
+    monkeypatch.setenv("PHARMAREEN_DEFAULT_PHARMACY_ID", "pharmacy-a")
+    monkeypatch.setattr(main, "get_pharmacy_registry", lambda: Registry())
+    monkeypatch.setattr(main, "owner_auth_service", service)
+    monkeypatch.setattr(owner_auth_module, "owner_auth_service", service)
+
+    with TestClient(main.app, base_url="https://ms20.test") as client:
+        first_page = client.get("/main-app/sign-in")
+        status_before = client.get("/api/ms20/auth/owner/bootstrap")
+        activated = client.post("/api/ms20/auth/owner/bootstrap", json={"pin": "Owner1234", "phone": "+254711111111", "pharmacy_id": "pharmacy-b"})
+        status_after = client.get("/api/ms20/auth/owner/bootstrap")
+        second_attempt = client.post("/api/ms20/auth/owner/bootstrap", json={"pin": "Another1234"})
+        repeat_page = client.get("/main-app/sign-in")
+
+    assert "Activate first owner" in first_page.text
+    assert status_before.json()["requires_initialization"] is True
+    assert activated.status_code == 200
+    assert activated.json()["pharmacy_id"] == "pharmacy-a"
+    assert status_after.json() == {"requires_initialization": False}
+    assert second_attempt.status_code == 409
+    assert "Owner sign in" in repeat_page.text
+    assert OWNER["phone_number"] not in first_page.text
+    assert "pharmacy-b" not in activated.text
+    path.unlink(missing_ok=True)
+
+
 def test_pin_sign_in_and_lockout_are_fail_closed():
     service = OwnerAuthService()
     raw, _ = service.create_activation(OWNER, now=100)
@@ -256,8 +317,15 @@ def test_owner_auth_fails_closed_when_durable_store_is_unavailable():
 
 def test_configured_persistence_receives_only_digests_and_hashes():
     saved: list[dict] = []
+    durable: dict = {"activations": {}, "credentials": {}}
+
+    def save(payload):
+        durable.clear()
+        durable.update(payload)
+        saved.append(payload)
+
     service = OwnerAuthService()
-    service.configure_persistence(loader=lambda: {"activations": {}, "credentials": {}}, saver=lambda payload: saved.append(payload))
+    service.configure_persistence(loader=lambda: durable, saver=save)
     raw, _ = service.create_activation(OWNER, now=100)
     service.activate(raw, "Owner1234", now=101)
     serialized = repr(saved)

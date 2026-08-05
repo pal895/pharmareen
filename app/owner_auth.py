@@ -128,9 +128,51 @@ class OwnerAuthService:
             owner_name=str(owner.get("owner_name") or "Owner"), expires_at=current + self.activation_ttl_seconds,
         )
         with self._lock:
+            self._refresh_persistent_state()
+            if any(item.pharmacy_id == pharmacy_id for item in self._credentials.values()):
+                raise HTTPException(status_code=409, detail="Owner access is already initialized.")
             self._activations[invitation.token_digest] = invitation
             self._save_state()
         return raw_token, invitation
+
+    def pharmacy_has_owner(self, pharmacy_id: str) -> bool:
+        self._require_persistence()
+        wanted = str(pharmacy_id or "").strip()
+        if not wanted:
+            raise HTTPException(status_code=503, detail="Owner initialization is not configured.")
+        with self._lock:
+            self._refresh_persistent_state()
+            return any(item.pharmacy_id == wanted for item in self._credentials.values())
+
+    def initialize_first_owner(self, owner: dict[str, str], pin: str, *, now: float | None = None) -> tuple[str, OwnerSession]:
+        """Create the sole bootstrap credential, only while this pharmacy is uninitialized."""
+        self._require_persistence()
+        current = time.time() if now is None else now
+        self._validate_pin(pin)
+        pharmacy_id = str(owner.get("pharmacy_id") or "").strip()
+        phone_key = registry_phone_key(owner.get("phone_number") or owner.get("phone"))
+        if not pharmacy_id or not phone_key:
+            raise HTTPException(status_code=503, detail="Owner initialization is not configured.")
+        with self._lock:
+            self._refresh_persistent_state()
+            if any(item.pharmacy_id == pharmacy_id for item in self._credentials.values()):
+                raise HTTPException(status_code=409, detail="Owner access is already initialized.")
+            credential = OwnerCredential(
+                owner_id=str(owner.get("owner_id") or f"owner_{phone_key}"),
+                phone_key=phone_key,
+                pharmacy_id=pharmacy_id,
+                pharmacy_name=str(owner.get("pharmacy_name") or pharmacy_id),
+                owner_name=str(owner.get("owner_name") or "Owner"),
+                pin_hash=self._hash_pin(pin),
+            )
+            previous = dict(self._credentials)
+            self._credentials[phone_key] = credential
+            try:
+                self._save_state()
+            except Exception:
+                self._credentials = previous
+                raise HTTPException(status_code=503, detail="Owner access is temporarily unavailable.")
+            return self._issue_session(credential, now=current)
 
     def inspect_activation(self, raw_token: str, *, now: float | None = None) -> dict[str, str]:
         self._require_persistence()
@@ -143,6 +185,10 @@ class OwnerAuthService:
         self._validate_pin(pin)
         with self._lock:
             invitation = self._valid_activation(raw_token, now=current)
+            self._refresh_persistent_state()
+            invitation = self._valid_activation(raw_token, now=current)
+            if any(item.pharmacy_id == invitation.pharmacy_id for item in self._credentials.values()):
+                raise HTTPException(status_code=409, detail="Owner access is already initialized.")
             credential = OwnerCredential(
                 owner_id=invitation.owner_id, phone_key=invitation.phone_key,
                 pharmacy_id=invitation.pharmacy_id, pharmacy_name=invitation.pharmacy_name,
@@ -236,6 +282,13 @@ class OwnerAuthService:
         temporary = self._state_path.with_suffix(".tmp")
         temporary.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
         temporary.replace(self._state_path)
+
+    def _refresh_persistent_state(self) -> None:
+        if not self._state_loader:
+            return
+        activations, credentials = self._decode_state(self._state_loader())
+        self._activations = activations
+        self._credentials = credentials
 
     def start_login(
         self,
