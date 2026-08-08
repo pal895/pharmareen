@@ -744,12 +744,14 @@ Permanent owner rule: MS2.0 is **Voice first → fast tap/action second → typi
 
 **MS2-LT-067-A repeat-identity correction (2026-08-08):** the owner phone was already established by trusted provisioning and stored in the active tenant registry; activation bound the durable credential to it but did not explain the identity source, while repeat sign-in wrongly asked the owner to type it. A random-phone rejection is not PIN-failure evidence. The shared tenant-bound route now confirms pharmacy, owner and a masked phone hint and accepts only the existing Primary Owner PIN. Client phone claims cannot select an owner; canonical registry/credential mismatch and cross-pharmacy session results fail closed. Await deployment and the one remaining physical repeat-PIN proof.
 
+**MS2-LT-067-A completion (2026-08-08):** physical-phone evidence now proves direct first-owner activation, durable Primary Owner PIN survival across republish, deterministic returning-owner recognition for Zuri Chemist/Pal with only masked phone ending 9472, PIN-only repeat authentication, and successful pharmacy-bound Main App entry. `Owner access is ready` remained distinct from `Operations setup needed`. MS2-LT-067-A and checkpoint 67 are **OWNER-VERIFIED PASSED/FROZEN/PROTECTED** and must not be repeated without verified regression. The next governed checkpoint is MS2-LT-068; locked Quick PIN, recovery, phone-change, QR/link and Multiuser requirements remain at their assigned later checkpoints.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-067 — Authentication, roles and access controls
+- Current: MS2-LT-068 — Export IP/privacy/compliance safeguards
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.

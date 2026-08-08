@@ -3,8 +3,8 @@
   "authority": "MS2.0_MASTER_LIVE_TEST_SEQUENCE.md",
   "checkpoint_count": 84,
   "current_checkpoint": {
-    "id": "MS2-LT-067",
-    "name": "Authentication, roles and access controls"
+    "id": "MS2-LT-068",
+    "name": "Export IP/privacy/compliance safeguards"
   },
   "protected_checkpoint_ids": [
     "MS2-LT-001",
@@ -55,6 +55,7 @@
     "MS2-LT-061",
     "MS2-LT-065",
     "MS2-LT-066",
+    "MS2-LT-067",
     "MS2-LT-070",
     "MS2-LT-071"
   ],
@@ -66,6 +67,6 @@
     "status": "ACTIVE",
     "document": "docs/engineering-memory/token-execution-policy.md"
   },
-  "master_sha256": "31e652fc7908fcf00dacde84fececea1e11a2976c7deef60df4341af6e5ec09e",
+  "master_sha256": "fe6ef9b9bd5b87d5cfd7126735324a599bb43001c65ca63d9de424b6008f400b",
   "rule": "Load the master and its Engineering Traceability Index; never reconstruct or maintain a parallel sequence."
 }

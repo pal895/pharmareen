@@ -1081,12 +1081,14 @@ The first republish after activation exposed a deployment-durability failure: bo
 
 Repeat identity is not customer-entered data. Trusted provisioning supplies the registered owner phone in the tenant registry; activation confirms pharmacy, owner and a masked phone hint and binds the credential to it. After the deployment boundary, the tenant-bound sign-in page confirms the same identity and accepts only the existing Primary Owner PIN. Any earlier instruction to type the phone is superseded. A client-supplied phone must not select or alter the owner.
 
+Physical-owner completion evidence on 2026-08-08 proved the full corrected contract: direct first-owner activation for Zuri Chemist/Pal, durable credential survival across republish, returning-owner recognition with only the masked registered-phone ending, PIN-only `Signing in...`, and successful pharmacy-bound Main App entry. The Main App correctly kept `Owner access is ready` separate from `Operations setup needed`. **MS2-LT-067-A and checkpoint 67 are OWNER-VERIFIED PASSED/FROZEN/PROTECTED.** Do not repeat activation, persistence, identity binding or repeat sign-in without verified regression. Quick PIN, recovery, phone change, QR/link onboarding and Multiuser remain deferred to their locked checkpoints.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
 - Authority: `MS2.0_MASTER_LIVE_TEST_SEQUENCE.md`
 - Checkpoints: 84
-- Current: MS2-LT-067 — Authentication, roles and access controls
+- Current: MS2-LT-068 — Export IP/privacy/compliance safeguards
 - Bridge manifest: `docs/engineering-memory/bridge-validation-contract.json`
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.
