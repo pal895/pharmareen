@@ -618,7 +618,24 @@ async def main_app_redirect() -> RedirectResponse:
 
 
 @app.get("/main-app/", include_in_schema=False)
-async def main_app_index() -> FileResponse:
+async def main_app_index(
+    request: Request,
+    ms20_owner_session: str | None = Cookie(default=None),
+) -> Response:
+    record = first_owner_registry_record(request)
+    state = owner_auth_service.pharmacy_owner_state(record)
+    if state == "uninitialized":
+        return RedirectResponse(url="/main-app/sign-in", status_code=307)
+    try:
+        owner_auth_service.authenticate(
+            ms20_owner_session,
+            pharmacy_id=record["pharmacy_id"],
+            allowed_roles={"owner"},
+        )
+    except HTTPException as exc:
+        if exc.status_code == 401:
+            return RedirectResponse(url="/main-app/sign-in", status_code=307)
+        raise
     return main_app_file_response("index.html")
 
 

@@ -16,7 +16,7 @@ from app.main import (
     OWNER_SIGN_IN_CLIENT_ACTIONS,
     OWNER_SIGN_IN_HTML,
 )
-from app.owner_auth import OWNER_CAPABILITIES, OwnerAuthService
+from app.owner_auth import OWNER_CAPABILITIES, OWNER_SESSION_COOKIE, OwnerAuthService
 
 
 OWNER = {
@@ -343,6 +343,65 @@ def test_production_gateway_binding_is_request_scoped_and_signed(monkeypatch):
 
     assert allowed.status_code == 200
     assert rejected.status_code == 503
+
+
+def test_main_app_entry_routes_from_canonical_owner_state(monkeypatch):
+    owner = {**OWNER, "pharmacy_name": "Afya Pharmacy", "active": "yes", "status": "active"}
+
+    class Registry:
+        def find_by_id(self, pharmacy_id, active_only=True):
+            return owner if pharmacy_id == "pharmacy-a" and active_only else None
+
+    path = Path("tests/.owner-entry-route-state-test.json")
+    path.unlink(missing_ok=True)
+    service = OwnerAuthService(state_path=path)
+    monkeypatch.setenv("PHARMAREEN_DEFAULT_PHARMACY_ID", "pharmacy-a")
+    monkeypatch.setattr(main, "get_pharmacy_registry", lambda: Registry())
+    monkeypatch.setattr(main, "owner_auth_service", service)
+
+    with TestClient(main.app, base_url="https://ms20.test", follow_redirects=False) as client:
+        first_entry = client.get("/main-app/")
+        first_page = client.get(first_entry.headers["location"])
+        token, _ = service.initialize_first_owner(owner, "Owner1234")
+        returning_entry = client.get("/main-app/")
+        returning_page = client.get(returning_entry.headers["location"])
+        client.cookies.set(OWNER_SESSION_COOKIE, token)
+        authenticated_entry = client.get("/main-app/")
+
+    assert first_entry.status_code == 307 and first_entry.headers["location"] == "/main-app/sign-in"
+    assert "Activate first owner" in first_page.text
+    assert returning_entry.status_code == 307 and returning_entry.headers["location"] == "/main-app/sign-in"
+    assert "Owner sign in" in returning_page.text
+    assert authenticated_entry.status_code == 200
+    assert "MS2.0" in authenticated_entry.text
+    path.unlink(missing_ok=True)
+
+
+def test_main_app_entry_fails_closed_for_mismatched_owner_state(monkeypatch):
+    owner = {**OWNER, "pharmacy_name": "Afya Pharmacy", "active": "yes", "status": "active"}
+    changed = {**owner, "phone": "+254722222222", "phone_number": "+254722222222"}
+
+    class Registry:
+        def find_by_id(self, pharmacy_id, active_only=True):
+            return changed if pharmacy_id == "pharmacy-a" and active_only else None
+
+    service = OwnerAuthService()
+    service.initialize_first_owner(owner, "Owner1234")
+    monkeypatch.setenv("PHARMAREEN_DEFAULT_PHARMACY_ID", "pharmacy-a")
+    monkeypatch.setattr(main, "get_pharmacy_registry", lambda: Registry())
+    monkeypatch.setattr(main, "owner_auth_service", service)
+    with TestClient(main.app, base_url="https://ms20.test", raise_server_exceptions=False) as client:
+        response = client.get("/main-app/")
+
+    assert response.status_code == 503
+
+
+def test_home_conversation_guidance_wraps_instead_of_truncating():
+    styles = (Path("ms20-main-app/src/styles.css")).read_text(encoding="utf-8")
+    rule = styles.split(".conversation-copy span {", 1)[1].split("}", 1)[0]
+    assert "white-space: normal" in rule
+    assert "text-overflow: clip" in rule
+    assert "text-overflow: ellipsis" not in rule
 
 
 def test_pin_sign_in_and_lockout_are_fail_closed():

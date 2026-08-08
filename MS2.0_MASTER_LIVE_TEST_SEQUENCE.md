@@ -213,6 +213,8 @@ Permanent client rule: infrastructure-only prerequisites never appear as pharmac
 
 The production server binding is request-scoped and supplied by a trusted, provisioning-populated tenant-routing edge using a short-lived authenticated binding; it is not a per-pharmacy environment variable. `PHARMAREEN_DEFAULT_PHARMACY_ID` is development compatibility only. Isolated Replit testing may select exactly one active registry row automatically; missing or ambiguous state remains fail-closed and is not an owner action.
 
+The normal `/main-app/` entry is part of the same canonical owner-state boundary: uninitialized routes directly to first-owner activation, initialized without a valid session routes to owner sign-in, authenticated matching owner serves the app, and invalid or ambiguous tenant/credential state fails closed. Essential setup guidance must wrap responsively and must not be hidden by ellipsis.
+
 ## Canonical synchronization invariants
 
 1. No Project Brain, Engineering Memory, architecture snapshot, test plan, handoff, bridge or synchronization package may publish an independent checkpoint list, count, order, prerequisite or status.
