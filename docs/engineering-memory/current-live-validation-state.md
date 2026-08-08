@@ -740,6 +740,8 @@ Owner screenshots close **MS2-LT-059-D and checkpoint 59 as OWNER-VERIFIED PASSE
 
 Permanent owner rule: MS2.0 is **Voice first → fast tap/action second → typing last**, minimal-typing and three-steps-or-fewer whenever possible. Every supported typed operational command must have voice parity wherever device/platform speech is available. Transcripts and typed input converge on the same deterministic router and shared workflow roots; no voice-only business implementation and no unjustified AI routing are allowed. Typing remains a protected fallback for accessibility, noisy environments, unsupported voice, offline phone speech limitations, correction and deliberate choice. Future live-test instructions default to voice where available, then verify typed fallback/parity. Only the owner may change this rule.
 
+**MS2-LT-067-A deployment-durability stop (2026-08-08):** the first post-activation republish returned `requires_initialization: true`, proving that the accepted credential had remained in a deployment-local fallback file and was lost when the instance changed. Production startup now uses the dedicated platform-admin workbook when configured, otherwise the already configured registry workbook, for activation digests and salted PIN hashes. It never needs a per-pharmacy environment value. Missing credentials, workbook binding, load, or save capability keeps owner authentication fail closed instead of using an ephemeral file. The lost test credential must be recreated once on the corrected build, then survive republish/restart before repeat sign-in. MS2-LT-067-A remains active and not passed.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

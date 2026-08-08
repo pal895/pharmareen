@@ -94,6 +94,8 @@ The owner can remove staff, disable lost devices, end sessions, view active devi
 
 MS2-LT-067-A is the narrow active foundation: an admin-protected QR/link activates the first owner once, the owner creates a private PIN, and later access uses registered phone plus PIN. Activation values are digest-only, PINs are uniquely salted strong hashes in the protected admin workbook, sessions are opaque secure cookies, and messaging/platform bearer access is not a customer dependency. This remains `IN PROGRESS` until the controlled HTTPS staging journey passes on the physical owner phone; it does not authorize later staff or multiuser cases.
 
+Deployment durability is part of this gate. The first republish exposed an ephemeral local credential fallback when no dedicated admin workbook ID was present. The corrected startup uses the dedicated admin workbook or the already configured registry workbook and fails closed if durable persistence is unavailable. Owner verification must recreate the lost staging credential once, prove it survives republish/restart, and complete repeat sign-in before MS2-LT-067-A can pass.
+
 Default owner reporting is **summary first; details only when requested**: total sales; cash, M-Pesa, credit and mixed totals; key stock alerts; important exceptions; and only action-needed items. Drill-down preserves staff, shift, device, payment, cancellation/refund, stock-edit, audit and unusual-activity detail. Payroll, advanced scheduling/approvals, custom roles, staff scoring and workforce analytics are Continuous Improvement.
 
 ### 4. Intelligence + Reliability — Launch Critical core

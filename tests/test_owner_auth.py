@@ -17,6 +17,7 @@ from app.main import (
     OWNER_SIGN_IN_HTML,
 )
 from app.owner_auth import OWNER_CAPABILITIES, OWNER_SESSION_COOKIE, OwnerAuthService
+from app.services.owner_auth_persistence import GoogleSheetsOwnerAuthStateStore, owner_auth_sheet_id
 
 
 OWNER = {
@@ -312,6 +313,7 @@ def test_single_active_registry_pharmacy_is_bound_without_per_tenant_environment
             return [owner]
 
     monkeypatch.delenv("PHARMAREEN_DEFAULT_PHARMACY_ID", raising=False)
+    monkeypatch.setattr(main, "owner_auth_service", OwnerAuthService())
     monkeypatch.setattr(main, "get_pharmacy_registry", lambda: Registry())
     with TestClient(main.app, base_url="https://pharmareen--test.replit.app") as client:
         response = client.get("/api/ms20/auth/owner/bootstrap")
@@ -347,6 +349,7 @@ def test_production_gateway_binding_is_request_scoped_and_signed(monkeypatch):
     key = "platform-routing-key-for-test"
     signature = hmac.new(key.encode(), f"pharmacy-a:{now}".encode(), hashlib.sha256).hexdigest()
     monkeypatch.delenv("PHARMAREEN_DEFAULT_PHARMACY_ID", raising=False)
+    monkeypatch.setattr(main, "owner_auth_service", OwnerAuthService())
     monkeypatch.setenv("PHARMAREEN_TENANT_ROUTING_KEY", key)
     monkeypatch.setattr(main.time, "time", lambda: now)
     monkeypatch.setattr(main, "get_pharmacy_registry", lambda: Registry())
@@ -500,6 +503,33 @@ def test_configured_persistence_receives_only_digests_and_hashes():
     assert raw not in serialized
     assert "Owner1234" not in serialized
     assert "pbkdf2_sha256$600000$" in serialized
+
+
+def test_owner_auth_store_uses_platform_admin_or_existing_registry_workbook(monkeypatch):
+    registry_settings = Settings(
+        GOOGLE_SHEET_ID="registry-workbook",
+        GOOGLE_SERVICE_ACCOUNT_JSON="unused.json",
+    )
+    assert owner_auth_sheet_id(registry_settings) == "registry-workbook"
+
+    admin_settings = Settings(
+        GOOGLE_SHEET_ID="registry-workbook",
+        PHARMAREEN_ADMIN_SHEET_ID="platform-admin-workbook",
+        GOOGLE_SERVICE_ACCOUNT_JSON="unused.json",
+    )
+    assert owner_auth_sheet_id(admin_settings) == "platform-admin-workbook"
+
+    opened: list[str] = []
+
+    class Client:
+        def open_by_key(self, sheet_id):
+            opened.append(sheet_id)
+            return object()
+
+    store = GoogleSheetsOwnerAuthStateStore(registry_settings)
+    monkeypatch.setattr(store._onboarding, "_gspread_client", lambda: Client())
+    store._spreadsheet()
+    assert opened == ["registry-workbook"]
 
 
 def test_durable_store_load_failure_is_not_treated_as_empty_valid_state():

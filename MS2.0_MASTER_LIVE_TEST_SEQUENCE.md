@@ -217,6 +217,8 @@ The normal `/main-app/` entry is part of the same canonical owner-state boundary
 
 Owner credential state and later operations/catalog onboarding state are separate and must be labelled distinctly. The Primary Owner PIN remains the strong master credential; an optional four-digit Quick PIN may only be added later as a revocable, rate-limited trusted-device convenience that cannot establish or recover ownership. Primary recovery requires verified registered-owner identity and invalidation/re-evaluation of old sessions/device trust. These deferred capabilities do not expand MS2-LT-067-A.
 
+The first post-activation republish exposed that owner credentials were still using a deployment-local fallback when a dedicated admin workbook ID was absent. Production owner authentication must instead use the dedicated platform-admin workbook when configured or the already configured registry workbook, persist only activation digests and salted PIN hashes, and fail closed when durable storage is unavailable. No per-pharmacy secret or ID is required. MS2-LT-067-A remains active until the recreated test credential survives republish/restart and repeat sign-in is physically verified.
+
 ## Canonical synchronization invariants
 
 1. No Project Brain, Engineering Memory, architecture snapshot, test plan, handoff, bridge or synchronization package may publish an independent checkpoint list, count, order, prerequisite or status.

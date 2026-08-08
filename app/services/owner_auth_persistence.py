@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.config import Settings
-from app.services.pharmacy_onboarding import PharmacyOnboardingService, ensure_worksheet
+from app.services.pharmacy_onboarding import PharmacyOnboardingService, admin_sheet_id, ensure_worksheet
 
 
 ACTIVATION_SHEET = "Owner_Activations"
@@ -18,6 +18,16 @@ CREDENTIAL_HEADERS = [
 ]
 
 
+def owner_auth_sheet_id(settings: Settings) -> str:
+    """Return the platform-managed durable auth workbook.
+
+    A dedicated admin workbook wins when configured. Isolated deployments use
+    the already configured registry workbook, avoiding per-pharmacy setup and
+    never falling back to an ephemeral deployment file.
+    """
+    return admin_sheet_id(settings) or str(settings.google_sheets_spreadsheet_id or "").strip()
+
+
 class GoogleSheetsOwnerAuthStateStore:
     """Durable owner-auth state in the protected PharMareen admin workbook.
 
@@ -26,9 +36,15 @@ class GoogleSheetsOwnerAuthStateStore:
 
     def __init__(self, settings: Settings):
         self._onboarding = PharmacyOnboardingService(settings)
+        self._sheet_id = owner_auth_sheet_id(settings)
+        if not self._sheet_id:
+            raise RuntimeError("Owner authentication durable workbook is not configured")
+
+    def _spreadsheet(self):
+        return self._onboarding._gspread_client().open_by_key(self._sheet_id)
 
     def load(self) -> dict[str, Any]:
-        spreadsheet = self._onboarding._admin_spreadsheet()
+        spreadsheet = self._spreadsheet()
         activations_ws = ensure_worksheet(spreadsheet, ACTIVATION_SHEET, ACTIVATION_HEADERS)
         credentials_ws = ensure_worksheet(spreadsheet, CREDENTIAL_SHEET, CREDENTIAL_HEADERS)
         activations: dict[str, Any] = {}
@@ -62,7 +78,7 @@ class GoogleSheetsOwnerAuthStateStore:
         return {"activations": activations, "credentials": credentials}
 
     def save(self, payload: dict[str, Any]) -> None:
-        spreadsheet = self._onboarding._admin_spreadsheet()
+        spreadsheet = self._spreadsheet()
         activations_ws = ensure_worksheet(spreadsheet, ACTIVATION_SHEET, ACTIVATION_HEADERS)
         credentials_ws = ensure_worksheet(spreadsheet, CREDENTIAL_SHEET, CREDENTIAL_HEADERS)
         activation_rows = [

@@ -76,8 +76,8 @@ from app.services.photo_intake import (
     save_photo_upload,
 )
 from app.services.pharmacy_engine import parse_payment_method
-from app.services.owner_auth_persistence import GoogleSheetsOwnerAuthStateStore
-from app.services.pharmacy_onboarding import admin_sheet_id, has_google_credentials
+from app.services.owner_auth_persistence import GoogleSheetsOwnerAuthStateStore, owner_auth_sheet_id
+from app.services.pharmacy_onboarding import has_google_credentials
 from app.sheets import GoogleSheetsStore, SHEETS_UNAVAILABLE_MESSAGE, SheetsUnavailableError
 from app.training_store import TrainingStore
 from app.transcription import TranscriptionService, TranscriptionUnavailableError
@@ -86,6 +86,7 @@ from app.whatsapp import WhatsAppClient, xml_message_response
 
 
 logger = logging.getLogger(__name__)
+DEFAULT_OWNER_AUTH_SERVICE = owner_auth_service
 processed_message_sids: set[str] = set()
 processed_whatsapp_web_message_ids: set[str] = set()
 offline_synced_entry_ids: set[str] = set()
@@ -245,14 +246,18 @@ def save_offline_confirmation_state() -> None:
 async def lifespan(app: FastAPI):
     load_offline_confirmation_state()
     settings = get_settings()
-    if has_google_credentials(settings) and admin_sheet_id(settings):
-        try:
-            owner_store = GoogleSheetsOwnerAuthStateStore(settings)
-            owner_auth_service.configure_persistence(loader=owner_store.load, saver=owner_store.save)
-            logger.info("Owner authentication durable store initialized")
-        except Exception:
+    if owner_auth_service is DEFAULT_OWNER_AUTH_SERVICE:
+        if has_google_credentials(settings) and owner_auth_sheet_id(settings):
+            try:
+                owner_store = GoogleSheetsOwnerAuthStateStore(settings)
+                owner_auth_service.configure_persistence(loader=owner_store.load, saver=owner_store.save)
+                logger.info("Owner authentication durable store initialized")
+            except Exception:
+                owner_auth_service.mark_persistence_unavailable()
+                logger.exception("Owner authentication durable store unavailable; activation remains disabled")
+        else:
             owner_auth_service.mark_persistence_unavailable()
-            logger.exception("Owner authentication durable store unavailable; activation remains disabled")
+            logger.error("Owner authentication durable store is not configured; activation remains disabled")
     print_startup_console_status()
     print("PHASE6_ROUTES_LOADED /offline-app /debug/offline-app")
     try:
