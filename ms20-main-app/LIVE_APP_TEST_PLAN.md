@@ -1083,6 +1083,10 @@ Repeat identity is not customer-entered data. Trusted provisioning supplies the 
 
 Physical-owner completion evidence on 2026-08-08 proved the full corrected contract: direct first-owner activation for Zuri Chemist/Pal, durable credential survival across republish, returning-owner recognition with only the masked registered-phone ending, PIN-only `Signing in...`, and successful pharmacy-bound Main App entry. The Main App correctly kept `Owner access is ready` separate from `Operations setup needed`. **MS2-LT-067-A and checkpoint 67 are OWNER-VERIFIED PASSED/FROZEN/PROTECTED.** Do not repeat activation, persistence, identity binding or repeat sign-in without verified regression. Quick PIN, recovery, phone change, QR/link onboarding and Multiuser remain deferred to their locked checkpoints.
 
+## MS2-LT-068 — Export IP/privacy/compliance safeguards
+
+Engineering is implemented and focused regression-protected; owner evidence remains open. In Export Hub, the default **Private pharmacy copy** must state that complete operational identifiers remain inside the pharmacy. Select **Safer sharing copy**, generate one CSV data file, and inspect it in the established compatible spreadsheet application. It must retain the complete medicine count and 12 canonical columns while every Cost price, Supplier, Barcode, Batch and Shelf cell is blank; no precise location, tenant/internal ID, endorsement claim, secret or infrastructure detail may appear. Return to Export Hub and confirm history identifies **Safer sharing copy**, states minimal metadata is kept for 30 days, and does not show a filename or pharmacy/internal identifier. Do not share the artifact outside the controlled owner test. Stop with safe screenshots of the scope choice, visible redacted rows/columns and minimized history; no protected private export needs repetition.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

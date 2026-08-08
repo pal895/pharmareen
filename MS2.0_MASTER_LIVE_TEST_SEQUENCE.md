@@ -109,7 +109,7 @@ Evidence abbreviations: `CVS` = `docs/engineering-memory/current-live-validation
 | 65 | Pharmacy/branch isolation | Prevent cross-pharmacy catalog, learning, notification, payment, export and credential leakage. | Implemented pharmacy-scoped data workflows | PASS / PROTECTED | Passed in protected workflows and automated gates | Yes | 15 min | CVS; ARCH; isolation tests/verifiers |
 | 66 | Idempotency, audit and duplicate prevention | Ensure retries/callbacks/imports/actions cannot duplicate mutations and every protected correction remains traceable. | 14–20, 51–53 | PASS / PROTECTED | Passed across protected workflows | Yes | 15 min | CVS; TCE; activity/export/offline verifiers |
 | 67 | Authentication, roles and access controls | Enforce owner/admin/branch authorization and minimum-necessary access across UI, routes and downloads. | 2, 58–65 | PASS / PROTECTED | MS2-LT-067-A OWNER-VERIFIED PASSED/FROZEN/PROTECTED on 2026-08-08: physical-phone evidence proved direct tenant-resolved first-owner activation for Zuri Chemist/Pal, durable Primary Owner PIN persistence across republish, deterministic returning-owner recognition using only a masked registered-phone reference, PIN-only repeat authentication, and successful pharmacy-bound Main App entry. Operations readiness remained correctly separate from owner-access readiness. No PIN, cookie, internal tenant ID, platform credential, or infrastructure action was exposed. | Yes | 15 min | `app/owner_auth.py`; `/main-app/sign-in`; `/api/ms20/auth/owner/bootstrap`; `/api/ms20/auth/owner/pin`; secure session cookie; focused owner-auth tests; ARCH; compliance plan; 2026-08-08 physical-owner activation, republish durability and repeat PIN-only sign-in screenshots; owner-auth regression suite; canonical /main-app/ tenant/auth router; durable workbook credential store |
-| 68 | Export IP/privacy/compliance safeguards | Register assets/licences, fail closed, redact/anonymize, control IDs/sharing/retention and avoid false endorsement. | 40–48, 65–67 | Planned / approved | Not started | No | Repository evidence not yet available. | LATP Improvement 3 |
+| 68 | Export IP/privacy/compliance safeguards | Register assets/licences, fail closed, redact/anonymize, control IDs/sharing/retention and avoid false endorsement. | 40–48, 65–67 | Implemented — awaiting owner live test | Shared compliance root preserves protected private exports, offers a safer-sharing copy that removes cost price, supplier, barcode, batch, shelf and precise location, blocks mismatched pharmacy/unregistered formats, minimizes history metadata with 30-day retention, registers export assets/licence use and disclaims third-party endorsement. Physical owner evidence is still required. | No | 10 min | `exportCompliance.js`; Export Hub scope controls; focused export verifier; ARCH; CVS; LATP |
 | 69 | Product-secrecy and quiet-UI audit | Remove unnecessary internal implementation disclosures while preserving legal/safety/privacy truth. | All functional/intelligence tests | Planned / approved | Not started | No | Repository evidence not yet available. | CVS; LATP future audit |
 
 ## 8. Production Qualification
@@ -199,9 +199,9 @@ This ledger deliberately accounts for owner-facing domains discovered across cur
 
 - Total checkpoints: **84**
 - PASS / PROTECTED: **51**
-- Implemented — awaiting owner live test: **6**
+- Implemented — awaiting owner live test: **7**
 - Partial implementation: **6**
-- Planned / approved: **16**
+- Planned / approved: **15**
 - External qualification: **3**
 - Deprecated with repository evidence: **2**
 
@@ -1279,13 +1279,13 @@ This generated index is part of the canonical master. Run `node scripts/sync-val
 - **Checkpoint ID:** MS2-LT-068
 - **Name:** Export IP/privacy/compliance safeguards
 - **Category:** Security / Privacy / Compliance Validation
-- **Current status:** Planned / approved
-- **Repository evidence:** LATP Improvement 3
+- **Current status:** Implemented — awaiting owner live test
+- **Repository evidence:** `exportCompliance.js`; Export Hub scope controls; focused export verifier; ARCH; CVS; LATP
 - **Implementation commit(s):** Repository evidence not yet available.
 - **Primary implementation files/modules:** Repository evidence not yet available.
-- **Owner live-test evidence:** Repository evidence not yet available.
+- **Owner live-test evidence:** Shared compliance root preserves protected private exports, offers a safer-sharing copy that removes cost price, supplier, barcode, batch, shelf and precise location, blocks mismatched pharmacy/unregistered formats, minimizes history metadata with 30-day retention, registers export assets/licence use and disclaims third-party endorsement. Physical owner evidence is still required.; source: `exportCompliance.js`; Export Hub scope controls; focused export verifier; ARCH; CVS; LATP
 - **PASS / PROTECTED confirmation:** Not applicable.
-- **Remaining implementation work:** Implement and owner-validate: Register assets/licences, fail closed, redact/anonymize, control IDs/sharing/retention and avoid false endorsement.
+- **Remaining implementation work:** Complete decisive owner live validation for: Register assets/licences, fail closed, redact/anonymize, control IDs/sharing/retention and avoid false endorsement.
 - **Prerequisite checkpoints:** 40–48, 65–67
 - **Dependent checkpoints:** MS2-LT-074, MS2-LT-075, MS2-LT-076
 

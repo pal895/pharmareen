@@ -7,6 +7,7 @@ import {
   buildPrintHtml, exportFilename, protectCsvSpreadsheetText, validateInventoryExportSnapshot, validateInventoryPptxPackage
 } from "../src/services/documentGenerator.js";
 import { exportCompletionSummary, exportFormat } from "../src/services/exportFormatMetadata.js";
+import { EXPORT_ASSET_LICENSE_REGISTER, EXPORT_HISTORY_RETENTION_DAYS, EXPORT_SCOPES, prepareCompliantExport, retainedExportHistory } from "../src/services/exportCompliance.js";
 import { buildMedicineFinderIndex, searchMedicineFinder } from "../src/services/medicineFinder.js";
 
 const pharmacy = { id: "pharmacy-a", name: "Zuri Pharmacy", branch: "Main", location: "Nairobi, Kenya" };
@@ -52,6 +53,20 @@ assert.match(EXPORT_FORMATS.find((format) => format.id === "csv").purpose, /anot
 assert.equal(exportCompletionSummary("pptx", "completed", 35), "Presentation completed — 35 medicines");
 assert.equal(exportCompletionSummary("csv", "completed", 35), "CSV completed — 35 medicines");
 assert.equal(exportCompletionSummary("print", "print_dialog_opened"), "Print dialog opened");
+assert.equal(exportCompletionSummary("csv", "blocked"), "CSV data file blocked by privacy checks");
+assert.equal(EXPORT_HISTORY_RETENTION_DAYS, 30);
+assert.ok(EXPORT_ASSET_LICENSE_REGISTER.some((item) => /no affiliation or endorsement/i.test(item.use)));
+const privateExport = prepareCompliantExport({ model, format: "csv", scope: EXPORT_SCOPES.PRIVATE, activePharmacyId: "pharmacy-a" });
+assert.equal(privateExport.model, model, "Private pharmacy copies must preserve the protected canonical export");
+const sharingExport = prepareCompliantExport({ model, format: "pdf", scope: EXPORT_SCOPES.SAFER_SHARING, activePharmacyId: "pharmacy-a" });
+assert.equal(sharingExport.model.rows.length, 35);
+assert.ok(sharingExport.model.rows.every((row) => row.costPrice === "" && row.supplier === "" && row.barcode === "" && row.batch === "" && row.shelf === ""));
+assert.equal(sharingExport.model.location, "Kenya");
+assert.throws(() => prepareCompliantExport({ model, format: "pdf", scope: EXPORT_SCOPES.PRIVATE, activePharmacyId: "pharmacy-b" }), /does not match/);
+assert.throws(() => prepareCompliantExport({ model, format: "exe", scope: EXPORT_SCOPES.PRIVATE, activePharmacyId: "pharmacy-a" }), /not registered/);
+assert.deepEqual(retainedExportHistory([
+  { generatedIso: "2026-07-20T00:00:00.000Z" }, { generatedIso: "2026-06-01T00:00:00.000Z" }, { generatedIso: "invalid" }
+], { now: new Date("2026-08-08T00:00:00.000Z") }), [{ generatedIso: "2026-07-20T00:00:00.000Z" }]);
 assert.equal(protectCsvSpreadsheetText("=1+1"), "'=1+1");
 assert.equal(protectCsvSpreadsheetText(" @SUM(A1:A2)"), "' @SUM(A1:A2)");
 assert.equal(protectCsvSpreadsheetText("001234"), "001234");
@@ -413,9 +428,13 @@ assert.match(metadataSource, /Open the downloaded presentation in Microsoft Powe
 assert.match(metadataSource, /Use browser Print and choose an available printer\./);
 assert.match(metadataSource, /Open in Microsoft Excel, Google Sheets or LibreOffice Calc to inspect the rows, or import it into another compatible system\./);
 assert.match(metadataSource, /text\/csv; charset=utf-8/);
-assert.match(appSource, /ms20\.export-history\.v1/);
+assert.match(appSource, /ms20\.export-history\.v2/);
 assert.match(appSource, /previous\.filter\(\(item\) => item\.id !== record\.id\)/);
 assert.match(appSource, /EXPORT_HISTORY_KEY_PREFIX.*state\.pharmacy\.id/s);
+assert.match(appSource, /Private pharmacy copy/);
+assert.match(appSource, /Safer sharing copy/);
+assert.match(appSource, /prepareCompliantExport/);
+assert.match(appSource, /minimal metadata for \$\{EXPORT_HISTORY_RETENTION_DAYS\} days/);
 assert.doesNotMatch(appSource, /function recordExportEvent[\s\S]{0,1200}addFeed\(/);
 assert.match(appSource, /function ensureExportHubCard\(\)/);
 assert.match(appSource, /state\.cards = state\.cards\.filter\(\(item\) => item\.type !== "ExportHubCard" \|\| item === card\)/);

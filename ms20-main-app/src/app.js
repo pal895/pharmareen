@@ -28,6 +28,7 @@ import {
   validateInventoryPptxPackage
 } from "./services/documentGenerator.js";
 import { EXPORT_FORMATS, exportCompletionSummary, exportFormat } from "./services/exportFormatMetadata.js";
+import { EXPORT_HISTORY_RETENTION_DAYS, EXPORT_SCOPES, exportScopeLabel, normalizeExportScope, prepareCompliantExport, retainedExportHistory } from "./services/exportCompliance.js";
 import { appendActivity, createCatalogActivityEntry } from "./services/activityHistory.js";
 import { createVoiceViewportAnchor, restoreVoiceViewportAnchor, settleVoiceViewportAnchor } from "./services/voiceViewportAnchor.js";
 import { normalizeSpokenSettlementDate } from "./services/spokenSettlementDate.js";
@@ -1689,6 +1690,7 @@ function handleAction(dataset) {
   if (action === "export-catalog-csv") exportCatalogCsv();
   if (action === "open-export-hub") openExportHub(dataset.history === "true");
   if (action === "close-export-hub") collapseExportHub();
+  if (action === "set-export-scope") setExportScope(dataset.cardId, dataset.scope);
   if (action === "download-inventory-export") downloadInventoryExport(dataset.format, dataset.cardId);
   if (action === "download-template") downloadBulkPasteTemplate();
   if (action === "read-card") readCardAloud(dataset.cardId);
@@ -4440,7 +4442,7 @@ function ensureExportHubCard() {
   const card = matching[0] || {
     id: `card-export-hub-${state.pharmacy.id}`, type: "ExportHubCard", title: "Export Hub",
     source: "Canonical Pharmacy Catalog", confidence: 1, status: "ready", aiRequired: false,
-    fields: { pharmacy_id: state.pharmacy.id, item_count: String(pharmacyBrain.catalog.length), expanded: false, history_open: false },
+    fields: { pharmacy_id: state.pharmacy.id, item_count: String(pharmacyBrain.catalog.length), expanded: false, history_open: false, export_scope: EXPORT_SCOPES.PRIVATE },
     validation: "Downloads are generated locally from this pharmacy's canonical records with zero AI formatting."
   };
   state.cards = state.cards.filter((item) => item.type !== "ExportHubCard" || item === card);
@@ -4448,6 +4450,7 @@ function ensureExportHubCard() {
   const history = readExportHistory();
   card.fields.history = history;
   card.fields.item_count = String(pharmacyBrain.catalog.length);
+  card.fields.export_scope = normalizeExportScope(card.fields.export_scope);
   card.fields.last_download = history[0]?.summary || "Ready to generate an export.";
   persistActiveCards();
   return card;
@@ -4487,6 +4490,7 @@ function exportHubCardTemplate(card) {
 }
 
 function exportHubTemplate(card) {
+  const selectedScope = normalizeExportScope(card.fields?.export_scope);
   const formatButton = (format) => `<button type="button" data-action="download-inventory-export" data-format="${format.id}" data-card-id="${card.id}" aria-label="${escapeHtml(format.accessibilityLabel)}"><strong>${format.label}</strong><span>${format.cardHelp}</span><small>Open with ${escapeHtml(format.recommendedApplication)}.</small></button>`;
   const polishedFormats = EXPORT_FORMATS.filter((format) => format.group === "polished");
   const dataFormats = EXPORT_FORMATS.filter((format) => format.group === "data");
@@ -4494,12 +4498,13 @@ function exportHubTemplate(card) {
   const historyRows = history.length ? history.map((item) => `<li class="export-history-item">
     <div><strong>${escapeHtml(item.format.toUpperCase())} · ${escapeHtml(item.status)}</strong><span>${escapeHtml(item.generatedKenya)} · ${escapeHtml(String(item.medicineCount))} medicines</span></div>
     <p>${escapeHtml(item.purpose)}</p>
-    <small>${escapeHtml(item.filename)} · ${escapeHtml(item.openGuidance)}</small>
+    <small>${escapeHtml(exportScopeLabel(item.scope))} · ${escapeHtml(item.openGuidance)}</small>
     <button type="button" data-action="download-inventory-export" data-format="${escapeHtml(item.format)}" data-card-id="${card.id}">${escapeHtml(exportFormat(item.format)?.regenerationWording || "Generate again")}</button>
   </li>`).join("") : "<li>No exports generated yet.</li>";
   return `<section class="export-hub" aria-label="Export Hub">
     <div class="export-hub-summary"><strong>${pharmacyBrain.catalog.length} medicines</strong><span>${escapeHtml(state.pharmacy.name)} · ${escapeHtml(state.pharmacy.branch || "Main")}</span></div>
     <p>Choose Excel for calculations and reconciliation, PDF for read-only sharing and phone viewing, Word for corrections and working notes, Presentation for owner or management decisions, Print for a physical register, and CSV for system-to-system data exchange.</p>
+    <fieldset class="export-scope"><legend>Information included</legend><button type="button" data-action="set-export-scope" data-card-id="${card.id}" data-scope="private" aria-pressed="${selectedScope === EXPORT_SCOPES.PRIVATE}"><strong>Private pharmacy copy</strong><span>Includes complete operational identifiers. Keep it inside the pharmacy.</span></button><button type="button" data-action="set-export-scope" data-card-id="${card.id}" data-scope="safer_sharing" aria-pressed="${selectedScope === EXPORT_SCOPES.SAFER_SHARING}"><strong>Safer sharing copy</strong><span>Removes cost price, supplier, barcode, batch, shelf and precise location.</span></button></fieldset>
     <div class="export-format-section">
       <h3>Polished owner copies</h3>
       <div class="export-format-grid">${polishedFormats.map(formatButton).join("")}</div>
@@ -4511,34 +4516,52 @@ function exportHubTemplate(card) {
     </div>
     <p class="export-hub-status" aria-live="polite">${escapeHtml(card.fields?.last_download || "None yet")}</p>
     <details class="export-history"${card.fields?.history_open ? " open" : ""}><summary>Export history (${history.length})</summary><p class="export-history-help">Files stay in your device Downloads. History keeps metadata only.</p><ol>${historyRows}</ol></details>
-    <p class="export-hub-assurance">Generated locally · Pharmacy-isolated · Canonical data · Zero AI formatting</p>
+    <p class="export-hub-assurance">Generated locally · Pharmacy-isolated · ${escapeHtml(exportScopeLabel(selectedScope))} · Zero AI formatting</p><p class="export-hub-assurance">Files stay on your device. Export history keeps minimal metadata for ${EXPORT_HISTORY_RETENTION_DAYS} days. Application names are compatibility guidance only; no endorsement is claimed.</p>
   </section>`;
 }
 
+function setExportScope(cardId, scope) {
+  const card = state.cards.find((item) => item.id === cardId && item.type === "ExportHubCard") || ensureExportHubCard();
+  card.fields.export_scope = normalizeExportScope(scope);
+  card.fields.last_download = `${exportScopeLabel(card.fields.export_scope)} selected. Choose a format.`;
+  persistActiveCards();
+  render();
+  focusCard(card.id);
+}
+
 function downloadInventoryExport(format, cardId = "") {
-  const model = buildCanonicalInventoryExport({ pharmacy: state.pharmacy, items: pharmacyBrain.catalog });
+  const canonicalModel = buildCanonicalInventoryExport({ pharmacy: state.pharmacy, items: pharmacyBrain.catalog });
   const builders = { csv: buildInventoryCsv, xlsx: buildInventoryXlsx, pdf: buildInventoryPdf, docx: buildInventoryDocx, pptx: buildInventoryPptx };
   const metadata = exportFormat(format);
   const targetCardId = cardId || ensureExportHubCard().id;
+  const targetCard = state.cards.find((item) => item.id === targetCardId) || ensureExportHubCard();
+  let compliant;
+  try {
+    compliant = prepareCompliantExport({ model: canonicalModel, format, scope: targetCard.fields?.export_scope, activePharmacyId: state.pharmacy.id });
+  } catch (error) {
+    console.error("MS2.0 export compliance check failed", error);
+    return recordExportEvent(targetCardId, exportHistoryRecord({ model: canonicalModel, format: format || "unknown", status: "blocked", scope: normalizeExportScope(targetCard.fields?.export_scope) }));
+  }
+  const model = compliant.model;
   if (format === "print") {
     const bridgeId = globalThis.crypto?.randomUUID?.() || `finder-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     state.printPreview = { model, bridgeId, query: "", message: "", exportCardId: targetCardId };
-    recordExportEvent(targetCardId, exportHistoryRecord({ model, format, status: "print_view_ready" }));
+    recordExportEvent(targetCardId, exportHistoryRecord({ model, format, status: "print_view_ready", scope: compliant.scope }));
     return;
   }
   const builder = builders[format];
   if (!metadata || !builder) {
-    return recordExportEvent(targetCardId, exportHistoryRecord({ model, format: format || "unknown", status: "unavailable" }));
+    return recordExportEvent(targetCardId, exportHistoryRecord({ model, format: format || "unknown", status: "unavailable", scope: compliant.scope }));
   }
   const filename = exportFilename(model, metadata.extension);
   try {
     const contents = builder(model);
     if (format === "pptx") validateInventoryPptxPackage(contents);
     downloadBlobFile({ filename, contents, mime: metadata.mime });
-    recordExportEvent(targetCardId, exportHistoryRecord({ model, format, status: "completed", filename }));
+    recordExportEvent(targetCardId, exportHistoryRecord({ model, format, status: "completed", scope: compliant.scope }));
   } catch (error) {
     console.error(`MS2.0 ${format.toUpperCase()} export failed`, error);
-    recordExportEvent(targetCardId, exportHistoryRecord({ model, format, status: "failed", filename }));
+    recordExportEvent(targetCardId, exportHistoryRecord({ model, format, status: "failed", scope: compliant.scope }));
   }
 }
 
@@ -4549,28 +4572,32 @@ function exportHistoryKey() {
 function readExportHistory() {
   try {
     const history = JSON.parse(safeLocalStorage()?.getItem(exportHistoryKey()) || "[]");
-    return Array.isArray(history) ? history.slice(0, EXPORT_HISTORY_LIMIT).map((item) => ({
-      ...item,
+    return retainedExportHistory(history).slice(0, EXPORT_HISTORY_LIMIT).map((item) => ({
+      id: String(item.id || `${item.format}:${item.generatedIso}`), version: "ms20.export-history.v2",
+      format: String(item.format || ""), generatedIso: String(item.generatedIso || ""),
+      generatedKenya: String(item.generatedKenya || ""), medicineCount: Number(item.medicineCount || 0),
+      purpose: String(item.purpose || "Requested export workflow."), historyDescription: String(item.historyDescription || ""),
+      recommendedApplication: String(item.recommendedApplication || "Compatible application"),
+      openGuidance: String(item.openGuidance || "Try generating this export again."),
+      status: String(item.status || "completed"), extension: String(item.extension || ""), scope: normalizeExportScope(item.scope),
       summary: exportCompletionSummary(item.format, item.status, item.medicineCount)
-    })) : [];
+    }));
   } catch {
     return [];
   }
 }
 
-function exportHistoryRecord({ model, format, status, filename = "" }) {
+function exportHistoryRecord({ model, format, status, scope = EXPORT_SCOPES.PRIVATE }) {
   const definition = exportFormat(format);
   const recordStatus = status || "completed";
   return {
-    id: `${state.pharmacy.id}:${format}:${model.generatedIso}`,
-    version: "ms20.export-history.v1",
+    id: `${format}:${model.generatedIso}`,
+    version: "ms20.export-history.v2",
     format,
-    filename,
-    pharmacyId: state.pharmacy.id,
-    pharmacyName: state.pharmacy.name,
     generatedIso: model.generatedIso,
     generatedKenya: `${model.generatedKenya} Africa/Nairobi`,
     medicineCount: model.rows.length,
+    scope: normalizeExportScope(scope),
     purpose: definition?.purpose || "Requested export workflow.",
     historyDescription: definition?.historyDescription || "Requested export workflow.",
     recommendedApplication: definition?.recommendedApplication || "Compatible application",

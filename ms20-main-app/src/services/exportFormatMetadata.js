@@ -97,6 +97,7 @@ export function exportCompletionSummary(formatId, status, medicineCount = 0) {
     return format.completionWording;
   }
   if (status === "failed") return `${format.label} generation failed`;
+  if (status === "blocked") return `${format.label} blocked by privacy checks`;
   if (status === "unavailable") return `${format.label} unavailable`;
   const count = Number(medicineCount);
   return count > 0 ? `${format.completionWording.replace(/\.$/, "")} — ${count} medicines` : format.completionWording;

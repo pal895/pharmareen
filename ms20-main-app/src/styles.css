@@ -1807,6 +1807,11 @@ pre {
 .export-history-item p { margin: 0; line-height: 1.35; }
 .export-history-item button { justify-self: start; min-height: 2.5rem; padding: 0.45rem 0.75rem; border: 1px solid #086c5c; border-radius: 1.25rem; background: #fff; color: #086c5c; font-weight: 700; }
 .export-hub-assurance { margin: 0; color: #536b66; font-size: 0.9rem; }
+.export-scope { display: grid; gap: 0.55rem; margin: 0; padding: 0.85rem; border: 1px solid #b8d3cd; border-radius: 0.9rem; }
+.export-scope legend { padding: 0 0.35rem; color: #19332f; font-weight: 700; }
+.export-scope button { display: grid; gap: 0.2rem; min-height: 44px; padding: 0.7rem; text-align: left; border: 1px solid #c9d8d4; border-radius: 0.75rem; background: #fff; color: #19332f; }
+.export-scope button[aria-pressed="true"] { border-color: #086c5c; background: #edf7f4; box-shadow: inset 0 0 0 1px #086c5c; }
+.export-scope button span { color: #536b66; line-height: 1.3; }
 .activity-hub-card { display: grid; gap: 0.8rem; }
 .activity-status-card { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
 .activity-status-card div { display: grid; gap: 0.25rem; }
