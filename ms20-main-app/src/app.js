@@ -305,7 +305,7 @@ function chatHomeTemplate() {
         <span class="conversation-copy">
           <strong>MS2.0 Assistant</strong>
           <small>${statusText}</small>
-          <span>${state.onboarding.completed ? pharmacyBrain.catalog.length ? "Sales, scans, invoices, reports, and approvals." : "Add your medicine catalog to begin." : "Set up your pharmacy to begin."}</span>
+          <span>${state.onboarding.completed ? pharmacyBrain.catalog.length ? "Sales, scans, invoices, reports, and approvals." : "Add your medicine catalog to begin." : "Owner access is ready. Add business details and medicines to begin."}</span>
         </span>
         <span class="row-arrow">Open</span>
       </button>
@@ -5280,7 +5280,7 @@ function latestNotificationPreview() {
 }
 
 function onboardingStatusText() {
-  if (!state.onboarding.completed) return "Setup needed";
+  if (!state.onboarding.completed) return "Operations setup needed";
   if (pharmacyBrain.catalog.length === 0) return "Catalog needed";
   return "Ready";
 }

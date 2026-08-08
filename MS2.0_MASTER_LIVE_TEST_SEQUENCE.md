@@ -215,6 +215,8 @@ The production server binding is request-scoped and supplied by a trusted, provi
 
 The normal `/main-app/` entry is part of the same canonical owner-state boundary: uninitialized routes directly to first-owner activation, initialized without a valid session routes to owner sign-in, authenticated matching owner serves the app, and invalid or ambiguous tenant/credential state fails closed. Essential setup guidance must wrap responsively and must not be hidden by ellipsis.
 
+Owner credential state and later operations/catalog onboarding state are separate and must be labelled distinctly. The Primary Owner PIN remains the strong master credential; an optional four-digit Quick PIN may only be added later as a revocable, rate-limited trusted-device convenience that cannot establish or recover ownership. Primary recovery requires verified registered-owner identity and invalidation/re-evaluation of old sessions/device trust. These deferred capabilities do not expand MS2-LT-067-A.
+
 ## Canonical synchronization invariants
 
 1. No Project Brain, Engineering Memory, architecture snapshot, test plan, handoff, bridge or synchronization package may publish an independent checkpoint list, count, order, prerequisite or status.

@@ -123,6 +123,24 @@ def test_owner_activation_and_repeat_sign_in_remain_within_three_client_actions(
         assert "Authorization" not in customer_html
 
 
+def test_first_owner_pin_guidance_and_visibility_are_safe_and_inline():
+    assert "Use at least 8 characters with letters and numbers" in OWNER_FIRST_SETUP_HTML
+    assert "Choose something you can remember" in OWNER_FIRST_SETUP_HTML
+    assert OWNER_FIRST_SETUP_HTML.count('type="button" data-pin-toggle=') == 2
+    assert 'input.type=show?"text":"password"' in OWNER_FIRST_SETUP_HTML
+    assert "localStorage" not in OWNER_FIRST_SETUP_HTML
+    assert "sessionStorage" not in OWNER_FIRST_SETUP_HTML
+    assert "location.search" not in OWNER_FIRST_SETUP_HTML
+    assert 'body:JSON.stringify({pin})' in OWNER_FIRST_SETUP_HTML
+    assert "The PINs do not match. Enter the same PIN twice." in OWNER_FIRST_SETUP_HTML
+
+
+def test_post_authentication_operations_setup_is_not_mislabeled_as_owner_setup():
+    app_source = Path("ms20-main-app/src/app.js").read_text(encoding="utf-8")
+    assert 'return "Operations setup needed"' in app_source
+    assert "Owner access is ready. Add business details and medicines to begin." in app_source
+
+
 def test_sensitive_login_code_is_hidden_from_public_outbox_and_debug(monkeypatch):
     main.offline_whatsapp_outbox.clear()
     main.offline_whatsapp_confirmation_history.clear()

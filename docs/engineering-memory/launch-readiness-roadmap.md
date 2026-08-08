@@ -180,6 +180,8 @@ Migration count: **33** (31 active non-protected checkpoints plus 2 evidence-bac
 | MS2-LT-075 Legal/regulatory qualification | Launch Critical | Professional Kenya launch review is an explicit external safety gate. |
 | MS2-LT-076 Channel/scale/recovery qualification | Launch Critical | Backup, recovery, monitoring and multi-pharmacy scale are launch safety requirements. |
 
+Locked authentication follow-up: the Primary Owner PIN remains the master credential. Optional four-digit Quick PIN delivery depends on MS2-LT-067 plus the trusted-device/session revocation controls in MS2-LT-077; it must be hashed/protected, strictly attempt-limited, device-bound, revocable, and unable to establish ownership or recover an account. Routine Primary Owner PIN recovery depends on autonomous provisioning and verified production identity/recovery channels in MS2-LT-073 and MS2-LT-076; successful recovery must revoke or re-evaluate old sessions and Quick PIN trust, while unproven identity fails closed. Neither item expands the active MS2-LT-067-A physical case.
+
 ## Continuous Improvement backlog
 
 The primary legacy backlog is the Continuous Improvement set in the migration table. Locked deferred scope also includes advanced loyalty missions/badges/challenges/campaigns/leaderboards; community themes/streaks/prompts/calls/events/mentorship/marketplace/regional groups/Impala Connect/games; payroll/scheduling/custom roles/staff scoring/workforce analytics; and advanced personalization, prediction, OCR/vision, complex AI plans, automated feature changes and behavioral intelligence.
