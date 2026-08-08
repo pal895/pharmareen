@@ -111,7 +111,7 @@ def test_owner_activation_and_repeat_sign_in_remain_within_three_client_actions(
     )
     assert OWNER_SIGN_IN_CLIENT_ACTIONS == (
         "Open MS2.0.",
-        "Enter the registered phone number and private PIN.",
+        "Confirm the provisioned owner identity and enter the private PIN.",
         "Enter the Main App.",
     )
     assert len(OWNER_ACTIVATION_CLIENT_ACTIONS) <= 3
@@ -300,6 +300,8 @@ def test_first_owner_bootstrap_page_switches_permanently_to_sign_in(monkeypatch)
     assert status_after.json() == {"requires_initialization": False}
     assert second_attempt.status_code == 409
     assert "Owner sign in" in repeat_page.text
+    assert "Registered phone ending 0001" in repeat_page.text
+    assert 'id="phone"' not in repeat_page.text
     assert OWNER["phone_number"] not in first_page.text
     assert "pharmacy-b" not in activated.text
     path.unlink(missing_ok=True)
@@ -443,11 +445,12 @@ def test_activation_and_pin_routes_set_secure_cookie_without_client_secrets(monk
     monkeypatch.setattr(main, "owner_auth_service", service)
     monkeypatch.setattr(owner_auth_module, "owner_auth_service", service)
     monkeypatch.setattr(owner_auth_module.time, "time", lambda: 101)
+    monkeypatch.setattr(main, "first_owner_registry_record", lambda _request: OWNER)
     with TestClient(main.app, base_url="https://ms20.test") as client:
         inspected = client.post("/api/ms20/auth/owner/activation/inspect", json={"token": raw})
         activated = client.post("/api/ms20/auth/owner/activation/complete", json={"token": raw, "pin": "Owner1234"})
         client.post("/api/ms20/auth/logout")
-        signed_in = client.post("/api/ms20/auth/owner/pin", json={"phone": OWNER["phone_number"], "pin": "Owner1234"})
+        signed_in = client.post("/api/ms20/auth/owner/pin", json={"phone": "+254799999999", "pin": "Owner1234"})
         session = client.get("/api/ms20/auth/session")
     assert inspected.json() == {"pharmacy_id": "pharmacy-a", "pharmacy_name": "Afya Pharmacy", "owner_name": "Mary", "role": "owner"}
     for response in (activated, signed_in):
@@ -457,6 +460,15 @@ def test_activation_and_pin_routes_set_secure_cookie_without_client_secrets(monk
     assert session.json()["authenticated"] is True
     assert "localStorage" not in OWNER_ACTIVATION_HTML and "sessionStorage" not in OWNER_ACTIVATION_HTML
     assert "ms20_owner_session" not in OWNER_ACTIVATION_HTML
+
+
+def test_repeat_sign_in_uses_trusted_tenant_owner_phone_and_pin_only():
+    assert 'id="phone"' not in OWNER_SIGN_IN_HTML
+    assert "trusted pharmacy provisioning" in OWNER_SIGN_IN_HTML
+    assert "{{OWNER_IDENTITY}}" in OWNER_SIGN_IN_HTML
+    assert 'JSON.stringify({pin})' in OWNER_SIGN_IN_HTML
+    assert 'JSON.stringify({phone,pin})' not in OWNER_SIGN_IN_HTML
+    assert 'id="pin-toggle"' in OWNER_SIGN_IN_HTML
 
 
 def test_owner_auth_fails_closed_when_durable_store_is_unavailable():

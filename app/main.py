@@ -135,7 +135,7 @@ OWNER_ACTIVATION_CLIENT_ACTIONS = (
 
 OWNER_SIGN_IN_CLIENT_ACTIONS = (
     "Open MS2.0.",
-    "Enter the registered phone number and private PIN.",
+    "Confirm the provisioned owner identity and enter the private PIN.",
     "Enter the Main App.",
 )
 
@@ -149,18 +149,20 @@ OWNER_SIGN_IN_HTML = """
   <style>
     body{font-family:Arial,sans-serif;background:#f4f8f6;color:#142d27;margin:0;padding:24px}
     main{max-width:440px;margin:8vh auto;background:#fff;border:1px solid #d6e2de;border-radius:24px;padding:28px}
-    label{display:block;font-weight:700;margin:18px 0 8px}input,button{box-sizing:border-box;width:100%;font-size:18px;padding:14px;border-radius:14px}
-    input{border:1px solid #b9c9c4}button{margin-top:16px;border:0;background:#176d5d;color:#fff;font-weight:700}.hidden{display:none}#status{min-height:48px}
+    label{display:block;font-weight:700;margin:18px 0 8px}input,button{box-sizing:border-box;font-size:18px;padding:14px;border-radius:14px}
+    input{width:100%;border:1px solid #b9c9c4}.pin-field{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}.pin-toggle{width:auto;margin:0;border:1px solid #176d5d;background:#fff;color:#176d5d;font-weight:700}#send{width:100%;margin-top:16px;border:0;background:#176d5d;color:#fff;font-weight:700}#status{min-height:48px}
   </style>
 </head>
 <body><main>
   <h1>Owner sign in</h1>
-  <p>Use the phone number registered to your pharmacy and your private owner PIN.</p>
-  <section><label for="phone">Registered phone number</label><input id="phone" inputmode="tel" autocomplete="tel"><label for="pin">Owner PIN</label><input id="pin" type="password" autocomplete="current-password"><button id="send">Sign in</button></section>
+  <p>{{OWNER_IDENTITY}}</p>
+  <p>Your registered owner phone was established during trusted pharmacy provisioning. Enter only your private Owner PIN.</p>
+  <section><label for="pin">Owner PIN</label><div class="pin-field"><input id="pin" type="password" autocomplete="current-password"><button class="pin-toggle" type="button" id="pin-toggle" aria-pressed="false">Show</button></div><button id="send">Sign in</button></section>
   <p id="status" role="status"></p>
 </main><script>
 const statusBox=document.getElementById("status");
-document.getElementById("send").onclick=async()=>{statusBox.textContent="Signing in…";const phone=document.getElementById("phone").value,pin=document.getElementById("pin").value;const response=await fetch("/api/ms20/auth/owner/pin",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone,pin}),credentials:"same-origin"});document.getElementById("phone").value="";document.getElementById("pin").value="";if(!response.ok){statusBox.textContent="The phone number or PIN is incorrect.";return;}statusBox.textContent="Signed in safely.";window.location.assign("/main-app/");};
+document.getElementById("pin-toggle").onclick=()=>{const input=document.getElementById("pin"),show=input.type==="password";input.type=show?"text":"password";document.getElementById("pin-toggle").textContent=show?"Hide":"Show";document.getElementById("pin-toggle").setAttribute("aria-pressed",String(show));};
+document.getElementById("send").onclick=async()=>{statusBox.textContent="Signing in…";const pin=document.getElementById("pin").value;const response=await fetch("/api/ms20/auth/owner/pin",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pin}),credentials:"same-origin"});document.getElementById("pin").value="";if(!response.ok){statusBox.textContent="The Owner PIN is incorrect.";return;}statusBox.textContent="Signed in safely.";window.location.assign("/main-app/");};
 </script></body></html>
 """
 
@@ -174,7 +176,7 @@ body{font-family:Arial,sans-serif;background:#f4f8f6;color:#142d27;margin:0;padd
 <button id="activate">Activate and open Main App</button></section><p id="status" role="status"></p></main><script>
 const identity=document.getElementById("identity"),form=document.getElementById("form"),statusBox=document.getElementById("status");
 document.querySelectorAll("[data-pin-toggle]").forEach(button=>button.onclick=()=>{const input=document.getElementById(button.dataset.pinToggle),show=input.type==="password";input.type=show?"text":"password";button.textContent=show?"Hide":"Show";button.setAttribute("aria-pressed",String(show));});
-(async()=>{const r=await fetch("/api/ms20/auth/owner/bootstrap",{credentials:"same-origin",cache:"no-store"});if(!r.ok){identity.textContent="Owner setup is temporarily unavailable.";return;}const d=await r.json();if(!d.requires_initialization){location.replace("/main-app/sign-in");return;}identity.textContent=`Confirm pharmacy: ${d.pharmacy_name}. First owner: ${d.owner_name}.`;form.hidden=false;})();
+(async()=>{const r=await fetch("/api/ms20/auth/owner/bootstrap",{credentials:"same-origin",cache:"no-store"});if(!r.ok){identity.textContent="Owner setup is temporarily unavailable.";return;}const d=await r.json();if(!d.requires_initialization){location.replace("/main-app/sign-in");return;}identity.textContent=`Confirm pharmacy: ${d.pharmacy_name}. First owner: ${d.owner_name}. Registered owner phone ending ${d.phone_hint}.`;form.hidden=false;})();
 document.getElementById("activate").onclick=async()=>{const pin=document.getElementById("pin").value,confirm=document.getElementById("confirm").value;if(pin!==confirm){statusBox.textContent="The PINs do not match. Enter the same PIN twice.";return;}if(pin.length<8||!/\\p{L}/u.test(pin)||!/\\p{N}/u.test(pin)){statusBox.textContent="Use at least 8 characters with letters and numbers.";return;}statusBox.textContent="Activating securely…";const r=await fetch("/api/ms20/auth/owner/bootstrap",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pin}),credentials:"same-origin"});document.getElementById("pin").value="";document.getElementById("confirm").value="";if(r.status===409){location.replace("/main-app/sign-in");return;}if(!r.ok){statusBox.textContent="Use at least 8 characters with letters and numbers.";return;}location.replace("/main-app/");};
 </script></body></html>
 """
@@ -411,6 +413,7 @@ async def ms20_owner_bootstrap_status(request: Request) -> dict[str, Any]:
         "requires_initialization": True,
         "pharmacy_name": record.get("pharmacy_name") or record["pharmacy_id"],
         "owner_name": record.get("owner_name") or "Owner",
+        "phone_hint": registry_phone_key(record.get("phone_number") or record.get("phone"))[-4:],
     }
 
 
@@ -442,9 +445,15 @@ async def ms20_owner_activation_complete(request: Request) -> JSONResponse:
 @app.post("/api/ms20/auth/owner/pin")
 async def ms20_owner_pin_sign_in(request: Request) -> JSONResponse:
     payload = await request.json()
-    phone = str(payload.get("phone") or "") if isinstance(payload, dict) else ""
     pin = str(payload.get("pin") or "") if isinstance(payload, dict) else ""
+    record = first_owner_registry_record(request)
+    if owner_auth_service.pharmacy_owner_state(record) != "initialized":
+        raise HTTPException(status_code=409, detail="Owner access is not initialized.")
+    phone = str(record.get("phone_number") or record.get("phone") or "")
     token, session = owner_auth_service.sign_in_with_pin(phone, pin)
+    if session.pharmacy_id != str(record.get("pharmacy_id") or ""):
+        owner_auth_service.revoke(token)
+        raise HTTPException(status_code=403, detail="This owner cannot access that pharmacy.")
     return owner_session_response(token, session)
 
 
@@ -461,6 +470,11 @@ async def ms20_owner_sign_in_page(request: Request) -> HTMLResponse:
     record = first_owner_registry_record(request)
     state = owner_auth_service.pharmacy_owner_state(record)
     html = OWNER_FIRST_SETUP_HTML if state == "uninitialized" else OWNER_SIGN_IN_HTML
+    if state == "initialized":
+        phone_key = registry_phone_key(record.get("phone_number") or record.get("phone"))
+        phone_hint = phone_key[-4:] if len(phone_key) >= 4 else "registered"
+        identity = f"Pharmacy: {escape(str(record.get('pharmacy_name') or record['pharmacy_id']))}. Owner: {escape(str(record.get('owner_name') or 'Owner'))}. Registered phone ending {escape(phone_hint)}."
+        html = html.replace("{{OWNER_IDENTITY}}", identity)
     return HTMLResponse(html, headers={"Referrer-Policy": "no-referrer", "Cache-Control": "no-store"})
 
 

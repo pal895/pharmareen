@@ -499,6 +499,8 @@ The customer boundary is permanent: platform-admin configuration is never an own
 
 Owner credentials are deployment-durable. Startup selects the dedicated platform-admin workbook when present or the already configured registry workbook otherwise, and stores only activation digests and salted PIN hashes in protected worksheets. Production never falls back to the local owner-auth JSON file: missing Google credentials, missing workbook binding, or load/save failure disables activation and sign-in. Browser sessions remain intentionally short-lived and may require ordinary sign-in after restart; the credential itself must survive deploys.
 
+Owner phone identity originates in trusted provisioning and the active tenant registry. It is server-derived for activation and repeat sign-in, never selected by a client request. Activation and sign-in confirm pharmacy, owner and a last-four phone hint; repeat sign-in submits only the Primary Owner PIN. The server verifies canonical initialized state, authenticates the registry phone's durable credential, and rejects any cross-pharmacy result. This supersedes the earlier phone-reentry UI contract.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

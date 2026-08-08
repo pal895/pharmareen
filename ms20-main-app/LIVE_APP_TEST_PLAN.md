@@ -1079,6 +1079,8 @@ The prior admin-secret, operator-invitation and WhatsApp-OTP proposals were with
 
 The first republish after activation exposed a deployment-durability failure: bootstrap returned initialization required because the accepted credential had remained in an ephemeral local file. Do not recreate the PIN on that build. The root fix makes the platform workbook (dedicated admin workbook, or the existing registry workbook) mandatory for production owner credentials and fails closed when unavailable. After deploying the corrected build, recreate the lost test credential once, republish/restart, require bootstrap to remain initialized, then complete repeat phone-plus-PIN sign-in. This is still MS2-LT-067-A and is not passed.
 
+Repeat identity is not customer-entered data. Trusted provisioning supplies the registered owner phone in the tenant registry; activation confirms pharmacy, owner and a masked phone hint and binds the credential to it. After the deployment boundary, the tenant-bound sign-in page confirms the same identity and accepts only the existing Primary Owner PIN. Any earlier instruction to type the phone is superseded. A client-supplied phone must not select or alter the owner.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

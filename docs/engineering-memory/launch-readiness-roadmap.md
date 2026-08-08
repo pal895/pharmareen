@@ -96,6 +96,8 @@ MS2-LT-067-A is the narrow active foundation: an admin-protected QR/link activat
 
 Deployment durability is part of this gate. The first republish exposed an ephemeral local credential fallback when no dedicated admin workbook ID was present. The corrected startup uses the dedicated admin workbook or the already configured registry workbook and fails closed if durable persistence is unavailable. Owner verification must recreate the lost staging credential once, prove it survives republish/restart, and complete repeat sign-in before MS2-LT-067-A can pass.
 
+Repeat owner identity is tenant-derived from trusted provisioning. The UI confirms pharmacy, owner and a masked registered-phone hint, while the client submits only the Primary Owner PIN. This removes unexplained identifier entry without weakening credential strength, tenant isolation, rate limiting, future trusted-device Quick PIN boundaries, or recovery requirements.
+
 Default owner reporting is **summary first; details only when requested**: total sales; cash, M-Pesa, credit and mixed totals; key stock alerts; important exceptions; and only action-needed items. Drill-down preserves staff, shift, device, payment, cancellation/refund, stock-edit, audit and unusual-activity detail. Payroll, advanced scheduling/approvals, custom roles, staff scoring and workforce analytics are Continuous Improvement.
 
 ### 4. Intelligence + Reliability — Launch Critical core

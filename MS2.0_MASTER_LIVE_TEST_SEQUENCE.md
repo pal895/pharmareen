@@ -219,6 +219,8 @@ Owner credential state and later operations/catalog onboarding state are separat
 
 The first post-activation republish exposed that owner credentials were still using a deployment-local fallback when a dedicated admin workbook ID was absent. Production owner authentication must instead use the dedicated platform-admin workbook when configured or the already configured registry workbook, persist only activation digests and salted PIN hashes, and fail closed when durable storage is unavailable. No per-pharmacy secret or ID is required. MS2-LT-067-A remains active until the recreated test credential survives republish/restart and repeat sign-in is physically verified.
 
+Repeat identity is established by trusted provisioning, not typed during first-owner activation. The tenant-bound route resolves the exact active registry record, both activation and credential state bind its normalized owner phone, and the customer UI confirms pharmacy, owner and only the phone's last four digits. Repeat sign-in accepts only the private Primary Owner PIN; it ignores client identity claims and verifies the resulting session remains bound to the resolved pharmacy. Earlier references to re-entering a registered phone are superseded by this deterministic contract.
+
 ## Canonical synchronization invariants
 
 1. No Project Brain, Engineering Memory, architecture snapshot, test plan, handoff, bridge or synchronization package may publish an independent checkpoint list, count, order, prerequisite or status.

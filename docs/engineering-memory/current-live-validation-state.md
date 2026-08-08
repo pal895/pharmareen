@@ -742,6 +742,8 @@ Permanent owner rule: MS2.0 is **Voice first → fast tap/action second → typi
 
 **MS2-LT-067-A deployment-durability stop (2026-08-08):** the first post-activation republish returned `requires_initialization: true`, proving that the accepted credential had remained in a deployment-local fallback file and was lost when the instance changed. Production startup now uses the dedicated platform-admin workbook when configured, otherwise the already configured registry workbook, for activation digests and salted PIN hashes. It never needs a per-pharmacy environment value. Missing credentials, workbook binding, load, or save capability keeps owner authentication fail closed instead of using an ephemeral file. The lost test credential must be recreated once on the corrected build, then survive republish/restart before repeat sign-in. MS2-LT-067-A remains active and not passed.
 
+**MS2-LT-067-A repeat-identity correction (2026-08-08):** the owner phone was already established by trusted provisioning and stored in the active tenant registry; activation bound the durable credential to it but did not explain the identity source, while repeat sign-in wrongly asked the owner to type it. A random-phone rejection is not PIN-failure evidence. The shared tenant-bound route now confirms pharmacy, owner and a masked phone hint and accepts only the existing Primary Owner PIN. Client phone claims cannot select an owner; canonical registry/credential mismatch and cross-pharmacy session results fail closed. Await deployment and the one remaining physical repeat-PIN proof.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 
