@@ -144,6 +144,8 @@ Certification requires plain-language prompts, no developer console/manual stora
 
 Only one milestone may be active. After automated validation, Codex provides exactly one focused owner live test and waits for evidence.
 
+Sequence steering belongs to Codex under repository governance. ChatGPT may report owner evidence and friction, but it must never choose, advance, or hard-code the next checkpoint or sub-checkpoint. On owner authorization, Codex selects the next boundary from the Master Live Test Sequence, current live-validation state, this dependency map, and actual owner-verified evidence; displayed checkpoint numbers never override unmet dependencies or planned sub-checkpoints.
+
 ## Legacy incomplete-checkpoint migration
 
 Migration count: **33** (31 active non-protected checkpoints plus 2 evidence-backed deprecated compatibility checkpoints).
