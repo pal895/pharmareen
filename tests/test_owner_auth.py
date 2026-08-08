@@ -464,7 +464,7 @@ def test_activation_and_pin_routes_set_secure_cookie_without_client_secrets(monk
 
 def test_repeat_sign_in_uses_trusted_tenant_owner_phone_and_pin_only():
     assert 'id="phone"' not in OWNER_SIGN_IN_HTML
-    assert "trusted pharmacy provisioning" in OWNER_SIGN_IN_HTML
+    assert "Your phone number is already registered. Enter your private Owner PIN." in OWNER_SIGN_IN_HTML
     assert "{{OWNER_IDENTITY}}" in OWNER_SIGN_IN_HTML
     assert 'JSON.stringify({pin})' in OWNER_SIGN_IN_HTML
     assert 'JSON.stringify({phone,pin})' not in OWNER_SIGN_IN_HTML

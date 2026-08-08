@@ -156,7 +156,7 @@ OWNER_SIGN_IN_HTML = """
 <body><main>
   <h1>Owner sign in</h1>
   <p>{{OWNER_IDENTITY}}</p>
-  <p>Your registered owner phone was established during trusted pharmacy provisioning. Enter only your private Owner PIN.</p>
+  <p>Your phone number is already registered. Enter your private Owner PIN.</p>
   <section><label for="pin">Owner PIN</label><div class="pin-field"><input id="pin" type="password" autocomplete="current-password"><button class="pin-toggle" type="button" id="pin-toggle" aria-pressed="false">Show</button></div><button id="send">Sign in</button></section>
   <p id="status" role="status"></p>
 </main><script>
