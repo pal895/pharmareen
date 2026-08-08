@@ -211,6 +211,8 @@ The only current open checkpoint is **#67 Authentication, roles and access contr
 
 Permanent client rule: infrastructure-only prerequisites never appear as pharmacy-owner actions. Platform-admin access remains separate and fail-closed, and is never owner authentication. Normal client workflows take no more than three meaningful actions whenever technically possible; automatic server processing, session creation, security checks and redirects do not count. MS2-LT-067-A first activation is open MS2.0 for the server-bound uninitialized pharmacy → confirm pharmacy and create PIN → Main App. Repeat sign-in is open MS2.0 → registered phone plus PIN → Main App. A longer client path is allowed only for a documented security or legal requirement.
 
+The production server binding is request-scoped and supplied by a trusted, provisioning-populated tenant-routing edge using a short-lived authenticated binding; it is not a per-pharmacy environment variable. `PHARMAREEN_DEFAULT_PHARMACY_ID` is development compatibility only. Isolated Replit testing may select exactly one active registry row automatically; missing or ambiguous state remains fail-closed and is not an owner action.
+
 ## Canonical synchronization invariants
 
 1. No Project Brain, Engineering Memory, architecture snapshot, test plan, handoff, bridge or synchronization package may publish an independent checkpoint list, count, order, prerequisite or status.

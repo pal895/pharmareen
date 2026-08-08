@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
@@ -282,6 +284,65 @@ def test_first_owner_bootstrap_page_switches_permanently_to_sign_in(monkeypatch)
     assert OWNER["phone_number"] not in first_page.text
     assert "pharmacy-b" not in activated.text
     path.unlink(missing_ok=True)
+
+
+def test_single_active_registry_pharmacy_is_bound_without_per_tenant_environment(monkeypatch):
+    owner = {**OWNER, "pharmacy_name": "Afya Pharmacy", "active": "yes", "status": "active"}
+
+    class Registry:
+        def list_records(self):
+            return [owner]
+
+    monkeypatch.delenv("PHARMAREEN_DEFAULT_PHARMACY_ID", raising=False)
+    monkeypatch.setattr(main, "get_pharmacy_registry", lambda: Registry())
+    with TestClient(main.app, base_url="https://pharmareen--test.replit.app") as client:
+        response = client.get("/api/ms20/auth/owner/bootstrap")
+
+    assert response.status_code == 200
+    assert response.json()["requires_initialization"] is True
+
+
+def test_ambiguous_registry_without_trusted_route_fails_closed(monkeypatch):
+    class Registry:
+        def list_records(self):
+            return [
+                {**OWNER, "active": "yes", "status": "active"},
+                {**OWNER, "pharmacy_id": "pharmacy-b", "phone": "+254722222222", "phone_number": "+254722222222", "active": "yes", "status": "active"},
+            ]
+
+    monkeypatch.delenv("PHARMAREEN_DEFAULT_PHARMACY_ID", raising=False)
+    monkeypatch.setattr(main, "get_pharmacy_registry", lambda: Registry())
+    with TestClient(main.app, base_url="https://ms20.test", raise_server_exceptions=False) as client:
+        response = client.get("/api/ms20/auth/owner/bootstrap")
+
+    assert response.status_code == 503
+
+
+def test_production_gateway_binding_is_request_scoped_and_signed(monkeypatch):
+    owner = {**OWNER, "pharmacy_name": "Afya Pharmacy", "active": "yes", "status": "active"}
+
+    class Registry:
+        def find_by_id(self, pharmacy_id, active_only=True):
+            return owner if pharmacy_id == "pharmacy-a" and active_only else None
+
+    now = 1_800_000_000
+    key = "platform-routing-key-for-test"
+    signature = hmac.new(key.encode(), f"pharmacy-a:{now}".encode(), hashlib.sha256).hexdigest()
+    monkeypatch.delenv("PHARMAREEN_DEFAULT_PHARMACY_ID", raising=False)
+    monkeypatch.setenv("PHARMAREEN_TENANT_ROUTING_KEY", key)
+    monkeypatch.setattr(main.time, "time", lambda: now)
+    monkeypatch.setattr(main, "get_pharmacy_registry", lambda: Registry())
+    headers = {
+        "x-pharmareen-pharmacy-id": "pharmacy-a",
+        "x-pharmareen-routing-timestamp": str(now),
+        "x-pharmareen-routing-signature": signature,
+    }
+    with TestClient(main.app, base_url="https://app.pharmareen.example", raise_server_exceptions=False) as client:
+        allowed = client.get("/api/ms20/auth/owner/bootstrap", headers=headers)
+        rejected = client.get("/api/ms20/auth/owner/bootstrap", headers={**headers, "x-pharmareen-pharmacy-id": "pharmacy-b"})
+
+    assert allowed.status_code == 200
+    assert rejected.status_code == 503
 
 
 def test_pin_sign_in_and_lockout_are_fail_closed():

@@ -45,7 +45,7 @@ from app.local_first_parser import LocalFirstParser
 from app.live_pilot import LivePharmacyPilotEngine
 from app.medicine_brain import MedicineBrain
 from app.pdf_reports import generate_daily_report_pdf, reports_pdf_dir
-from app.pharmacy_registry import GoogleSheetsPharmacyRegistry, registry_phone_key
+from app.pharmacy_registry import GoogleSheetsPharmacyRegistry, registry_phone_key, registry_record_is_active
 from app.reliability import ProductionReliabilityEngine, SyncEnvelope
 from app.reports import LowStockWarning, ReportMetrics, ReportService, build_report_metrics, build_transaction_metrics, low_stock_from_items
 from app.routes.admin import router as admin_router
@@ -338,19 +338,56 @@ def owner_session_response(token: str, session: Any) -> JSONResponse:
     return response
 
 
-def first_owner_registry_record() -> dict[str, str]:
-    pharmacy_id = str(os.getenv("PHARMAREEN_DEFAULT_PHARMACY_ID") or "").strip()
-    if not pharmacy_id:
+def _gateway_pharmacy_id(request: Request) -> str:
+    """Verify a tenant binding supplied by the trusted production edge.
+
+    The edge owns the indexed host-to-tenant lookup.  One platform-wide key
+    authenticates the binding; no per-pharmacy environment variable is needed.
+    """
+    pharmacy_id = request.headers.get("x-pharmareen-pharmacy-id", "").strip()
+    timestamp = request.headers.get("x-pharmareen-routing-timestamp", "").strip()
+    signature = request.headers.get("x-pharmareen-routing-signature", "").strip()
+    if not any((pharmacy_id, timestamp, signature)):
+        return ""
+    routing_key = os.getenv("PHARMAREEN_TENANT_ROUTING_KEY", "").strip()
+    try:
+        issued_at = int(timestamp)
+    except ValueError:
+        issued_at = 0
+    expected = hmac.new(routing_key.encode(), f"{pharmacy_id}:{timestamp}".encode(), hashlib.sha256).hexdigest() if routing_key else ""
+    if not routing_key or abs(int(time.time()) - issued_at) > 300 or not hmac.compare_digest(signature, expected):
         raise HTTPException(status_code=503, detail="Owner initialization is not configured.")
-    record = get_pharmacy_registry().find_by_id(pharmacy_id, active_only=True)
+    return pharmacy_id
+
+
+def first_owner_registry_record(request: Request) -> dict[str, str]:
+    registry = get_pharmacy_registry()
+    pharmacy_id = _gateway_pharmacy_id(request)
+    if not pharmacy_id:
+        # Compatibility for isolated development deployments only. Production
+        # uses the authenticated edge binding above.
+        pharmacy_id = str(os.getenv("PHARMAREEN_DEFAULT_PHARMACY_ID") or "").strip()
+    if not pharmacy_id:
+        # A one-pharmacy Replit/dev registry is deterministic and needs no
+        # copied ID. Ambiguity still fails closed.
+        host = str(request.url.hostname or "").lower()
+        environment = os.getenv("PHARMAREEN_ENVIRONMENT", "").strip().lower()
+        if not (host.endswith(".replit.app") or environment in {"development", "dev", "test"}):
+            raise HTTPException(status_code=503, detail="Owner initialization is not configured.")
+        records = [record for record in registry.list_records() if registry_record_is_active(record)]
+        if len(records) != 1:
+            raise HTTPException(status_code=503, detail="Owner initialization is not configured.")
+        record = records[0]
+    else:
+        record = registry.find_by_id(pharmacy_id, active_only=True)
     if not record or not registry_phone_key(record.get("phone_number") or record.get("phone")):
         raise HTTPException(status_code=503, detail="Owner initialization is not configured.")
     return record
 
 
 @app.get("/api/ms20/auth/owner/bootstrap")
-async def ms20_owner_bootstrap_status() -> dict[str, Any]:
-    record = first_owner_registry_record()
+async def ms20_owner_bootstrap_status(request: Request) -> dict[str, Any]:
+    record = first_owner_registry_record(request)
     requires_initialization = owner_auth_service.pharmacy_owner_state(record) == "uninitialized"
     if not requires_initialization:
         return {"requires_initialization": False}
@@ -365,7 +402,7 @@ async def ms20_owner_bootstrap_status() -> dict[str, Any]:
 async def ms20_owner_bootstrap_complete(request: Request) -> JSONResponse:
     payload = await request.json()
     pin = str(payload.get("pin") or "") if isinstance(payload, dict) else ""
-    record = first_owner_registry_record()
+    record = first_owner_registry_record(request)
     token, session = owner_auth_service.initialize_first_owner(record, pin)
     return owner_session_response(token, session)
 
@@ -404,8 +441,8 @@ async def ms20_owner_logout(ms20_owner_session: str | None = Cookie(default=None
 
 
 @app.get("/main-app/sign-in", response_class=HTMLResponse, include_in_schema=False)
-async def ms20_owner_sign_in_page() -> HTMLResponse:
-    record = first_owner_registry_record()
+async def ms20_owner_sign_in_page(request: Request) -> HTMLResponse:
+    record = first_owner_registry_record(request)
     state = owner_auth_service.pharmacy_owner_state(record)
     html = OWNER_FIRST_SETUP_HTML if state == "uninitialized" else OWNER_SIGN_IN_HTML
     return HTMLResponse(html, headers={"Referrer-Policy": "no-referrer", "Cache-Control": "no-store"})
