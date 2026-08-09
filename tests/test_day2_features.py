@@ -72,6 +72,8 @@ def test_landing_page_and_manifest_work():
     assert "Start MS2.0" in page.text
     assert "Primary Owner PIN" in page.text
     assert "Contact phone <small>(optional)" in page.text
+    assert "href='/terms'" in page.text and "href='/privacy'" in page.text
+    assert "Show Primary Owner PIN" in page.text
     assert "WhatsApp" not in page.text
     assert manifest.status_code == 200
     assert manifest.json()["short_name"] == "MS2.0"

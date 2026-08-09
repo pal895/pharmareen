@@ -152,6 +152,8 @@ def test_shared_link_creates_ms20_owned_pharmacy_and_owner_without_messaging_ide
     monkeypatch.setattr(main, "owner_auth_service", OwnerAuthService())
     with TestClient(main.app, base_url="https://ms20.test") as client:
         page = client.get("/start")
+        terms = client.get("/terms")
+        privacy = client.get("/privacy")
         started = client.post("/api/ms20/front-door/start")
         created = client.post("/api/ms20/front-door/new-pharmacy", json={
             "entry": started.json()["entry"], "pharmacy_name": "Independent Chemist",
@@ -162,6 +164,12 @@ def test_shared_link_creates_ms20_owned_pharmacy_and_owner_without_messaging_ide
     assert page.status_code == 200
     assert "whatsapp" not in page.text.lower() and "verification code" not in page.text.lower()
     assert "Contact phone <small>(optional)" in page.text and "Primary Owner PIN" in page.text
+    assert "at least 8 characters, including a letter and a number" in page.text
+    assert "later 4-digit Quick PIN" in page.text and "show.onclick" in page.text
+    assert "href='/terms'" in page.text and "href='/privacy'" in page.text
+    assert terms.status_code == privacy.status_code == 200
+    assert main.MS20_TERMS_VERSION in terms.text and main.MS20_PRIVACY_VERSION in privacy.text
+    assert "Optional contact phone" in privacy.text and "does not define pharmacy identity" in privacy.text
     assert started.status_code == 200 and created.status_code == 200 and legacy_verify.status_code == 410
     assert created.cookies.get("ms20_owner_session")
     assert records[0]["owner_id"].startswith("owner_") and "254" not in records[0]["owner_id"]
