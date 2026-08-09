@@ -635,12 +635,31 @@ class GoogleSheetsStore:
             logger.warning("Medicine catalog metadata could not be read for operations resume", exc_info=True)
         records: list[dict[str, Any]] = []
         seen: set[str] = set()
-        for name in self.list_master_drug_names():
+        names = self.list_master_drug_names()
+        # Older Main App onboarding and the live stock workflows persist the
+        # pharmacy's operational catalog in Inventory (or <pharmacy>_inventory),
+        # while Master_Stock can legitimately be empty.  Authentication must
+        # therefore resume from both durable representations.  Keep this read
+        # pharmacy-scoped; the broad include_all safety lookup is deliberately
+        # not used here because it could pull another tenant's inventory into
+        # an authenticated bootstrap response.
+        for _title, inventory_record, _row_number in self._inventory_records_with_rows(
+            pharmacy_id=pharmacy_id,
+            include_all=False,
+        ):
+            inventory_name = record_text_value(inventory_record, STOCK_NAME_HEADERS)
+            if inventory_name:
+                names.append(inventory_name)
+        for name in names:
             identity = normalize_key(name)
             if not identity or identity in seen:
                 continue
             seen.add(identity)
-            stock = self.find_stock_for_safety(name, pharmacy_id=pharmacy_id)
+            stock = self._find_stock_from_sources(
+                name,
+                pharmacy_id=pharmacy_id,
+                include_all_inventory=False,
+            )
             metadata = metadata_by_name.get(identity, {})
             records.append({
                 "name": name,

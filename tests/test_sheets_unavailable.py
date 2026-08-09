@@ -86,6 +86,46 @@ def make_fake_sheet_store(worksheets) -> GoogleSheetsStore:
     return store
 
 
+def test_operations_catalog_resume_reads_pharmacy_inventory_when_master_stock_is_empty():
+    store = make_fake_sheet_store({
+        MASTER_STOCK: FakeWorksheet([["Drug Name", "Selling Price", "Cost Price", "Current Stock", "Reorder Level"]]),
+        "pharmacy-a_inventory": FakeWorksheet([
+            ["Drug", "Stock", "Selling Price", "Cost Price", "Low Stock Alert Level"],
+            ["Ibuprofen", "13", "18", "10", "5"],
+        ]),
+        INVENTORY: FakeWorksheet([["Drug", "Stock", "Selling Price"]]),
+    })
+
+    assert store.list_pharmacy_catalog_records("pharmacy-a") == [{
+        "name": "Ibuprofen",
+        "strength": "",
+        "forms": [],
+        "units": [],
+        "sellingPrice": 18.0,
+        "costPrice": 10.0,
+        "stockLeft": 13,
+        "reorderLevel": 5,
+        "supplier": "",
+        "barcode": "",
+        "batches": [],
+        "shelf": "",
+    }]
+
+
+def test_operations_catalog_resume_does_not_read_another_pharmacy_inventory():
+    store = make_fake_sheet_store({
+        MASTER_STOCK: FakeWorksheet([["Drug Name", "Selling Price", "Cost Price", "Current Stock", "Reorder Level"]]),
+        "pharmacy-a_inventory": FakeWorksheet([["Drug", "Stock", "Selling Price"]]),
+        "pharmacy-b_inventory": FakeWorksheet([
+            ["Drug", "Stock", "Selling Price"],
+            ["Private B Medicine", "4", "20"],
+        ]),
+        INVENTORY: FakeWorksheet([["Drug", "Stock", "Selling Price"]]),
+    })
+
+    assert store.list_pharmacy_catalog_records("pharmacy-a") == []
+
+
 @pytest.mark.parametrize("file_contents", ["", "{not-json"])
 def test_store_starts_unavailable_for_empty_or_invalid_service_account(file_contents, tmp_path):
     service_account = tmp_path / f"service-account-{uuid4().hex}.json"
