@@ -232,6 +232,50 @@ class FrontDoorRegistry:
             self.store.save(state)
         return token
 
+    def start_new_owner_verification(self, *, phone_key: str, deliver_code: Any, now: int | None = None) -> dict[str, Any]:
+        """Start customer-facing verification without requiring channel initiation."""
+        current = int(time.time()) if now is None else int(now)
+        normalized = str(phone_key or "").strip()
+        if len(normalized) < 10:
+            raise ValueError("A valid owner phone is required")
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        challenge = secrets.token_urlsafe(24)
+        with self._lock:
+            state = self.store.load()
+            recent = [item for item in state.setdefault("pending_verifications", {}).values() if item.get("phone_key_digest") == _digest(normalized) and item.get("status") == "active" and int(item.get("started_at") or 0) > current - 60]
+            if recent:
+                raise ValueError("Please wait a moment before requesting another code")
+            state.setdefault("pending_verifications", {})[_digest(challenge)] = {
+                "phone_key_digest": _digest(normalized), "code_digest": _digest(code),
+                "started_at": current, "expires_at": current + 600, "attempts_left": 5, "status": "active",
+            }
+            self.store.save(state)
+        try:
+            deliver_code(code)
+        except Exception:
+            with self._lock:
+                state = self.store.load()
+                state.setdefault("pending_verifications", {}).pop(_digest(challenge), None)
+                self.store.save(state)
+            raise
+        return {"accepted": True, "challenge_id": challenge, "expires_in": 600}
+
+    def complete_new_owner_verification(self, *, challenge_id: str, phone_key: str, code: str, now: int | None = None) -> str:
+        current = int(time.time()) if now is None else int(now)
+        key = _digest(challenge_id)
+        with self._lock:
+            state = self.store.load()
+            pending = state.setdefault("pending_verifications", {}).get(key)
+            valid = pending and pending.get("status") == "active" and int(pending.get("expires_at") or 0) > current and int(pending.get("attempts_left") or 0) > 0
+            if not valid or pending.get("phone_key_digest") != _digest(phone_key) or pending.get("code_digest") != _digest(code):
+                if valid:
+                    pending["attempts_left"] = int(pending["attempts_left"]) - 1
+                    self.store.save(state)
+                raise ValueError("The verification code is invalid or expired")
+            pending["status"] = "used"
+            self.store.save(state)
+        return self.issue_new_pharmacy_context(verified_phone_key=phone_key)
+
     def consume_new_pharmacy_context(self, token: str, *, phone_key: str) -> None:
         payload = self._require_signer().verify(token, expected_kind=EntryKind.NEW_PHARMACY)
         if payload.get("p") != "__new_pharmacy__":

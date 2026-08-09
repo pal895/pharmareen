@@ -140,6 +140,37 @@ def test_channel_verified_new_pharmacy_creates_one_tenant_owner_session_and_fron
     assert len(records) == 1
 
 
+def test_shared_link_verifies_inside_ms20_then_issues_one_use_setup_context(monkeypatch):
+    registry = FrontDoorRegistry(MemoryFrontDoorStore(), SignedEntryContext("public-start-signing-key-which-is-long-123"))
+    delivered = []
+    monkeypatch.setattr(main, "front_door_registry", registry)
+    monkeypatch.setattr(main, "queue_offline_whatsapp_confirmation", lambda phone, message, **kwargs: delivered.append((phone, message)) or {"queued": True})
+    with TestClient(main.app, base_url="https://ms20.test") as client:
+        page = client.get("/start")
+        started = client.post("/api/ms20/front-door/start", json={"phone": "+254700000777"})
+        code = delivered[0][1].split("code is ", 1)[1].split(".", 1)[0]
+        wrong = client.post("/api/ms20/front-door/verify", json={"phone": "+254700000777", "challenge_id": started.json()["challenge_id"], "code": "000000"})
+        verified = client.post("/api/ms20/front-door/verify", json={"phone": "+254700000777", "challenge_id": started.json()["challenge_id"], "code": code})
+        replay = client.post("/api/ms20/front-door/verify", json={"phone": "+254700000777", "challenge_id": started.json()["challenge_id"], "code": code})
+    assert page.status_code == 200
+    assert "channel" not in page.text.lower() and "whatsapp" not in page.text.lower()
+    assert started.status_code == 200 and wrong.status_code == 401 and verified.status_code == 200 and replay.status_code == 401
+    assert verified.json()["continue_path"].startswith("/main-app/new-pharmacy?entry=")
+
+
+def test_same_verified_owner_phone_can_hold_isolated_credentials_for_two_pharmacies():
+    auth = OwnerAuthService()
+    owner_a = {"pharmacy_id": "pharmacy-a", "pharmacy_name": "A", "owner_name": "Owner", "phone_number": "+254700000777"}
+    owner_b = {"pharmacy_id": "pharmacy-b", "pharmacy_name": "B", "owner_name": "Owner", "phone_number": "+254700000777"}
+    auth.initialize_first_owner(owner_a, "OwnerA123", now=100)
+    auth.initialize_first_owner(owner_b, "OwnerB123", now=100)
+    _, session_a = auth.sign_in_with_pin(owner_a["phone_number"], "OwnerA123", pharmacy_id="pharmacy-a", now=101)
+    _, session_b = auth.sign_in_with_pin(owner_b["phone_number"], "OwnerB123", pharmacy_id="pharmacy-b", now=101)
+    assert session_a.pharmacy_id == "pharmacy-a" and session_b.pharmacy_id == "pharmacy-b"
+    with pytest.raises(Exception):
+        auth.sign_in_with_pin(owner_a["phone_number"], "OwnerA123", now=101)
+
+
 def test_owner_invitation_and_staff_join_routes_are_one_use_and_do_not_create_a_tenant(monkeypatch):
     registry, _, store = services()
     monkeypatch.setattr(main, "front_door_registry", registry)

@@ -98,6 +98,10 @@ class OwnerAuthService:
         self._lock = RLock()
         self._load_state()
 
+    @staticmethod
+    def _credential_key(pharmacy_id: str, phone_key: str) -> str:
+        return f"{str(pharmacy_id).strip()}:{str(phone_key).strip()}"
+
     def configure_persistence(
         self,
         *,
@@ -203,7 +207,7 @@ class OwnerAuthService:
                 pin_hash=self._hash_pin(pin),
             )
             previous = dict(self._credentials)
-            self._credentials[phone_key] = credential
+            self._credentials[self._credential_key(pharmacy_id, phone_key)] = credential
             try:
                 self._save_state()
             except Exception:
@@ -231,18 +235,19 @@ class OwnerAuthService:
                 pharmacy_id=invitation.pharmacy_id, pharmacy_name=invitation.pharmacy_name,
                 owner_name=invitation.owner_name, pin_hash=self._hash_pin(pin),
             )
-            self._credentials[credential.phone_key] = credential
+            self._credentials[self._credential_key(credential.pharmacy_id, credential.phone_key)] = credential
             invitation.used_at = current
             self._save_state()
             return self._issue_session(credential, now=current)
 
-    def sign_in_with_pin(self, phone: str, pin: str, *, now: float | None = None) -> tuple[str, OwnerSession]:
+    def sign_in_with_pin(self, phone: str, pin: str, *, pharmacy_id: str = "", now: float | None = None) -> tuple[str, OwnerSession]:
         self._require_persistence()
         current = time.time() if now is None else now
         phone_key = registry_phone_key(phone)
         with self._lock:
             self._refresh_persistent_state()
-            credential = self._credentials.get(phone_key)
+            matches = [item for item in self._credentials.values() if item.phone_key == phone_key and (not pharmacy_id or item.pharmacy_id == pharmacy_id)]
+            credential = matches[0] if len(matches) == 1 else None
             if not credential or credential.locked_until > current:
                 raise self._unauthorized("The phone number or PIN is incorrect.")
             if not self._verify_pin(pin, credential.pin_hash):
@@ -273,13 +278,13 @@ class OwnerAuthService:
         with self._lock:
             self._refresh_persistent_state()
             matches = [(key, item) for key, item in self._credentials.items() if item.pharmacy_id == pharmacy_id and item.owner_id == owner_id]
-            if len(matches) != 1 or (new_key in self._credentials and self._credentials[new_key].pharmacy_id != pharmacy_id):
+            if len(matches) != 1:
                 raise HTTPException(status_code=409, detail="Owner phone change conflicts with existing access.")
             old_key, credential = matches[0]
             previous_credentials, previous_sessions = dict(self._credentials), dict(self._sessions)
             self._credentials.pop(old_key)
             credential.phone_key = new_key
-            self._credentials[new_key] = credential
+            self._credentials[self._credential_key(pharmacy_id, new_key)] = credential
             for session in self._sessions.values():
                 if session.pharmacy_id == pharmacy_id:
                     session.revoked = True

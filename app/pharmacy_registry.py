@@ -159,8 +159,9 @@ class GoogleSheetsPharmacyRegistry:
             return RegistryWriteResult(False, {}, False, "Google Sheets registry is not available.", error)
 
         phone = display_phone(details.get("phone_number") or details.get("phone"))
+        allow_additional = bool(details.get("allow_additional_pharmacy_for_verified_owner"))
         existing = self.find_by_phone(phone, active_only=False)
-        if existing:
+        if existing and not allow_additional:
             logger.info("PHARMACY_REGISTRY_DUPLICATE normalized_phone=%s pharmacy_id=%s", registry_phone_key(phone), existing.get("pharmacy_id", ""))
             return RegistryWriteResult(True, existing, False, "Pharmacy phone is already registered.")
 

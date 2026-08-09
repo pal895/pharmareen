@@ -69,12 +69,12 @@ def test_landing_page_and_manifest_work():
     assert root.status_code == 200
     assert root.json() == {"status": "running"}
     assert page.status_code == 200
-    assert "Run your pharmacy from WhatsApp" in page.text
-    assert "wa.me" in page.text
-    assert "create-qr-code" in page.text
-    assert "/status" in page.text
+    assert "Start MS2.0" in page.text
+    assert "verification code" in page.text
+    assert "WhatsApp" not in page.text
     assert manifest.status_code == 200
     assert manifest.json()["short_name"] == "MS2.0"
+    assert manifest.json()["start_url"] == "/start"
 
 
 def test_status_page_shows_startup_readiness_and_localhost_warning(monkeypatch):

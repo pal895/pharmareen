@@ -380,6 +380,50 @@ async def ms20_auth_session(actor: ActorContext = Depends(require_front_door_act
     }
 
 
+@app.post("/api/ms20/front-door/start")
+async def ms20_public_start(request: Request) -> dict[str, Any]:
+    """Begin the generic shared-link/native-app owner verification journey."""
+    payload = await request.json()
+    phone = str(payload.get("phone") or "") if isinstance(payload, dict) else ""
+    phone_key = registry_phone_key(phone)
+
+    def deliver(code: str) -> None:
+        queued = queue_offline_whatsapp_confirmation(
+            phone,
+            f"Your {APP_BRAND} verification code is {code}. It expires in 10 minutes. Do not share it.",
+            sensitive=True,
+        )
+        if not queued:
+            raise HTTPException(status_code=503, detail="Verification delivery is temporarily unavailable.")
+
+    try:
+        return get_front_door_registry().start_new_owner_verification(phone_key=phone_key, deliver_code=deliver)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/ms20/front-door/verify")
+async def ms20_public_verify(request: Request) -> dict[str, Any]:
+    payload = await request.json()
+    phone_key = registry_phone_key(str(payload.get("phone") or "")) if isinstance(payload, dict) else ""
+    try:
+        entry = get_front_door_registry().complete_new_owner_verification(
+            challenge_id=str(payload.get("challenge_id") or ""), phone_key=phone_key,
+            code=str(payload.get("code") or ""),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    return {"verified": True, "continue_path": f"/main-app/new-pharmacy?entry={quote(entry, safe='')}"}
+
+
+@app.get("/start", response_class=HTMLResponse, include_in_schema=False)
+async def ms20_public_start_page() -> HTMLResponse:
+    return HTMLResponse("""<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Start MS2.0</title>
+<style>body{font:17px system-ui;background:#f3f8f6;color:#12352e;margin:0;padding:20px}main{max-width:520px;margin:8vh auto;background:#fff;padding:28px;border-radius:24px}label{display:block;margin-top:16px;font-weight:700}input,button{font:inherit;width:100%;box-sizing:border-box;padding:15px;margin-top:7px;border-radius:12px;border:1px solid #9bb8b1}button{background:#167563;color:#fff;border:0;font-weight:800}.error{color:#9b1c1c}</style>
+<main><h1>Start MS2.0</h1><p>Create your pharmacy with a quick security check.</p><form id=p><label>Your phone number<input name=phone inputmode=tel autocomplete=tel required></label><button>Send verification code</button></form><form id=v hidden><label>Verification code<input name=code inputmode=numeric autocomplete=one-time-code pattern='[0-9]{6}' required></label><button>Continue</button></form><p id=m class=error role=alert></p></main>
+<script>let challenge='',phone='';p.onsubmit=async e=>{e.preventDefault();phone=new FormData(p).get('phone');m.textContent='Sending code…';const r=await fetch('/api/ms20/front-door/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})}),d=await r.json();if(r.ok){challenge=d.challenge_id;p.hidden=true;v.hidden=false;m.textContent='Enter the code sent to your phone.'}else m.textContent=d.detail||'Verification unavailable.'};v.onsubmit=async e=>{e.preventDefault();m.textContent='Verifying…';const r=await fetch('/api/ms20/front-door/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,challenge_id:challenge,code:new FormData(v).get('code')})}),d=await r.json();if(r.ok){sessionStorage.setItem('ms20-verified-phone',phone);location.replace(d.continue_path)}else m.textContent=d.detail||'That code could not be verified.'};</script>""", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
 @app.post("/api/ms20/front-door/new-pharmacy")
 async def ms20_front_door_new_pharmacy(request: Request) -> JSONResponse:
     """Complete a channel-verified, one-use new-pharmacy provisioning handoff."""
@@ -396,6 +440,7 @@ async def ms20_front_door_new_pharmacy(request: Request) -> JSONResponse:
         "location": str(payload.get("location") or "").strip(),
         "status": "active",
         "active": "yes",
+        "allow_additional_pharmacy_for_verified_owner": True,
     }
     if not entry or not phone_key or not details["pharmacy_name"] or not details["owner_name"] or not details["location"]:
         raise HTTPException(status_code=400, detail="Verified phone, pharmacy, owner and location are required")
@@ -434,8 +479,8 @@ async def ms20_new_pharmacy_page(entry: str = Query(default="")) -> HTMLResponse
         raise HTTPException(status_code=403, detail="Verified new-pharmacy entry is required")
     return HTMLResponse("""<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Create pharmacy</title>
 <style>body{font:17px system-ui;background:#f3f8f6;color:#12352e;margin:0;padding:20px}main{max-width:580px;margin:4vh auto;background:white;padding:26px;border-radius:24px}label{display:block;margin-top:15px;font-weight:700}input,button{font:inherit;width:100%;box-sizing:border-box;padding:14px;margin-top:6px;border-radius:12px;border:1px solid #9bb8b1}button{margin-top:22px;background:#167563;color:white;border:0;font-weight:800}.error{color:#9b1c1c}</style>
-<main><h1>Create your pharmacy</h1><p>Your phone was verified by the entry channel. Add the pharmacy details once, then create the Primary Owner PIN.</p><form id=f><label>Registered phone<input name=phone inputmode=tel autocomplete=tel required></label><label>Pharmacy name<input name=pharmacy_name required></label><label>Owner name<input name=owner_name required></label><label>Location<input name=location required></label><label>Primary Owner PIN<input name=pin type=password minlength=8 required></label><label><input name=accept type=checkbox required style='width:auto'> I accept the current Terms and Privacy Notice</label><button>Create pharmacy</button><p id=m class=error role=alert></p></form></main>
-<script>const entry=new URLSearchParams(location.search).get('entry');f.onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(f));m.textContent='Creating pharmacy…';const r=await fetch('/api/ms20/front-door/new-pharmacy',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({...d,entry,terms_version:'ms20-terms-2026-08',privacy_version:'ms20-privacy-2026-08'})});if(r.ok)location.replace('/main-app/');else m.textContent=(await r.json()).detail||'Pharmacy setup is unavailable.'};</script>""", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+<main><h1>Create your pharmacy</h1><p>Your identity is verified. Add the pharmacy details once, then create the Primary Owner PIN.</p><form id=f><label>Verified phone<input name=phone inputmode=tel autocomplete=tel required></label><label>Pharmacy name<input name=pharmacy_name required></label><label>Owner name<input name=owner_name required></label><label>Location<input name=location required></label><label>Primary Owner PIN<input name=pin type=password minlength=8 required></label><label><input name=accept type=checkbox required style='width:auto'> I accept the current Terms and Privacy Notice</label><button>Create pharmacy</button><p id=m class=error role=alert></p></form></main>
+<script>const entry=new URLSearchParams(location.search).get('entry'),verified=sessionStorage.getItem('ms20-verified-phone');if(verified){f.phone.value=verified;f.phone.readOnly=true}f.onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(f));m.textContent='Creating pharmacy…';const r=await fetch('/api/ms20/front-door/new-pharmacy',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({...d,entry,terms_version:'ms20-terms-2026-08',privacy_version:'ms20-privacy-2026-08'})});if(r.ok){sessionStorage.removeItem('ms20-verified-phone');location.replace('/main-app/')}else m.textContent=(await r.json()).detail||'Pharmacy setup is unavailable.'};</script>""", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 
 @app.post("/api/ms20/front-door/invitations")
@@ -835,7 +880,7 @@ async def ms20_owner_pin_sign_in(request: Request) -> JSONResponse:
     if owner_auth_service.pharmacy_owner_state(record) != "initialized":
         raise HTTPException(status_code=409, detail="Owner access is not initialized.")
     phone = str(record.get("phone_number") or record.get("phone") or "")
-    token, session = owner_auth_service.sign_in_with_pin(phone, pin)
+    token, session = owner_auth_service.sign_in_with_pin(phone, pin, pharmacy_id=str(record.get("pharmacy_id") or ""))
     if session.pharmacy_id != str(record.get("pharmacy_id") or ""):
         owner_auth_service.revoke(token)
         raise HTTPException(status_code=403, detail="This owner cannot access that pharmacy.")
@@ -2401,67 +2446,10 @@ def startup_status_page() -> str:
     """
 
 
-@app.get("/landing", response_class=HTMLResponse)
-def landing_page() -> str:
-    settings = get_settings()
-    whatsapp_number = settings.whatsapp_number.replace("whatsapp:", "") or "Your WhatsApp number"
-    click_link = whatsapp_click_link(settings.whatsapp_number)
-    public_status_url = f"{effective_app_base_url(settings)}/status"
-    qr_link = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + quote(click_link, safe="")
-    return f"""
-    <!doctype html>
-    <html lang="en">
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <link rel="manifest" href="/manifest.json">
-      <title>{APP_BRAND}</title>
-      <style>
-        body {{ margin:0; font-family: Arial, sans-serif; background:#f6f8fb; color:#14213d; }}
-        main {{ max-width: 760px; margin: 0 auto; padding: 32px 20px; }}
-        h1 {{ font-size: 34px; margin: 0 0 8px; }}
-        h2 {{ font-size: 20px; margin-top: 28px; }}
-        .panel {{ background:white; border:1px solid #d9e2ec; border-radius:8px; padding:18px; margin-top:18px; }}
-        .button {{ display:inline-block; background:#1f4e79; color:white; padding:12px 16px; border-radius:6px; text-decoration:none; font-weight:bold; }}
-        .qr {{ width:180px; height:180px; border:1px solid #d9e2ec; border-radius:8px; }}
-        code {{ background:#eef3f8; padding:3px 6px; border-radius:4px; }}
-        li {{ margin: 8px 0; }}
-      </style>
-    </head>
-    <body>
-      <main>
-        <h1>{APP_BRAND}</h1>
-        <p>Run your pharmacy from WhatsApp.</p>
-        <section class="panel">
-          <h2>Save This WhatsApp Number</h2>
-          <p><strong>{whatsapp_number}</strong></p>
-          <p>Save this WhatsApp number and send <code>start</code>.</p>
-          <p><a class="button" href="{click_link}">Open WhatsApp</a></p>
-          <p><img class="qr" alt="WhatsApp start QR code" src="{qr_link}"></p>
-        </section>
-        <section class="panel">
-          <h2>Basic Commands</h2>
-          <ul>
-            <li><code>Panadol 2</code> records a sale.</li>
-            <li><code>+Panadol 20 2000</code> records stock received and cost.</li>
-            <li><code>Panadol stock</code> checks stock.</li>
-            <li><code>Insulin no stock</code> records missed demand.</li>
-            <li><code>report today</code> sends a WhatsApp summary and PDF download link.</li>
-          </ul>
-        </section>
-        <section class="panel">
-          <h2>Reports</h2>
-          <p>Daily and weekly reports are generated as printable PDFs with phone download links.</p>
-          <p>Production status: <a href="{public_status_url}">{public_status_url}</a></p>
-        </section>
-        <section class="panel">
-          <h2>Support</h2>
-          <p>{settings.support_contact}</p>
-        </section>
-      </main>
-    </body>
-    </html>
-    """
+@app.get("/landing", include_in_schema=False)
+def landing_page() -> RedirectResponse:
+    """Preserve old shared links while making the customer front door canonical."""
+    return RedirectResponse(url="/start", status_code=307)
 
 
 @app.get("/manifest.json")
@@ -2470,7 +2458,7 @@ def manifest() -> JSONResponse:
         {
             "name": APP_BRAND,
             "short_name": APP_BRAND,
-            "start_url": "/landing",
+            "start_url": "/start",
             "display": "standalone",
             "background_color": "#f6f8fb",
             "theme_color": "#1f4e79",
