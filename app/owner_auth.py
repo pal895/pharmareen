@@ -98,11 +98,12 @@ class OwnerAuthService:
         """Switch to a shared durable store and refresh state from it."""
         with self._lock:
             data = loader()
-            activations, credentials = self._decode_state(data)
+            activations, credentials, sessions = self._decode_state(data)
             self._state_loader = loader
             self._state_saver = saver
             self._activations = activations
             self._credentials = credentials
+            self._sessions = sessions
             self._persistence_available = True
 
     def mark_persistence_unavailable(self) -> None:
@@ -231,6 +232,7 @@ class OwnerAuthService:
         current = time.time() if now is None else now
         phone_key = registry_phone_key(phone)
         with self._lock:
+            self._refresh_persistent_state()
             credential = self._credentials.get(phone_key)
             if not credential or credential.locked_until > current:
                 raise self._unauthorized("The phone number or PIN is incorrect.")
@@ -257,6 +259,7 @@ class OwnerAuthService:
         token = secrets.token_urlsafe(32)
         session = OwnerSession(self._digest(token), credential.owner_id, credential.pharmacy_id, "owner", credential.owner_name, now + self.session_ttl_seconds)
         self._sessions[session.session_digest] = session
+        self._save_state()
         return token, session
 
     @staticmethod
@@ -285,20 +288,22 @@ class OwnerAuthService:
                 data = json.loads(self._state_path.read_text(encoding="utf-8"))
             else:
                 return
-            self._activations, self._credentials = self._decode_state(data)
+            self._activations, self._credentials, self._sessions = self._decode_state(data)
         except Exception:
-            self._activations, self._credentials = {}, {}
+            self._activations, self._credentials, self._sessions = {}, {}, {}
 
     @staticmethod
-    def _decode_state(data: dict[str, Any]) -> tuple[dict[str, ActivationInvitation], dict[str, OwnerCredential]]:
+    def _decode_state(data: dict[str, Any]) -> tuple[dict[str, ActivationInvitation], dict[str, OwnerCredential], dict[str, OwnerSession]]:
         activations = {k: ActivationInvitation(**v) for k, v in data.get("activations", {}).items()}
         credentials = {k: OwnerCredential(**v) for k, v in data.get("credentials", {}).items()}
-        return activations, credentials
+        sessions = {k: OwnerSession(**v) for k, v in data.get("sessions", {}).items()}
+        return activations, credentials, sessions
 
     def _save_state(self) -> None:
         payload = {
             "activations": {k: vars(v) for k, v in self._activations.items()},
             "credentials": {k: vars(v) for k, v in self._credentials.items()},
+            "sessions": {k: vars(v) for k, v in self._sessions.items()},
         }
         if self._state_saver:
             self._state_saver(payload)
@@ -313,9 +318,10 @@ class OwnerAuthService:
     def _refresh_persistent_state(self) -> None:
         if not self._state_loader:
             return
-        activations, credentials = self._decode_state(self._state_loader())
+        activations, credentials, sessions = self._decode_state(self._state_loader())
         self._activations = activations
         self._credentials = credentials
+        self._sessions = sessions
 
     def start_login(
         self,
@@ -365,6 +371,7 @@ class OwnerAuthService:
                 expires_at=current + self.session_ttl_seconds,
             )
             self._sessions[session.session_digest] = session
+            self._save_state()
             return token, session
 
     def authenticate(
@@ -378,6 +385,7 @@ class OwnerAuthService:
         current = time.time() if now is None else now
         digest = self._digest(token) if token else ""
         with self._lock:
+            self._refresh_persistent_state()
             session = self._sessions.get(digest)
             if not session or session.revoked or session.expires_at <= current:
                 raise self._unauthorized("Owner sign-in required.")
@@ -396,9 +404,11 @@ class OwnerAuthService:
     def revoke(self, token: str | None) -> None:
         digest = self._digest(token) if token else ""
         with self._lock:
+            self._refresh_persistent_state()
             session = self._sessions.get(digest)
             if session:
                 session.revoked = True
+                self._save_state()
 
     @staticmethod
     def _digest(value: str | None) -> str:

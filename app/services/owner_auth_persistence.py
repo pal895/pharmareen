@@ -8,6 +8,7 @@ from app.services.pharmacy_onboarding import PharmacyOnboardingService, admin_sh
 
 ACTIVATION_SHEET = "Owner_Activations"
 CREDENTIAL_SHEET = "Owner_Credentials"
+SESSION_SHEET = "Owner_Sessions"
 ACTIVATION_HEADERS = [
     "Token Digest", "Owner ID", "Phone Key", "Pharmacy ID", "Pharmacy Name",
     "Owner Name", "Expires At", "Used At",
@@ -15,6 +16,10 @@ ACTIVATION_HEADERS = [
 CREDENTIAL_HEADERS = [
     "Phone Key", "Owner ID", "Pharmacy ID", "Pharmacy Name", "Owner Name",
     "PIN Hash", "Failed Attempts", "Locked Until",
+]
+SESSION_HEADERS = [
+    "Session Digest", "Actor ID", "Pharmacy ID", "Role", "Display Name",
+    "Expires At", "Revoked",
 ]
 
 
@@ -31,7 +36,9 @@ def owner_auth_sheet_id(settings: Settings) -> str:
 class GoogleSheetsOwnerAuthStateStore:
     """Durable owner-auth state in the protected PharMareen admin workbook.
 
-    Raw activation values, private PINs, and session cookies are never written.
+    Raw activation values, private PINs, and raw session cookies are never written.
+    Only one-way session digests and their authorization envelope are shared so
+    authenticated requests survive deployment process handoffs.
     """
 
     def __init__(self, settings: Settings):
@@ -47,8 +54,10 @@ class GoogleSheetsOwnerAuthStateStore:
         spreadsheet = self._spreadsheet()
         activations_ws = ensure_worksheet(spreadsheet, ACTIVATION_SHEET, ACTIVATION_HEADERS)
         credentials_ws = ensure_worksheet(spreadsheet, CREDENTIAL_SHEET, CREDENTIAL_HEADERS)
+        sessions_ws = ensure_worksheet(spreadsheet, SESSION_SHEET, SESSION_HEADERS)
         activations: dict[str, Any] = {}
         credentials: dict[str, Any] = {}
+        sessions: dict[str, Any] = {}
         for row in activations_ws.get_all_records():
             digest = str(row.get("Token Digest") or "").strip()
             if digest:
@@ -75,12 +84,25 @@ class GoogleSheetsOwnerAuthStateStore:
                     "failed_attempts": int(row.get("Failed Attempts") or 0),
                     "locked_until": float(row.get("Locked Until") or 0),
                 }
-        return {"activations": activations, "credentials": credentials}
+        for row in sessions_ws.get_all_records():
+            digest = str(row.get("Session Digest") or "").strip()
+            if digest:
+                sessions[digest] = {
+                    "session_digest": digest,
+                    "actor_id": str(row.get("Actor ID") or ""),
+                    "pharmacy_id": str(row.get("Pharmacy ID") or ""),
+                    "role": str(row.get("Role") or ""),
+                    "display_name": str(row.get("Display Name") or ""),
+                    "expires_at": float(row.get("Expires At") or 0),
+                    "revoked": str(row.get("Revoked") or "").strip().lower() in {"true", "yes", "1"},
+                }
+        return {"activations": activations, "credentials": credentials, "sessions": sessions}
 
     def save(self, payload: dict[str, Any]) -> None:
         spreadsheet = self._spreadsheet()
         activations_ws = ensure_worksheet(spreadsheet, ACTIVATION_SHEET, ACTIVATION_HEADERS)
         credentials_ws = ensure_worksheet(spreadsheet, CREDENTIAL_SHEET, CREDENTIAL_HEADERS)
+        sessions_ws = ensure_worksheet(spreadsheet, SESSION_SHEET, SESSION_HEADERS)
         activation_rows = [
             [
                 value["token_digest"], value["owner_id"], value["phone_key"],
@@ -97,7 +119,17 @@ class GoogleSheetsOwnerAuthStateStore:
             ]
             for value in payload.get("credentials", {}).values()
         ]
+        session_rows = [
+            [
+                value["session_digest"], value["actor_id"], value["pharmacy_id"],
+                value["role"], value["display_name"], value["expires_at"],
+                value["revoked"],
+            ]
+            for value in payload.get("sessions", {}).values()
+        ]
         activations_ws.clear()
         activations_ws.update("A1", [ACTIVATION_HEADERS, *activation_rows])
         credentials_ws.clear()
         credentials_ws.update("A1", [CREDENTIAL_HEADERS, *credential_rows])
+        sessions_ws.clear()
+        sessions_ws.update("A1", [SESSION_HEADERS, *session_rows])

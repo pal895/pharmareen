@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import json
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
@@ -84,6 +85,30 @@ def test_expired_and_revoked_sessions_are_blocked():
     token, _ = revocable.verify_login(started["challenge_id"], delivered[0][1], now=101.0)
     revocable.revoke(token)
     assert_http_error(401, lambda: revocable.authenticate(token, now=102.0))
+
+
+def test_authenticated_session_survives_process_handoff_and_shared_revocation():
+    durable = {}
+
+    def load():
+        return json.loads(json.dumps(durable))
+
+    def save(payload):
+        durable.clear()
+        durable.update(json.loads(json.dumps(payload)))
+
+    first = OwnerAuthService()
+    first.configure_persistence(loader=load, saver=save)
+    first.initialize_first_owner(OWNER, "Owner1234", now=100.0)
+    token, session = first.sign_in_with_pin(OWNER["phone_number"], "Owner1234", now=101.0)
+
+    replacement = OwnerAuthService()
+    replacement.configure_persistence(loader=load, saver=save)
+    actor = replacement.authenticate(token, pharmacy_id=session.pharmacy_id, now=102.0)
+    assert actor.actor_id == session.actor_id
+
+    replacement.revoke(token)
+    assert_http_error(401, lambda: first.authenticate(token, now=103.0))
 
 
 def test_unknown_phone_is_not_enumerated_and_no_secret_uses_client_storage_or_ui():
