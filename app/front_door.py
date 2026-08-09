@@ -251,7 +251,17 @@ class FrontDoorRegistry:
             }
             self.store.save(state)
         try:
-            deliver_code(code)
+            receipt = deliver_code(code)
+            if not isinstance(receipt, Mapping) or not str(receipt.get("message_id") or "").strip():
+                raise RuntimeError("Verification provider did not accept delivery")
+            with self._lock:
+                state = self.store.load()
+                pending = state.setdefault("pending_verifications", {}).get(_digest(challenge))
+                if pending:
+                    pending["delivery_provider"] = str(receipt.get("provider") or "")
+                    pending["delivery_receipt_digest"] = _digest(str(receipt["message_id"]))
+                    pending["delivery_status"] = "provider_accepted"
+                    self.store.save(state)
         except Exception:
             with self._lock:
                 state = self.store.load()

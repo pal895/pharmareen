@@ -55,6 +55,7 @@ from app.reliability import ProductionReliabilityEngine, SyncEnvelope
 from app.reports import LowStockWarning, ReportMetrics, ReportService, build_report_metrics, build_transaction_metrics, low_stock_from_items
 from app.routes.admin import router as admin_router
 from app.routes.meta_webhook import meta_callback_router, router as meta_whatsapp_router
+from app.providers.meta_whatsapp import MetaWhatsAppClient
 from app.routes.offline_sync import router as offline_sync_router
 from app.sale_numbering import DailySaleLedger
 from app.services.medicine_catalog import (
@@ -387,19 +388,16 @@ async def ms20_public_start(request: Request) -> dict[str, Any]:
     phone = str(payload.get("phone") or "") if isinstance(payload, dict) else ""
     phone_key = registry_phone_key(phone)
 
-    def deliver(code: str) -> None:
-        queued = queue_offline_whatsapp_confirmation(
-            phone,
-            f"Your {APP_BRAND} verification code is {code}. It expires in 10 minutes. Do not share it.",
-            sensitive=True,
-        )
-        if not queued:
-            raise HTTPException(status_code=503, detail="Verification delivery is temporarily unavailable.")
+    def deliver(code: str) -> dict[str, str]:
+        return MetaWhatsAppClient(get_settings()).send_verification_code(phone, code)
 
     try:
         return get_front_door_registry().start_new_owner_verification(phone_key=phone_key, deliver_code=deliver)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.warning("NEW_OWNER_VERIFICATION_DELIVERY_FAILED phone=%s reason=%s", mask_phone(phone), type(exc).__name__)
+        raise HTTPException(status_code=503, detail="We could not send a verification code. Check the number and try again.") from exc
 
 
 @app.post("/api/ms20/front-door/verify")
@@ -419,9 +417,9 @@ async def ms20_public_verify(request: Request) -> dict[str, Any]:
 @app.get("/start", response_class=HTMLResponse, include_in_schema=False)
 async def ms20_public_start_page() -> HTMLResponse:
     return HTMLResponse("""<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Start MS2.0</title>
-<style>body{font:17px system-ui;background:#f3f8f6;color:#12352e;margin:0;padding:20px}main{max-width:520px;margin:8vh auto;background:#fff;padding:28px;border-radius:24px}label{display:block;margin-top:16px;font-weight:700}input,button{font:inherit;width:100%;box-sizing:border-box;padding:15px;margin-top:7px;border-radius:12px;border:1px solid #9bb8b1}button{background:#167563;color:#fff;border:0;font-weight:800}.error{color:#9b1c1c}</style>
-<main><h1>Start MS2.0</h1><p>Create your pharmacy with a quick security check.</p><form id=p><label>Your phone number<input name=phone inputmode=tel autocomplete=tel required></label><button>Send verification code</button></form><form id=v hidden><label>Verification code<input name=code inputmode=numeric autocomplete=one-time-code pattern='[0-9]{6}' required></label><button>Continue</button></form><p id=m class=error role=alert></p></main>
-<script>let challenge='',phone='';p.onsubmit=async e=>{e.preventDefault();phone=new FormData(p).get('phone');m.textContent='Sending code…';const r=await fetch('/api/ms20/front-door/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})}),d=await r.json();if(r.ok){challenge=d.challenge_id;p.hidden=true;v.hidden=false;m.textContent='Enter the code sent to your phone.'}else m.textContent=d.detail||'Verification unavailable.'};v.onsubmit=async e=>{e.preventDefault();m.textContent='Verifying…';const r=await fetch('/api/ms20/front-door/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,challenge_id:challenge,code:new FormData(v).get('code')})}),d=await r.json();if(r.ok){sessionStorage.setItem('ms20-verified-phone',phone);location.replace(d.continue_path)}else m.textContent=d.detail||'That code could not be verified.'};</script>""", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+<style>body{font:17px system-ui;background:#f3f8f6;color:#12352e;margin:0;padding:20px}main{max-width:520px;margin:8vh auto;background:#fff;padding:28px;border-radius:24px}label{display:block;margin-top:16px;font-weight:700}input,button{font:inherit;width:100%;box-sizing:border-box;padding:15px;margin-top:7px;border-radius:12px;border:1px solid #9bb8b1}button{background:#167563;color:#fff;border:0;font-weight:800}.back{width:auto;background:transparent;color:#12352e;border:0;padding:4px;margin:0 0 10px;font-size:26px}.error{color:#9b1c1c}</style>
+<main><button id=b class=back type=button hidden aria-label='Change phone number'>←</button><h1>Start MS2.0</h1><p>Create your pharmacy with a quick security check.</p><form id=p><label>Your phone number<input name=phone inputmode=tel autocomplete=tel required></label><button id=s>Send verification code</button></form><form id=v hidden><label>Verification code<input name=code inputmode=numeric autocomplete=one-time-code pattern='[0-9]{6}' required></label><button>Continue</button></form><p id=m class=error role=alert></p></main>
+<script>let challenge='',phone='';const showPhone=()=>{v.hidden=true;p.hidden=false;b.hidden=true;challenge='';m.textContent='';p.phone.focus()};b.onclick=showPhone;p.onsubmit=async e=>{e.preventDefault();phone=new FormData(p).get('phone');s.disabled=true;m.textContent='Sending code…';try{const r=await fetch('/api/ms20/front-door/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})}),d=await r.json();if(r.ok){challenge=d.challenge_id;p.hidden=true;v.hidden=false;b.hidden=false;m.textContent='Enter the code sent to your phone.'}else m.textContent=d.detail||'We could not send a verification code.'}catch{m.textContent='We could not send a verification code. Check your connection and try again.'}finally{s.disabled=false}};v.onsubmit=async e=>{e.preventDefault();m.textContent='Verifying…';const r=await fetch('/api/ms20/front-door/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,challenge_id:challenge,code:new FormData(v).get('code')})}),d=await r.json();if(r.ok){sessionStorage.setItem('ms20-verified-phone',phone);location.replace(d.continue_path)}else m.textContent=d.detail||'That code could not be verified.'};</script>""", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 
 @app.post("/api/ms20/front-door/new-pharmacy")

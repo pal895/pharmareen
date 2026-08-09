@@ -144,11 +144,15 @@ def test_shared_link_verifies_inside_ms20_then_issues_one_use_setup_context(monk
     registry = FrontDoorRegistry(MemoryFrontDoorStore(), SignedEntryContext("public-start-signing-key-which-is-long-123"))
     delivered = []
     monkeypatch.setattr(main, "front_door_registry", registry)
-    monkeypatch.setattr(main, "queue_offline_whatsapp_confirmation", lambda phone, message, **kwargs: delivered.append((phone, message)) or {"queued": True})
+    class Delivery:
+        def send_verification_code(self, phone, code):
+            delivered.append((phone, code))
+            return {"provider": "meta_whatsapp", "message_id": "wamid.accepted"}
+    monkeypatch.setattr(main, "MetaWhatsAppClient", lambda settings: Delivery())
     with TestClient(main.app, base_url="https://ms20.test") as client:
         page = client.get("/start")
         started = client.post("/api/ms20/front-door/start", json={"phone": "+254700000777"})
-        code = delivered[0][1].split("code is ", 1)[1].split(".", 1)[0]
+        code = delivered[0][1]
         wrong = client.post("/api/ms20/front-door/verify", json={"phone": "+254700000777", "challenge_id": started.json()["challenge_id"], "code": "000000"})
         verified = client.post("/api/ms20/front-door/verify", json={"phone": "+254700000777", "challenge_id": started.json()["challenge_id"], "code": code})
         replay = client.post("/api/ms20/front-door/verify", json={"phone": "+254700000777", "challenge_id": started.json()["challenge_id"], "code": code})
@@ -156,6 +160,23 @@ def test_shared_link_verifies_inside_ms20_then_issues_one_use_setup_context(monk
     assert "channel" not in page.text.lower() and "whatsapp" not in page.text.lower()
     assert started.status_code == 200 and wrong.status_code == 401 and verified.status_code == 200 and replay.status_code == 401
     assert verified.json()["continue_path"].startswith("/main-app/new-pharmacy?entry=")
+
+
+def test_start_stays_on_phone_screen_when_provider_does_not_accept_and_has_change_number_back(monkeypatch):
+    registry = FrontDoorRegistry(MemoryFrontDoorStore(), SignedEntryContext("delivery-failure-signing-key-long-enough-123"))
+    class UnavailableDelivery:
+        def send_verification_code(self, phone, code):
+            raise RuntimeError("provider unavailable")
+    monkeypatch.setattr(main, "front_door_registry", registry)
+    monkeypatch.setattr(main, "MetaWhatsAppClient", lambda settings: UnavailableDelivery())
+    with TestClient(main.app, base_url="https://ms20.test") as client:
+        page = client.get("/start")
+        failed = client.post("/api/ms20/front-door/start", json={"phone": "+254700000777"})
+    assert failed.status_code == 503
+    assert "could not send" in failed.json()["detail"]
+    assert "Change phone number" in page.text and "b.onclick=showPhone" in page.text
+    assert "if(r.ok){challenge=d.challenge_id;p.hidden=true" in page.text
+    assert registry.store.load().get("pending_verifications", {}) == {}
 
 
 def test_same_verified_owner_phone_can_hold_isolated_credentials_for_two_pharmacies():

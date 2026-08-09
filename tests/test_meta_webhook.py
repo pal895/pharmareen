@@ -154,3 +154,30 @@ def test_meta_callback_post_accepts_sample_payload(monkeypatch):
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_meta_verification_template_requires_configuration_and_provider_receipt(monkeypatch):
+    from app.config import Settings
+    from app.providers.meta_whatsapp import MetaWhatsAppClient
+    import pytest
+
+    with pytest.raises(RuntimeError, match="not configured"):
+        MetaWhatsAppClient(Settings(_env_file=None)).send_verification_code("+254700000001", "123456")
+
+    captured = {}
+    class Response:
+        def raise_for_status(self): pass
+        def json(self): return {"messages": [{"id": "wamid.accepted"}]}
+    class Client:
+        def __init__(self, **kwargs): pass
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def post(self, url, json, headers):
+            captured.update(url=url, json=json, headers=headers)
+            return Response()
+    monkeypatch.setattr("app.providers.meta_whatsapp.httpx.Client", Client)
+    settings = Settings(_env_file=None, meta_access_token="token", meta_phone_number_id="phone-id", meta_verification_template_name="ms20_owner_code")
+    receipt = MetaWhatsAppClient(settings).send_verification_code("+254 700 000 001", "123456")
+    assert receipt == {"provider": "meta_whatsapp", "message_id": "wamid.accepted"}
+    assert captured["json"]["to"] == "+254700000001"
+    assert captured["json"]["template"]["components"][0]["parameters"][0]["text"] == "123456"
