@@ -169,6 +169,7 @@ def test_post_authentication_operations_setup_is_not_mislabeled_as_owner_setup()
 
 
 def test_authenticated_operations_bootstrap_resumes_durable_existing_pharmacy(monkeypatch):
+    from app.front_door import FrontDoorRegistry, MemoryFrontDoorStore
     class Store:
         is_available = True
 
@@ -185,6 +186,7 @@ def test_authenticated_operations_bootstrap_resumes_durable_existing_pharmacy(mo
     monkeypatch.setattr(main, "get_sheet_store", lambda: Store())
     try:
         with TestClient(main.app, base_url="https://ms20.test") as client:
+            monkeypatch.setattr(main, "front_door_registry", FrontDoorRegistry(MemoryFrontDoorStore()))
             response = client.get("/api/ms20/operations/bootstrap")
     finally:
         main.app.dependency_overrides.pop(main.require_owner_actor, None)

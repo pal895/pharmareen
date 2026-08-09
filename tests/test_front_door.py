@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.front_door import EntryKind, EntryState, SignedEntryContext, can_manage, resolve_front_door
+from app.front_door import EntryKind, EntryState, FrontDoorRegistry, MemoryFrontDoorStore, SignedEntryContext, can_manage, resolve_front_door
 
 
 def decision(**overrides):
@@ -33,6 +33,14 @@ def test_unavailable_durable_state_never_exposes_setup_or_recovery():
     assert result.allow_recovery is False
 
 
+def test_established_trusted_device_can_start_offline_but_unknown_or_revoked_device_cannot():
+    offline = decision(durable_state_available=False, trusted_cached_established=True)
+    revoked = decision(durable_state_available=False, trusted_cached_established=True, device_active=False)
+    assert offline.state == EntryState.ESTABLISHED
+    assert offline.reason == "trusted_offline_resume"
+    assert revoked.state == EntryState.AUTHENTICATION_REQUIRED
+
+
 def test_staff_cannot_create_or_recover_a_pharmacy():
     result = decision(actor_id="staff-a", role="cashier", entry_kind=EntryKind.STAFF_INVITATION)
     assert result.state == EntryState.STAFF_INVITATION_REQUIRED
@@ -58,3 +66,105 @@ def test_owner_only_authorities_remain_fixed_and_explicit():
     assert can_manage({"billing"}, "manager", "billing") is True
     assert can_manage(set(), "manager", "billing") is False
     assert can_manage({"billing"}, "cashier", "billing") is False
+
+
+def registry():
+    store = MemoryFrontDoorStore()
+    signer = SignedEntryContext("entry-secret-which-is-long-enough-123", ttl_seconds=600)
+    return FrontDoorRegistry(store, signer), store
+
+
+def test_pharmacy_foundation_allocates_collision_safe_shared_identities_once():
+    service, _ = registry()
+    first = service.initialize_pharmacy(pharmacy_id="pharmacy-a", owner_id="owner-a", owner_name="Owner A", owner_phone_key="2547001")
+    repeated = service.initialize_pharmacy(pharmacy_id="pharmacy-a", owner_id="owner-a", owner_name="Owner A", owner_phone_key="2547001")
+    second = service.initialize_pharmacy(pharmacy_id="pharmacy-b", owner_id="owner-b", owner_name="Owner B", owner_phone_key="2547002")
+    assert first["community"]["community_id"] == repeated["community"]["community_id"] == "001"
+    assert second["community"]["community_id"] == "002"
+    assert first["loyalty"]["pool_scope"] == "pharmacy"
+    assert first["billing"]["active_seats"] == 1
+    assert first["billing"]["device_count_is_seat_count"] is False
+
+
+def test_empty_tenant_classification_is_owner_only_and_cannot_flip():
+    service, _ = registry()
+    service.initialize_pharmacy(pharmacy_id="pharmacy-a", owner_id="owner-a", owner_name="Owner A", owner_phone_key="2547001")
+    classified = service.classify_empty_pharmacy("pharmacy-a", owner_id="owner-a", classification="legacy_recovery")
+    assert classified["entry_classification"] == "legacy_recovery"
+    with pytest.raises(ValueError):
+        service.classify_empty_pharmacy("pharmacy-a", owner_id="owner-a", classification="genuinely_new")
+
+
+def test_invitation_join_is_one_use_role_fixed_and_does_not_create_another_pharmacy():
+    service, store = registry()
+    service.initialize_pharmacy(pharmacy_id="pharmacy-a", owner_id="owner-a", owner_name="Owner A", owner_phone_key="2547001")
+    token = service.issue_invitation("pharmacy-a", owner_id="owner-a", role="cashier", display_name="Mary")
+    member = service.accept_invitation(token, actor_id="staff-a", verified_identity=True, device_key="phone-a")
+    assert member["role"] == "cashier"
+    state = store.load()
+    assert list(state["pharmacies"]) == ["pharmacy-a"]
+    assert state["pharmacies"]["pharmacy-a"]["billing"]["active_seats"] == 2
+    with pytest.raises(ValueError):
+        service.accept_invitation(token, actor_id="staff-b", verified_identity=True)
+
+
+def test_devices_do_not_multiply_seats_and_revocation_is_durable():
+    service, store = registry()
+    service.initialize_pharmacy(pharmacy_id="pharmacy-a", owner_id="owner-a", owner_name="Owner A", owner_phone_key="2547001")
+    service.bind_device("pharmacy-a", actor_id="owner-a", device_key="old-phone")
+    service.bind_device("pharmacy-a", actor_id="owner-a", device_key="replacement-phone")
+    service.revoke_device("pharmacy-a", owner_id="owner-a", device_key="old-phone")
+    pharmacy = store.load()["pharmacies"]["pharmacy-a"]
+    assert pharmacy["billing"]["active_seats"] == 1
+    assert sorted(device["status"] for device in pharmacy["devices"].values()) == ["active", "revoked"]
+
+
+def test_owner_phone_change_and_recovery_force_session_device_and_quick_pin_recheck():
+    service, store = registry()
+    service.initialize_pharmacy(pharmacy_id="pharmacy-a", owner_id="owner-a", owner_name="Owner A", owner_phone_key="2547001")
+    service.bind_device("pharmacy-a", actor_id="owner-a", device_key="phone-a")
+    with pytest.raises(ValueError):
+        service.change_owner_phone("pharmacy-a", owner_id="owner-a", new_phone_key="2547002", current_owner_verified=True, new_phone_verified=False)
+    result = service.change_owner_phone("pharmacy-a", owner_id="owner-a", new_phone_key="2547002", current_owner_verified=True, new_phone_verified=True)
+    recovery = service.complete_account_recovery("pharmacy-a", owner_id="owner-a", verified_identity=True)
+    assert result == recovery == {"revoke_sessions": True, "recheck_devices": True, "recheck_quick_pin": True}
+    assert next(iter(store.load()["pharmacies"]["pharmacy-a"]["devices"].values()))["status"] == "recheck_required"
+
+
+def test_community_loyalty_and_billing_authority_are_pharmacy_bound():
+    service, _ = registry()
+    service.initialize_pharmacy(pharmacy_id="pharmacy-a", owner_id="owner-a", owner_name="Owner A", owner_phone_key="2547001")
+    token = service.issue_invitation("pharmacy-a", owner_id="owner-a", role="cashier", display_name="Mary")
+    service.accept_invitation(token, actor_id="staff-a", verified_identity=True)
+    owner = service.pharmacy_authorities("pharmacy-a", actor_id="owner-a")
+    staff = service.pharmacy_authorities("pharmacy-a", actor_id="staff-a")
+    assert owner["community"] == staff["community"]
+    assert owner["loyalty"] == staff["loyalty"]
+    assert owner["may_redeem"] is True
+    assert staff["may_redeem"] is False
+    assert staff["may_post"] is False
+
+
+def test_referral_entry_is_signed_pharmacy_pooled_one_time_and_not_device_multiplied():
+    service, store = registry()
+    service.initialize_pharmacy(pharmacy_id="pharmacy-a", owner_id="owner-a", owner_name="Owner A", owner_phone_key="2547001")
+    service.initialize_pharmacy(pharmacy_id="pharmacy-b", owner_id="owner-b", owner_name="Owner B", owner_phone_key="2547002")
+    token = service.issue_referral_context("pharmacy-a", owner_id="owner-a")
+    service.attribute_referral(token, new_pharmacy_id="pharmacy-b", new_owner_id="owner-b")
+    assert store.load()["pharmacies"]["pharmacy-b"]["loyalty"]["referred_by_pharmacy_id"] == "pharmacy-a"
+    with pytest.raises(ValueError):
+        service.attribute_referral(token, new_pharmacy_id="pharmacy-b", new_owner_id="owner-b")
+
+
+def test_provisioning_resume_compliance_subscription_and_quick_pin_boundaries_are_initialized():
+    service, store = registry()
+    foundation = service.initialize_pharmacy(pharmacy_id="pharmacy-a", owner_id="owner-a", owner_name="Owner A", owner_phone_key="2547001")
+    assert foundation["billing"]["subscription_status"] == "unqualified"
+    service.record_provisioning_resume("pharmacy-a", owner_id="owner-a", failed_step="catalog", resume_token="raw-resume-token")
+    service.record_owner_acceptance("pharmacy-a", owner_id="owner-a", terms_version="terms-v1", privacy_version="privacy-v1")
+    service.bind_device("pharmacy-a", actor_id="owner-a", device_key="phone-a")
+    pharmacy = store.load()["pharmacies"]["pharmacy-a"]
+    assert pharmacy["provisioning"]["status"] == "resume_required"
+    assert pharmacy["provisioning"]["resume_token_digest"] != "raw-resume-token"
+    assert pharmacy["compliance"]["terms_version"] == "terms-v1"
+    assert next(iter(pharmacy["devices"].values()))["quick_pin_trust"] == "disabled"

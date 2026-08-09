@@ -42,7 +42,7 @@ from app.config import Settings, get_settings
 from app.correction_learning import CorrectionLearningEngine
 from app.demo_store import DemoPharmacyStore
 from app.deployment import PharmacyDeploymentEngine, normalize_id as normalize_runtime_id
-from app.front_door import resolve_front_door
+from app.front_door import FrontDoorRegistry, SignedEntryContext, resolve_front_door
 from app.intake import IntakeService, normalize_key, normalize_spoken_command_text, parse_operating_commands, replace_number_words
 from app.local_first_parser import LocalFirstParser
 from app.live_pilot import LivePharmacyPilotEngine
@@ -80,6 +80,7 @@ from app.services.photo_intake import (
 )
 from app.services.pharmacy_engine import parse_payment_method
 from app.services.owner_auth_persistence import GoogleSheetsOwnerAuthStateStore, owner_auth_sheet_id
+from app.services.front_door_persistence import GoogleSheetsFrontDoorStore
 from app.services.pharmacy_onboarding import has_google_credentials
 from app.sheets import GoogleSheetsStore, SHEETS_UNAVAILABLE_MESSAGE, SheetsUnavailableError
 from app.training_store import TrainingStore
@@ -129,6 +130,7 @@ main_app_invoice_ocr_cache: dict[str, dict[str, Any]] = {}
 main_app_stock_fix_ocr_cache: dict[str, dict[str, Any]] = {}
 PENDING_VOICE_TTL_SECONDS = 600
 startup_status_printed = False
+front_door_registry: FrontDoorRegistry | None = None
 XML_CONTENT_TYPE = "application/xml"
 last_openai_error: dict[str, Any] = {
     "feature": "",
@@ -274,6 +276,7 @@ def save_offline_confirmation_state() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global front_door_registry
     load_offline_confirmation_state()
     settings = get_settings()
     if owner_auth_service is DEFAULT_OWNER_AUTH_SERVICE:
@@ -288,6 +291,16 @@ async def lifespan(app: FastAPI):
         else:
             owner_auth_service.mark_persistence_unavailable()
             logger.error("Owner authentication durable store is not configured; activation remains disabled")
+    if has_google_credentials(settings) and owner_auth_sheet_id(settings):
+        try:
+            signing_key = os.getenv("PHARMAREEN_TENANT_ROUTING_KEY", "").strip()
+            signer = SignedEntryContext(signing_key) if len(signing_key.encode("utf-8")) >= 32 else None
+            front_door_registry = FrontDoorRegistry(GoogleSheetsFrontDoorStore(settings), signer)
+            front_door_registry.store.load()
+            logger.info("Front-door durable store initialized")
+        except Exception:
+            front_door_registry = None
+            logger.exception("Front-door durable store unavailable; entry state remains fail closed")
     print_startup_console_status()
     print("PHASE6_ROUTES_LOADED /offline-app /debug/offline-app")
     try:
@@ -341,6 +354,18 @@ async def ms20_operations_bootstrap(
         logger.warning("Durable pharmacy operations bootstrap failed", exc_info=True)
         raise HTTPException(status_code=503, detail="Durable pharmacy operations state is unavailable") from exc
     operations_initialized = bool((durable_state or {}).get("initialized") or catalog)
+    if front_door_registry is None:
+        raise HTTPException(status_code=503, detail="Durable pharmacy entry state is unavailable")
+    try:
+        front_door_registry.initialize_pharmacy(
+            pharmacy_id=actor.pharmacy_id,
+            owner_id=actor.actor_id,
+            owner_name=str(record.get("owner_name") or actor.actor_id),
+            owner_phone_key=registry_phone_key(record.get("phone_number") or record.get("phone")),
+        )
+    except Exception as exc:
+        logger.warning("Durable front-door initialization failed", exc_info=True)
+        raise HTTPException(status_code=503, detail="Durable pharmacy entry state is unavailable") from exc
     front_door = resolve_front_door(
         pharmacy_id=actor.pharmacy_id,
         actor_id=actor.actor_id,
