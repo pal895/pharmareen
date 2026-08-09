@@ -90,9 +90,6 @@ class Settings(BaseSettings):
     meta_phone_number_id: str = ""
     meta_waba_id: str = Field(default="", validation_alias=AliasChoices("META_WHATSAPP_BUSINESS_ACCOUNT_ID", "META_WABA_ID"))
     meta_graph_api_version: str = "v21.0"
-    verification_provider: str = Field(default="meta_whatsapp", validation_alias=AliasChoices("MS20_VERIFICATION_PROVIDER", "VERIFICATION_PROVIDER"))
-    meta_verification_template_name: str = Field(default="", validation_alias=AliasChoices("META_VERIFICATION_TEMPLATE_NAME", "WHATSAPP_VERIFICATION_TEMPLATE_NAME"))
-    meta_verification_template_language: str = Field(default="en", validation_alias=AliasChoices("META_VERIFICATION_TEMPLATE_LANGUAGE", "WHATSAPP_VERIFICATION_TEMPLATE_LANGUAGE"))
 
     def __init__(self, **data):
         local_test_mode = data.get("_env_file", object()) is None

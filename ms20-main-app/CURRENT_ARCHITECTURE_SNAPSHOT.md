@@ -529,3 +529,7 @@ The customer front door now has complete internal entry workflows over that root
 - Token policy: ACTIVE — `docs/engineering-memory/token-execution-policy.md`
 - Rule: Codex and ChatGPT Bridges load the master and Engineering Traceability Index; no parallel sequence is permitted.
 <!-- VALIDATION_CONTRACT_SYNC_END -->
+
+## Core account independence (2026-08-09)
+
+MS2.0 owns durable pharmacy IDs, owner IDs, Primary Owner PIN credentials, tenant sessions, devices and staff membership. Core creation, sign-in and operation have no Meta/WhatsApp/SMS/email/social-platform prerequisite. Contact phone is optional profile data only. Provider-independent recovery remains intentionally unimplemented pending an owner-approved permanent design; provider-dependent recovery must fail closed and cannot be reintroduced as a shortcut. Optional messaging adapters sit outside this identity boundary.

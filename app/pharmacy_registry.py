@@ -27,6 +27,7 @@ PHARMACY_REGISTRY_HEADERS = [
     "Currency",
     "Active",
     "Updated At",
+    "Owner ID",
 ]
 
 ACTIVE_STATUSES = {"active", "approved", "approved_provisioned", "google_live", "ready", "provisioned"}
@@ -75,6 +76,7 @@ def normalize_registry_record(record: dict[str, Any]) -> dict[str, str]:
         "spreadsheet_id": str(record.get("spreadsheet_id") or record.get("Spreadsheet ID") or "").strip(),
         "spreadsheet_url": str(record.get("spreadsheet_url") or record.get("Spreadsheet URL") or "").strip(),
         "notes": str(record.get("notes") or record.get("Notes") or "").strip(),
+        "owner_id": str(record.get("owner_id") or record.get("Owner ID") or "").strip(),
     }
 
 
@@ -184,6 +186,7 @@ class GoogleSheetsPharmacyRegistry:
             "timezone": str(details.get("timezone") or self.timezone_name).strip(),
             "currency": str(details.get("currency") or self.currency).strip(),
             "notes": str(details.get("notes") or "registered_by_live_onboarding").strip(),
+            "owner_id": str(details.get("owner_id") or "").strip(),
         }
         worksheet = self._worksheet()
         worksheet.append_row(row_for_registry_record(record), value_input_option="USER_ENTERED")
@@ -209,6 +212,21 @@ class GoogleSheetsPharmacyRegistry:
         worksheet = self._worksheet()
         worksheet.clear()
         worksheet.update("A1", [PHARMACY_REGISTRY_HEADERS, *[row_for_registry_record(row) for row in records]])
+        return normalize_registry_record(target)
+
+    def update_contact_phone(self, pharmacy_id: str, *, new_phone: str) -> dict[str, str]:
+        """Update optional contact data; it has no authentication meaning."""
+        if not self.is_available:
+            raise RuntimeError("Pharmacy registry is unavailable")
+        wanted = str(pharmacy_id or "").strip()
+        records = self.list_records()
+        target = next((row for row in records if row["pharmacy_id"] == wanted), None)
+        if not target:
+            raise ValueError("Pharmacy was not found")
+        target["phone"] = target["phone_number"] = display_phone(new_phone)
+        target["updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        self._worksheet().clear()
+        self._worksheet().update("A1", [PHARMACY_REGISTRY_HEADERS, *[row_for_registry_record(row) for row in records]])
         return normalize_registry_record(target)
 
     def _worksheet(self):
@@ -262,4 +280,5 @@ def row_for_registry_record(record: dict[str, Any]) -> list[str]:
         str(record.get("currency") or ""),
         str(record.get("active") or ""),
         str(record.get("updated_at") or ""),
+        str(record.get("owner_id") or ""),
     ]

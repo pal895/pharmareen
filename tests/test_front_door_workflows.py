@@ -135,48 +135,37 @@ def test_channel_verified_new_pharmacy_creates_one_tenant_owner_session_and_fron
     assert response.json()["pharmacy_id"] == "afya-777"
     assert response.cookies.get("ms20_owner_session")
     pharmacy = registry.store.load()["pharmacies"]["afya-777"]
-    assert pharmacy["owner_id"] == "owner_254700000777"
+    assert pharmacy["owner_id"].startswith("owner_") and "254700000777" not in pharmacy["owner_id"]
     assert pharmacy["compliance"]["terms_version"] == main.MS20_TERMS_VERSION
     assert len(records) == 1
 
 
-def test_shared_link_verifies_inside_ms20_then_issues_one_use_setup_context(monkeypatch):
+def test_shared_link_creates_ms20_owned_pharmacy_and_owner_without_messaging_identity(monkeypatch):
     registry = FrontDoorRegistry(MemoryFrontDoorStore(), SignedEntryContext("public-start-signing-key-which-is-long-123"))
-    delivered = []
+    records = []
+    class PharmacyRegistry:
+        def register_pharmacy(self, details):
+            records.append(details)
+            return RegistryWriteResult(True, details, True, "created")
     monkeypatch.setattr(main, "front_door_registry", registry)
-    class Delivery:
-        def send_verification_code(self, phone, code):
-            delivered.append((phone, code))
-            return {"provider": "meta_whatsapp", "message_id": "wamid.accepted"}
-    monkeypatch.setattr(main, "MetaWhatsAppClient", lambda settings: Delivery())
+    monkeypatch.setattr(main, "get_pharmacy_registry", lambda: PharmacyRegistry())
+    monkeypatch.setattr(main, "owner_auth_service", OwnerAuthService())
     with TestClient(main.app, base_url="https://ms20.test") as client:
         page = client.get("/start")
-        started = client.post("/api/ms20/front-door/start", json={"phone": "+254700000777"})
-        code = delivered[0][1]
-        wrong = client.post("/api/ms20/front-door/verify", json={"phone": "+254700000777", "challenge_id": started.json()["challenge_id"], "code": "000000"})
-        verified = client.post("/api/ms20/front-door/verify", json={"phone": "+254700000777", "challenge_id": started.json()["challenge_id"], "code": code})
-        replay = client.post("/api/ms20/front-door/verify", json={"phone": "+254700000777", "challenge_id": started.json()["challenge_id"], "code": code})
+        started = client.post("/api/ms20/front-door/start")
+        created = client.post("/api/ms20/front-door/new-pharmacy", json={
+            "entry": started.json()["entry"], "pharmacy_name": "Independent Chemist",
+            "owner_name": "Owner", "location": "Nairobi", "pin": "Owner1234",
+            "terms_version": main.MS20_TERMS_VERSION, "privacy_version": main.MS20_PRIVACY_VERSION,
+        })
+        legacy_verify = client.post("/api/ms20/front-door/verify", json={})
     assert page.status_code == 200
-    assert "channel" not in page.text.lower() and "whatsapp" not in page.text.lower()
-    assert started.status_code == 200 and wrong.status_code == 401 and verified.status_code == 200 and replay.status_code == 401
-    assert verified.json()["continue_path"].startswith("/main-app/new-pharmacy?entry=")
-
-
-def test_start_stays_on_phone_screen_when_provider_does_not_accept_and_has_change_number_back(monkeypatch):
-    registry = FrontDoorRegistry(MemoryFrontDoorStore(), SignedEntryContext("delivery-failure-signing-key-long-enough-123"))
-    class UnavailableDelivery:
-        def send_verification_code(self, phone, code):
-            raise RuntimeError("provider unavailable")
-    monkeypatch.setattr(main, "front_door_registry", registry)
-    monkeypatch.setattr(main, "MetaWhatsAppClient", lambda settings: UnavailableDelivery())
-    with TestClient(main.app, base_url="https://ms20.test") as client:
-        page = client.get("/start")
-        failed = client.post("/api/ms20/front-door/start", json={"phone": "+254700000777"})
-    assert failed.status_code == 503
-    assert "could not send" in failed.json()["detail"]
-    assert "Change phone number" in page.text and "b.onclick=showPhone" in page.text
-    assert "if(r.ok){challenge=d.challenge_id;p.hidden=true" in page.text
-    assert registry.store.load().get("pending_verifications", {}) == {}
+    assert "whatsapp" not in page.text.lower() and "verification code" not in page.text.lower()
+    assert "Contact phone <small>(optional)" in page.text and "Primary Owner PIN" in page.text
+    assert started.status_code == 200 and created.status_code == 200 and legacy_verify.status_code == 410
+    assert created.cookies.get("ms20_owner_session")
+    assert records[0]["owner_id"].startswith("owner_") and "254" not in records[0]["owner_id"]
+    assert records[0]["pharmacy_id"].startswith("independent_chemist_")
 
 
 def test_same_verified_owner_phone_can_hold_isolated_credentials_for_two_pharmacies():

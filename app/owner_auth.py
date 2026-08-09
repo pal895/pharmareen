@@ -37,6 +37,10 @@ def canonical_registry_owner_id(owner: dict[str, Any]) -> str:
     return f"owner_{phone_key}" if phone_key else ""
 
 
+def registry_owner_login_key(owner: dict[str, Any]) -> str:
+    return registry_phone_key(owner.get("phone_number") or owner.get("phone")) or canonical_registry_owner_id(owner)
+
+
 @dataclass
 class LoginChallenge:
     phone_key: str
@@ -131,7 +135,7 @@ class OwnerAuthService:
         self._require_persistence()
         current = time.time() if now is None else now
         pharmacy_id = str(owner.get("pharmacy_id") or "").strip()
-        phone_key = registry_phone_key(owner.get("phone_number") or owner.get("phone"))
+        phone_key = registry_owner_login_key(owner)
         if not pharmacy_id or not phone_key:
             raise HTTPException(status_code=400, detail="An active pharmacy owner is required.")
         raw_token = secrets.token_urlsafe(32)
@@ -168,7 +172,7 @@ class OwnerAuthService:
         """
         self._require_persistence()
         pharmacy_id = str(owner.get("pharmacy_id") or "").strip()
-        phone_key = registry_phone_key(owner.get("phone_number") or owner.get("phone"))
+        phone_key = registry_owner_login_key(owner)
         if not pharmacy_id or not phone_key:
             raise HTTPException(status_code=503, detail="Owner initialization is not configured.")
         with self._lock:
@@ -191,7 +195,7 @@ class OwnerAuthService:
         current = time.time() if now is None else now
         self._validate_pin(pin)
         pharmacy_id = str(owner.get("pharmacy_id") or "").strip()
-        phone_key = registry_phone_key(owner.get("phone_number") or owner.get("phone"))
+        phone_key = registry_owner_login_key(owner)
         if not pharmacy_id or not phone_key:
             raise HTTPException(status_code=503, detail="Owner initialization is not configured.")
         with self._lock:
@@ -257,6 +261,21 @@ class OwnerAuthService:
                     credential.failed_attempts = 0
                 self._save_state()
                 raise self._unauthorized("The phone number or PIN is incorrect.")
+            credential.failed_attempts = 0
+            credential.locked_until = 0.0
+            self._save_state()
+            return self._issue_session(credential, now=current)
+
+    def sign_in_pharmacy_with_pin(self, pharmacy_id: str, pin: str, *, now: float | None = None) -> tuple[str, OwnerSession]:
+        """Authenticate an already-routed tenant without any external identity provider."""
+        self._require_persistence()
+        current = time.time() if now is None else now
+        with self._lock:
+            self._refresh_persistent_state()
+            matches = [item for item in self._credentials.values() if item.pharmacy_id == pharmacy_id]
+            credential = matches[0] if len(matches) == 1 else None
+            if not credential or credential.locked_until > current or not self._verify_pin(pin, credential.pin_hash):
+                raise self._unauthorized("The PIN is incorrect.")
             credential.failed_attempts = 0
             credential.locked_until = 0.0
             self._save_state()

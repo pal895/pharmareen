@@ -232,6 +232,20 @@ class FrontDoorRegistry:
             self.store.save(state)
         return token
 
+    def issue_independent_new_pharmacy_context(self, *, ttl_seconds: int = 900) -> str:
+        """Issue one-use setup authority owned entirely by MS2.0."""
+        signer = self._require_signer()
+        nonce = secrets.token_urlsafe(24)
+        token = signer.issue(pharmacy_id="__new_pharmacy__", kind=EntryKind.NEW_PHARMACY, nonce=nonce)
+        with self._lock:
+            state = self.store.load()
+            state.setdefault("pending_entries", {})[_digest(nonce)] = {
+                "identity_mode": "ms20_owned", "status": "active",
+                "expires_at": int(time.time()) + min(max(ttl_seconds, 60), 1800),
+            }
+            self.store.save(state)
+        return token
+
     def start_new_owner_verification(self, *, phone_key: str, deliver_code: Any, now: int | None = None) -> dict[str, Any]:
         """Start customer-facing verification without requiring channel initiation."""
         current = int(time.time()) if now is None else int(now)
@@ -298,7 +312,7 @@ class FrontDoorRegistry:
                 not pending
                 or pending.get("status") != "active"
                 or int(pending.get("expires_at") or 0) <= int(time.time())
-                or pending.get("phone_key_digest") != _digest(phone_key)
+                or (pending.get("identity_mode") != "ms20_owned" and pending.get("phone_key_digest") != _digest(phone_key))
                 or nonce_digest in set(state.setdefault("used_nonces", []))
             ):
                 raise ValueError("New-pharmacy context is unavailable")

@@ -74,33 +74,6 @@ class MetaWhatsAppClient:
             response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
 
-    def send_verification_code(self, to_phone: str, code: str) -> dict[str, str]:
-        """Send an approved authentication template and require provider acceptance."""
-        if self.settings.verification_provider != "meta_whatsapp":
-            raise RuntimeError("The configured verification provider is unsupported")
-        if not self.settings.meta_access_token or not self.settings.meta_phone_number_id or not self.settings.meta_verification_template_name:
-            raise RuntimeError("Production verification delivery is not configured")
-        url = f"{self.base_url}/{self.settings.meta_phone_number_id}/messages"
-        payload = {
-            "messaging_product": "whatsapp",
-            "to": clean_whatsapp_phone(to_phone),
-            "type": "template",
-            "template": {
-                "name": self.settings.meta_verification_template_name,
-                "language": {"code": self.settings.meta_verification_template_language},
-                "components": [{"type": "body", "parameters": [{"type": "text", "text": code}]}],
-            },
-        }
-        headers = {"Authorization": f"Bearer {self.settings.meta_access_token}"}
-        with httpx.Client(timeout=20.0) as client:
-            response = client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
-            data = response.json()
-        messages = data.get("messages") if isinstance(data, dict) else None
-        message_id = str((messages[0] if isinstance(messages, list) and messages else {}).get("id") or "")
-        if not message_id:
-            raise RuntimeError("Verification provider did not accept the message")
-        return {"provider": "meta_whatsapp", "message_id": message_id}
 
     async def get_media_url(self, media_id: str) -> str:
         url = f"{self.base_url}/{media_id}"
