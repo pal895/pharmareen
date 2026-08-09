@@ -1087,6 +1087,8 @@ Physical-owner completion evidence on 2026-08-08 proved the full corrected contr
 
 Engineering is implemented and focused regression-protected; owner evidence remains open. In Export Hub, the default **Private pharmacy copy** must state that complete operational identifiers remain inside the pharmacy. Select **Safer sharing copy**, generate one CSV data file, and inspect it in the established compatible spreadsheet application. It must retain the complete medicine count and 12 canonical columns while every Cost price, Supplier, Barcode, Batch and Shelf cell is blank; no precise location, tenant/internal ID, endorsement claim, secret or infrastructure detail may appear. Return to Export Hub and confirm history identifies **Safer sharing copy**, states minimal metadata is kept for 30 days, and does not show a filename or pharmacy/internal identifier. Do not share the artifact outside the controlled owner test. Stop with safe screenshots of the scope choice, visible redacted rows/columns and minimized history; no protected private export needs repetition.
 
+The first deployed entry attempt stopped before export because authenticated Zuri opened a blank pharmacy-setup card. Do not confirm or repeat checkpoint-2 setup. That result exposed browser-local operations readiness being used as production truth on a new origin. The shared tenant-bound durable operations-bootstrap repair must deploy first. Refresh the same authenticated Zuri path and require it to resume its existing catalog/operations state without a setup card before continuing to Export Hub.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

@@ -153,6 +153,14 @@ def metadata_text_value(value: Any) -> str:
     return str(value).strip()
 
 
+def metadata_values(value: Any) -> list[str]:
+    return [item.strip() for item in metadata_text_value(value).split(",") if item.strip()]
+
+
+def first_metadata_value(value: Any) -> str:
+    return next(iter(metadata_values(value)), "")
+
+
 def is_inventory_worksheet_title(title: str) -> bool:
     clean_title = str(title or "").strip()
     if not clean_title:
@@ -614,6 +622,41 @@ class GoogleSheetsStore:
             metadata_text_value(record.get("source")) or "Pharmacy owner import",
             now_in_timezone(self.settings.timezone).strftime("%Y-%m-%d %H:%M:%S"),
         ]
+
+    def list_pharmacy_catalog_records(self, pharmacy_id: str | None = None) -> list[dict[str, Any]]:
+        """Return durable pharmacy catalog truth for authenticated Main App resume."""
+        metadata_by_name: dict[str, dict[str, Any]] = {}
+        try:
+            for record in self._worksheet(MEDICINE_CATALOG_METADATA).get_all_records():
+                name = str(record.get("Drug Name") or "").strip()
+                if name:
+                    metadata_by_name[normalize_key(name)] = record
+        except Exception:
+            logger.warning("Medicine catalog metadata could not be read for operations resume", exc_info=True)
+        records: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for name in self.list_master_drug_names():
+            identity = normalize_key(name)
+            if not identity or identity in seen:
+                continue
+            seen.add(identity)
+            stock = self.find_stock_for_safety(name, pharmacy_id=pharmacy_id)
+            metadata = metadata_by_name.get(identity, {})
+            records.append({
+                "name": name,
+                "strength": first_metadata_value(metadata.get("Strengths")),
+                "forms": metadata_values(metadata.get("Dosage Forms")),
+                "units": metadata_values(metadata.get("Units")),
+                "sellingPrice": stock.selling_price if stock else None,
+                "costPrice": stock.cost_price if stock else None,
+                "stockLeft": stock.current_stock if stock else None,
+                "reorderLevel": stock.reorder_level if stock else None,
+                "supplier": "",
+                "barcode": "",
+                "batches": [],
+                "shelf": "",
+            })
+        return records
         self._upsert_medicine_catalog_row(name, row)
 
     def upsert_medicine_catalog_metadata(self, drug_name: str) -> None:

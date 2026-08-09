@@ -293,6 +293,37 @@ async def ms20_auth_session(actor: ActorContext = Depends(require_owner_actor)) 
     }
 
 
+@app.get("/api/ms20/operations/bootstrap")
+async def ms20_operations_bootstrap(
+    request: Request,
+    actor: ActorContext = Depends(require_owner_actor),
+) -> dict[str, Any]:
+    """Resume durable pharmacy operations state after owner authentication."""
+    record = first_owner_registry_record(request)
+    if actor.pharmacy_id != record["pharmacy_id"]:
+        raise HTTPException(status_code=403, detail="Authenticated pharmacy does not match the routed pharmacy")
+    store = get_sheet_store()
+    if not getattr(store, "is_available", False):
+        raise HTTPException(status_code=503, detail="Durable pharmacy operations state is unavailable")
+    try:
+        catalog = store.list_pharmacy_catalog_records(actor.pharmacy_id)
+    except Exception as exc:
+        logger.warning("Durable pharmacy operations bootstrap failed", exc_info=True)
+        raise HTTPException(status_code=503, detail="Durable pharmacy operations state is unavailable") from exc
+    return {
+        "schema": "ms20.operations-bootstrap.v1",
+        "pharmacy": {
+            "id": actor.pharmacy_id,
+            "name": str(record.get("pharmacy_name") or actor.pharmacy_id),
+            "owner": str(record.get("owner_name") or "Owner"),
+            "branch": str(record.get("branch") or "Main"),
+            "location": str(record.get("location") or "Kenya"),
+        },
+        "operations_initialized": bool(catalog),
+        "catalog": catalog,
+    }
+
+
 @app.get("/api/ms20/admin/session")
 async def ms20_admin_session(actor: ActorContext = Depends(require_admin_actor)) -> dict[str, Any]:
     return {

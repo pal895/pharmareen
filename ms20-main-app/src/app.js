@@ -95,7 +95,7 @@ const transactionEngine = new TransactionCompletionEngine({
 });
 const saleAdjustmentEngine = new SaleAdjustmentEngine({ storage: safeLocalStorage(), staffIdentity: () => "Owner" });
 const pharmacyBrain = new PharmacyBrain({ pharmacyId: state.pharmacy.id });
-const pronunciationMemory = new PharmacyPronunciationMemory(state.pharmacy.id, safeLocalStorage());
+let pronunciationMemory = new PharmacyPronunciationMemory(state.pharmacy.id, safeLocalStorage());
 const sourceBrain = new SourceBrain();
 const aiFallback = new AIFallbackAdapter();
 const SETUP_KEY = "ms20-main-app:onboarding-complete";
@@ -214,6 +214,7 @@ state.shelfAcquisitionOpen = false;
 state.pendingScanType = "medicine_photo";
 state.stockFixPhotoCardId = "";
 state.catalogPasteCaptureCardId = "";
+state.operationsBootstrap = { status: "pending" };
 state.cardFontScale = readCardFontScale();
 hydrateResumeState();
 state.notifications = readNotifications();
@@ -1257,6 +1258,7 @@ function catalogImportMobileRowTemplate(cardId, row, index, rowCount, columns = 
 
 function activeActionsTemplate(card) {
   if (card.type === "CatalogWorkspaceCard" || card.type === "ExportHubCard") return "";
+  if (card.type === "OperationsStateUnavailableCard") return "";
   if (card.type === "CatalogOnboardingCard") {
     return `
       <div class="card-actions onboarding-actions">
@@ -2928,6 +2930,13 @@ function createOnboardingCard() {
 }
 
 function ensureOnboardingStarted() {
+  if (state.operationsBootstrap?.status === "pending") return;
+  if (state.operationsBootstrap?.status === "unavailable" && !state.onboarding.completed) {
+    if (!state.cards.some((card) => card.type === "OperationsStateUnavailableCard")) {
+      state.cards.unshift({ id: "card-operations-state-unavailable", type: "OperationsStateUnavailableCard", title: "Pharmacy setup unavailable", source: "Durable pharmacy state", fields: { message: "Your saved pharmacy state could not be checked. Nothing was reset. Try again when the connection is ready." }, status: "blocked", confidence: 1, aiRequired: false });
+    }
+    return;
+  }
   if (state.onboarding.completed) {
     pruneCatalogOnboardingCards();
     ensureCatalogOnboardingStarted();
@@ -2966,7 +2975,7 @@ function hydrateResumeState() {
     completed: setupComplete() || catalogItems.length > 0
   };
   if (catalogItems.length > 0 && !setupComplete()) {
-    safeLocalStorage()?.setItem(SETUP_KEY, "true");
+    safeLocalStorage()?.setItem(setupStorageKey(), "true");
   }
   state.feed = readFeed();
   state.cards = readActiveCards();
@@ -3050,8 +3059,8 @@ function consolidateEmptyPasteDrafts() {
 
 function resetOnboarding() {
   const storage = safeLocalStorage();
-  storage?.removeItem(SETUP_KEY);
-  storage?.removeItem(CATALOG_KEY);
+  storage?.removeItem(setupStorageKey());
+  storage?.removeItem(catalogStorageKey());
   storage?.removeItem(NOTIFICATION_KEY);
   storage?.removeItem(FEED_KEY);
   storage?.removeItem(ACTIVE_CARDS_KEY);
@@ -3471,7 +3480,7 @@ function confirmSaleUndo(cardId) {
       if (Number.isFinite(current)) {
         medicine.stockLeft = current + stockToRestore;
         state.catalog.items = pharmacyBrain.catalog;
-        safeLocalStorage()?.setItem(CATALOG_KEY, JSON.stringify(state.catalog.items));
+        safeLocalStorage()?.setItem(catalogStorageKey(), JSON.stringify(state.catalog.items));
         void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);
       }
     }
@@ -3569,7 +3578,7 @@ function confirmSaleAdjustment(cardId) {
       if (Number.isFinite(current)) {
         medicine.stockLeft = current + Number(record.base_stock_to_restore);
         state.catalog.items = pharmacyBrain.catalog;
-        safeLocalStorage()?.setItem(CATALOG_KEY, JSON.stringify(state.catalog.items));
+        safeLocalStorage()?.setItem(catalogStorageKey(), JSON.stringify(state.catalog.items));
         void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);
       }
     }
@@ -3867,7 +3876,7 @@ function confirmCard(cardId) {
   if (card.type === "SaleCard") saveApprovedSalePackFacts(card);
   if (card.type === "OnboardingCard") {
     state.onboarding.completed = true;
-    safeLocalStorage()?.setItem(SETUP_KEY, "true");
+    safeLocalStorage()?.setItem(setupStorageKey(), "true");
   }
   recordCard(card);
   removeCard(cardId);
@@ -4154,7 +4163,7 @@ function approveCatalogEdit(cardId) {
   if (!result.valid || !result.changes?.length) return;
   pharmacyBrain.loadCatalog(result.catalog);
   state.catalog.items = pharmacyBrain.catalog;
-  safeLocalStorage()?.setItem(CATALOG_KEY, JSON.stringify(state.catalog.items));
+  safeLocalStorage()?.setItem(catalogStorageKey(), JSON.stringify(state.catalog.items));
   void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);
   recordCatalogActivity({
     medicine: result.updated.name,
@@ -4342,8 +4351,8 @@ function saveCatalogItems(items = []) {
     saved.push(pharmacyBrain.upsertCatalogItem(item));
   }
   state.catalog.items = pharmacyBrain.catalog;
-  safeLocalStorage()?.setItem(CATALOG_KEY, JSON.stringify(state.catalog.items));
-  safeLocalStorage()?.setItem(SETUP_KEY, "true");
+  safeLocalStorage()?.setItem(catalogStorageKey(), JSON.stringify(state.catalog.items));
+  safeLocalStorage()?.setItem(setupStorageKey(), "true");
   state.onboarding.completed = true;
   void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);
   pruneCatalogOnboardingCards();
@@ -4946,7 +4955,7 @@ function completeStockCorrection(card) {
 function persistCorrectedCatalog(items) {
   const storage = safeLocalStorage();
   if (!storage) return false;
-  storage.setItem(CATALOG_KEY, JSON.stringify(items));
+  storage.setItem(catalogStorageKey(), JSON.stringify(items));
   return true;
 }
 
@@ -5069,7 +5078,7 @@ function applyLocalSaleStock(card) {
   medicine.stockLeft = remaining;
   card.fields.stockLeft = remaining;
   state.catalog.items = pharmacyBrain.catalog;
-  safeLocalStorage()?.setItem(CATALOG_KEY, JSON.stringify(state.catalog.items));
+  safeLocalStorage()?.setItem(catalogStorageKey(), JSON.stringify(state.catalog.items));
   void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);
 }
 
@@ -5088,7 +5097,7 @@ function saveApprovedSalePackFacts(card) {
   medicine.unitConversions = { ...(medicine.unitConversions || {}), [baseUnit]: 1, [unit]: conversion };
   medicine.unitPrices = { ...(medicine.unitPrices || {}), [unit]: price };
   state.catalog.items = pharmacyBrain.catalog;
-  safeLocalStorage()?.setItem(CATALOG_KEY, JSON.stringify(state.catalog.items));
+  safeLocalStorage()?.setItem(catalogStorageKey(), JSON.stringify(state.catalog.items));
   void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);
 }
 
@@ -5111,7 +5120,7 @@ function applyLocalRestockStock(card) {
   medicine.stockLeft = stockLeft;
   card.fields.stockLeft = stockLeft;
   state.catalog.items = pharmacyBrain.catalog;
-  safeLocalStorage()?.setItem(CATALOG_KEY, JSON.stringify(state.catalog.items));
+  safeLocalStorage()?.setItem(catalogStorageKey(), JSON.stringify(state.catalog.items));
   void cloudGateway.saveCatalog(state.pharmacy.id, state.catalog.items);
 }
 
@@ -5453,12 +5462,59 @@ function savedReplyFor(card) {
 }
 
 function setupComplete() {
-  return safeLocalStorage()?.getItem(SETUP_KEY) === "true";
+  return safeLocalStorage()?.getItem(setupStorageKey()) === "true";
+}
+
+function operationsStorageKey(base) {
+  const pharmacyId = String(state.pharmacy?.id || "unresolved").trim() || "unresolved";
+  return `${base}:${pharmacyId}`;
+}
+
+function setupStorageKey() {
+  return operationsStorageKey(SETUP_KEY);
+}
+
+function catalogStorageKey() {
+  return operationsStorageKey(CATALOG_KEY);
+}
+
+async function hydrateDurableOperationsState() {
+  try {
+    const response = await fetch("/api/ms20/operations/bootstrap", { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error(`operations bootstrap ${response.status}`);
+    const payload = await response.json();
+    if (payload?.schema !== "ms20.operations-bootstrap.v1" || !payload?.pharmacy?.id || !Array.isArray(payload.catalog)) {
+      throw new Error("operations bootstrap payload is invalid");
+    }
+    state.pharmacy = { ...state.pharmacy, ...payload.pharmacy, catalogLoaded: payload.catalog.length > 0 };
+    offlineSyncGateway.pharmacy = state.pharmacy;
+    pronunciationMemory = new PharmacyPronunciationMemory(state.pharmacy.id, safeLocalStorage());
+    const localCatalog = readCatalog();
+    const catalog = payload.operations_initialized ? payload.catalog : localCatalog;
+    state.catalog = { items: catalog };
+    pharmacyBrain.pharmacyId = state.pharmacy.id;
+    pharmacyBrain.loadCatalog(catalog);
+    if (payload.operations_initialized) {
+      safeLocalStorage()?.setItem(setupStorageKey(), "true");
+      safeLocalStorage()?.setItem(catalogStorageKey(), JSON.stringify(catalog));
+      state.onboarding.completed = true;
+      state.onboarding.started = false;
+      removeCardsByType(["OnboardingCard", "CatalogOnboardingCard", "OperationsStateUnavailableCard"]);
+    } else {
+      state.onboarding.completed = setupComplete() || catalog.length > 0;
+    }
+    state.operationsBootstrap = { status: "ready", initialized: Boolean(payload.operations_initialized) };
+    refreshNotifications();
+    render();
+  } catch (error) {
+    state.operationsBootstrap = { status: "unavailable", error: String(error?.message || error) };
+    render();
+  }
 }
 
 function readCatalog() {
   try {
-    return JSON.parse(safeLocalStorage()?.getItem(CATALOG_KEY) || "[]");
+    return JSON.parse(safeLocalStorage()?.getItem(catalogStorageKey()) || "[]");
   } catch {
     return [];
   }
@@ -5779,6 +5835,7 @@ syncPendingStockCorrections();
 warmSpeechSynthesis();
 window.speechSynthesis?.addEventListener?.("voiceschanged", warmSpeechSynthesis, { once: true });
 render();
+void hydrateDurableOperationsState();
 window.setInterval(hideReplitBadge, 1500);
 if (shouldAutoProbeBackend()) {
   void refreshLiveStatus({ silent: true });

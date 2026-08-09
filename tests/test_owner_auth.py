@@ -9,6 +9,7 @@ from pathlib import Path
 from app import main
 from app import owner_auth as owner_auth_module
 from app.config import Settings
+from app.actor_context import ActorContext
 from app.main import (
     OWNER_ACTIVATION_CLIENT_ACTIONS,
     OWNER_ACTIVATION_HTML,
@@ -140,6 +141,41 @@ def test_post_authentication_operations_setup_is_not_mislabeled_as_owner_setup()
     app_source = Path("ms20-main-app/src/app.js").read_text(encoding="utf-8")
     assert 'return "Operations setup needed"' in app_source
     assert "Owner access is ready. Add business details and medicines to begin." in app_source
+
+
+def test_authenticated_operations_bootstrap_resumes_durable_existing_pharmacy(monkeypatch):
+    class Store:
+        is_available = True
+
+        def list_pharmacy_catalog_records(self, pharmacy_id):
+            assert pharmacy_id == "pharmacy-a"
+            return [{"name": "Ibuprofen", "stockLeft": 13, "sellingPrice": 18}]
+
+    main.app.dependency_overrides[main.require_owner_actor] = lambda: ActorContext(
+        pharmacy_id="pharmacy-a", actor_id="owner-a", role="owner"
+    )
+    monkeypatch.setattr(main, "first_owner_registry_record", lambda _request: {
+        **OWNER, "pharmacy_name": "Zuri Chemist", "branch": "Main", "location": "Nairobi"
+    })
+    monkeypatch.setattr(main, "get_sheet_store", lambda: Store())
+    try:
+        with TestClient(main.app, base_url="https://ms20.test") as client:
+            response = client.get("/api/ms20/operations/bootstrap")
+    finally:
+        main.app.dependency_overrides.pop(main.require_owner_actor, None)
+    assert response.status_code == 200
+    assert response.json()["operations_initialized"] is True
+    assert response.json()["pharmacy"]["name"] == "Zuri Chemist"
+    assert response.json()["catalog"] == [{"name": "Ibuprofen", "stockLeft": 13, "sellingPrice": 18}]
+
+
+def test_operations_resume_is_tenant_scoped_and_does_not_reopen_setup_from_blank_browser_memory():
+    app_source = Path("ms20-main-app/src/app.js").read_text(encoding="utf-8")
+    assert 'fetch("/api/ms20/operations/bootstrap"' in app_source
+    assert "payload.operations_initialized" in app_source
+    assert 'removeCardsByType(["OnboardingCard", "CatalogOnboardingCard", "OperationsStateUnavailableCard"])' in app_source
+    assert "setupStorageKey()" in app_source and "catalogStorageKey()" in app_source
+    assert 'state.operationsBootstrap = { status: "unavailable"' in app_source
 
 
 def test_sensitive_login_code_is_hidden_from_public_outbox_and_debug(monkeypatch):
