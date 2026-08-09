@@ -178,7 +178,7 @@ def test_authenticated_operations_bootstrap_resumes_durable_existing_pharmacy(mo
             return [{"name": "Ibuprofen", "stockLeft": 13, "sellingPrice": 18}]
 
     main.app.dependency_overrides[main.require_owner_actor] = lambda: ActorContext(
-        pharmacy_id="pharmacy-a", actor_id="owner-a", role="owner"
+        pharmacy_id="pharmacy-a", actor_id="owner_254700000001", role="owner"
     )
     monkeypatch.setattr(main, "first_owner_registry_record", lambda _request: {
         **OWNER, "pharmacy_name": "Zuri Chemist", "branch": "Main", "location": "Nairobi"
@@ -194,6 +194,68 @@ def test_authenticated_operations_bootstrap_resumes_durable_existing_pharmacy(mo
     assert response.json()["operations_initialized"] is True
     assert response.json()["pharmacy"]["name"] == "Zuri Chemist"
     assert response.json()["catalog"] == [{"name": "Ibuprofen", "stockLeft": 13, "sellingPrice": 18}]
+
+
+def test_authenticated_empty_established_registry_reaches_recovery_decision_after_legacy_owner_reconciliation(monkeypatch):
+    from app.front_door import FrontDoorRegistry, MemoryFrontDoorStore
+
+    class Store:
+        is_available = True
+
+        def get_ms20_operations_state(self, pharmacy_id):
+            assert pharmacy_id == "pharmacy-a"
+            return None
+
+        def list_pharmacy_catalog_records(self, pharmacy_id):
+            assert pharmacy_id == "pharmacy-a"
+            return []
+
+    legacy = MemoryFrontDoorStore()
+    FrontDoorRegistry(legacy).initialize_pharmacy(
+        pharmacy_id="pharmacy-a",
+        owner_id="254700000001",
+        owner_name="Mary",
+        owner_phone_key="254700000001",
+    )
+    main.app.dependency_overrides[main.require_owner_actor] = lambda: ActorContext(
+        pharmacy_id="pharmacy-a", actor_id="owner_254700000001", role="owner"
+    )
+    monkeypatch.setattr(main, "first_owner_registry_record", lambda _request: OWNER)
+    monkeypatch.setattr(main, "get_sheet_store", lambda: Store())
+    try:
+        with TestClient(main.app, base_url="https://ms20.test") as client:
+            monkeypatch.setattr(main, "front_door_registry", FrontDoorRegistry(legacy))
+            response = client.get("/api/ms20/operations/bootstrap")
+    finally:
+        main.app.dependency_overrides.pop(main.require_owner_actor, None)
+
+    assert response.status_code == 200
+    assert response.json()["operations_initialized"] is False
+    assert response.json()["front_door"]["state"] == "recovery_or_setup_required"
+    assert legacy.load()["pharmacies"]["pharmacy-a"]["owner_id"] == "owner_254700000001"
+
+
+def test_operations_bootstrap_rejects_session_owner_that_does_not_match_registry(monkeypatch):
+    class Store:
+        is_available = True
+
+        def get_ms20_operations_state(self, pharmacy_id):
+            return None
+
+        def list_pharmacy_catalog_records(self, pharmacy_id):
+            return []
+
+    main.app.dependency_overrides[main.require_owner_actor] = lambda: ActorContext(
+        pharmacy_id="pharmacy-a", actor_id="owner_other", role="owner"
+    )
+    monkeypatch.setattr(main, "first_owner_registry_record", lambda _request: OWNER)
+    monkeypatch.setattr(main, "get_sheet_store", lambda: Store())
+    try:
+        with TestClient(main.app, base_url="https://ms20.test") as client:
+            response = client.get("/api/ms20/operations/bootstrap")
+    finally:
+        main.app.dependency_overrides.pop(main.require_owner_actor, None)
+    assert response.status_code == 403
 
 
 def test_operations_resume_is_tenant_scoped_and_does_not_reopen_setup_from_blank_browser_memory():

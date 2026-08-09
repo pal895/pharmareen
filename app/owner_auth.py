@@ -28,6 +28,15 @@ OWNER_CAPABILITIES = (
 )
 
 
+def canonical_registry_owner_id(owner: dict[str, Any]) -> str:
+    """Return the stable owner identity shared by provisioning, auth and entry."""
+    explicit = str(owner.get("owner_id") or owner.get("Owner ID") or "").strip()
+    if explicit:
+        return explicit
+    phone_key = registry_phone_key(owner.get("phone_number") or owner.get("phone"))
+    return f"owner_{phone_key}" if phone_key else ""
+
+
 @dataclass
 class LoginChallenge:
     phone_key: str
@@ -122,7 +131,7 @@ class OwnerAuthService:
         if not pharmacy_id or not phone_key:
             raise HTTPException(status_code=400, detail="An active pharmacy owner is required.")
         raw_token = secrets.token_urlsafe(32)
-        owner_id = str(owner.get("owner_id") or f"owner_{phone_key}")
+        owner_id = canonical_registry_owner_id(owner)
         invitation = ActivationInvitation(
             token_digest=self._digest(raw_token), owner_id=owner_id, phone_key=phone_key,
             pharmacy_id=pharmacy_id, pharmacy_name=str(owner.get("pharmacy_name") or pharmacy_id),
@@ -186,7 +195,7 @@ class OwnerAuthService:
             if any(item.pharmacy_id == pharmacy_id for item in self._credentials.values()):
                 raise HTTPException(status_code=409, detail="Owner access is already initialized.")
             credential = OwnerCredential(
-                owner_id=str(owner.get("owner_id") or f"owner_{phone_key}"),
+                owner_id=canonical_registry_owner_id(owner),
                 phone_key=phone_key,
                 pharmacy_id=pharmacy_id,
                 pharmacy_name=str(owner.get("pharmacy_name") or pharmacy_id),

@@ -86,6 +86,46 @@ def test_pharmacy_foundation_allocates_collision_safe_shared_identities_once():
     assert first["billing"]["device_count_is_seat_count"] is False
 
 
+def test_existing_phone_key_owner_is_canonicalized_without_losing_authority_state():
+    legacy_owner = "2547001"
+    initial_service, store = registry()
+    initial_service.initialize_pharmacy(
+        pharmacy_id="pharmacy-a", owner_id=legacy_owner, owner_name="Owner A", owner_phone_key=legacy_owner
+    )
+    initial_service.bind_device("pharmacy-a", actor_id=legacy_owner, device_key="phone-a")
+
+    restarted = FrontDoorRegistry(store)
+    pharmacy = restarted.initialize_pharmacy(
+        pharmacy_id="pharmacy-a",
+        owner_id="owner_2547001",
+        owner_name="Owner A",
+        owner_phone_key=legacy_owner,
+        trusted_legacy_owner_ids=(legacy_owner,),
+    )
+
+    assert pharmacy["owner_id"] == "owner_2547001"
+    assert set(pharmacy["members"]) == {"owner_2547001"}
+    assert pharmacy["billing"]["authority_actor_ids"] == ["owner_2547001"]
+    assert next(iter(pharmacy["devices"].values()))["actor_id"] == "owner_2547001"
+    assert restarted.pharmacy_authorities("pharmacy-a", actor_id="owner_2547001")["role"] == "owner"
+
+
+@pytest.mark.parametrize("legacy_owner", ["unrelated-owner", "2547999"])
+def test_unknown_or_cross_identity_owner_mismatch_remains_fail_closed(legacy_owner):
+    service, _ = registry()
+    service.initialize_pharmacy(
+        pharmacy_id="pharmacy-a", owner_id=legacy_owner, owner_name="Owner A", owner_phone_key="2547001"
+    )
+    with pytest.raises(ValueError, match="owner mismatch"):
+        service.initialize_pharmacy(
+            pharmacy_id="pharmacy-a",
+            owner_id="owner_2547001",
+            owner_name="Owner A",
+            owner_phone_key="2547001",
+            trusted_legacy_owner_ids=("2547001",),
+        )
+
+
 def test_empty_tenant_classification_is_owner_only_and_cannot_flip():
     service, _ = registry()
     service.initialize_pharmacy(pharmacy_id="pharmacy-a", owner_id="owner-a", owner_name="Owner A", owner_phone_key="2547001")

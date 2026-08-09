@@ -168,14 +168,28 @@ class FrontDoorRegistry:
         self.signer = signer
         self._lock = threading.RLock()
 
-    def initialize_pharmacy(self, *, pharmacy_id: str, owner_id: str, owner_name: str, owner_phone_key: str) -> dict[str, Any]:
+    def initialize_pharmacy(
+        self,
+        *,
+        pharmacy_id: str,
+        owner_id: str,
+        owner_name: str,
+        owner_phone_key: str,
+        trusted_legacy_owner_ids: tuple[str, ...] = (),
+    ) -> dict[str, Any]:
         with self._lock:
             state = self.store.load()
             pharmacies = state.setdefault("pharmacies", {})
             existing = pharmacies.get(pharmacy_id)
             if existing:
                 if existing.get("owner_id") != owner_id:
-                    raise ValueError("Pharmacy owner mismatch")
+                    self._reconcile_legacy_owner(
+                        existing,
+                        owner_id=owner_id,
+                        owner_phone_key=owner_phone_key,
+                        trusted_legacy_owner_ids=trusted_legacy_owner_ids,
+                    )
+                    self.store.save(state)
                 return deepcopy(existing)
             state["community_counter"] = int(state.get("community_counter") or 0) + 1
             community_number = state["community_counter"]
@@ -199,6 +213,49 @@ class FrontDoorRegistry:
             pharmacies[pharmacy_id] = pharmacy
             self.store.save(state)
             return deepcopy(pharmacy)
+
+    @staticmethod
+    def _reconcile_legacy_owner(
+        pharmacy: dict[str, Any],
+        *,
+        owner_id: str,
+        owner_phone_key: str,
+        trusted_legacy_owner_ids: tuple[str, ...],
+    ) -> None:
+        """Migrate only the exact pre-canonical phone-key owner representation."""
+        previous = str(pharmacy.get("owner_id") or "")
+        allowed = {str(value).strip() for value in trusted_legacy_owner_ids if str(value).strip()}
+        members = pharmacy.get("members")
+        previous_member = members.get(previous) if isinstance(members, dict) else None
+        if (
+            not previous
+            or previous not in allowed
+            or pharmacy.get("phone_key_digest") != _digest(owner_phone_key)
+            or not isinstance(previous_member, dict)
+            or previous_member.get("role") != "owner"
+            or previous_member.get("status") != "active"
+            or (owner_id in members and owner_id != previous)
+        ):
+            raise ValueError("Pharmacy owner mismatch")
+
+        pharmacy["owner_id"] = owner_id
+        member = members.pop(previous)
+        member["actor_id"] = owner_id
+        members[owner_id] = member
+        for invitation in pharmacy.get("invitations", {}).values():
+            if invitation.get("created_by") == previous:
+                invitation["created_by"] = owner_id
+        for device in pharmacy.get("devices", {}).values():
+            if device.get("actor_id") == previous:
+                device["actor_id"] = owner_id
+        billing = pharmacy.get("billing", {})
+        billing["authority_actor_ids"] = [owner_id if value == previous else value for value in billing.get("authority_actor_ids", [])]
+        loyalty = pharmacy.get("loyalty", {})
+        loyalty["contribution_actor_ids"] = [owner_id if value == previous else value for value in loyalty.get("contribution_actor_ids", [])]
+        for event in pharmacy.get("audit", []):
+            if event.get("actor_id") == previous:
+                event["actor_id"] = owner_id
+        pharmacy.setdefault("audit", []).append({"event": "owner_identity_canonicalized", "actor_id": owner_id, "details": {}, "at": int(time.time())})
 
     def issue_referral_context(self, pharmacy_id: str, *, owner_id: str) -> str:
         signer = self._require_signer()

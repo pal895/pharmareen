@@ -515,6 +515,8 @@ Owner credentials are deployment-durable. Startup selects the dedicated platform
 
 Owner phone identity originates in trusted provisioning and the active tenant registry. It is server-derived for activation and repeat sign-in, never selected by a client request. Activation and sign-in confirm pharmacy, owner and a last-four phone hint; repeat sign-in submits only the Primary Owner PIN. The server verifies canonical initialized state, authenticates the registry phone's durable credential, and rejects any cross-pharmacy result. This supersedes the earlier phone-reentry UI contract.
 
+Provisioning, owner credentials/sessions and front-door state share one canonical registry-derived owner actor ID. Authenticated bootstrap requires the session actor to equal that routed owner. A bounded compatibility migration may convert only the exact legacy normalized-phone owner key when the durable phone digest and active owner membership also match; all other owner mismatches remain unavailable/fail closed.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

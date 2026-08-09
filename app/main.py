@@ -37,7 +37,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from app.branding import APP_BRAND
 from app.access_control import ADMIN_CAPABILITIES, authenticate_admin, require_admin_actor
 from app.actor_context import ActorContext
-from app.owner_auth import OWNER_CAPABILITIES, OWNER_SESSION_COOKIE, owner_auth_service, require_owner_actor
+from app.owner_auth import OWNER_CAPABILITIES, OWNER_SESSION_COOKIE, canonical_registry_owner_id, owner_auth_service, require_owner_actor
 from app.ai import AIService, ai_usage_snapshot, log_ai_route_decision
 from app.config import Settings, get_settings
 from app.correction_learning import CorrectionLearningEngine
@@ -377,13 +377,18 @@ async def ms20_operations_bootstrap(
         logger.warning("Durable pharmacy operations bootstrap failed", exc_info=True)
         raise HTTPException(status_code=503, detail="Durable pharmacy operations state is unavailable") from exc
     operations_initialized = bool((durable_state or {}).get("initialized") or catalog)
+    owner_id = canonical_registry_owner_id(record)
+    owner_phone_key = registry_phone_key(record.get("phone_number") or record.get("phone"))
+    if not owner_id or actor.actor_id != owner_id:
+        raise HTTPException(status_code=403, detail="Authenticated owner does not match the routed pharmacy owner")
     try:
         registry = get_front_door_registry()
         registry.initialize_pharmacy(
             pharmacy_id=actor.pharmacy_id,
-            owner_id=actor.actor_id,
-            owner_name=str(record.get("owner_name") or actor.actor_id),
-            owner_phone_key=registry_phone_key(record.get("phone_number") or record.get("phone")),
+            owner_id=owner_id,
+            owner_name=str(record.get("owner_name") or owner_id),
+            owner_phone_key=owner_phone_key,
+            trusted_legacy_owner_ids=(owner_phone_key,),
         )
     except Exception as exc:
         logger.warning("Durable front-door initialization failed", exc_info=True)
