@@ -40,6 +40,11 @@ REPORT_SOURCE_CACHE_TTL_SECONDS = 600.0
 REPORT_SOURCE_REFRESH_SECONDS = 300.0
 REPORT_SOURCE_CACHE_MAX_ROWS = 100000
 PHARMACIES = "Pharmacies"
+MS20_OPERATIONS_STATE = "MS20_Operations_State"
+MS20_OPERATIONS_STATE_HEADERS = [
+    "Pharmacy ID", "Initialized", "Pharmacy Name", "Owner Name", "Branch",
+    "Location", "Payments", "Catalog JSON", "Updated At",
+]
 
 SHEETS_UNAVAILABLE_MESSAGE = (
     "Google Sheets is not configured. Add a valid service-account.json to enable logging."
@@ -449,6 +454,7 @@ class GoogleSheetsStore:
         self._ensure_worksheet(OFFLINE_SYNC_LOG, OFFLINE_SYNC_HEADERS, rows=10000)
         self._ensure_worksheet(MEDICINE_CATALOG_METADATA, MEDICINE_CATALOG_METADATA_HEADERS, rows=3000)
         self._ensure_worksheet(PHARMACIES, PHARMACIES_HEADERS, rows=2000)
+        self._ensure_worksheet(MS20_OPERATIONS_STATE, MS20_OPERATIONS_STATE_HEADERS, rows=2000)
 
     def list_master_drug_names(self) -> list[str]:
         return [
@@ -677,6 +683,56 @@ class GoogleSheetsStore:
             })
         return records
         self._upsert_medicine_catalog_row(name, row)
+
+    def get_ms20_operations_state(self, pharmacy_id: str) -> dict[str, Any] | None:
+        wanted = str(pharmacy_id or "").strip()
+        if not wanted:
+            return None
+        try:
+            rows = self._worksheet(MS20_OPERATIONS_STATE).get_all_values()
+        except (WorksheetNotFound, KeyError):
+            return None
+        for row in rows[1:]:
+            if not row or str(row[0] or "").strip() != wanted:
+                continue
+            try:
+                catalog = json.loads(row[7] if len(row) > 7 else "[]")
+            except (TypeError, ValueError, json.JSONDecodeError):
+                catalog = []
+            return {
+                "initialized": str(row[1] if len(row) > 1 else "").strip().lower() in {"true", "yes", "1"},
+                "pharmacy_name": str(row[2] if len(row) > 2 else "").strip(),
+                "owner_name": str(row[3] if len(row) > 3 else "").strip(),
+                "branch": str(row[4] if len(row) > 4 else "").strip(),
+                "location": str(row[5] if len(row) > 5 else "").strip(),
+                "payments": str(row[6] if len(row) > 6 else "").strip(),
+                "catalog": catalog if isinstance(catalog, list) else [],
+            }
+        return None
+
+    def save_ms20_operations_state(
+        self, pharmacy_id: str, profile: dict[str, Any], catalog: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        wanted = str(pharmacy_id or "").strip()
+        if not wanted:
+            raise ValueError("Missing pharmacy identity")
+        clean_catalog = [dict(item) for item in catalog[:500] if isinstance(item, dict) and str(item.get("name") or "").strip()]
+        row = [
+            wanted, "true", str(profile.get("name") or "").strip(),
+            str(profile.get("owner") or "").strip(), str(profile.get("branch") or "Main").strip(),
+            str(profile.get("location") or "Kenya").strip(),
+            str(profile.get("payments") or "cash, mpesa, credit").strip(),
+            json.dumps(clean_catalog, ensure_ascii=False, separators=(",", ":")),
+            now_in_timezone(self.settings.timezone).strftime("%Y-%m-%d %H:%M:%S"),
+        ]
+        worksheet = self._worksheet(MS20_OPERATIONS_STATE)
+        rows = worksheet.get_all_values()
+        for row_number, existing in enumerate(rows[1:], start=2):
+            if existing and str(existing[0] or "").strip() == wanted:
+                worksheet.update(f"A{row_number}", [row])
+                return self.get_ms20_operations_state(wanted) or {}
+        worksheet.append_row(row, value_input_option="USER_ENTERED")
+        return self.get_ms20_operations_state(wanted) or {}
 
     def upsert_medicine_catalog_metadata(self, drug_name: str) -> None:
         """Keep onboarding metadata separate so legacy stock columns stay stable."""

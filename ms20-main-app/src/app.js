@@ -5482,7 +5482,17 @@ async function hydrateDurableOperationsState() {
   try {
     const response = await fetch("/api/ms20/operations/bootstrap", { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error(`operations bootstrap ${response.status}`);
-    const payload = await response.json();
+    let payload = await response.json();
+    const legacyCatalog = readLegacyCatalog();
+    if (!payload.operations_initialized && payload.legacy_migration_allowed && legacySetupComplete() && legacyCatalog.length > 0) {
+      const migration = await fetch("/api/ms20/operations/migrate-legacy", {
+        method: "POST", credentials: "same-origin", cache: "no-store",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ catalog: legacyCatalog })
+      });
+      if (!migration.ok) throw new Error(`operations legacy migration ${migration.status}`);
+      payload = await migration.json();
+    }
     if (payload?.schema !== "ms20.operations-bootstrap.v1" || !payload?.pharmacy?.id || !Array.isArray(payload.catalog)) {
       throw new Error("operations bootstrap payload is invalid");
     }
@@ -5497,6 +5507,8 @@ async function hydrateDurableOperationsState() {
     if (payload.operations_initialized) {
       safeLocalStorage()?.setItem(setupStorageKey(), "true");
       safeLocalStorage()?.setItem(catalogStorageKey(), JSON.stringify(catalog));
+      safeLocalStorage()?.removeItem(SETUP_KEY);
+      safeLocalStorage()?.removeItem(CATALOG_KEY);
       state.onboarding.completed = true;
       state.onboarding.started = false;
       removeCardsByType(["OnboardingCard", "CatalogOnboardingCard", "OperationsStateUnavailableCard"]);
@@ -5509,6 +5521,19 @@ async function hydrateDurableOperationsState() {
   } catch (error) {
     state.operationsBootstrap = { status: "unavailable", error: String(error?.message || error) };
     render();
+  }
+}
+
+function legacySetupComplete() {
+  return safeLocalStorage()?.getItem(SETUP_KEY) === "true";
+}
+
+function readLegacyCatalog() {
+  try {
+    const catalog = JSON.parse(safeLocalStorage()?.getItem(CATALOG_KEY) || "[]");
+    return Array.isArray(catalog) ? catalog : [];
+  } catch {
+    return [];
   }
 }
 

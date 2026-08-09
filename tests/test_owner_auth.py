@@ -178,6 +178,49 @@ def test_operations_resume_is_tenant_scoped_and_does_not_reopen_setup_from_blank
     assert 'state.operationsBootstrap = { status: "unavailable"' in app_source
 
 
+def test_authenticated_legacy_workspace_migrates_once_to_durable_operations_state(monkeypatch):
+    saved = []
+
+    class Store:
+        is_available = True
+
+        def get_ms20_operations_state(self, pharmacy_id):
+            assert pharmacy_id == "pharmacy-a"
+            return None
+
+        def save_ms20_operations_state(self, pharmacy_id, profile, catalog):
+            saved.append((pharmacy_id, profile, catalog))
+            return {"initialized": True, "catalog": catalog}
+
+    main.app.dependency_overrides[main.require_owner_actor] = lambda: ActorContext(
+        pharmacy_id="pharmacy-a", actor_id="owner-a", role="owner"
+    )
+    monkeypatch.setattr(main, "first_owner_registry_record", lambda _request: {
+        **OWNER, "pharmacy_name": "Zuri Chemist", "owner_name": "Pal", "location": "Nairobi"
+    })
+    monkeypatch.setattr(main, "get_sheet_store", lambda: Store())
+    try:
+        with TestClient(main.app, base_url="https://ms20.test") as client:
+            response = client.post("/api/ms20/operations/migrate-legacy", json={
+                "catalog": [{"name": "Ibuprofen", "stockLeft": 13}]
+            })
+    finally:
+        main.app.dependency_overrides.pop(main.require_owner_actor, None)
+    assert response.status_code == 200
+    assert response.json()["operations_initialized"] is True
+    assert response.json()["catalog"][0]["name"] == "Ibuprofen"
+    assert saved[0][0] == "pharmacy-a"
+    assert saved[0][1]["name"] == "Zuri Chemist"
+
+
+def test_legacy_workspace_migration_requires_completed_catalog_and_is_frontend_gated():
+    app_source = Path("ms20-main-app/src/app.js").read_text(encoding="utf-8")
+    assert "payload.legacy_migration_allowed && legacySetupComplete() && legacyCatalog.length > 0" in app_source
+    assert 'fetch("/api/ms20/operations/migrate-legacy"' in app_source
+    assert "safeLocalStorage()?.removeItem(SETUP_KEY)" in app_source
+    assert "safeLocalStorage()?.removeItem(CATALOG_KEY)" in app_source
+
+
 def test_sensitive_login_code_is_hidden_from_public_outbox_and_debug(monkeypatch):
     main.offline_whatsapp_outbox.clear()
     main.offline_whatsapp_confirmation_history.clear()

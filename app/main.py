@@ -306,7 +306,9 @@ async def ms20_operations_bootstrap(
     if not getattr(store, "is_available", False):
         raise HTTPException(status_code=503, detail="Durable pharmacy operations state is unavailable")
     try:
-        catalog = store.list_pharmacy_catalog_records(actor.pharmacy_id)
+        durable_reader = getattr(store, "get_ms20_operations_state", None)
+        durable_state = durable_reader(actor.pharmacy_id) if callable(durable_reader) else None
+        catalog = durable_state.get("catalog", []) if durable_state else store.list_pharmacy_catalog_records(actor.pharmacy_id)
     except Exception as exc:
         logger.warning("Durable pharmacy operations bootstrap failed", exc_info=True)
         raise HTTPException(status_code=503, detail="Durable pharmacy operations state is unavailable") from exc
@@ -314,13 +316,48 @@ async def ms20_operations_bootstrap(
         "schema": "ms20.operations-bootstrap.v1",
         "pharmacy": {
             "id": actor.pharmacy_id,
-            "name": str(record.get("pharmacy_name") or actor.pharmacy_id),
-            "owner": str(record.get("owner_name") or "Owner"),
-            "branch": str(record.get("branch") or "Main"),
-            "location": str(record.get("location") or "Kenya"),
+            "name": str((durable_state or {}).get("pharmacy_name") or record.get("pharmacy_name") or actor.pharmacy_id),
+            "owner": str((durable_state or {}).get("owner_name") or record.get("owner_name") or "Owner"),
+            "branch": str((durable_state or {}).get("branch") or record.get("branch") or "Main"),
+            "location": str((durable_state or {}).get("location") or record.get("location") or "Kenya"),
         },
-        "operations_initialized": bool(catalog),
+        "operations_initialized": bool((durable_state or {}).get("initialized") or catalog),
         "catalog": catalog,
+        "legacy_migration_allowed": durable_state is None and not catalog,
+    }
+
+
+@app.post("/api/ms20/operations/migrate-legacy")
+async def ms20_operations_migrate_legacy(
+    request: Request,
+    actor: ActorContext = Depends(require_owner_actor),
+) -> dict[str, Any]:
+    """Move an authenticated pre-durable Main App workspace into Sheets once."""
+    record = first_owner_registry_record(request)
+    if actor.pharmacy_id != record["pharmacy_id"]:
+        raise HTTPException(status_code=403, detail="Authenticated pharmacy does not match the routed pharmacy")
+    payload = await request.json()
+    catalog = payload.get("catalog") if isinstance(payload, dict) else None
+    if not isinstance(catalog, list) or not catalog:
+        raise HTTPException(status_code=400, detail="A completed legacy catalog is required")
+    store = get_sheet_store()
+    if not getattr(store, "is_available", False):
+        raise HTTPException(status_code=503, detail="Durable pharmacy operations state is unavailable")
+    existing = store.get_ms20_operations_state(actor.pharmacy_id)
+    profile = {
+        "name": str(record.get("pharmacy_name") or actor.pharmacy_id),
+        "owner": str(record.get("owner_name") or "Owner"),
+        "branch": str(record.get("branch") or "Main"),
+        "location": str(record.get("location") or "Kenya"),
+        "payments": "cash, mpesa, credit",
+    }
+    state = existing or store.save_ms20_operations_state(actor.pharmacy_id, profile, catalog)
+    return {
+        "schema": "ms20.operations-bootstrap.v1",
+        "pharmacy": {"id": actor.pharmacy_id, **profile},
+        "operations_initialized": bool(state.get("initialized")),
+        "catalog": state.get("catalog", []),
+        "legacy_migrated": existing is None,
     }
 
 

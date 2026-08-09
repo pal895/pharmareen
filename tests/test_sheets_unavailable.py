@@ -57,6 +57,15 @@ class FakeWorksheet:
             self.values[row - 1].append("")
         self.values[row - 1][column - 1] = value
 
+    def append_row(self, row, value_input_option=None):
+        self.values.append(list(row))
+
+    def update(self, cell, rows):
+        row_number = int(str(cell).lstrip("A"))
+        while len(self.values) < row_number:
+            self.values.append([])
+        self.values[row_number - 1] = list(rows[0])
+
 
 class FakeSpreadsheet:
     def __init__(self, worksheets):
@@ -124,6 +133,24 @@ def test_operations_catalog_resume_does_not_read_another_pharmacy_inventory():
     })
 
     assert store.list_pharmacy_catalog_records("pharmacy-a") == []
+
+
+def test_ms20_operations_state_round_trips_as_durable_pharmacy_scoped_truth():
+    from app.sheets import MS20_OPERATIONS_STATE, MS20_OPERATIONS_STATE_HEADERS
+
+    store = make_fake_sheet_store({
+        MS20_OPERATIONS_STATE: FakeWorksheet([MS20_OPERATIONS_STATE_HEADERS]),
+    })
+    saved = store.save_ms20_operations_state(
+        "pharmacy-a",
+        {"name": "Afya Pharmacy", "owner": "Mary", "branch": "Main", "location": "Nairobi"},
+        [{"name": "Ibuprofen", "stockLeft": 13}],
+    )
+
+    assert saved["initialized"] is True
+    assert saved["pharmacy_name"] == "Afya Pharmacy"
+    assert saved["catalog"] == [{"name": "Ibuprofen", "stockLeft": 13}]
+    assert store.get_ms20_operations_state("pharmacy-b") is None
 
 
 @pytest.mark.parametrize("file_contents", ["", "{not-json"])
