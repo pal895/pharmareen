@@ -221,6 +221,14 @@ def test_legacy_workspace_migration_requires_completed_catalog_and_is_frontend_g
     assert "safeLocalStorage()?.removeItem(CATALOG_KEY)" in app_source
 
 
+def test_legacy_inventory_csv_preserves_blanks_and_rejects_duplicates():
+    headers = ",".join(main.LEGACY_INVENTORY_HEADERS)
+    rows = main.legacy_inventory_catalog((headers + "\nIbuprofen,200 mg,tablet,tablet,18,,13,,,,,\n").encode())
+    assert rows == [{"name":"Ibuprofen","strength":"200 mg","forms":["tablet"],"units":["tablet"],"sellingPrice":18.0,"costPrice":None,"stockLeft":13.0,"supplier":"","barcode":"","batches":[],"shelf":""}]
+    with pytest.raises(ValueError, match="unique"):
+        main.legacy_inventory_catalog((headers + "\nIbuprofen,,tablet,tablet,,,,,,,,\nIbuprofen,,tablet,tablet,,,,,,,,\n").encode())
+
+
 def test_sensitive_login_code_is_hidden_from_public_outbox_and_debug(monkeypatch):
     main.offline_whatsapp_outbox.clear()
     main.offline_whatsapp_confirmation_history.clear()

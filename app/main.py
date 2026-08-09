@@ -1,8 +1,10 @@
 ﻿from __future__ import annotations
 
 import base64
+import csv
 import hashlib
 import hmac
+import io
 import json
 import logging
 import os
@@ -86,6 +88,31 @@ from app.whatsapp import WhatsAppClient, xml_message_response
 
 
 logger = logging.getLogger(__name__)
+LEGACY_INVENTORY_HEADERS = ["Medicine", "Strength", "Form", "Unit", "Selling price (KES)", "Cost price (KES)", "Stock", "Supplier", "Barcode", "Batch", "Expiry", "Shelf"]
+
+
+def legacy_inventory_catalog(raw: bytes) -> list[dict[str, Any]]:
+    text = raw.decode("utf-8-sig")
+    reader = csv.DictReader(io.StringIO(text))
+    if reader.fieldnames != LEGACY_INVENTORY_HEADERS:
+        raise ValueError("This is not an unchanged MS2.0 inventory CSV")
+    catalog = []
+    seen = set()
+    for row in reader:
+        name = str(row.get("Medicine") or "").strip()
+        key = normalize_key(name)
+        if not name or key in seen:
+            raise ValueError("Every recovered medicine must have one unique identity")
+        seen.add(key)
+        def number(field):
+            value = str(row.get(field) or "").strip()
+            return float(value) if value else None
+        batch = str(row.get("Batch") or "").strip()
+        expiry = str(row.get("Expiry") or "").strip()
+        catalog.append({"name": name, "strength": str(row.get("Strength") or ""), "forms": [str(row.get("Form") or "")] if row.get("Form") else [], "units": [str(row.get("Unit") or "")] if row.get("Unit") else [], "sellingPrice": number("Selling price (KES)"), "costPrice": number("Cost price (KES)"), "stockLeft": number("Stock"), "supplier": str(row.get("Supplier") or ""), "barcode": str(row.get("Barcode") or ""), "batches": [{"batch": batch, "expiry": expiry}] if batch or expiry else [], "shelf": str(row.get("Shelf") or "")})
+    if not catalog:
+        raise ValueError("The recovery CSV is empty")
+    return catalog
 DEFAULT_OWNER_AUTH_SERVICE = owner_auth_service
 processed_message_sids: set[str] = set()
 processed_whatsapp_web_message_ids: set[str] = set()
@@ -359,6 +386,28 @@ async def ms20_operations_migrate_legacy(
         "catalog": state.get("catalog", []),
         "legacy_migrated": existing is None,
     }
+
+
+@app.get("/main-app/recover-legacy", response_class=HTMLResponse, include_in_schema=False)
+async def ms20_recover_legacy_page(actor: ActorContext = Depends(require_owner_actor)) -> HTMLResponse:
+    return HTMLResponse("""<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Restore pharmacy inventory</title><style>body{font:18px system-ui;background:#f3f8f6;color:#12352e;margin:0;padding:24px}main{max-width:560px;margin:8vh auto;background:white;padding:28px;border-radius:24px}button,input{font:inherit;width:100%;box-sizing:border-box;padding:16px;margin-top:18px}button{background:#167563;color:white;border:0;border-radius:16px;font-weight:700}</style><main><h1>Restore existing pharmacy</h1><p>Select an unchanged inventory CSV previously exported from MS2.0. It will be validated and saved to this authenticated pharmacy. Missing values remain blank.</p><form method=post enctype=multipart/form-data><input required type=file name=file accept='.csv,text/csv'><button>Validate and restore</button></form></main>""", headers={"Cache-Control":"no-store","Referrer-Policy":"no-referrer"})
+
+
+@app.post("/main-app/recover-legacy", include_in_schema=False)
+async def ms20_recover_legacy_submit(request: Request, file: UploadFile = File(...), actor: ActorContext = Depends(require_owner_actor)) -> Response:
+    record = first_owner_registry_record(request)
+    if actor.pharmacy_id != record["pharmacy_id"]:
+        raise HTTPException(status_code=403, detail="Authenticated pharmacy does not match the routed pharmacy")
+    try:
+        catalog = legacy_inventory_catalog(await file.read())
+    except (UnicodeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    store = get_sheet_store()
+    if not getattr(store, "is_available", False):
+        raise HTTPException(status_code=503, detail="Durable pharmacy operations state is unavailable")
+    profile = {"name": record.get("pharmacy_name") or actor.pharmacy_id, "owner": record.get("owner_name") or "Owner", "branch": record.get("branch") or "Main", "location": record.get("location") or "Kenya", "payments": "cash, mpesa, credit"}
+    store.save_ms20_operations_state(actor.pharmacy_id, profile, catalog)
+    return RedirectResponse(url="/main-app/", status_code=303)
 
 
 @app.get("/api/ms20/admin/session")
