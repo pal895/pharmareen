@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import traceback
 from html import escape
@@ -131,6 +132,32 @@ main_app_stock_fix_ocr_cache: dict[str, dict[str, Any]] = {}
 PENDING_VOICE_TTL_SECONDS = 600
 startup_status_printed = False
 front_door_registry: FrontDoorRegistry | None = None
+front_door_registry_lock = threading.RLock()
+
+
+def get_front_door_registry() -> FrontDoorRegistry:
+    """Return durable front-door state with per-worker lazy recovery.
+
+    Autoscaled workers must not remain permanently unavailable because their
+    one startup attempt raced worksheet creation or a transient Sheets error.
+    Failed attempts are never cached; the next request retries the same shared
+    durable store and still fails closed if it remains unavailable.
+    """
+    global front_door_registry
+    if front_door_registry is not None:
+        return front_door_registry
+    with front_door_registry_lock:
+        if front_door_registry is not None:
+            return front_door_registry
+        settings = get_settings()
+        if not has_google_credentials(settings) or not owner_auth_sheet_id(settings):
+            raise RuntimeError("Front-door durable store is not configured")
+        signing_key = os.getenv("PHARMAREEN_TENANT_ROUTING_KEY", "").strip()
+        signer = SignedEntryContext(signing_key) if len(signing_key.encode("utf-8")) >= 32 else None
+        candidate = FrontDoorRegistry(GoogleSheetsFrontDoorStore(settings), signer)
+        candidate.store.load()
+        front_door_registry = candidate
+        return candidate
 XML_CONTENT_TYPE = "application/xml"
 last_openai_error: dict[str, Any] = {
     "feature": "",
@@ -291,16 +318,12 @@ async def lifespan(app: FastAPI):
         else:
             owner_auth_service.mark_persistence_unavailable()
             logger.error("Owner authentication durable store is not configured; activation remains disabled")
-    if has_google_credentials(settings) and owner_auth_sheet_id(settings):
-        try:
-            signing_key = os.getenv("PHARMAREEN_TENANT_ROUTING_KEY", "").strip()
-            signer = SignedEntryContext(signing_key) if len(signing_key.encode("utf-8")) >= 32 else None
-            front_door_registry = FrontDoorRegistry(GoogleSheetsFrontDoorStore(settings), signer)
-            front_door_registry.store.load()
-            logger.info("Front-door durable store initialized")
-        except Exception:
-            front_door_registry = None
-            logger.exception("Front-door durable store unavailable; entry state remains fail closed")
+    try:
+        get_front_door_registry()
+        logger.info("Front-door durable store initialized")
+    except Exception:
+        front_door_registry = None
+        logger.exception("Front-door durable store unavailable at startup; requests will retry and fail closed until healthy")
     print_startup_console_status()
     print("PHASE6_ROUTES_LOADED /offline-app /debug/offline-app")
     try:
@@ -354,10 +377,9 @@ async def ms20_operations_bootstrap(
         logger.warning("Durable pharmacy operations bootstrap failed", exc_info=True)
         raise HTTPException(status_code=503, detail="Durable pharmacy operations state is unavailable") from exc
     operations_initialized = bool((durable_state or {}).get("initialized") or catalog)
-    if front_door_registry is None:
-        raise HTTPException(status_code=503, detail="Durable pharmacy entry state is unavailable")
     try:
-        front_door_registry.initialize_pharmacy(
+        registry = get_front_door_registry()
+        registry.initialize_pharmacy(
             pharmacy_id=actor.pharmacy_id,
             owner_id=actor.actor_id,
             owner_name=str(record.get("owner_name") or actor.actor_id),
