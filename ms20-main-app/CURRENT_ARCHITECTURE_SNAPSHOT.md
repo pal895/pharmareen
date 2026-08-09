@@ -28,6 +28,12 @@ The generated Engineering Traceability Index in the master maps every checkpoint
 
 The launch dependency order is transaction correctness; persistence/access/provisioning; Multiuser Pharmacy; billing clarity; Impala Loyalty; Impala Community; measurable low-data/resource/desktop reliability; compact multi-medicine photo onboarding; daily assistant; external qualification; and Demo Mode certification. Only one milestone may be active and the former numeric sequence cannot select work automatically.
 
+## Unified beginning/front-door root (2026-08-09)
+
+`../app/front_door.py` is the shared entry decision contract for authenticated web, channel, QR and share-link adapters. It accepts only trusted request-scoped tenant/actor/role facts and durable operations readiness. Its states are authentication required, durable-state unavailable, established, owner restore-or-new classification, and staff invitation required. Missing operations rows never silently mean `new pharmacy`; failure never renders onboarding; non-owners cannot create or recover a tenant. Signed adapter context is short-lived, non-enumerable and fail-closed on tamper, expiry or journey mismatch. Fixed launch roles and owner-only billing/loyalty/staff/public-posting authority remain explicit.
+
+The existing owner-auth service remains the protected credential/session root. Operations bootstrap projects the front-door decision, and Main App clears stale onboarding cards before showing unavailable or unresolved state. Future MS2-LT-073/076/077 work extends this root with durable invitation replay protection, memberships, attribution, devices/session revocation and verified owner-phone recovery. Pooled loyalty, community and billing identities attach to the pharmacy only after tenant/membership truth exists. This implementation-order gate does not pass those future checkpoints.
+
 The planned shared ownership boundaries are:
 
 - one pharmacy/account root for owner, staff roles, devices, invitations and immutable attribution;

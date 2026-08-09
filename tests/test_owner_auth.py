@@ -663,3 +663,11 @@ def test_durable_store_load_failure_is_not_treated_as_empty_valid_state():
             loader=lambda: (_ for _ in ()).throw(RuntimeError("workbook unavailable")),
             saver=lambda _payload: None,
         )
+
+
+def test_operations_bootstrap_never_leaves_onboarding_visible_when_state_is_unavailable_or_unresolved():
+    app_source = (Path(__file__).resolve().parents[1] / "ms20-main-app" / "src" / "app.js").read_text(encoding="utf-8")
+    assert 'removeCardsByType(["OnboardingCard", "CatalogOnboardingCard"]);' in app_source
+    assert 'state.operationsBootstrap?.state === "recovery_or_setup_required"' in app_source
+    assert 'return "Pharmacy state unavailable"' in app_source
+    assert "Only a genuinely new pharmacy starts setup." in app_source

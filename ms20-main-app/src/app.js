@@ -2932,8 +2932,18 @@ function createOnboardingCard() {
 function ensureOnboardingStarted() {
   if (state.operationsBootstrap?.status === "pending") return;
   if (state.operationsBootstrap?.status === "unavailable" && !state.onboarding.completed) {
+    removeCardsByType(["OnboardingCard", "CatalogOnboardingCard"]);
+    state.onboarding.started = false;
     if (!state.cards.some((card) => card.type === "OperationsStateUnavailableCard")) {
       state.cards.unshift({ id: "card-operations-state-unavailable", type: "OperationsStateUnavailableCard", title: "Pharmacy setup unavailable", source: "Durable pharmacy state", fields: { message: "Your saved pharmacy state could not be checked. Nothing was reset. Try again when the connection is ready." }, status: "blocked", confidence: 1, aiRequired: false });
+    }
+    return;
+  }
+  if (state.operationsBootstrap?.state === "recovery_or_setup_required" && !state.onboarding.completed) {
+    removeCardsByType(["OnboardingCard", "CatalogOnboardingCard"]);
+    state.onboarding.started = false;
+    if (!state.cards.some((card) => card.id === "card-operations-entry-choice")) {
+      state.cards.unshift({ id: "card-operations-entry-choice", type: "OperationsStateUnavailableCard", title: "Choose restore or new setup", source: "Durable pharmacy state", fields: { message: "Existing pharmacies restore a legitimate MS2.0 export. Only a genuinely new pharmacy starts setup." }, status: "blocked", confidence: 1, aiRequired: false });
     }
     return;
   }
@@ -5316,6 +5326,9 @@ function latestNotificationPreview() {
 }
 
 function onboardingStatusText() {
+  if (state.operationsBootstrap?.status === "pending") return "Checking pharmacy state";
+  if (state.operationsBootstrap?.status === "unavailable") return "Pharmacy state unavailable";
+  if (state.operationsBootstrap?.state === "recovery_or_setup_required") return "Choose restore or new setup";
   if (!state.onboarding.completed) return "Operations setup needed";
   if (pharmacyBrain.catalog.length === 0) return "Catalog needed";
   return "Ready";
@@ -5513,13 +5526,17 @@ async function hydrateDurableOperationsState() {
       state.onboarding.started = false;
       removeCardsByType(["OnboardingCard", "CatalogOnboardingCard", "OperationsStateUnavailableCard"]);
     } else {
-      state.onboarding.completed = setupComplete() || catalog.length > 0;
+      state.onboarding.completed = false;
+      state.onboarding.started = false;
+      removeCardsByType(["OnboardingCard", "CatalogOnboardingCard"]);
     }
-    state.operationsBootstrap = { status: "ready", initialized: Boolean(payload.operations_initialized) };
+    state.operationsBootstrap = { status: "ready", initialized: Boolean(payload.operations_initialized), state: payload?.front_door?.state || "" };
     refreshNotifications();
     render();
   } catch (error) {
     state.operationsBootstrap = { status: "unavailable", error: String(error?.message || error) };
+    state.onboarding.started = false;
+    removeCardsByType(["OnboardingCard", "CatalogOnboardingCard"]);
     render();
   }
 }

@@ -42,6 +42,7 @@ from app.config import Settings, get_settings
 from app.correction_learning import CorrectionLearningEngine
 from app.demo_store import DemoPharmacyStore
 from app.deployment import PharmacyDeploymentEngine, normalize_id as normalize_runtime_id
+from app.front_door import resolve_front_door
 from app.intake import IntakeService, normalize_key, normalize_spoken_command_text, parse_operating_commands, replace_number_words
 from app.local_first_parser import LocalFirstParser
 from app.live_pilot import LivePharmacyPilotEngine
@@ -339,6 +340,15 @@ async def ms20_operations_bootstrap(
     except Exception as exc:
         logger.warning("Durable pharmacy operations bootstrap failed", exc_info=True)
         raise HTTPException(status_code=503, detail="Durable pharmacy operations state is unavailable") from exc
+    operations_initialized = bool((durable_state or {}).get("initialized") or catalog)
+    front_door = resolve_front_door(
+        pharmacy_id=actor.pharmacy_id,
+        actor_id=actor.actor_id,
+        role=actor.role,
+        authenticated=True,
+        durable_state_available=True,
+        operations_initialized=operations_initialized,
+    )
     return {
         "schema": "ms20.operations-bootstrap.v1",
         "pharmacy": {
@@ -348,9 +358,10 @@ async def ms20_operations_bootstrap(
             "branch": str((durable_state or {}).get("branch") or record.get("branch") or "Main"),
             "location": str((durable_state or {}).get("location") or record.get("location") or "Kenya"),
         },
-        "operations_initialized": bool((durable_state or {}).get("initialized") or catalog),
+        "operations_initialized": operations_initialized,
         "catalog": catalog,
         "legacy_migration_allowed": durable_state is None and not catalog,
+        "front_door": front_door.as_dict(),
     }
 
 
