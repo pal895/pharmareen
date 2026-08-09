@@ -111,6 +111,28 @@ def test_authenticated_session_survives_process_handoff_and_shared_revocation():
     assert_http_error(401, lambda: first.authenticate(token, now=103.0))
 
 
+def test_owner_phone_change_requires_primary_pin_rekeys_access_and_revokes_sessions():
+    service = OwnerAuthService()
+    token, session = service.initialize_first_owner(OWNER, "Owner1234", now=100.0)
+    assert_http_error(401, lambda: service.verify_primary_pin(pharmacy_id="pharmacy-a", owner_id=session.actor_id, pin="wrong"))
+    service.verify_primary_pin(pharmacy_id="pharmacy-a", owner_id=session.actor_id, pin="Owner1234")
+    service.change_owner_phone(pharmacy_id="pharmacy-a", owner_id=session.actor_id, new_phone="+254700000009")
+    assert_http_error(401, lambda: service.authenticate(token, now=101.0))
+    assert_http_error(401, lambda: service.sign_in_with_pin(OWNER["phone_number"], "Owner1234", now=102.0))
+    new_token, _ = service.sign_in_with_pin("+254700000009", "Owner1234", now=102.0)
+    assert service.authenticate(new_token, pharmacy_id="pharmacy-a", now=103.0).actor_id == session.actor_id
+
+
+def test_verified_primary_recovery_replaces_pin_and_revokes_old_sessions():
+    service = OwnerAuthService()
+    token, session = service.initialize_first_owner(OWNER, "Owner1234", now=100.0)
+    service.recover_primary_pin(pharmacy_id="pharmacy-a", owner_id=session.actor_id, new_pin="Recovered1234")
+    assert_http_error(401, lambda: service.authenticate(token, now=101.0))
+    assert_http_error(401, lambda: service.sign_in_with_pin(OWNER["phone_number"], "Owner1234", now=102.0))
+    replacement, _ = service.sign_in_with_pin(OWNER["phone_number"], "Recovered1234", now=102.0)
+    assert service.authenticate(replacement, now=103.0).pharmacy_id == "pharmacy-a"
+
+
 def test_unknown_phone_is_not_enumerated_and_no_secret_uses_client_storage_or_ui():
     service = OwnerAuthService()
     delivered: list[tuple[str, str]] = []
@@ -177,7 +199,7 @@ def test_authenticated_operations_bootstrap_resumes_durable_existing_pharmacy(mo
             assert pharmacy_id == "pharmacy-a"
             return [{"name": "Ibuprofen", "stockLeft": 13, "sellingPrice": 18}]
 
-    main.app.dependency_overrides[main.require_owner_actor] = lambda: ActorContext(
+    main.app.dependency_overrides[main.require_front_door_actor] = lambda: ActorContext(
         pharmacy_id="pharmacy-a", actor_id="owner_254700000001", role="owner"
     )
     monkeypatch.setattr(main, "first_owner_registry_record", lambda _request: {
@@ -189,7 +211,7 @@ def test_authenticated_operations_bootstrap_resumes_durable_existing_pharmacy(mo
             monkeypatch.setattr(main, "front_door_registry", FrontDoorRegistry(MemoryFrontDoorStore()))
             response = client.get("/api/ms20/operations/bootstrap")
     finally:
-        main.app.dependency_overrides.pop(main.require_owner_actor, None)
+        main.app.dependency_overrides.pop(main.require_front_door_actor, None)
     assert response.status_code == 200
     assert response.json()["operations_initialized"] is True
     assert response.json()["pharmacy"]["name"] == "Zuri Chemist"
@@ -217,7 +239,7 @@ def test_authenticated_empty_established_registry_reaches_recovery_decision_afte
         owner_name="Mary",
         owner_phone_key="254700000001",
     )
-    main.app.dependency_overrides[main.require_owner_actor] = lambda: ActorContext(
+    main.app.dependency_overrides[main.require_front_door_actor] = lambda: ActorContext(
         pharmacy_id="pharmacy-a", actor_id="owner_254700000001", role="owner"
     )
     monkeypatch.setattr(main, "first_owner_registry_record", lambda _request: OWNER)
@@ -227,7 +249,7 @@ def test_authenticated_empty_established_registry_reaches_recovery_decision_afte
             monkeypatch.setattr(main, "front_door_registry", FrontDoorRegistry(legacy))
             response = client.get("/api/ms20/operations/bootstrap")
     finally:
-        main.app.dependency_overrides.pop(main.require_owner_actor, None)
+        main.app.dependency_overrides.pop(main.require_front_door_actor, None)
 
     assert response.status_code == 200
     assert response.json()["operations_initialized"] is False
@@ -245,7 +267,7 @@ def test_operations_bootstrap_rejects_session_owner_that_does_not_match_registry
         def list_pharmacy_catalog_records(self, pharmacy_id):
             return []
 
-    main.app.dependency_overrides[main.require_owner_actor] = lambda: ActorContext(
+    main.app.dependency_overrides[main.require_front_door_actor] = lambda: ActorContext(
         pharmacy_id="pharmacy-a", actor_id="owner_other", role="owner"
     )
     monkeypatch.setattr(main, "first_owner_registry_record", lambda _request: OWNER)
@@ -254,7 +276,7 @@ def test_operations_bootstrap_rejects_session_owner_that_does_not_match_registry
         with TestClient(main.app, base_url="https://ms20.test") as client:
             response = client.get("/api/ms20/operations/bootstrap")
     finally:
-        main.app.dependency_overrides.pop(main.require_owner_actor, None)
+        main.app.dependency_overrides.pop(main.require_front_door_actor, None)
     assert response.status_code == 403
 
 

@@ -31,12 +31,13 @@ def store_with(ws):
 
 def test_front_door_store_round_trips_platform_and_pharmacy_state():
     ws = Worksheet([
-        {"Pharmacy ID": "__platform__", "State JSON": json.dumps({"community_counter": 2, "used_nonces": ["digest"]})},
+        {"Pharmacy ID": "__platform__", "State JSON": json.dumps({"community_counter": 2, "used_nonces": ["digest"], "pending_entries": {"nonce-digest": {"phone_key_digest": "phone-digest", "status": "active", "expires_at": 9999999999}}})},
         {"Pharmacy ID": "pharmacy-a", "State JSON": json.dumps({"pharmacy_id": "pharmacy-a", "members": {}})},
     ])
     loaded = store_with(ws).load()
     assert loaded["community_counter"] == 2
     assert loaded["used_nonces"] == ["digest"]
+    assert loaded["pending_entries"]["nonce-digest"]["phone_key_digest"] == "phone-digest"
     assert loaded["pharmacies"]["pharmacy-a"]["pharmacy_id"] == "pharmacy-a"
 
 

@@ -517,6 +517,8 @@ Owner phone identity originates in trusted provisioning and the active tenant re
 
 Provisioning, owner credentials/sessions and front-door state share one canonical registry-derived owner actor ID. Authenticated bootstrap requires the session actor to equal that routed owner. A bounded compatibility migration may convert only the exact legacy normalized-phone owner key when the durable phone digest and active owner membership also match; all other owner mismatches remain unavailable/fail closed.
 
+The customer front door now has complete internal entry workflows over that root. Authenticated channel onboarding produces a one-use verified new-pharmacy handoff into owner activation; staff use owner-issued expiring invitation links, protected staff credentials, device-bound durable sessions and the same Main App/catalog without onboarding. Bootstrap returns actor identity/role for operational attribution. Owner access management projects members, devices, Community identity, pooled Impala Coins and truthful seat/subscription qualification. Recovery, owner-phone change, Quick PIN trust, session/device revocation, bounded Loyalty earning/redemption and Community posting/moderation stay tenant-bound and fail closed. External provider, legal and scale qualification remain separate unchanged Master gates.
+
 <!-- VALIDATION_CONTRACT_SYNC_START -->
 ## Generated validation-contract reference
 

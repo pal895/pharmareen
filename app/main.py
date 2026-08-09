@@ -43,7 +43,8 @@ from app.config import Settings, get_settings
 from app.correction_learning import CorrectionLearningEngine
 from app.demo_store import DemoPharmacyStore
 from app.deployment import PharmacyDeploymentEngine, normalize_id as normalize_runtime_id
-from app.front_door import FrontDoorRegistry, SignedEntryContext, resolve_front_door
+from app.front_door import EntryKind, FrontDoorRegistry, SignedEntryContext, resolve_front_door
+from app.front_door_workflows import FrontDoorWorkflowService
 from app.intake import IntakeService, normalize_key, normalize_spoken_command_text, parse_operating_commands, replace_number_words
 from app.local_first_parser import LocalFirstParser
 from app.live_pilot import LivePharmacyPilotEngine
@@ -92,6 +93,8 @@ from app.whatsapp import WhatsAppClient, xml_message_response
 
 logger = logging.getLogger(__name__)
 LEGACY_INVENTORY_HEADERS = ["Medicine", "Strength", "Form", "Unit", "Selling price (KES)", "Cost price (KES)", "Stock", "Supplier", "Barcode", "Batch", "Expiry", "Shelf"]
+MS20_TERMS_VERSION = "ms20-terms-2026-08"
+MS20_PRIVACY_VERSION = "ms20-privacy-2026-08"
 
 
 def legacy_inventory_catalog(raw: bytes) -> list[dict[str, Any]]:
@@ -158,6 +161,26 @@ def get_front_door_registry() -> FrontDoorRegistry:
         candidate.store.load()
         front_door_registry = candidate
         return candidate
+
+
+def get_front_door_workflows() -> FrontDoorWorkflowService:
+    return FrontDoorWorkflowService(get_front_door_registry())
+
+
+def require_front_door_actor(
+    ms20_owner_session: str | None = Cookie(default=None),
+    ms20_staff_session: str | None = Cookie(default=None),
+    ms20_device_key: str | None = Cookie(default=None),
+) -> ActorContext:
+    if ms20_owner_session:
+        return owner_auth_service.authenticate(ms20_owner_session)
+    if not ms20_staff_session or not ms20_device_key:
+        raise HTTPException(status_code=401, detail="Pharmacy sign-in required.")
+    try:
+        staff = get_front_door_workflows().authenticate_staff_any(ms20_staff_session, device_key=ms20_device_key)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail="Staff sign-in required.") from exc
+    return ActorContext(pharmacy_id=staff["pharmacy_id"], actor_id=staff["actor_id"], role=staff["role"], display_name=staff["display_name"])
 XML_CONTENT_TYPE = "application/xml"
 last_openai_error: dict[str, Any] = {
     "feature": "",
@@ -347,7 +370,7 @@ app = FastAPI(
 
 
 @app.get("/api/ms20/auth/session")
-async def ms20_auth_session(actor: ActorContext = Depends(require_owner_actor)) -> dict[str, Any]:
+async def ms20_auth_session(actor: ActorContext = Depends(require_front_door_actor)) -> dict[str, Any]:
     return {
         "authenticated": True,
         "actor_id": actor.actor_id,
@@ -357,10 +380,189 @@ async def ms20_auth_session(actor: ActorContext = Depends(require_owner_actor)) 
     }
 
 
+@app.post("/api/ms20/front-door/new-pharmacy")
+async def ms20_front_door_new_pharmacy(request: Request) -> JSONResponse:
+    """Complete a channel-verified, one-use new-pharmacy provisioning handoff."""
+    payload = await request.json()
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="New-pharmacy details are required")
+    entry = str(payload.get("entry") or "")
+    phone = str(payload.get("phone") or "")
+    phone_key = registry_phone_key(phone)
+    details = {
+        "pharmacy_name": str(payload.get("pharmacy_name") or "").strip(),
+        "owner_name": str(payload.get("owner_name") or "").strip(),
+        "phone_number": phone,
+        "location": str(payload.get("location") or "").strip(),
+        "status": "active",
+        "active": "yes",
+    }
+    if not entry or not phone_key or not details["pharmacy_name"] or not details["owner_name"] or not details["location"]:
+        raise HTTPException(status_code=400, detail="Verified phone, pharmacy, owner and location are required")
+    pin = str(payload.get("pin") or "")
+    if len(pin) < 8 or not any(c.isalpha() for c in pin) or not any(c.isdigit() for c in pin):
+        raise HTTPException(status_code=400, detail="Choose a PIN with at least 8 characters, including letters and numbers")
+    if payload.get("terms_version") != MS20_TERMS_VERSION or payload.get("privacy_version") != MS20_PRIVACY_VERSION:
+        raise HTTPException(status_code=400, detail="Current Terms and Privacy Notice acceptance is required")
+    registry = get_front_door_registry()
+    try:
+        registry.consume_new_pharmacy_context(entry, phone_key=phone_key)
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail="Verified new-pharmacy entry is unavailable") from exc
+    result = get_pharmacy_registry().register_pharmacy(details)
+    if not result.accepted:
+        raise HTTPException(status_code=503, detail="New-pharmacy registry is temporarily unavailable")
+    record = result.record
+    owner_state = owner_auth_service.pharmacy_owner_state(record)
+    if not result.created and owner_state != "uninitialized":
+        raise HTTPException(status_code=409, detail="This owner already has an active pharmacy entry")
+    owner_id = canonical_registry_owner_id(record)
+    registry.initialize_pharmacy(
+        pharmacy_id=record["pharmacy_id"],
+        owner_id=owner_id,
+        owner_name=record.get("owner_name") or "Owner",
+        owner_phone_key=phone_key,
+    )
+    registry.record_owner_acceptance(record["pharmacy_id"], owner_id=owner_id, terms_version=MS20_TERMS_VERSION, privacy_version=MS20_PRIVACY_VERSION)
+    token, session = owner_auth_service.initialize_first_owner(record, pin)
+    return owner_session_response(token, session)
+
+
+@app.get("/main-app/new-pharmacy", response_class=HTMLResponse, include_in_schema=False)
+async def ms20_new_pharmacy_page(entry: str = Query(default="")) -> HTMLResponse:
+    if not entry:
+        raise HTTPException(status_code=403, detail="Verified new-pharmacy entry is required")
+    return HTMLResponse("""<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Create pharmacy</title>
+<style>body{font:17px system-ui;background:#f3f8f6;color:#12352e;margin:0;padding:20px}main{max-width:580px;margin:4vh auto;background:white;padding:26px;border-radius:24px}label{display:block;margin-top:15px;font-weight:700}input,button{font:inherit;width:100%;box-sizing:border-box;padding:14px;margin-top:6px;border-radius:12px;border:1px solid #9bb8b1}button{margin-top:22px;background:#167563;color:white;border:0;font-weight:800}.error{color:#9b1c1c}</style>
+<main><h1>Create your pharmacy</h1><p>Your phone was verified by the entry channel. Add the pharmacy details once, then create the Primary Owner PIN.</p><form id=f><label>Registered phone<input name=phone inputmode=tel autocomplete=tel required></label><label>Pharmacy name<input name=pharmacy_name required></label><label>Owner name<input name=owner_name required></label><label>Location<input name=location required></label><label>Primary Owner PIN<input name=pin type=password minlength=8 required></label><label><input name=accept type=checkbox required style='width:auto'> I accept the current Terms and Privacy Notice</label><button>Create pharmacy</button><p id=m class=error role=alert></p></form></main>
+<script>const entry=new URLSearchParams(location.search).get('entry');f.onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(f));m.textContent='Creating pharmacy…';const r=await fetch('/api/ms20/front-door/new-pharmacy',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({...d,entry,terms_version:'ms20-terms-2026-08',privacy_version:'ms20-privacy-2026-08'})});if(r.ok)location.replace('/main-app/');else m.textContent=(await r.json()).detail||'Pharmacy setup is unavailable.'};</script>""", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
+@app.post("/api/ms20/front-door/invitations")
+async def ms20_front_door_invitation(request: Request, actor: ActorContext = Depends(require_owner_actor)) -> dict[str, Any]:
+    payload = await request.json()
+    role = str((payload or {}).get("role") or "").strip().lower()
+    display_name = str((payload or {}).get("display_name") or "").strip()
+    try:
+        token = get_front_door_registry().issue_invitation(actor.pharmacy_id, owner_id=actor.actor_id, role=role, display_name=display_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"schema": "ms20.staff-invitation.v1", "join_path": f"/main-app/join?entry={quote(token, safe='')}", "expires_in": 600}
+
+
+@app.post("/api/ms20/front-door/staff/join")
+async def ms20_front_door_staff_join(request: Request) -> JSONResponse:
+    payload = await request.json()
+    entry = str((payload or {}).get("entry") or "")
+    device_key = str((payload or {}).get("device_key") or "")
+    try:
+        joined = get_front_door_workflows().accept_staff_invitation(
+            entry, verified_identity=f"invitation:{hashlib.sha256(entry.encode()).hexdigest()}",
+            pin=str((payload or {}).get("pin") or ""), device_key=device_key,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    response = JSONResponse({"authenticated": True, "pharmacy_id": joined["pharmacy_id"], "actor_id": joined["actor_id"], "role": joined["role"]})
+    response.set_cookie("ms20_staff_session", joined["session"], max_age=900, httponly=True, secure=True, samesite="strict", path="/")
+    response.set_cookie("ms20_device_key", device_key, max_age=31536000, httponly=True, secure=True, samesite="strict", path="/")
+    return response
+
+
+@app.get("/main-app/join", response_class=HTMLResponse, include_in_schema=False)
+async def ms20_staff_join_page(entry: str = Query(default="")) -> HTMLResponse:
+    if not entry:
+        raise HTTPException(status_code=403, detail="Staff invitation is required")
+    return HTMLResponse("""<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Join pharmacy</title><style>body{font:17px system-ui;background:#f3f8f6;color:#12352e;margin:0;padding:20px}main{max-width:520px;margin:8vh auto;background:#fff;padding:28px;border-radius:24px}input,button{font:inherit;width:100%;box-sizing:border-box;padding:15px;margin-top:14px;border-radius:12px}button{background:#167563;color:#fff;border:0;font-weight:800}.error{color:#9b1c1c}</style><main><h1>Join this pharmacy</h1><p>This one-use invitation adds you to the existing pharmacy. It never creates another pharmacy.</p><form id=f><label>Create your private staff PIN<input name=pin type=password minlength=8 required></label><button>Join pharmacy</button><p id=m class=error role=alert></p></form></main><script>const entry=new URLSearchParams(location.search).get('entry');let device=localStorage.getItem('ms20-device-key');if(!device){device=crypto.randomUUID();localStorage.setItem('ms20-device-key',device)}f.onsubmit=async e=>{e.preventDefault();m.textContent='Joining…';const r=await fetch('/api/ms20/front-door/staff/join',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({entry,pin:new FormData(f).get('pin'),device_key:device})});if(r.ok)location.replace('/main-app/');else m.textContent=(await r.json()).detail||'Invitation unavailable.'};</script>""", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
+@app.get("/api/ms20/front-door/summary")
+async def ms20_front_door_summary(actor: ActorContext = Depends(require_owner_actor)) -> dict[str, Any]:
+    registry = get_front_door_registry()
+    state = registry.store.load()
+    pharmacy = state.get("pharmacies", {}).get(actor.pharmacy_id)
+    if not pharmacy or pharmacy.get("owner_id") != actor.actor_id:
+        raise HTTPException(status_code=403, detail="Owner authority is required")
+    members = [{"actor_id": key, "display_name": value.get("display_name"), "role": value.get("role"), "status": value.get("status")} for key, value in pharmacy.get("members", {}).items()]
+    return {
+        "schema": "ms20.front-door-summary.v1",
+        "pharmacy_id": actor.pharmacy_id,
+        "members": members,
+        "devices": [{"device_digest": key, "actor_id": value.get("actor_id"), "status": value.get("status"), "last_active_at": value.get("last_active_at")} for key, value in pharmacy.get("devices", {}).items()],
+        "community": {key: pharmacy["community"].get(key) for key in ("community_id", "pharmacy_identity", "posting_control")},
+        "loyalty": {key: pharmacy["loyalty"].get(key) for key in ("wallet_id", "referral_code", "balance")},
+        "billing": get_front_door_workflows().billing_summary(actor.pharmacy_id, actor_id=actor.actor_id),
+    }
+
+
+@app.post("/api/ms20/front-door/owner-phone")
+async def ms20_front_door_owner_phone(request: Request, actor: ActorContext = Depends(require_owner_actor)) -> dict[str, Any]:
+    payload = await request.json()
+    new_phone = str((payload or {}).get("new_phone") or "")
+    new_key = registry_phone_key(new_phone)
+    entry = str((payload or {}).get("verification_entry") or "")
+    registry = get_front_door_registry()
+    try:
+        registry.consume_account_recovery_context(entry, phone_key=new_key, pharmacy_id=actor.pharmacy_id)
+        owner_auth_service.verify_primary_pin(pharmacy_id=actor.pharmacy_id, owner_id=actor.actor_id, pin=str((payload or {}).get("primary_pin") or ""))
+    except (ValueError, HTTPException) as exc:
+        raise HTTPException(status_code=403, detail="Owner phone verification failed") from exc
+    pharmacy_registry = get_pharmacy_registry()
+    current = pharmacy_registry.find_by_id(actor.pharmacy_id, active_only=True)
+    if not current:
+        raise HTTPException(status_code=503, detail="Pharmacy registry is unavailable")
+    previous_phone = current["phone_number"]
+    try:
+        pharmacy_registry.update_owner_phone(actor.pharmacy_id, expected_phone=previous_phone, new_phone=new_phone)
+        owner_auth_service.change_owner_phone(pharmacy_id=actor.pharmacy_id, owner_id=actor.actor_id, new_phone=new_phone)
+        registry.change_owner_phone(actor.pharmacy_id, owner_id=actor.actor_id, new_phone_key=new_key, current_owner_verified=True, new_phone_verified=True)
+    except Exception as exc:
+        try:
+            pharmacy_registry.update_owner_phone(actor.pharmacy_id, expected_phone=new_phone, new_phone=previous_phone)
+        except Exception:
+            logger.exception("Owner phone registry rollback failed")
+        try:
+            owner_auth_service.change_owner_phone(pharmacy_id=actor.pharmacy_id, owner_id=actor.actor_id, new_phone=previous_phone)
+        except Exception:
+            logger.exception("Owner phone credential rollback failed")
+        try:
+            registry.change_owner_phone(actor.pharmacy_id, owner_id=actor.actor_id, new_phone_key=registry_phone_key(previous_phone), current_owner_verified=True, new_phone_verified=True)
+        except Exception:
+            logger.exception("Owner phone front-door rollback failed")
+        raise HTTPException(status_code=503, detail="Owner phone change could not be completed safely") from exc
+    return {"changed": True, "sessions_revoked": True, "devices_recheck_required": True}
+
+
+@app.post("/api/ms20/front-door/recover-owner")
+async def ms20_front_door_recover_owner(request: Request) -> dict[str, Any]:
+    payload = await request.json()
+    entry = str((payload or {}).get("verification_entry") or "")
+    phone = str((payload or {}).get("phone") or "")
+    phone_key = registry_phone_key(phone)
+    registry = get_front_door_registry()
+    try:
+        context = registry.signer.verify(entry, expected_kind=EntryKind.ACCOUNT_RECOVERY) if registry.signer else None
+        pharmacy_id = str((context or {}).get("p") or "")
+        record = get_pharmacy_registry().find_by_id(pharmacy_id, active_only=True)
+        if not record or registry_phone_key(record.get("phone_number")) != phone_key:
+            raise ValueError("Recovery identity mismatch")
+        registry.consume_account_recovery_context(entry, phone_key=phone_key, pharmacy_id=pharmacy_id)
+        owner_id = canonical_registry_owner_id(record)
+        owner_auth_service.recover_primary_pin(pharmacy_id=pharmacy_id, owner_id=owner_id, new_pin=str((payload or {}).get("new_pin") or ""))
+        registry.complete_account_recovery(pharmacy_id, owner_id=owner_id, verified_identity=True)
+    except (ValueError, HTTPException) as exc:
+        raise HTTPException(status_code=403, detail="Verified owner recovery is unavailable") from exc
+    return {"recovered": True, "sessions_revoked": True, "devices_recheck_required": True, "sign_in_required": True}
+
+
+@app.get("/main-app/access", response_class=HTMLResponse, include_in_schema=False)
+async def ms20_front_door_access_page(actor: ActorContext = Depends(require_owner_actor)) -> HTMLResponse:
+    return HTMLResponse("""<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Pharmacy access</title><style>body{font:16px system-ui;background:#f3f8f6;color:#12352e;margin:0;padding:20px}main{max-width:700px;margin:auto;background:#fff;padding:26px;border-radius:24px}section{border-top:1px solid #d8e5e1;margin-top:20px;padding-top:15px}input,select,button{font:inherit;padding:12px;margin:5px;border-radius:10px}button{background:#167563;color:#fff;border:0;font-weight:700}code{overflow-wrap:anywhere}</style><main><h1>Pharmacy access</h1><p>Manage staff entry, pharmacy identity and seats without changing pharmacy data.</p><section id=s>Loading…</section><section><h2>Invite staff</h2><form id=f><input name=display_name placeholder='Staff name' required><select name=role><option>manager</option><option>pharmacist</option><option>cashier</option><option>staff</option></select><button>Create one-use link</button></form><p id=m></p></section></main><script>async function load(){const r=await fetch('/api/ms20/front-door/summary',{credentials:'same-origin'}),d=await r.json();s.innerHTML=`<h2>${d.community.pharmacy_identity}</h2><p>${d.members.length} active/history members · ${d.billing.active_seats} active seats</p><p>Impala Coins: ${d.loyalty.balance||0}</p><p>Subscription: ${d.billing.commercially_qualified?d.billing.subscription_status:'Commercial qualification pending'}</p>`}f.onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(f));const r=await fetch('/api/ms20/front-door/invitations',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}),j=await r.json();m.innerHTML=r.ok?`Share this one-use link: <code>${location.origin+j.join_path}</code>`:(j.detail||'Invitation unavailable.')};load();</script>""", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
 @app.get("/api/ms20/operations/bootstrap")
 async def ms20_operations_bootstrap(
     request: Request,
-    actor: ActorContext = Depends(require_owner_actor),
+    actor: ActorContext = Depends(require_front_door_actor),
 ) -> dict[str, Any]:
     """Resume durable pharmacy operations state after owner authentication."""
     record = first_owner_registry_record(request)
@@ -379,7 +581,9 @@ async def ms20_operations_bootstrap(
     operations_initialized = bool((durable_state or {}).get("initialized") or catalog)
     owner_id = canonical_registry_owner_id(record)
     owner_phone_key = registry_phone_key(record.get("phone_number") or record.get("phone"))
-    if not owner_id or actor.actor_id != owner_id:
+    if not owner_id:
+        raise HTTPException(status_code=503, detail="Routed pharmacy owner identity is unavailable")
+    if actor.role == "owner" and actor.actor_id != owner_id:
         raise HTTPException(status_code=403, detail="Authenticated owner does not match the routed pharmacy owner")
     try:
         registry = get_front_door_registry()
@@ -410,6 +614,7 @@ async def ms20_operations_bootstrap(
             "branch": str((durable_state or {}).get("branch") or record.get("branch") or "Main"),
             "location": str((durable_state or {}).get("location") or record.get("location") or "Kenya"),
         },
+        "actor": {"id": actor.actor_id, "role": actor.role, "display_name": actor.display_name or ("Owner" if actor.role == "owner" else "Staff")},
         "operations_initialized": operations_initialized,
         "catalog": catalog,
         "legacy_migration_allowed": durable_state is None and not catalog,
@@ -831,21 +1036,29 @@ async def main_app_redirect() -> RedirectResponse:
 async def main_app_index(
     request: Request,
     ms20_owner_session: str | None = Cookie(default=None),
+    ms20_staff_session: str | None = Cookie(default=None),
+    ms20_device_key: str | None = Cookie(default=None),
 ) -> Response:
     record = first_owner_registry_record(request)
     state = owner_auth_service.pharmacy_owner_state(record)
     if state == "uninitialized":
         return RedirectResponse(url="/main-app/sign-in", status_code=307)
-    try:
-        owner_auth_service.authenticate(
-            ms20_owner_session,
-            pharmacy_id=record["pharmacy_id"],
-            allowed_roles={"owner"},
-        )
-    except HTTPException as exc:
-        if exc.status_code == 401:
+    if ms20_owner_session:
+        try:
+            owner_auth_service.authenticate(ms20_owner_session, pharmacy_id=record["pharmacy_id"], allowed_roles={"owner"})
+        except HTTPException as exc:
+            if exc.status_code == 401:
+                return RedirectResponse(url="/main-app/sign-in", status_code=307)
+            raise
+    elif ms20_staff_session and ms20_device_key:
+        try:
+            staff = get_front_door_workflows().authenticate_staff_any(ms20_staff_session, device_key=ms20_device_key)
+        except ValueError:
             return RedirectResponse(url="/main-app/sign-in", status_code=307)
-        raise
+        if staff["pharmacy_id"] != record["pharmacy_id"]:
+            raise HTTPException(status_code=403, detail="Staff session does not match the routed pharmacy")
+    else:
+        return RedirectResponse(url="/main-app/sign-in", status_code=307)
     return main_app_file_response("index.html")
 
 
@@ -4962,6 +5175,7 @@ try:
             development_override_numbers=sorted(development_overrides),
             live_test_number=live_number,
             onboarding_enabled=enabled,
+            new_pharmacy_entry_factory=lambda phone: "/main-app/new-pharmacy?entry=" + quote(get_front_door_registry().issue_new_pharmacy_context(verified_phone_key=registry_phone_key(phone)), safe=""),
         )
     def try_get_settings():
         return _phase13_settings_safe()

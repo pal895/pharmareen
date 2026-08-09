@@ -257,6 +257,54 @@ class OwnerAuthService:
             self._save_state()
             return self._issue_session(credential, now=current)
 
+    def verify_primary_pin(self, *, pharmacy_id: str, owner_id: str, pin: str) -> None:
+        self._require_persistence()
+        with self._lock:
+            self._refresh_persistent_state()
+            matches = [item for item in self._credentials.values() if item.pharmacy_id == pharmacy_id and item.owner_id == owner_id]
+            if len(matches) != 1 or not self._verify_pin(pin, matches[0].pin_hash):
+                raise self._unauthorized("Primary Owner PIN verification failed.")
+
+    def change_owner_phone(self, *, pharmacy_id: str, owner_id: str, new_phone: str) -> None:
+        self._require_persistence()
+        new_key = registry_phone_key(new_phone)
+        if not new_key:
+            raise HTTPException(status_code=400, detail="A verified new owner phone is required.")
+        with self._lock:
+            self._refresh_persistent_state()
+            matches = [(key, item) for key, item in self._credentials.items() if item.pharmacy_id == pharmacy_id and item.owner_id == owner_id]
+            if len(matches) != 1 or (new_key in self._credentials and self._credentials[new_key].pharmacy_id != pharmacy_id):
+                raise HTTPException(status_code=409, detail="Owner phone change conflicts with existing access.")
+            old_key, credential = matches[0]
+            previous_credentials, previous_sessions = dict(self._credentials), dict(self._sessions)
+            self._credentials.pop(old_key)
+            credential.phone_key = new_key
+            self._credentials[new_key] = credential
+            for session in self._sessions.values():
+                if session.pharmacy_id == pharmacy_id:
+                    session.revoked = True
+            try:
+                self._save_state()
+            except Exception:
+                self._credentials, self._sessions = previous_credentials, previous_sessions
+                raise HTTPException(status_code=503, detail="Owner access is temporarily unavailable.")
+
+    def recover_primary_pin(self, *, pharmacy_id: str, owner_id: str, new_pin: str) -> None:
+        self._require_persistence()
+        self._validate_pin(new_pin)
+        with self._lock:
+            self._refresh_persistent_state()
+            matches = [item for item in self._credentials.values() if item.pharmacy_id == pharmacy_id and item.owner_id == owner_id]
+            if len(matches) != 1:
+                raise HTTPException(status_code=503, detail="Owner recovery state is unavailable.")
+            matches[0].pin_hash = self._hash_pin(new_pin)
+            matches[0].failed_attempts = 0
+            matches[0].locked_until = 0.0
+            for session in self._sessions.values():
+                if session.pharmacy_id == pharmacy_id:
+                    session.revoked = True
+            self._save_state()
+
     def _valid_activation(self, raw_token: str, *, now: float | None = None) -> ActivationInvitation:
         current = time.time() if now is None else now
         invitation = self._activations.get(self._digest(raw_token))

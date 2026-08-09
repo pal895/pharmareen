@@ -93,7 +93,7 @@ const transactionEngine = new TransactionCompletionEngine({
     simulator: paymentSimulator
   }
 });
-const saleAdjustmentEngine = new SaleAdjustmentEngine({ storage: safeLocalStorage(), staffIdentity: () => "Owner" });
+const saleAdjustmentEngine = new SaleAdjustmentEngine({ storage: safeLocalStorage(), staffIdentity: () => state.actor?.display_name || "Owner" });
 const pharmacyBrain = new PharmacyBrain({ pharmacyId: state.pharmacy.id });
 let pronunciationMemory = new PharmacyPronunciationMemory(state.pharmacy.id, safeLocalStorage());
 const sourceBrain = new SourceBrain();
@@ -5510,6 +5510,7 @@ async function hydrateDurableOperationsState() {
       throw new Error("operations bootstrap payload is invalid");
     }
     state.pharmacy = { ...state.pharmacy, ...payload.pharmacy, catalogLoaded: payload.catalog.length > 0 };
+    state.actor = { ...(state.actor || {}), ...(payload.actor || {}) };
     offlineSyncGateway.pharmacy = state.pharmacy;
     pronunciationMemory = new PharmacyPronunciationMemory(state.pharmacy.id, safeLocalStorage());
     const localCatalog = readCatalog();

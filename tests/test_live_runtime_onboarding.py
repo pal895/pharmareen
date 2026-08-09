@@ -272,6 +272,27 @@ def test_google_sheets_registry_onboards_phone_and_routes_sale():
     assert intake.calls[0]["actor_id"] == phone
 
 
+def test_verified_channel_new_pharmacy_hands_off_to_secure_owner_activation():
+    store = FakeRegistryStore()
+    registry = GoogleSheetsPharmacyRegistry(store)
+    issued = []
+    router = LiveRuntimeRouter(
+        intake_service_factory=lambda: FakeIntake(),
+        provisioning_engine=make_engine("registry_secure_handoff"),
+        pharmacy_registry=registry,
+        new_pharmacy_entry_factory=lambda phone: issued.append(phone) or "/main-app/new-pharmacy?entry=signed",
+    )
+    result = router.handle_whatsapp_message(
+        phone_number="+254700000776",
+        text="Pharmacy: Tumaini Chemist; Owner: Akinyi; Location: Eldoret",
+        source="baileys",
+    )
+    assert result.status == "registered_active_pharmacy"
+    assert issued == ["+254700000776"]
+    assert "/main-app/new-pharmacy?entry=signed" in result.reply
+    assert "send sales" not in result.reply
+
+
 def test_registry_duplicate_onboarding_does_not_create_second_row():
     store = FakeRegistryStore()
     registry = GoogleSheetsPharmacyRegistry(store)

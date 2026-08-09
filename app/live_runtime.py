@@ -59,6 +59,7 @@ class LiveRuntimeRouter:
         development_override_numbers: list[str] | None = None,
         live_test_number: str = LIVE_TEST_NUMBER,
         onboarding_enabled: bool = True,
+        new_pharmacy_entry_factory: Callable[[str], str] | None = None,
     ) -> None:
         self.intake_service_factory = intake_service_factory
         self.provisioning = provisioning_engine or AutonomousProvisioningEngine()
@@ -76,6 +77,7 @@ class LiveRuntimeRouter:
         }
         self.live_test_number = normalize_phone(live_test_number) or LIVE_TEST_NUMBER
         self.onboarding_enabled = onboarding_enabled
+        self.new_pharmacy_entry_factory = new_pharmacy_entry_factory
 
     def handle_whatsapp_message(
         self,
@@ -399,10 +401,11 @@ class LiveRuntimeRouter:
         session_id = str(session.get("session_id") or "")
         self._sync_registry_to_provisioning(phone=phone, pharmacy_id=record.get("pharmacy_id", ""), session_id=session_id)
         status = "registered_existing_pharmacy" if not result.created else "registered_active_pharmacy"
-        reply = (
-            f"{record.get('pharmacy_name') or 'Your pharmacy'} is registered and active. "
-            "You can now send sales like: Panadol 2 cash."
-        )
+        if result.created and self.new_pharmacy_entry_factory:
+            entry_path = self.new_pharmacy_entry_factory(phone)
+            reply = f"{record.get('pharmacy_name') or 'Your pharmacy'} is registered. Continue secure owner setup: {entry_path}"
+        else:
+            reply = f"{record.get('pharmacy_name') or 'Your pharmacy'} is registered and active. You can now send sales like: Panadol 2 cash."
         return LiveRuntimeResult(
             reply,
             status,

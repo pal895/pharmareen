@@ -61,6 +61,18 @@ def test_signed_qr_link_context_is_tenant_bound_short_lived_and_tamper_proof():
         signer.verify(token, now=220)
 
 
+def test_verified_new_pharmacy_context_is_digest_only_one_use_and_phone_bound():
+    service, store = registry()
+    token = service.issue_new_pharmacy_context(verified_phone_key="254700000001")
+    durable = store.load()
+    assert "254700000001" not in str(durable)
+    with pytest.raises(ValueError):
+        service.consume_new_pharmacy_context(token, phone_key="254700000002")
+    service.consume_new_pharmacy_context(token, phone_key="254700000001")
+    with pytest.raises(ValueError):
+        service.consume_new_pharmacy_context(token, phone_key="254700000001")
+
+
 def test_owner_only_authorities_remain_fixed_and_explicit():
     assert can_manage(set(), "owner", "billing") is True
     assert can_manage({"billing"}, "manager", "billing") is True

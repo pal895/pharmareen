@@ -190,6 +190,26 @@ class GoogleSheetsPharmacyRegistry:
         logger.info("PHARMACY_REGISTRY_WRITE_SUCCESS normalized_phone=%s pharmacy_id=%s", registry_phone_key(phone), record["pharmacy_id"])
         return RegistryWriteResult(True, normalize_registry_record(record), True, "Pharmacy registered.")
 
+    def update_owner_phone(self, pharmacy_id: str, *, expected_phone: str, new_phone: str) -> dict[str, str]:
+        if not self.is_available:
+            raise RuntimeError("Pharmacy registry is unavailable")
+        wanted, expected_key, new_key = str(pharmacy_id or "").strip(), registry_phone_key(expected_phone), registry_phone_key(new_phone)
+        if not wanted or not expected_key or not new_key:
+            raise ValueError("Pharmacy and both verified phone identities are required")
+        records = self.list_records()
+        target = next((row for row in records if row["pharmacy_id"] == wanted), None)
+        if not target or registry_phone_key(target["phone_number"]) != expected_key:
+            raise ValueError("Current owner phone does not match the pharmacy registry")
+        collision = next((row for row in records if row["pharmacy_id"] != wanted and registry_phone_key(row["phone_number"]) == new_key), None)
+        if collision:
+            raise ValueError("New owner phone is already assigned")
+        target["phone"] = target["phone_number"] = display_phone(new_phone)
+        target["updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        worksheet = self._worksheet()
+        worksheet.clear()
+        worksheet.update("A1", [PHARMACY_REGISTRY_HEADERS, *[row_for_registry_record(row) for row in records]])
+        return normalize_registry_record(target)
+
     def _worksheet(self):
         spreadsheet = getattr(self.store, "spreadsheet", None)
         if spreadsheet is None:

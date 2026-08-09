@@ -214,6 +214,79 @@ class FrontDoorRegistry:
             self.store.save(state)
             return deepcopy(pharmacy)
 
+    def issue_new_pharmacy_context(self, *, verified_phone_key: str, ttl_seconds: int = 900) -> str:
+        """Issue a one-use setup context after a channel verifies the owner phone."""
+        signer = self._require_signer()
+        phone_key = str(verified_phone_key or "").strip()
+        if not phone_key:
+            raise ValueError("Verified owner identity is required")
+        nonce = secrets.token_urlsafe(24)
+        token = signer.issue(pharmacy_id="__new_pharmacy__", kind=EntryKind.NEW_PHARMACY, nonce=nonce)
+        with self._lock:
+            state = self.store.load()
+            state.setdefault("pending_entries", {})[_digest(nonce)] = {
+                "phone_key_digest": _digest(phone_key),
+                "status": "active",
+                "expires_at": int(time.time()) + min(max(ttl_seconds, 60), 1800),
+            }
+            self.store.save(state)
+        return token
+
+    def consume_new_pharmacy_context(self, token: str, *, phone_key: str) -> None:
+        payload = self._require_signer().verify(token, expected_kind=EntryKind.NEW_PHARMACY)
+        if payload.get("p") != "__new_pharmacy__":
+            raise ValueError("New-pharmacy context is invalid")
+        nonce_digest = _digest(str(payload["n"]))
+        with self._lock:
+            state = self.store.load()
+            pending = state.setdefault("pending_entries", {}).get(nonce_digest)
+            if (
+                not pending
+                or pending.get("status") != "active"
+                or int(pending.get("expires_at") or 0) <= int(time.time())
+                or pending.get("phone_key_digest") != _digest(phone_key)
+                or nonce_digest in set(state.setdefault("used_nonces", []))
+            ):
+                raise ValueError("New-pharmacy context is unavailable")
+            pending["status"] = "used"
+            state["used_nonces"].append(nonce_digest)
+            self.store.save(state)
+
+    def issue_account_recovery_context(self, *, pharmacy_id: str, verified_phone_key: str, ttl_seconds: int = 600) -> str:
+        signer = self._require_signer()
+        if not pharmacy_id.strip() or not verified_phone_key.strip():
+            raise ValueError("Verified recovery identity is required")
+        nonce = secrets.token_urlsafe(24)
+        token = signer.issue(pharmacy_id=pharmacy_id, kind=EntryKind.ACCOUNT_RECOVERY, nonce=nonce)
+        with self._lock:
+            state = self.store.load()
+            if pharmacy_id not in state.get("pharmacies", {}):
+                raise ValueError("Recovery pharmacy is unavailable")
+            state.setdefault("pending_entries", {})[_digest(nonce)] = {"phone_key_digest": _digest(verified_phone_key), "status": "active", "kind": "account_recovery", "pharmacy_id": pharmacy_id, "expires_at": int(time.time()) + min(max(ttl_seconds, 60), 900)}
+            self.store.save(state)
+        return token
+
+    def consume_account_recovery_context(self, token: str, *, phone_key: str, pharmacy_id: str) -> None:
+        payload = self._require_signer().verify(token, expected_kind=EntryKind.ACCOUNT_RECOVERY)
+        nonce_digest = _digest(str(payload["n"]))
+        with self._lock:
+            state = self.store.load()
+            pending = state.setdefault("pending_entries", {}).get(nonce_digest)
+            if (
+                payload.get("p") != pharmacy_id
+                or not pending
+                or pending.get("kind") != "account_recovery"
+                or pending.get("pharmacy_id") != pharmacy_id
+                or pending.get("status") != "active"
+                or int(pending.get("expires_at") or 0) <= int(time.time())
+                or pending.get("phone_key_digest") != _digest(phone_key)
+                or nonce_digest in set(state.setdefault("used_nonces", []))
+            ):
+                raise ValueError("Recovery context is unavailable")
+            pending["status"] = "used"
+            state["used_nonces"].append(nonce_digest)
+            self.store.save(state)
+
     @staticmethod
     def _reconcile_legacy_owner(
         pharmacy: dict[str, Any],
@@ -327,7 +400,9 @@ class FrontDoorRegistry:
                 self._bind_device(pharmacy, actor_id, device_key)
             self._audit(pharmacy, "invitation_accepted", actor_id, {"role": invitation["role"]})
             self.store.save(state)
-            return deepcopy(pharmacy["members"][actor_id])
+            accepted = deepcopy(pharmacy["members"][actor_id])
+            accepted["pharmacy_id"] = str(payload["p"])
+            return accepted
 
     def revoke_invitation(self, pharmacy_id: str, *, owner_id: str, nonce: str) -> None:
         with self._lock:
