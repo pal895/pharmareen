@@ -283,7 +283,7 @@ whatsapp_bridge_runtime_status: dict[str, Any] = {
     "last_error": "",
     "updated_at": "",
 }
-MS20_FRONT_DOOR_RELEASE = "owner-recovery-v1"
+MS20_FRONT_DOOR_RELEASE = "owner-recovery-v2"
 
 
 def current_git_commit_short() -> str:

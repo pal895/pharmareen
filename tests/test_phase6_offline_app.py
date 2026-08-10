@@ -160,7 +160,7 @@ def test_debug_version_exposes_realpath_build_marker():
     assert response.status_code == 200
     data = response.json()
     assert data["offline_build_version"] == "pharmareen-tap-talk-first-attempt-v2026-06-08"
-    assert data["front_door_release"] == "owner-recovery-v1"
+    assert data["front_door_release"] == "owner-recovery-v2"
     assert "PHARMAREEN REAL PATH BUILD" in data["offline_frontend_marker"]
 
 

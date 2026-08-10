@@ -399,8 +399,8 @@ class OwnerAuthService:
             for session in self._sessions.values():
                 if session.pharmacy_id == pharmacy_id:
                     session.revoked = True
+            token, session = self._issue_session(credential, now=current, persist=False)
             self._save_state()
-            token, session = self._issue_session(credential, now=current)
             return token, session, replacement_key
 
     def recover_with_trusted_device(self, *, pharmacy_id: str, owner_id: str, device_proved: bool, new_pin: str, now: float | None = None) -> tuple[str, OwnerSession, str]:
@@ -423,8 +423,8 @@ class OwnerAuthService:
             for session in self._sessions.values():
                 if session.pharmacy_id == pharmacy_id:
                     session.revoked = True
+            token, session = self._issue_session(credential, now=current, persist=False)
             self._save_state()
-            token, session = self._issue_session(credential, now=current)
             return token, session, replacement_key
 
     def _valid_activation(self, raw_token: str, *, now: float | None = None) -> ActivationInvitation:
@@ -434,11 +434,12 @@ class OwnerAuthService:
             raise self._unauthorized("This activation invitation is invalid or expired.")
         return invitation
 
-    def _issue_session(self, credential: OwnerCredential, *, now: float) -> tuple[str, OwnerSession]:
+    def _issue_session(self, credential: OwnerCredential, *, now: float, persist: bool = True) -> tuple[str, OwnerSession]:
         token = secrets.token_urlsafe(32)
         session = OwnerSession(self._digest(token), credential.owner_id, credential.pharmacy_id, "owner", credential.owner_name, now + self.session_ttl_seconds)
         self._sessions[session.session_digest] = session
-        self._save_state()
+        if persist:
+            self._save_state()
         return token, session
 
     @staticmethod

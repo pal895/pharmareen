@@ -161,6 +161,39 @@ def test_recovery_key_enrollment_recovery_rotation_rate_limit_and_tenant_preserv
     ))
 
 
+def test_recovery_commits_rotated_credential_revocations_and_new_session_once():
+    durable = {"activations": {}, "credentials": {}, "sessions": {}}
+    saves: list[dict] = []
+
+    def save(payload):
+        nonlocal durable
+        durable = json.loads(json.dumps(payload))
+        saves.append(durable)
+
+    service = OwnerAuthService()
+    service.configure_persistence(loader=lambda: durable, saver=save)
+    old_token, _ = service.initialize_first_owner(
+        {"pharmacy_id": "pharmacy-a", "owner_id": "owner-a", "pharmacy_name": "A", "owner_name": "Owner"},
+        "Owner1234", now=100,
+    )
+    key = service.enroll_recovery_key(pharmacy_id="pharmacy-a", owner_id="owner-a", now=101)
+    saves.clear()
+
+    token, session, replacement = service.recover_with_recovery_key(
+        pharmacy_id="pharmacy-a", recovery_key=key, new_pin="Recovered1234", now=102,
+    )
+
+    assert len(saves) == 1
+    assert service.authenticate(token, now=103).actor_id == session.actor_id == "owner-a"
+    assert_http_error(401, lambda: service.authenticate(old_token, now=103))
+    assert_http_error(401, lambda: service.sign_in_pharmacy_with_pin("pharmacy-a", "Owner1234", now=103))
+    service.sign_in_pharmacy_with_pin("pharmacy-a", "Recovered1234", now=103)
+    assert_http_error(401, lambda: service.recover_with_recovery_key(
+        pharmacy_id="pharmacy-a", recovery_key=key, new_pin="Again1234", now=104,
+    ))
+    assert replacement not in json.dumps(durable)
+
+
 def test_trusted_device_recovery_requires_independent_device_proof_not_quick_pin():
     service = OwnerAuthService()
     owner = {"pharmacy_id": "pharmacy-a", "owner_id": "owner-a", "pharmacy_name": "A", "owner_name": "Owner"}

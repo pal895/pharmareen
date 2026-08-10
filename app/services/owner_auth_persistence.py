@@ -134,9 +134,13 @@ class GoogleSheetsOwnerAuthStateStore:
             ]
             for value in payload.get("sessions", {}).values()
         ]
-        activations_ws.clear()
-        activations_ws.update("A1", [ACTIVATION_HEADERS, *activation_rows])
-        credentials_ws.clear()
-        credentials_ws.update("A1", [CREDENTIAL_HEADERS, *credential_rows])
+        # Recovery changes credentials and sessions together. Persist sessions
+        # first and the credential verifier last, so an interrupted write can
+        # never rotate the owner's secret before its replacement session and
+        # stale-session revocations are durable.
         sessions_ws.clear()
         sessions_ws.update("A1", [SESSION_HEADERS, *session_rows])
+        credentials_ws.clear()
+        credentials_ws.update("A1", [CREDENTIAL_HEADERS, *credential_rows])
+        activations_ws.clear()
+        activations_ws.update("A1", [ACTIVATION_HEADERS, *activation_rows])

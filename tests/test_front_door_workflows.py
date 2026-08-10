@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.front_door import FrontDoorRegistry, MemoryFrontDoorStore, SignedEntryContext
@@ -203,6 +204,58 @@ def test_shared_link_resumes_initialized_matching_pharmacy_without_duplicate(mon
         })
     assert response.status_code == 200
     assert registry.store.load()["pharmacies"]["pharmacy_existing"]["owner_id"] == "owner_existing"
+
+
+def test_recovery_http_boundary_rotates_credentials_sets_session_and_preserves_tenant(monkeypatch):
+    registry = FrontDoorRegistry(MemoryFrontDoorStore(), SignedEntryContext("recovery-route-signing-key-which-is-long-123"))
+    existing = {
+        "pharmacy_id": "pharmacy-existing", "owner_id": "owner-existing",
+        "pharmacy_name": "Existing Pharmacy", "owner_name": "Owner",
+        "location": "Nairobi", "phone_number": "", "phone": "",
+        "status": "active", "active": "yes", "inventory_marker": "preserve-me",
+    }
+    registry.initialize_pharmacy(
+        pharmacy_id="pharmacy-existing", owner_id="owner-existing",
+        owner_name="Owner", owner_phone_key="",
+    )
+    state = registry.store.load()
+    state["pharmacies"]["pharmacy-existing"]["inventory_marker"] = "preserve-me"
+    registry.store.save(state)
+    before = registry.store.load()["pharmacies"]["pharmacy-existing"].copy()
+    auth = OwnerAuthService()
+    old_token, _ = auth.initialize_first_owner(existing, "Owner1234", now=100)
+    key = auth.enroll_recovery_key(pharmacy_id="pharmacy-existing", owner_id="owner-existing", now=101)
+    other = {
+        "pharmacy_id": "pharmacy-other", "owner_id": "owner-other",
+        "pharmacy_name": "Other", "owner_name": "Other",
+    }
+    auth.initialize_first_owner(other, "Other1234", now=100)
+    auth.enroll_recovery_key(pharmacy_id="pharmacy-other", owner_id="owner-other", now=101)
+    monkeypatch.setattr(main, "front_door_registry", registry)
+    monkeypatch.setattr(main, "owner_auth_service", auth)
+
+    with TestClient(main.app, base_url="https://ms20.test") as client:
+        page = client.get("/main-app/recover?pharmacy_id=pharmacy-existing")
+        wrong_tenant = client.post("/api/ms20/front-door/recover-owner", json={
+            "pharmacy_id": "pharmacy-other", "recovery_key": key, "new_pin": "Recovered1234",
+        })
+        response = client.post("/api/ms20/front-door/recover-owner", json={
+            "pharmacy_id": "pharmacy-existing", "recovery_key": key, "new_pin": "Recovered1234",
+        })
+
+    assert page.status_code == 200 and "Recover and open pharmacy" in page.text
+    assert wrong_tenant.status_code == 401
+    assert response.status_code == 200
+    assert response.cookies.get("ms20_owner_session")
+    assert response.json()["pharmacy_id"] == "pharmacy-existing"
+    assert response.json()["recovery_key"] != key
+    assert registry.store.load()["pharmacies"]["pharmacy-existing"]["inventory_marker"] == before["inventory_marker"]
+    assert set(registry.store.load()["pharmacies"]) == {"pharmacy-existing"}
+    with pytest.raises(HTTPException):
+        auth.authenticate(old_token, now=102)
+    with pytest.raises(HTTPException):
+        auth.sign_in_pharmacy_with_pin("pharmacy-existing", "Owner1234", now=102)
+    assert auth.sign_in_pharmacy_with_pin("pharmacy-existing", "Recovered1234", now=102)[1].actor_id == "owner-existing"
 
 
 def test_independent_start_does_not_require_durable_store_until_create_claim():
