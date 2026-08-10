@@ -177,6 +177,25 @@ def test_trusted_device_recovery_requires_independent_device_proof_not_quick_pin
     assert session.actor_id == "owner-a" and replacement.startswith("IMPALA-")
 
 
+def test_mwangaza_migration_canonicalizes_only_exact_unique_tenant_without_changing_pin():
+    from scripts.enroll_mwangaza_recovery import PHARMACY_ID, OWNER_ID, enroll_exact_mwangaza
+    service = OwnerAuthService()
+    service.initialize_first_owner({"pharmacy_id": PHARMACY_ID, "owner_id": "owner-partial", "pharmacy_name": "Mwangaza", "owner_name": "Pal"}, "Original1234", now=100)
+    original_hash = next(iter(service._credentials.values())).pin_hash
+    key = enroll_exact_mwangaza(service)
+    credential = next(iter(service._credentials.values()))
+    assert credential.owner_id == OWNER_ID
+    assert credential.pin_hash == original_hash
+    assert key not in credential.recovery_key_hash
+    with pytest.raises(SystemExit):
+        enroll_exact_mwangaza(service)
+
+    other = OwnerAuthService()
+    other.initialize_first_owner({"pharmacy_id": "pharmacy-other", "owner_id": "owner-other", "pharmacy_name": "Other", "owner_name": "Other"}, "Other1234", now=100)
+    with pytest.raises(SystemExit):
+        enroll_exact_mwangaza(other)
+
+
 def test_unknown_phone_is_not_enumerated_and_no_secret_uses_client_storage_or_ui():
     service = OwnerAuthService()
     delivered: list[tuple[str, str]] = []
