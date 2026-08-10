@@ -110,11 +110,29 @@ def test_customer_entry_signing_is_independent_from_optional_routing_key(monkeyp
     assert registry.signer is not None
 
 
+def test_customer_entry_uses_domain_separated_existing_ms20_session_secret(monkeypatch):
+    class Store:
+        def __init__(self, _settings):
+            pass
+        def load(self):
+            return {"version": 1, "pharmacies": {}}
+
+    monkeypatch.setattr(main, "front_door_registry", None)
+    monkeypatch.setattr(main, "has_google_credentials", lambda _settings: True)
+    monkeypatch.setattr(main, "owner_auth_sheet_id", lambda _settings: "admin-workbook")
+    monkeypatch.setattr(main, "GoogleSheetsFrontDoorStore", Store)
+    monkeypatch.delenv("MS20_FRONT_DOOR_SIGNING_KEY", raising=False)
+    monkeypatch.delenv("PHARMAREEN_TENANT_ROUTING_KEY", raising=False)
+    monkeypatch.setenv("SESSION_SECRET", "existing-ms20-session-secret-123456789")
+    assert main.get_front_door_registry().signer is not None
+
+
 def test_customer_entry_fails_before_rendering_fake_setup_when_signing_is_missing(monkeypatch):
     monkeypatch.setattr(main, "front_door_registry", None)
     monkeypatch.setattr(main, "has_google_credentials", lambda _settings: True)
     monkeypatch.setattr(main, "owner_auth_sheet_id", lambda _settings: "admin-workbook")
     monkeypatch.delenv("PHARMAREEN_TENANT_ROUTING_KEY", raising=False)
     monkeypatch.delenv("MS20_FRONT_DOOR_SIGNING_KEY", raising=False)
+    monkeypatch.delenv("SESSION_SECRET", raising=False)
     with pytest.raises(RuntimeError, match="front-door signing is not configured"):
         main.get_front_door_registry()

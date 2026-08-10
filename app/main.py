@@ -160,6 +160,10 @@ def get_front_door_registry() -> FrontDoorRegistry:
         # independent from optional edge tenant routing infrastructure.
         signing_key = os.getenv("MS20_FRONT_DOOR_SIGNING_KEY", "").strip()
         if not signing_key:
+            session_secret = os.getenv("SESSION_SECRET", "").strip()
+            if len(session_secret.encode("utf-8")) >= 32:
+                signing_key = hashlib.sha256(("ms20-front-door-v1\0" + session_secret).encode("utf-8")).hexdigest()
+        if not signing_key:
             signing_key = os.getenv("PHARMAREEN_TENANT_ROUTING_KEY", "").strip()  # legacy compatibility
         if len(signing_key.encode("utf-8")) < 32:
             raise RuntimeError("MS2.0 front-door signing is not configured")
