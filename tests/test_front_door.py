@@ -183,6 +183,18 @@ def test_owner_phone_change_and_recovery_force_session_device_and_quick_pin_rech
     assert next(iter(store.load()["pharmacies"]["pharmacy-a"]["devices"].values()))["status"] == "recheck_required"
 
 
+def test_owner_recovery_device_uses_cryptographic_credential_and_quick_pin_is_not_proof():
+    service = FrontDoorRegistry(MemoryFrontDoorStore())
+    service.initialize_pharmacy(pharmacy_id="pharmacy-a", owner_id="owner-a", owner_name="Owner", owner_phone_key="")
+    credential = "device-cryptographic-credential-" + "x" * 32
+    service.enroll_owner_recovery_device("pharmacy-a", owner_id="owner-a", device_credential=credential)
+    assert service.verify_owner_recovery_device("pharmacy-a", device_credential=credential) == "owner-a"
+    with pytest.raises(ValueError):
+        service.verify_owner_recovery_device("pharmacy-a", device_credential="1234")
+    with pytest.raises(ValueError):
+        service.verify_owner_recovery_device("pharmacy-b", device_credential=credential)
+
+
 def test_community_loyalty_and_billing_authority_are_pharmacy_bound():
     service, _ = registry()
     service.initialize_pharmacy(pharmacy_id="pharmacy-a", owner_id="owner-a", owner_name="Owner A", owner_phone_key="2547001")

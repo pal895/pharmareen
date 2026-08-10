@@ -15,7 +15,8 @@ ACTIVATION_HEADERS = [
 ]
 CREDENTIAL_HEADERS = [
     "Phone Key", "Owner ID", "Pharmacy ID", "Pharmacy Name", "Owner Name",
-    "PIN Hash", "Failed Attempts", "Locked Until",
+    "PIN Hash", "Failed Attempts", "Locked Until", "Recovery Key Hash",
+    "Recovery Failures", "Recovery Locked Until", "Recovery Rotated At",
 ]
 SESSION_HEADERS = [
     "Session Digest", "Actor ID", "Pharmacy ID", "Role", "Display Name",
@@ -83,6 +84,10 @@ class GoogleSheetsOwnerAuthStateStore:
                     "pin_hash": str(row.get("PIN Hash") or ""),
                     "failed_attempts": int(row.get("Failed Attempts") or 0),
                     "locked_until": float(row.get("Locked Until") or 0),
+                    "recovery_key_hash": str(row.get("Recovery Key Hash") or ""),
+                    "recovery_failures": int(row.get("Recovery Failures") or 0),
+                    "recovery_locked_until": float(row.get("Recovery Locked Until") or 0),
+                    "recovery_rotated_at": float(row.get("Recovery Rotated At") or 0),
                 }
         for row in sessions_ws.get_all_records():
             digest = str(row.get("Session Digest") or "").strip()
@@ -116,6 +121,8 @@ class GoogleSheetsOwnerAuthStateStore:
                 value["phone_key"], value["owner_id"], value["pharmacy_id"],
                 value["pharmacy_name"], value["owner_name"], value["pin_hash"],
                 value["failed_attempts"], value["locked_until"],
+                value.get("recovery_key_hash", ""), value.get("recovery_failures", 0),
+                value.get("recovery_locked_until", 0), value.get("recovery_rotated_at", 0),
             ]
             for value in payload.get("credentials", {}).values()
         ]

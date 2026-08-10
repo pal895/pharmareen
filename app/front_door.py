@@ -547,6 +547,30 @@ class FrontDoorRegistry:
             self.store.save(state)
             return deepcopy(device)
 
+    def enroll_owner_recovery_device(self, pharmacy_id: str, *, owner_id: str, device_credential: str) -> None:
+        if len(str(device_credential or "")) < 32:
+            raise ValueError("A cryptographic device credential is required")
+        with self._lock:
+            state, pharmacy = self._owner_pharmacy(pharmacy_id, owner_id)
+            device = self._bind_device(pharmacy, owner_id, device_credential)
+            device["owner_recovery_credential_digest"] = _digest(device_credential)
+            device["owner_recovery_trust"] = "active"
+            self._audit(pharmacy, "owner_recovery_device_enrolled", owner_id, {})
+            self.store.save(state)
+
+    def verify_owner_recovery_device(self, pharmacy_id: str, *, device_credential: str) -> str:
+        digest = _digest(device_credential)
+        with self._lock:
+            state = self.store.load()
+            pharmacy = state.setdefault("pharmacies", {}).get(pharmacy_id)
+            device = (pharmacy or {}).get("devices", {}).get(digest)
+            if not pharmacy or not device or device.get("status") != "active" or device.get("owner_recovery_trust") != "active" or device.get("owner_recovery_credential_digest") != digest:
+                raise ValueError("Trusted-device proof is unavailable")
+            owner_id = str(pharmacy.get("owner_id") or "")
+            if device.get("actor_id") != owner_id:
+                raise ValueError("Trusted-device proof is unavailable")
+            return owner_id
+
     def revoke_device(self, pharmacy_id: str, *, owner_id: str, device_key: str) -> None:
         with self._lock:
             state, pharmacy = self._owner_pharmacy(pharmacy_id, owner_id)

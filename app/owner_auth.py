@@ -84,6 +84,10 @@ class OwnerCredential:
     pin_hash: str
     failed_attempts: int = 0
     locked_until: float = 0.0
+    recovery_key_hash: str = ""
+    recovery_failures: int = 0
+    recovery_locked_until: float = 0.0
+    recovery_rotated_at: float = 0.0
 
 
 class OwnerAuthService:
@@ -328,6 +332,100 @@ class OwnerAuthService:
                 if session.pharmacy_id == pharmacy_id:
                     session.revoked = True
             self._save_state()
+
+    @staticmethod
+    def _new_recovery_key() -> str:
+        alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+        raw = "".join(secrets.choice(alphabet) for _ in range(16))
+        return "IMPALA-" + "-".join(raw[index:index + 4] for index in range(0, 16, 4))
+
+    @staticmethod
+    def _normalize_recovery_key(value: str) -> str:
+        return "-".join(part for part in str(value or "").strip().upper().split("-") if part)
+
+    def enroll_recovery_key(self, *, pharmacy_id: str, owner_id: str, allow_existing: bool = False, now: float | None = None) -> str:
+        """Create and return a Recovery Key exactly once at enrollment."""
+        self._require_persistence()
+        current = time.time() if now is None else now
+        with self._lock:
+            self._refresh_persistent_state()
+            matches = [item for item in self._credentials.values() if item.pharmacy_id == pharmacy_id and item.owner_id == owner_id]
+            if len(matches) != 1:
+                raise HTTPException(status_code=503, detail="Owner recovery state is unavailable.")
+            credential = matches[0]
+            if credential.recovery_key_hash and not allow_existing:
+                raise HTTPException(status_code=409, detail="A Recovery Key is already enrolled.")
+            raw = self._new_recovery_key()
+            credential.recovery_key_hash = self._hash_pin(raw)
+            credential.recovery_failures = 0
+            credential.recovery_locked_until = 0.0
+            credential.recovery_rotated_at = current
+            self._save_state()
+            return raw
+
+    def recovery_is_enrolled(self, *, pharmacy_id: str, owner_id: str) -> bool:
+        self._require_persistence()
+        with self._lock:
+            self._refresh_persistent_state()
+            matches = [item for item in self._credentials.values() if item.pharmacy_id == pharmacy_id and item.owner_id == owner_id]
+            return len(matches) == 1 and bool(matches[0].recovery_key_hash)
+
+    def recover_with_recovery_key(self, *, pharmacy_id: str, recovery_key: str, new_pin: str, now: float | None = None) -> tuple[str, OwnerSession, str]:
+        self._require_persistence()
+        self._validate_pin(new_pin)
+        current = time.time() if now is None else now
+        normalized = self._normalize_recovery_key(recovery_key)
+        with self._lock:
+            self._refresh_persistent_state()
+            matches = [item for item in self._credentials.values() if item.pharmacy_id == pharmacy_id]
+            credential = matches[0] if len(matches) == 1 else None
+            valid = bool(credential and credential.recovery_key_hash and credential.recovery_locked_until <= current and self._verify_pin(normalized, credential.recovery_key_hash))
+            if not valid:
+                if credential and credential.recovery_locked_until <= current:
+                    credential.recovery_failures += 1
+                    if credential.recovery_failures >= 5:
+                        credential.recovery_failures = 0
+                        credential.recovery_locked_until = current + 900
+                    self._save_state()
+                raise self._unauthorized("The Recovery Key is incorrect or temporarily locked.")
+            credential.pin_hash = self._hash_pin(new_pin)
+            credential.failed_attempts = 0
+            credential.locked_until = 0.0
+            credential.recovery_failures = 0
+            credential.recovery_locked_until = 0.0
+            replacement_key = self._new_recovery_key()
+            credential.recovery_key_hash = self._hash_pin(replacement_key)
+            credential.recovery_rotated_at = current
+            for session in self._sessions.values():
+                if session.pharmacy_id == pharmacy_id:
+                    session.revoked = True
+            self._save_state()
+            token, session = self._issue_session(credential, now=current)
+            return token, session, replacement_key
+
+    def recover_with_trusted_device(self, *, pharmacy_id: str, owner_id: str, device_proved: bool, new_pin: str, now: float | None = None) -> tuple[str, OwnerSession, str]:
+        if not device_proved:
+            raise self._unauthorized("Trusted-device proof is required.")
+        self._validate_pin(new_pin)
+        current = time.time() if now is None else now
+        with self._lock:
+            self._refresh_persistent_state()
+            matches = [item for item in self._credentials.values() if item.pharmacy_id == pharmacy_id and item.owner_id == owner_id]
+            if len(matches) != 1:
+                raise HTTPException(status_code=503, detail="Owner recovery state is unavailable.")
+            credential = matches[0]
+            credential.pin_hash = self._hash_pin(new_pin)
+            credential.failed_attempts = 0
+            credential.locked_until = 0.0
+            replacement_key = self._new_recovery_key()
+            credential.recovery_key_hash = self._hash_pin(replacement_key)
+            credential.recovery_rotated_at = current
+            for session in self._sessions.values():
+                if session.pharmacy_id == pharmacy_id:
+                    session.revoked = True
+            self._save_state()
+            token, session = self._issue_session(credential, now=current)
+            return token, session, replacement_key
 
     def _valid_activation(self, raw_token: str, *, now: float | None = None) -> ActivationInvitation:
         current = time.time() if now is None else now

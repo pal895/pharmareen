@@ -89,6 +89,26 @@ def create_owner_activation(pharmacy_id: str, request: Request) -> dict[str, Any
     return {"ok": True, "pharmacy_id": invitation.pharmacy_id, "pharmacy_name": invitation.pharmacy_name, "owner_name": invitation.owner_name, "expires_in": owner_auth_service.activation_ttl_seconds, "activation_url": activation_url, "qr_data_uri": qr_data_uri}
 
 
+@router.post("/pharmacy/{pharmacy_id}/legacy-recovery-enrollment")
+def enroll_legacy_recovery(pharmacy_id: str, request: Request) -> dict[str, Any]:
+    """One-time recovery enrollment for an explicitly allowlisted partial tenant."""
+    allowed_pharmacy = os.getenv("MS20_RECOVERY_MIGRATION_PHARMACY_ID", "").strip()
+    allowed_owner = os.getenv("MS20_RECOVERY_MIGRATION_OWNER_ID", "").strip()
+    if not allowed_pharmacy or pharmacy_id != allowed_pharmacy:
+        raise HTTPException(status_code=403, detail="Recovery migration is not enabled for this pharmacy.")
+    record = service().get_pharmacy(pharmacy_id)
+    if not record or str(record.get("owner_id") or "") != allowed_owner:
+        raise HTTPException(status_code=403, detail="Recovery migration identity does not match.")
+    if owner_auth_service.recovery_is_enrolled(pharmacy_id=pharmacy_id, owner_id=allowed_owner):
+        raise HTTPException(status_code=409, detail="Recovery is already enrolled; migration is permanently closed.")
+    recovery_key = owner_auth_service.enroll_recovery_key(pharmacy_id=pharmacy_id, owner_id=allowed_owner)
+    return {
+        "ok": True, "pharmacy_id": pharmacy_id, "recovery_key": recovery_key,
+        "recovery_url": f"{str(request.base_url).rstrip('/')}/main-app/recover?pharmacy_id={pharmacy_id}",
+        "one_time_enrollment": True,
+    }
+
+
 @router.post("/photo-onboard-placeholder")
 def photo_onboard_placeholder() -> dict[str, Any]:
     # Future flow: photo upload -> OpenAI Vision extraction -> review table -> create/update Inventory.

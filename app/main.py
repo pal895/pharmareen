@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -282,7 +283,7 @@ whatsapp_bridge_runtime_status: dict[str, Any] = {
     "last_error": "",
     "updated_at": "",
 }
-MS20_FRONT_DOOR_RELEASE = "deferred-setup-claim-v1"
+MS20_FRONT_DOOR_RELEASE = "owner-recovery-v1"
 
 
 def current_git_commit_short() -> str:
@@ -408,7 +409,7 @@ async def ms20_public_start_page() -> HTMLResponse:
     return HTMLResponse("""<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Start MS2.0</title>
 <style>body{font:17px system-ui;background:#f3f8f6;color:#12352e;margin:0;padding:20px}main{max-width:560px;margin:4vh auto;background:#fff;padding:28px;border-radius:24px}label{display:block;margin-top:14px;font-weight:700}input,button{font:inherit;width:100%;box-sizing:border-box;padding:14px;margin-top:6px;border-radius:12px;border:1px solid #9bb8b1}button{margin-top:20px;background:#167563;color:#fff;border:0;font-weight:800}.pinrow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}.pinrow button{width:auto;margin-top:6px;background:#fff;color:#167563;border:1px solid #167563}.help{display:block;font-weight:400;color:#49615b;margin-top:7px;line-height:1.35}.check input{width:auto}.check a{color:#126b5c}.error{color:#9b1c1c}</style>
 <main><h1>Start MS2.0</h1><p>Create your pharmacy and protect the Primary Owner with an MS2.0 PIN.</p><form id=f><label>Pharmacy name<input name=pharmacy_name required></label><label>Owner name<input name=owner_name required></label><label>Location<input name=location required></label><label>Contact phone <small>(optional)</small><input name=phone inputmode=tel autocomplete=tel></label><label>Primary Owner PIN<span class=pinrow><input id=pin name=pin type=password minlength=8 aria-describedby=pinhelp required><button id=show type=button aria-label='Show Primary Owner PIN'>Show</button></span><small id=pinhelp class=help>This is the main security code for the pharmacy owner. Use at least 8 characters, including a letter and a number. A later 4-digit Quick PIN only unlocks a trusted device.</small></label><label class=check><input name=accept type=checkbox required> I accept the current <a href='/terms' target='_blank' rel='noopener'>Terms</a> and <a href='/privacy' target='_blank' rel='noopener'>Privacy Notice</a></label><button id=s>Create pharmacy</button><p id=m class=error role=alert></p></form></main>
-<script>let setupEntry='';async function body(r){const t=await r.text();try{return JSON.parse(t)}catch{return {detail:'Pharmacy setup is temporarily unavailable. Please try again.'}}}show.onclick=()=>{const visible=pin.type==='text';pin.type=visible?'password':'text';show.textContent=visible?'Show':'Hide';show.setAttribute('aria-label',(visible?'Show':'Hide')+' Primary Owner PIN')};f.onsubmit=async e=>{e.preventDefault();s.disabled=true;m.textContent='Creating pharmacy…';try{if(!setupEntry){const start=await fetch('/api/ms20/front-door/start',{method:'POST',credentials:'same-origin'}),a=await body(start);if(!start.ok)throw Error(a.detail||'Setup unavailable.');setupEntry=a.entry}const d=Object.fromEntries(new FormData(f));const r=await fetch('/api/ms20/front-door/new-pharmacy',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({...d,entry:setupEntry,terms_version:'ms20-terms-2026-08',privacy_version:'ms20-privacy-2026-08'})}),j=await body(r);if(r.ok)location.replace('/main-app/');else throw Error(j.detail||'Pharmacy setup is unavailable.')}catch(x){m.textContent=x.message||'Pharmacy setup is temporarily unavailable. Please try again.'}s.disabled=false};</script>""", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+<script>let setupEntry='';async function body(r){const t=await r.text();try{return JSON.parse(t)}catch{return {detail:'Pharmacy setup is temporarily unavailable. Please try again.'}}}show.onclick=()=>{const visible=pin.type==='text';pin.type=visible?'password':'text';show.textContent=visible?'Show':'Hide';show.setAttribute('aria-label',(visible?'Show':'Hide')+' Primary Owner PIN')};f.onsubmit=async e=>{e.preventDefault();s.disabled=true;m.textContent='Creating pharmacy…';try{if(!setupEntry){const start=await fetch('/api/ms20/front-door/start',{method:'POST',credentials:'same-origin'}),a=await body(start);if(!start.ok)throw Error(a.detail||'Setup unavailable.');setupEntry=a.entry}const d=Object.fromEntries(new FormData(f));const r=await fetch('/api/ms20/front-door/new-pharmacy',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({...d,entry:setupEntry,terms_version:'ms20-terms-2026-08',privacy_version:'ms20-privacy-2026-08'})}),j=await body(r);if(r.ok){if(j.recovery_key){sessionStorage.setItem('ms20-recovery-key',j.recovery_key);location.replace('/main-app/protect-pharmacy')}else location.replace('/main-app/')}else throw Error(j.detail||'Pharmacy setup is unavailable.')}catch(x){m.textContent=x.message||'Pharmacy setup is temporarily unavailable. Please try again.'}s.disabled=false};</script>""", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 
 def legal_page(title: str, version: str, sections: tuple[tuple[str, str], ...]) -> HTMLResponse:
@@ -510,15 +511,21 @@ async def ms20_front_door_new_pharmacy(request: Request) -> JSONResponse:
         owner_phone_key=phone_key,
     )
     registry.record_owner_acceptance(record["pharmacy_id"], owner_id=owner_id, terms_version=MS20_TERMS_VERSION, privacy_version=MS20_PRIVACY_VERSION)
+    recovery_key = ""
     if resume_record is not None:
-        pass  # The existing Primary Owner PIN was verified before adoption.
+        # The existing Primary Owner PIN was verified before adoption.  If a
+        # response failed after credential creation but before recovery-factor
+        # enrollment, finish that same tenant instead of stranding it again.
+        if not owner_auth_service.recovery_is_enrolled(pharmacy_id=record["pharmacy_id"], owner_id=owner_id):
+            recovery_key = owner_auth_service.enroll_recovery_key(pharmacy_id=record["pharmacy_id"], owner_id=owner_id)
     elif owner_state == "uninitialized":
         token, session = owner_auth_service.initialize_first_owner(record, pin)
+        recovery_key = owner_auth_service.enroll_recovery_key(pharmacy_id=record["pharmacy_id"], owner_id=owner_id)
     else:
         token, session = owner_auth_service.sign_in_pharmacy_with_pin(record["pharmacy_id"], pin)
     if not phone_key:
         registry.complete_independent_new_pharmacy_context(entry)
-    return owner_session_response(token, session)
+    return owner_session_response(token, session, recovery_key=recovery_key)
 
 
 @app.get("/main-app/new-pharmacy", response_class=HTMLResponse, include_in_schema=False)
@@ -611,7 +618,54 @@ async def ms20_front_door_owner_phone(request: Request, actor: ActorContext = De
 
 @app.post("/api/ms20/front-door/recover-owner")
 async def ms20_front_door_recover_owner(request: Request) -> dict[str, Any]:
-    raise HTTPException(status_code=501, detail="Provider-independent owner recovery requires an owner-approved permanent design.")
+    payload = await request.json()
+    pharmacy_id = str((payload or {}).get("pharmacy_id") or "")
+    token, session, replacement_key = owner_auth_service.recover_with_recovery_key(
+        pharmacy_id=pharmacy_id,
+        recovery_key=str((payload or {}).get("recovery_key") or ""),
+        new_pin=str((payload or {}).get("new_pin") or ""),
+    )
+    try:
+        get_front_door_registry().complete_account_recovery(pharmacy_id, owner_id=session.actor_id, verified_identity=True)
+    except Exception:
+        logger.exception("Front-door recovery trust recheck could not be recorded")
+    return owner_session_response(token, session, recovery_key=replacement_key)
+
+
+@app.post("/api/ms20/front-door/trusted-device/enroll")
+async def ms20_enroll_owner_recovery_device(actor: ActorContext = Depends(require_owner_actor)) -> JSONResponse:
+    credential = secrets.token_urlsafe(48)
+    get_front_door_registry().enroll_owner_recovery_device(actor.pharmacy_id, owner_id=actor.actor_id, device_credential=credential)
+    response = JSONResponse({"enrolled": True})
+    response.set_cookie("ms20_owner_device", credential, max_age=31536000, httponly=True, secure=True, samesite="strict", path="/")
+    return response
+
+
+@app.post("/api/ms20/front-door/trusted-device/recover")
+async def ms20_trusted_device_recover(request: Request, ms20_owner_device: str | None = Cookie(default=None)) -> JSONResponse:
+    payload = await request.json()
+    pharmacy_id = str((payload or {}).get("pharmacy_id") or "")
+    try:
+        owner_id = get_front_door_registry().verify_owner_recovery_device(pharmacy_id, device_credential=str(ms20_owner_device or ""))
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail="Trusted-device proof is unavailable.") from exc
+    token, session, replacement_key = owner_auth_service.recover_with_trusted_device(
+        pharmacy_id=pharmacy_id, owner_id=owner_id, device_proved=True,
+        new_pin=str((payload or {}).get("new_pin") or ""),
+    )
+    get_front_door_registry().complete_account_recovery(pharmacy_id, owner_id=owner_id, verified_identity=True)
+    return owner_session_response(token, session, recovery_key=replacement_key)
+
+
+@app.get("/main-app/protect-pharmacy", response_class=HTMLResponse, include_in_schema=False)
+async def ms20_protect_pharmacy_page() -> HTMLResponse:
+    return HTMLResponse("""<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Protect your pharmacy</title><style>body{font:18px system-ui;background:#f3f8f6;color:#12352e;padding:20px}main{max-width:520px;margin:8vh auto;background:#fff;padding:28px;border-radius:24px}code{display:block;font-size:22px;padding:18px;background:#eef6f3;border-radius:12px;overflow-wrap:anywhere}button{font:inherit;width:100%;padding:15px;margin-top:14px;border:0;border-radius:12px;background:#167563;color:#fff;font-weight:800}</style><main><h1>Protect your pharmacy</h1><p>Keep this Recovery Key somewhere safe. You will need it if you forget your Primary Owner PIN and lose your device.</p><code id=k></code><button id=save>Save Key</button><button id=go>Continue</button><p id=m></p></main><script>const key=sessionStorage.getItem('ms20-recovery-key')||'';k.textContent=key||'Recovery Key unavailable';fetch('/api/ms20/front-door/trusted-device/enroll',{method:'POST',credentials:'same-origin'}).catch(()=>{});save.onclick=async()=>{await navigator.clipboard.writeText(key);m.textContent='Recovery Key copied. Keep it private.'};go.onclick=()=>{sessionStorage.removeItem('ms20-recovery-key');location.replace('/main-app/')}</script>""", headers={"Cache-Control":"no-store","Referrer-Policy":"no-referrer"})
+
+
+@app.get("/main-app/recover", response_class=HTMLResponse, include_in_schema=False)
+async def ms20_recover_page(pharmacy_id: str = Query(default="")) -> HTMLResponse:
+    safe_id = json.dumps(pharmacy_id)
+    return HTMLResponse(f"""<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Recover my pharmacy</title><style>body{{font:18px system-ui;background:#f3f8f6;color:#12352e;padding:20px}}main{{max-width:520px;margin:6vh auto;background:#fff;padding:28px;border-radius:24px}}input,button{{font:inherit;width:100%;box-sizing:border-box;padding:15px;margin-top:12px;border-radius:12px}}button{{border:0;background:#167563;color:#fff;font-weight:800}}.error{{color:#9b1c1c}}</style><main><h1>Recover my pharmacy</h1><label>MS2.0 Recovery Key<input id=k autocomplete=off></label><label>Create a new Primary Owner PIN<input id=p type=password minlength=8></label><button id=go>Recover and open pharmacy</button><p id=m class=error></p></main><script>const pharmacy={safe_id};go.onclick=async()=>{{go.disabled=true;const r=await fetch('/api/ms20/front-door/recover-owner',{{method:'POST',credentials:'same-origin',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{pharmacy_id:pharmacy,recovery_key:k.value,new_pin:p.value}})}}),d=await r.json();k.value='';p.value='';if(r.ok){{sessionStorage.setItem('ms20-recovery-key',d.recovery_key);location.replace('/main-app/protect-pharmacy')}}else{{m.textContent=d.detail||'Recovery is unavailable.';go.disabled=false}}}};</script>""", headers={"Cache-Control":"no-store","Referrer-Policy":"no-referrer"})
 
 
 @app.get("/main-app/access", response_class=HTMLResponse, include_in_schema=False)
@@ -795,8 +849,11 @@ async def ms20_owner_login_verify(request: Request) -> JSONResponse:
     return response
 
 
-def owner_session_response(token: str, session: Any) -> JSONResponse:
-    response = JSONResponse({"authenticated": True, "role": session.role, "pharmacy_id": session.pharmacy_id, "expires_in": owner_auth_service.session_ttl_seconds})
+def owner_session_response(token: str, session: Any, *, recovery_key: str = "") -> JSONResponse:
+    payload = {"authenticated": True, "role": session.role, "pharmacy_id": session.pharmacy_id, "expires_in": owner_auth_service.session_ttl_seconds}
+    if recovery_key:
+        payload["recovery_key"] = recovery_key
+    response = JSONResponse(payload)
     response.set_cookie(OWNER_SESSION_COOKIE, token, max_age=owner_auth_service.session_ttl_seconds, httponly=True, secure=True, samesite="strict", path="/")
     return response
 

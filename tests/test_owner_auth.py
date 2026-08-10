@@ -133,6 +133,50 @@ def test_verified_primary_recovery_replaces_pin_and_revokes_old_sessions():
     assert service.authenticate(replacement, now=103.0).pharmacy_id == "pharmacy-a"
 
 
+def test_recovery_key_enrollment_recovery_rotation_rate_limit_and_tenant_preservation():
+    service = OwnerAuthService()
+    owner = {"pharmacy_id": "pharmacy-a", "owner_id": "owner-a", "pharmacy_name": "A", "owner_name": "Owner"}
+    old_token, old_session = service.initialize_first_owner(owner, "Owner1234", now=100)
+    key = service.enroll_recovery_key(pharmacy_id="pharmacy-a", owner_id="owner-a", now=101)
+    assert key.startswith("IMPALA-") and len(key) == 26
+    stored = next(iter(service._credentials.values()))
+    assert key not in stored.recovery_key_hash and "IMPALA" not in stored.recovery_key_hash
+
+    for attempt in range(5):
+        assert_http_error(401, lambda: service.recover_with_recovery_key(
+            pharmacy_id="pharmacy-a", recovery_key="IMPALA-WRNG-WRNG-WRNG-WRNG",
+            new_pin="Recovered1234", now=110 + attempt,
+        ))
+    assert_http_error(401, lambda: service.recover_with_recovery_key(
+        pharmacy_id="pharmacy-a", recovery_key=key, new_pin="Recovered1234", now=120,
+    ))
+    token, session, replacement = service.recover_with_recovery_key(
+        pharmacy_id="pharmacy-a", recovery_key=key, new_pin="Recovered1234", now=1015,
+    )
+    assert session.pharmacy_id == "pharmacy-a" and replacement != key
+    assert_http_error(401, lambda: service.authenticate(old_token, now=1016))
+    assert service.authenticate(token, now=1016).actor_id == "owner-a"
+    assert_http_error(401, lambda: service.recover_with_recovery_key(
+        pharmacy_id="pharmacy-a", recovery_key=key, new_pin="Again1234", now=1017,
+    ))
+
+
+def test_trusted_device_recovery_requires_independent_device_proof_not_quick_pin():
+    service = OwnerAuthService()
+    owner = {"pharmacy_id": "pharmacy-a", "owner_id": "owner-a", "pharmacy_name": "A", "owner_name": "Owner"}
+    service.initialize_first_owner(owner, "Owner1234", now=100)
+    service.enroll_recovery_key(pharmacy_id="pharmacy-a", owner_id="owner-a", now=101)
+    assert_http_error(401, lambda: service.recover_with_trusted_device(
+        pharmacy_id="pharmacy-a", owner_id="owner-a", device_proved=False,
+        new_pin="Recovered1234", now=102,
+    ))
+    _, session, replacement = service.recover_with_trusted_device(
+        pharmacy_id="pharmacy-a", owner_id="owner-a", device_proved=True,
+        new_pin="Recovered1234", now=103,
+    )
+    assert session.actor_id == "owner-a" and replacement.startswith("IMPALA-")
+
+
 def test_unknown_phone_is_not_enumerated_and_no_secret_uses_client_storage_or_ui():
     service = OwnerAuthService()
     delivered: list[tuple[str, str]] = []
