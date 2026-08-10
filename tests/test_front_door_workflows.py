@@ -176,6 +176,35 @@ def test_shared_link_creates_ms20_owned_pharmacy_and_owner_without_messaging_ide
     assert records[0]["pharmacy_id"].startswith("pharmacy_")
 
 
+def test_shared_link_resumes_initialized_matching_pharmacy_without_duplicate(monkeypatch):
+    registry = FrontDoorRegistry(MemoryFrontDoorStore(), SignedEntryContext("resume-signing-key-which-is-long-enough-123"))
+    existing = {
+        "pharmacy_id": "pharmacy_existing", "owner_id": "owner_existing",
+        "pharmacy_name": "Mwangaza test pharmacy 0809", "owner_name": "Pal",
+        "location": "Nairobi", "phone_number": "", "phone": "",
+        "notes": "registered_by_live_onboarding", "status": "active", "active": "yes",
+    }
+    auth = OwnerAuthService()
+    auth.initialize_first_owner(existing, "Owner1234", now=100)
+    class PharmacyRegistry:
+        def list_records(self):
+            return [existing]
+        def register_pharmacy(self, details):
+            raise AssertionError("resume must not create a duplicate")
+    monkeypatch.setattr(main, "front_door_registry", registry)
+    monkeypatch.setattr(main, "get_pharmacy_registry", lambda: PharmacyRegistry())
+    monkeypatch.setattr(main, "owner_auth_service", auth)
+    with TestClient(main.app, base_url="https://ms20.test") as client:
+        entry = client.post("/api/ms20/front-door/start").json()["entry"]
+        response = client.post("/api/ms20/front-door/new-pharmacy", json={
+            "entry": entry, "pharmacy_name": existing["pharmacy_name"],
+            "owner_name": "Pal", "location": "Nairobi", "pin": "Owner1234",
+            "terms_version": main.MS20_TERMS_VERSION, "privacy_version": main.MS20_PRIVACY_VERSION,
+        })
+    assert response.status_code == 200
+    assert registry.store.load()["pharmacies"]["pharmacy_existing"]["owner_id"] == "owner_existing"
+
+
 def test_same_verified_owner_phone_can_hold_isolated_credentials_for_two_pharmacies():
     auth = OwnerAuthService()
     owner_a = {"pharmacy_id": "pharmacy-a", "pharmacy_name": "A", "owner_name": "Owner", "phone_number": "+254700000777"}

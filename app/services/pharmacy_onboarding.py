@@ -455,6 +455,11 @@ def ensure_worksheet(spreadsheet: Any, title: str, headers: list[str]):
         worksheet = spreadsheet.worksheet(title)
     except WorksheetNotFound:
         worksheet = spreadsheet.add_worksheet(title=title, rows=2000, cols=max(len(headers), 8))
+    # Existing production workbooks may predate newly appended schema columns.
+    # gspread cannot update beyond the physical grid, so expand first and make
+    # every shared worksheet migration-safe rather than special-casing callers.
+    if int(getattr(worksheet, "col_count", 0) or 0) < len(headers):
+        worksheet.resize(cols=len(headers))
     existing = worksheet.row_values(1)
     if existing[: len(headers)] != headers:
         worksheet.update("A1", [headers])

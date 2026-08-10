@@ -278,6 +278,24 @@ class FrontDoorRegistry:
             state.setdefault("used_nonces", []).append(nonce_digest)
             self.store.save(state)
 
+    def adopt_independent_new_pharmacy_context(self, token: str, *, pharmacy_id: str, owner_id: str) -> None:
+        """Bind a fresh setup attempt to an authenticated incomplete tenant.
+
+        This is used only after the route has proved possession of the existing
+        Primary Owner PIN. It prevents a response/persistence failure from
+        creating a second pharmacy when the owner resumes setup later.
+        """
+        payload = self._require_signer().verify(token, expected_kind=EntryKind.NEW_PHARMACY)
+        nonce_digest = _digest(str(payload["n"]))
+        with self._lock:
+            state = self.store.load()
+            pending = state.setdefault("pending_entries", {}).get(nonce_digest)
+            if not pending or pending.get("identity_mode") != "ms20_owned" or pending.get("status") != "provisioning":
+                raise ValueError("New-pharmacy context is unavailable")
+            pending["pharmacy_id"] = str(pharmacy_id)
+            pending["owner_id"] = str(owner_id)
+            self.store.save(state)
+
     def start_new_owner_verification(self, *, phone_key: str, deliver_code: Any, now: int | None = None) -> dict[str, Any]:
         """Start customer-facing verification without requiring channel initiation."""
         current = int(time.time()) if now is None else int(now)

@@ -464,13 +464,43 @@ async def ms20_front_door_new_pharmacy(request: Request) -> JSONResponse:
             details.update(identities)
     except ValueError as exc:
         raise HTTPException(status_code=403, detail="Verified new-pharmacy entry is unavailable") from exc
-    result = get_pharmacy_registry().register_pharmacy(details)
-    if not result.accepted:
-        raise HTTPException(status_code=503, detail="New-pharmacy registry is temporarily unavailable")
-    record = result.record
+    pharmacy_registry = get_pharmacy_registry()
+    resume_record = None
+    if not phone_key:
+        wanted = (
+            details["pharmacy_name"].casefold(), details["owner_name"].casefold(),
+            details["location"].casefold(), registry_phone_key(details["phone_number"]),
+        )
+        matches = []
+        for candidate in getattr(pharmacy_registry, "list_records", lambda: [])():
+            actual = (
+                str(candidate.get("pharmacy_name") or "").strip().casefold(),
+                str(candidate.get("owner_name") or "").strip().casefold(),
+                str(candidate.get("location") or "").strip().casefold(),
+                registry_phone_key(candidate.get("phone_number") or candidate.get("phone")),
+            )
+            if actual == wanted and str(candidate.get("notes") or "") == "registered_by_live_onboarding":
+                matches.append(candidate)
+        if len(matches) > 1:
+            raise HTTPException(status_code=409, detail="Pharmacy setup needs owner support before it can continue")
+        if len(matches) == 1 and owner_auth_service.pharmacy_owner_state(matches[0]) == "initialized":
+            # PIN verification is the proof that this is a safe continuation of
+            # the same partially committed setup, not a name-based takeover.
+            token, session = owner_auth_service.sign_in_pharmacy_with_pin(matches[0]["pharmacy_id"], pin)
+            resume_record = matches[0]
+            registry.adopt_independent_new_pharmacy_context(
+                entry, pharmacy_id=resume_record["pharmacy_id"],
+                owner_id=canonical_registry_owner_id(resume_record),
+            )
+    result = pharmacy_registry.register_pharmacy(details) if resume_record is None else None
+    if resume_record is not None:
+        record = resume_record
+    else:
+        assert result is not None
+        if not result.accepted:
+            raise HTTPException(status_code=503, detail="New-pharmacy registry is temporarily unavailable")
+        record = result.record
     owner_state = owner_auth_service.pharmacy_owner_state(record)
-    if not result.created and owner_state != "uninitialized":
-        raise HTTPException(status_code=409, detail="This owner already has an active pharmacy entry")
     owner_id = canonical_registry_owner_id(record)
     registry.initialize_pharmacy(
         pharmacy_id=record["pharmacy_id"],
@@ -479,7 +509,9 @@ async def ms20_front_door_new_pharmacy(request: Request) -> JSONResponse:
         owner_phone_key=phone_key,
     )
     registry.record_owner_acceptance(record["pharmacy_id"], owner_id=owner_id, terms_version=MS20_TERMS_VERSION, privacy_version=MS20_PRIVACY_VERSION)
-    if owner_state == "uninitialized":
+    if resume_record is not None:
+        pass  # The existing Primary Owner PIN was verified before adoption.
+    elif owner_state == "uninitialized":
         token, session = owner_auth_service.initialize_first_owner(record, pin)
     else:
         token, session = owner_auth_service.sign_in_pharmacy_with_pin(record["pharmacy_id"], pin)
