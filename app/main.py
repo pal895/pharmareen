@@ -156,8 +156,14 @@ def get_front_door_registry() -> FrontDoorRegistry:
         settings = get_settings()
         if not has_google_credentials(settings) or not owner_auth_sheet_id(settings):
             raise RuntimeError("Front-door durable store is not configured")
-        signing_key = os.getenv("PHARMAREEN_TENANT_ROUTING_KEY", "").strip()
-        signer = SignedEntryContext(signing_key) if len(signing_key.encode("utf-8")) >= 32 else None
+        # Customer entry signatures are an MS2.0 account-security concern,
+        # independent from optional edge tenant routing infrastructure.
+        signing_key = os.getenv("MS20_FRONT_DOOR_SIGNING_KEY", "").strip()
+        if not signing_key:
+            signing_key = os.getenv("PHARMAREEN_TENANT_ROUTING_KEY", "").strip()  # legacy compatibility
+        if len(signing_key.encode("utf-8")) < 32:
+            raise RuntimeError("MS2.0 front-door signing is not configured")
+        signer = SignedEntryContext(signing_key)
         candidate = FrontDoorRegistry(GoogleSheetsFrontDoorStore(settings), signer)
         candidate.store.load()
         front_door_registry = candidate

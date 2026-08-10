@@ -85,8 +85,36 @@ def test_worker_front_door_initialization_retries_after_transient_startup_failur
     monkeypatch.setattr(main, "has_google_credentials", lambda _settings: True)
     monkeypatch.setattr(main, "owner_auth_sheet_id", lambda _settings: "admin-workbook")
     monkeypatch.setattr(main, "GoogleSheetsFrontDoorStore", Store)
+    monkeypatch.setenv("MS20_FRONT_DOOR_SIGNING_KEY", "worker-retry-front-door-key-123456789")
     with pytest.raises(RuntimeError, match="temporary worksheet race"):
         main.get_front_door_registry()
     recovered = main.get_front_door_registry()
     assert recovered is main.front_door_registry
     assert len(attempts) == 2
+
+
+def test_customer_entry_signing_is_independent_from_optional_routing_key(monkeypatch):
+    class Store:
+        def __init__(self, _settings):
+            pass
+        def load(self):
+            return {"version": 1, "pharmacies": {}}
+
+    monkeypatch.setattr(main, "front_door_registry", None)
+    monkeypatch.setattr(main, "has_google_credentials", lambda _settings: True)
+    monkeypatch.setattr(main, "owner_auth_sheet_id", lambda _settings: "admin-workbook")
+    monkeypatch.setattr(main, "GoogleSheetsFrontDoorStore", Store)
+    monkeypatch.delenv("PHARMAREEN_TENANT_ROUTING_KEY", raising=False)
+    monkeypatch.setenv("MS20_FRONT_DOOR_SIGNING_KEY", "independent-ms20-front-door-key-123456789")
+    registry = main.get_front_door_registry()
+    assert registry.signer is not None
+
+
+def test_customer_entry_fails_before_rendering_fake_setup_when_signing_is_missing(monkeypatch):
+    monkeypatch.setattr(main, "front_door_registry", None)
+    monkeypatch.setattr(main, "has_google_credentials", lambda _settings: True)
+    monkeypatch.setattr(main, "owner_auth_sheet_id", lambda _settings: "admin-workbook")
+    monkeypatch.delenv("PHARMAREEN_TENANT_ROUTING_KEY", raising=False)
+    monkeypatch.delenv("MS20_FRONT_DOOR_SIGNING_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="front-door signing is not configured"):
+        main.get_front_door_registry()
