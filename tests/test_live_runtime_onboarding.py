@@ -42,6 +42,10 @@ class FakeRegistryWorksheet:
     def __init__(self, title: str):
         self.title = title
         self.rows: list[list[object]] = []
+        self.col_count = len(PHARMACY_REGISTRY_HEADERS)
+
+    def resize(self, *, cols: int) -> None:
+        self.col_count = cols
 
     def row_values(self, row: int) -> list[object]:
         if row <= 0 or row > len(self.rows):
@@ -270,6 +274,31 @@ def test_google_sheets_registry_onboards_phone_and_routes_sale():
     assert sale.pharmacy_id == setup.pharmacy_id
     assert intake.calls[0]["text"] == "Panadol 2 cash"
     assert intake.calls[0]["actor_id"] == phone
+
+
+def test_registry_expands_older_sheet_before_owner_identity_header_and_write():
+    store = FakeRegistryStore()
+    worksheet = FakeRegistryWorksheet("Pharmacies")
+    worksheet.col_count = len(PHARMACY_REGISTRY_HEADERS) - 1
+    worksheet.rows = [PHARMACY_REGISTRY_HEADERS[:-1]]
+    store.spreadsheet.worksheets["Pharmacies"] = worksheet
+    registry = GoogleSheetsPharmacyRegistry(store)
+
+    result = registry.register_pharmacy({
+        "pharmacy_id": "pharmacy-stable", "owner_id": "owner-stable",
+        "pharmacy_name": "Mwangaza", "owner_name": "Pal", "location": "Nairobi",
+    })
+
+    assert result.accepted is True and result.created is True
+    assert worksheet.col_count == len(PHARMACY_REGISTRY_HEADERS)
+    assert worksheet.rows[0] == PHARMACY_REGISTRY_HEADERS
+    assert worksheet.rows[1][-1] == "owner-stable"
+    repeated = registry.register_pharmacy({
+        "pharmacy_id": "pharmacy-stable", "owner_id": "owner-stable",
+        "pharmacy_name": "Mwangaza", "owner_name": "Pal", "location": "Nairobi",
+    })
+    assert repeated.accepted is True and repeated.created is False
+    assert len(worksheet.rows) == 2
 
 
 def test_verified_channel_new_pharmacy_hands_off_to_secure_owner_activation():

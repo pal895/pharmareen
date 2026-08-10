@@ -58,6 +58,16 @@ def test_front_door_store_serializes_only_bounded_digest_state():
     assert "raw_phone" not in serialized
 
 
+def test_front_door_store_keeps_in_progress_identity_for_cross_worker_retry():
+    ws = Worksheet()
+    store_with(ws).save({"pending_entries": {"nonce": {
+        "status": "provisioning", "expires_at": 9999999999,
+        "identity_mode": "ms20_owned", "pharmacy_id": "pharmacy-stable", "owner_id": "owner-stable",
+    }}, "pharmacies": {}})
+    serialized = repr(ws.updated)
+    assert "pharmacy-stable" in serialized and "owner-stable" in serialized
+
+
 def test_worker_front_door_initialization_retries_after_transient_startup_failure(monkeypatch):
     attempts = []
 

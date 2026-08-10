@@ -241,10 +241,42 @@ class FrontDoorRegistry:
             state = self.store.load()
             state.setdefault("pending_entries", {})[_digest(nonce)] = {
                 "identity_mode": "ms20_owned", "status": "active",
+                "pharmacy_id": f"pharmacy_{secrets.token_hex(12)}",
+                "owner_id": f"owner_{secrets.token_hex(12)}",
                 "expires_at": int(time.time()) + min(max(ttl_seconds, 60), 1800),
             }
             self.store.save(state)
         return token
+
+    def claim_independent_new_pharmacy_context(self, token: str) -> dict[str, str]:
+        """Return stable provisioning identities; identical retries may resume."""
+        payload = self._require_signer().verify(token, expected_kind=EntryKind.NEW_PHARMACY)
+        nonce_digest = _digest(str(payload["n"]))
+        with self._lock:
+            state = self.store.load()
+            pending = state.setdefault("pending_entries", {}).get(nonce_digest)
+            if (
+                not pending
+                or pending.get("identity_mode") != "ms20_owned"
+                or pending.get("status") not in {"active", "provisioning"}
+                or int(pending.get("expires_at") or 0) <= int(time.time())
+            ):
+                raise ValueError("New-pharmacy context is unavailable")
+            pending["status"] = "provisioning"
+            self.store.save(state)
+            return {"pharmacy_id": str(pending["pharmacy_id"]), "owner_id": str(pending["owner_id"])}
+
+    def complete_independent_new_pharmacy_context(self, token: str) -> None:
+        payload = self._require_signer().verify(token, expected_kind=EntryKind.NEW_PHARMACY)
+        nonce_digest = _digest(str(payload["n"]))
+        with self._lock:
+            state = self.store.load()
+            pending = state.setdefault("pending_entries", {}).get(nonce_digest)
+            if not pending or pending.get("status") != "provisioning":
+                raise ValueError("New-pharmacy context is unavailable")
+            pending["status"] = "complete"
+            state.setdefault("used_nonces", []).append(nonce_digest)
+            self.store.save(state)
 
     def start_new_owner_verification(self, *, phone_key: str, deliver_code: Any, now: int | None = None) -> dict[str, Any]:
         """Start customer-facing verification without requiring channel initiation."""

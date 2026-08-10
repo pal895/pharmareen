@@ -160,6 +160,18 @@ class GoogleSheetsPharmacyRegistry:
             logger.warning("PHARMACY_REGISTRY_WRITE_FAILED normalized_phone=%s reason=%s", registry_phone_key(details.get("phone_number") or details.get("phone")), error)
             return RegistryWriteResult(False, {}, False, "Google Sheets registry is not available.", error)
 
+        requested_id = str(details.get("pharmacy_id") or "").strip()
+        existing_by_id = self.find_by_id(requested_id, active_only=False) if requested_id else None
+        if existing_by_id:
+            same_identity = (
+                existing_by_id["pharmacy_name"] == str(details.get("pharmacy_name") or "").strip()
+                and existing_by_id["owner_name"] == str(details.get("owner_name") or "").strip()
+                and existing_by_id["owner_id"] == str(details.get("owner_id") or "").strip()
+            )
+            if not same_identity:
+                return RegistryWriteResult(False, {}, False, "Pharmacy identity collision.", "pharmacy_id_collision")
+            return RegistryWriteResult(True, existing_by_id, False, "Pharmacy registration resumed.")
+
         phone = display_phone(details.get("phone_number") or details.get("phone"))
         allow_additional = bool(details.get("allow_additional_pharmacy_for_verified_owner"))
         existing = self.find_by_phone(phone, active_only=False)
@@ -241,6 +253,11 @@ class GoogleSheetsPharmacyRegistry:
                 rows=2000,
                 cols=max(len(PHARMACY_REGISTRY_HEADERS), 8),
             )
+        # Existing production registries may predate newly appended columns.
+        # Expand the grid before updating the header or appending a row.
+        current_cols = int(getattr(worksheet, "col_count", 0) or 0)
+        if current_cols and current_cols < len(PHARMACY_REGISTRY_HEADERS):
+            worksheet.resize(cols=len(PHARMACY_REGISTRY_HEADERS))
         existing = worksheet.row_values(1)
         if existing[: len(PHARMACY_REGISTRY_HEADERS)] != PHARMACY_REGISTRY_HEADERS:
             worksheet.update("A1", [PHARMACY_REGISTRY_HEADERS])

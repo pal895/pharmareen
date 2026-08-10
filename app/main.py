@@ -397,7 +397,7 @@ async def ms20_public_start_page() -> HTMLResponse:
     return HTMLResponse("""<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Start MS2.0</title>
 <style>body{font:17px system-ui;background:#f3f8f6;color:#12352e;margin:0;padding:20px}main{max-width:560px;margin:4vh auto;background:#fff;padding:28px;border-radius:24px}label{display:block;margin-top:14px;font-weight:700}input,button{font:inherit;width:100%;box-sizing:border-box;padding:14px;margin-top:6px;border-radius:12px;border:1px solid #9bb8b1}button{margin-top:20px;background:#167563;color:#fff;border:0;font-weight:800}.pinrow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}.pinrow button{width:auto;margin-top:6px;background:#fff;color:#167563;border:1px solid #167563}.help{display:block;font-weight:400;color:#49615b;margin-top:7px;line-height:1.35}.check input{width:auto}.check a{color:#126b5c}.error{color:#9b1c1c}</style>
 <main><h1>Start MS2.0</h1><p>Create your pharmacy and protect the Primary Owner with an MS2.0 PIN.</p><form id=f><label>Pharmacy name<input name=pharmacy_name required></label><label>Owner name<input name=owner_name required></label><label>Location<input name=location required></label><label>Contact phone <small>(optional)</small><input name=phone inputmode=tel autocomplete=tel></label><label>Primary Owner PIN<span class=pinrow><input id=pin name=pin type=password minlength=8 aria-describedby=pinhelp required><button id=show type=button aria-label='Show Primary Owner PIN'>Show</button></span><small id=pinhelp class=help>This is the main security code for the pharmacy owner. Use at least 8 characters, including a letter and a number. A later 4-digit Quick PIN only unlocks a trusted device.</small></label><label class=check><input name=accept type=checkbox required> I accept the current <a href='/terms' target='_blank' rel='noopener'>Terms</a> and <a href='/privacy' target='_blank' rel='noopener'>Privacy Notice</a></label><button id=s>Create pharmacy</button><p id=m class=error role=alert></p></form></main>
-<script>show.onclick=()=>{const visible=pin.type==='text';pin.type=visible?'password':'text';show.textContent=visible?'Show':'Hide';show.setAttribute('aria-label',(visible?'Show':'Hide')+' Primary Owner PIN')};f.onsubmit=async e=>{e.preventDefault();s.disabled=true;m.textContent='Creating pharmacy…';try{const start=await fetch('/api/ms20/front-door/start',{method:'POST',credentials:'same-origin'}),a=await start.json();if(!start.ok)throw Error(a.detail||'Setup unavailable.');const d=Object.fromEntries(new FormData(f));const r=await fetch('/api/ms20/front-door/new-pharmacy',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({...d,entry:a.entry,terms_version:'ms20-terms-2026-08',privacy_version:'ms20-privacy-2026-08'})}),j=await r.json();if(r.ok)location.replace('/main-app/');else throw Error(j.detail||'Pharmacy setup is unavailable.')}catch(x){m.textContent=x.message}s.disabled=false};</script>""", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+<script>let setupEntry='';async function body(r){const t=await r.text();try{return JSON.parse(t)}catch{return {detail:'Pharmacy setup is temporarily unavailable. Please try again.'}}}show.onclick=()=>{const visible=pin.type==='text';pin.type=visible?'password':'text';show.textContent=visible?'Show':'Hide';show.setAttribute('aria-label',(visible?'Show':'Hide')+' Primary Owner PIN')};f.onsubmit=async e=>{e.preventDefault();s.disabled=true;m.textContent='Creating pharmacy…';try{if(!setupEntry){const start=await fetch('/api/ms20/front-door/start',{method:'POST',credentials:'same-origin'}),a=await body(start);if(!start.ok)throw Error(a.detail||'Setup unavailable.');setupEntry=a.entry}const d=Object.fromEntries(new FormData(f));const r=await fetch('/api/ms20/front-door/new-pharmacy',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({...d,entry:setupEntry,terms_version:'ms20-terms-2026-08',privacy_version:'ms20-privacy-2026-08'})}),j=await body(r);if(r.ok)location.replace('/main-app/');else throw Error(j.detail||'Pharmacy setup is unavailable.')}catch(x){m.textContent=x.message||'Pharmacy setup is temporarily unavailable. Please try again.'}s.disabled=false};</script>""", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 
 def legal_page(title: str, version: str, sections: tuple[tuple[str, str], ...]) -> HTMLResponse:
@@ -424,7 +424,7 @@ async def ms20_front_door_new_pharmacy(request: Request) -> JSONResponse:
     entry = str(payload.get("entry") or "")
     phone = str(payload.get("phone") or "")
     phone_key = registry_phone_key(phone)
-    owner_id = f"owner_{uuid4().hex}"
+    owner_id = ""
     details = {
         "pharmacy_name": str(payload.get("pharmacy_name") or "").strip(),
         "owner_name": str(payload.get("owner_name") or "").strip(),
@@ -433,7 +433,7 @@ async def ms20_front_door_new_pharmacy(request: Request) -> JSONResponse:
         "status": "active",
         "active": "yes",
         "allow_additional_pharmacy_for_verified_owner": True,
-        "pharmacy_id": pharmacy_id_for_name(str(payload.get("pharmacy_name") or "")),
+        "pharmacy_id": "",
         "owner_id": owner_id,
     }
     if not entry or not details["pharmacy_name"] or not details["owner_name"] or not details["location"]:
@@ -445,7 +445,13 @@ async def ms20_front_door_new_pharmacy(request: Request) -> JSONResponse:
         raise HTTPException(status_code=400, detail="Current Terms and Privacy Notice acceptance is required")
     registry = get_front_door_registry()
     try:
-        registry.consume_new_pharmacy_context(entry, phone_key=phone_key)
+        if phone_key:
+            registry.consume_new_pharmacy_context(entry, phone_key=phone_key)
+            details["pharmacy_id"] = pharmacy_id_for_name(details["pharmacy_name"])
+            details["owner_id"] = f"owner_{uuid4().hex}"
+        else:
+            identities = registry.claim_independent_new_pharmacy_context(entry)
+            details.update(identities)
     except ValueError as exc:
         raise HTTPException(status_code=403, detail="Verified new-pharmacy entry is unavailable") from exc
     result = get_pharmacy_registry().register_pharmacy(details)
@@ -463,7 +469,12 @@ async def ms20_front_door_new_pharmacy(request: Request) -> JSONResponse:
         owner_phone_key=phone_key,
     )
     registry.record_owner_acceptance(record["pharmacy_id"], owner_id=owner_id, terms_version=MS20_TERMS_VERSION, privacy_version=MS20_PRIVACY_VERSION)
-    token, session = owner_auth_service.initialize_first_owner(record, pin)
+    if owner_state == "uninitialized":
+        token, session = owner_auth_service.initialize_first_owner(record, pin)
+    else:
+        token, session = owner_auth_service.sign_in_pharmacy_with_pin(record["pharmacy_id"], pin)
+    if not phone_key:
+        registry.complete_independent_new_pharmacy_context(entry)
     return owner_session_response(token, session)
 
 

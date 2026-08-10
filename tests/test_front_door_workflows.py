@@ -173,7 +173,7 @@ def test_shared_link_creates_ms20_owned_pharmacy_and_owner_without_messaging_ide
     assert started.status_code == 200 and created.status_code == 200 and legacy_verify.status_code == 410
     assert created.cookies.get("ms20_owner_session")
     assert records[0]["owner_id"].startswith("owner_") and "254" not in records[0]["owner_id"]
-    assert records[0]["pharmacy_id"].startswith("independent_chemist_")
+    assert records[0]["pharmacy_id"].startswith("pharmacy_")
 
 
 def test_same_verified_owner_phone_can_hold_isolated_credentials_for_two_pharmacies():

@@ -58,7 +58,7 @@ class GoogleSheetsFrontDoorStore:
         payload = deepcopy(value)
         pending_entries = {
             key: item for key, item in dict(payload.get("pending_entries") or {}).items()
-            if item.get("status") == "active" and int(item.get("expires_at") or 0) > int(time.time())
+            if item.get("status") in {"active", "provisioning"} and int(item.get("expires_at") or 0) > int(time.time())
         }
         rows = [[PLATFORM_ROW, _json({"community_counter": int(payload.get("community_counter") or 0), "used_nonces": list(payload.get("used_nonces") or [])[-10000:], "pending_entries": pending_entries})]]
         for pharmacy_id, pharmacy in sorted(payload.get("pharmacies", {}).items()):
