@@ -68,6 +68,8 @@ def test_supervisor_scripts_are_present_and_bridge_is_optional():
     assert "npm install" in start_script
     assert "BRIDGE_SCRIPT" in start_script
     assert "Backend stays running" in start_script
+    assert 'PYTHON_BIN="python"' in start_script
+    assert "required port opens within the health-check window" in start_script
     assert "WHATSAPP_BRIDGE_ENABLED" in start_all
     assert "/debug/system-status" in check_all
     assert "local_whatsapp_bridge.js" in stop_all

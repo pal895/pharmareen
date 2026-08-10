@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
 PORT="${PORT:-5000}"
-PYTHON_BIN="${PYTHON_BIN:-./.ms20-venv/bin/python}"
+PYTHON_BIN="${PYTHON_BIN:-}"
 BACKEND_LOG="${BACKEND_LOG:-server.log}"
 BRIDGE_LOG="${BRIDGE_LOG:-bridge.log}"
 WHATSAPP_BRIDGE_ENABLED="${WHATSAPP_BRIDGE_ENABLED:-false}"
@@ -26,7 +26,13 @@ if ! command -v tesseract >/dev/null 2>&1 && [ "${MS20_NIX_OCR_READY:-false}" !=
   echo "Local invoice reader is unavailable: tesseract was not found."
 fi
 
-if [ ! -x "$PYTHON_BIN" ]; then
+if [ -z "$PYTHON_BIN" ] && python -c "import uvicorn, PIL, pytesseract" >/dev/null 2>&1; then
+  # Replit Publishing installs requirements during its build. Reuse that
+  # environment so the required port opens within the health-check window.
+  PYTHON_BIN="python"
+fi
+
+if [ -z "$PYTHON_BIN" ] || ! "$PYTHON_BIN" -c "import sys" >/dev/null 2>&1; then
   echo "Creating the project Python environment..."
   python -m venv .ms20-venv
   PYTHON_BIN="./.ms20-venv/bin/python"
