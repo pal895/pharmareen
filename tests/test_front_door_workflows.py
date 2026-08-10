@@ -205,6 +205,32 @@ def test_shared_link_resumes_initialized_matching_pharmacy_without_duplicate(mon
     assert registry.store.load()["pharmacies"]["pharmacy_existing"]["owner_id"] == "owner_existing"
 
 
+def test_independent_start_does_not_require_durable_store_until_create_claim():
+    class Store:
+        def __init__(self):
+            self.value = {"version": 1, "community_counter": 0, "pharmacies": {}, "used_nonces": []}
+            self.loads = 0
+            self.saves = 0
+        def load(self):
+            self.loads += 1
+            return self.value.copy()
+        def save(self, value):
+            self.saves += 1
+            self.value = value
+
+    store = Store()
+    registry = FrontDoorRegistry(store, SignedEntryContext("deferred-claim-signing-key-which-is-long-123"))
+    entry = registry.issue_independent_new_pharmacy_context()
+    assert store.loads == store.saves == 0
+
+    first = registry.claim_independent_new_pharmacy_context(entry)
+    second = registry.claim_independent_new_pharmacy_context(entry)
+    assert first == second
+    assert first["pharmacy_id"].startswith("pharmacy_")
+    assert first["owner_id"].startswith("owner_")
+    assert store.loads == store.saves == 2
+
+
 def test_same_verified_owner_phone_can_hold_isolated_credentials_for_two_pharmacies():
     auth = OwnerAuthService()
     owner_a = {"pharmacy_id": "pharmacy-a", "pharmacy_name": "A", "owner_name": "Owner", "phone_number": "+254700000777"}

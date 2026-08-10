@@ -458,7 +458,8 @@ def ensure_worksheet(spreadsheet: Any, title: str, headers: list[str]):
     # Existing production workbooks may predate newly appended schema columns.
     # gspread cannot update beyond the physical grid, so expand first and make
     # every shared worksheet migration-safe rather than special-casing callers.
-    if int(getattr(worksheet, "col_count", 0) or 0) < len(headers):
+    physical_cols = int(getattr(worksheet, "col_count", 0) or 0)
+    if physical_cols and physical_cols < len(headers):
         worksheet.resize(cols=len(headers))
     existing = worksheet.row_values(1)
     if existing[: len(headers)] != headers:

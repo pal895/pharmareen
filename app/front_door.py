@@ -233,20 +233,17 @@ class FrontDoorRegistry:
         return token
 
     def issue_independent_new_pharmacy_context(self, *, ttl_seconds: int = 900) -> str:
-        """Issue one-use setup authority owned entirely by MS2.0."""
+        """Issue short-lived setup authority without a remote persistence write.
+
+        The signed random nonce is already non-enumerable and expiry-bound.  The
+        durable provisioning claim is created on the first create request, where
+        it is actually needed.  Keeping the display-only ``/start`` boundary
+        independent of Sheets avoids stranding an owner before reconciliation
+        while replay protection remains durable once provisioning begins.
+        """
         signer = self._require_signer()
         nonce = secrets.token_urlsafe(24)
-        token = signer.issue(pharmacy_id="__new_pharmacy__", kind=EntryKind.NEW_PHARMACY, nonce=nonce)
-        with self._lock:
-            state = self.store.load()
-            state.setdefault("pending_entries", {})[_digest(nonce)] = {
-                "identity_mode": "ms20_owned", "status": "active",
-                "pharmacy_id": f"pharmacy_{secrets.token_hex(12)}",
-                "owner_id": f"owner_{secrets.token_hex(12)}",
-                "expires_at": int(time.time()) + min(max(ttl_seconds, 60), 1800),
-            }
-            self.store.save(state)
-        return token
+        return signer.issue(pharmacy_id="__new_pharmacy__", kind=EntryKind.NEW_PHARMACY, nonce=nonce)
 
     def claim_independent_new_pharmacy_context(self, token: str) -> dict[str, str]:
         """Return stable provisioning identities; identical retries may resume."""
@@ -255,6 +252,16 @@ class FrontDoorRegistry:
         with self._lock:
             state = self.store.load()
             pending = state.setdefault("pending_entries", {}).get(nonce_digest)
+            if pending is None and nonce_digest not in set(state.setdefault("used_nonces", [])):
+                # Stable identities make a response failure retry-safe without
+                # persisting anything merely to render the setup form.
+                pending = {
+                    "identity_mode": "ms20_owned", "status": "active",
+                    "pharmacy_id": f"pharmacy_{_stable_id('pharmacy', str(payload['n']))[:24]}",
+                    "owner_id": f"owner_{_stable_id('owner', str(payload['n']))[:24]}",
+                    "expires_at": int(payload["exp"]),
+                }
+                state["pending_entries"][nonce_digest] = pending
             if (
                 not pending
                 or pending.get("identity_mode") != "ms20_owned"

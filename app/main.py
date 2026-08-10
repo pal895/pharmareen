@@ -282,6 +282,7 @@ whatsapp_bridge_runtime_status: dict[str, Any] = {
     "last_error": "",
     "updated_at": "",
 }
+MS20_FRONT_DOOR_RELEASE = "deferred-setup-claim-v1"
 
 
 def current_git_commit_short() -> str:
@@ -956,6 +957,7 @@ async def debug_version() -> dict[str, Any]:
         "offline_build_version": OFFLINE_BUILD_VERSION,
         "offline_frontend_marker": OFFLINE_FRONTEND_MARKER,
         "git_commit": current_git_commit_short(),
+        "front_door_release": MS20_FRONT_DOOR_RELEASE,
         "offline_app_index": str(OFFLINE_APP_DIR / "index.html"),
         "cache_control": OFFLINE_NO_CACHE_HEADERS["Cache-Control"],
     }
