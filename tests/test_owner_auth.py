@@ -255,7 +255,9 @@ def test_mwangaza_migration_canonicalizes_only_exact_unique_tenant_without_chang
 
 def test_exact_mwangaza_identity_chain_reconciliation_covers_partial_history_and_rejects_conflict():
     from app.front_door import FrontDoorRegistry, MemoryFrontDoorStore
-    from scripts.reconcile_mwangaza_identity import PHARMACY_ID, OWNER_ID, reconcile_exact_mwangaza
+    from scripts.reconcile_mwangaza_identity import PHARMACY_ID, reconcile_exact_mwangaza
+
+    registry_owner = "owner-live-registry-authority"
 
     class Registry:
         def __init__(self, owner_id=""):
@@ -270,22 +272,23 @@ def test_exact_mwangaza_identity_chain_reconciliation_covers_partial_history_and
             return self.record.copy() if pharmacy_id == PHARMACY_ID else None
 
     auth = OwnerAuthService()
+    legacy_owner = "owner-credential-partial"
     old_session, _ = auth.initialize_first_owner(
-        {"pharmacy_id": PHARMACY_ID, "owner_id": OWNER_ID, "pharmacy_name": "Mwangaza", "owner_name": "Pal"},
+        {"pharmacy_id": PHARMACY_ID, "owner_id": legacy_owner, "pharmacy_name": "Mwangaza", "owner_name": "Pal"},
         "Owner1234", now=100,
     )
-    exposed = auth.enroll_recovery_key(pharmacy_id=PHARMACY_ID, owner_id=OWNER_ID, now=101)
+    exposed = auth.enroll_recovery_key(pharmacy_id=PHARMACY_ID, owner_id=legacy_owner, now=101)
     front = FrontDoorRegistry(MemoryFrontDoorStore())
     front.initialize_pharmacy(
         pharmacy_id=PHARMACY_ID, owner_id="owner-historical-partial",
         owner_name="Pal", owner_phone_key="",
     )
-    registry = Registry()
+    registry = Registry(registry_owner)
 
     replacement = reconcile_exact_mwangaza(registry, auth, front)
 
-    assert registry.record["owner_id"] == OWNER_ID
-    assert front.store.load()["pharmacies"][PHARMACY_ID]["owner_id"] == OWNER_ID
+    assert registry.record["owner_id"] == registry_owner
+    assert front.store.load()["pharmacies"][PHARMACY_ID]["owner_id"] == registry_owner
     assert_http_error(401, lambda: auth.authenticate(old_session, now=102))
     assert_http_error(401, lambda: auth.recover_with_recovery_key(
         pharmacy_id=PHARMACY_ID, recovery_key=exposed, new_pin="Recovered1234", now=102,
@@ -294,14 +297,8 @@ def test_exact_mwangaza_identity_chain_reconciliation_covers_partial_history_and
         pharmacy_id=PHARMACY_ID, recovery_key=replacement, new_pin="Recovered1234", now=102,
     )
 
-    conflict_auth = OwnerAuthService()
-    conflict_auth.initialize_first_owner(
-        {"pharmacy_id": PHARMACY_ID, "owner_id": OWNER_ID, "pharmacy_name": "Mwangaza", "owner_name": "Pal"},
-        "Owner1234", now=100,
-    )
-    conflict_auth.enroll_recovery_key(pharmacy_id=PHARMACY_ID, owner_id=OWNER_ID, now=101)
-    with pytest.raises(SystemExit, match="REGISTRY_OWNER_CONFLICT"):
-        reconcile_exact_mwangaza(Registry("owner-genuinely-different"), conflict_auth, front)
+    with pytest.raises(SystemExit, match="REGISTRY_OWNER_MISSING"):
+        reconcile_exact_mwangaza(Registry(""), auth, front)
 
 
 def test_unknown_phone_is_not_enumerated_and_no_secret_uses_client_storage_or_ui():

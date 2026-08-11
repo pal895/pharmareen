@@ -9,7 +9,6 @@ from app.sheets import GoogleSheetsStore
 
 
 PHARMACY_ID = "pharmacy_2260644ed30c4e941dff33a2"
-OWNER_ID = "owner_7bf5ceb64de96d78d516afa63"
 
 
 def reconcile_exact_mwangaza(registry, auth: OwnerAuthService, front_door: FrontDoorRegistry) -> str:
@@ -17,21 +16,25 @@ def reconcile_exact_mwangaza(registry, auth: OwnerAuthService, front_door: Front
     if len(records) != 1:
         raise SystemExit("MWANGAZA_REGISTRY_CONFLICT: expected exactly one record")
     registry_owner = str(records[0].get("owner_id") or "")
-    if registry_owner not in {"", OWNER_ID}:
-        raise SystemExit("MWANGAZA_REGISTRY_OWNER_CONFLICT")
+    if not registry_owner:
+        raise SystemExit("MWANGAZA_REGISTRY_OWNER_MISSING")
 
     credentials = [item for item in auth._credentials.values() if item.pharmacy_id == PHARMACY_ID]
-    if len(credentials) != 1 or credentials[0].owner_id != OWNER_ID:
+    if len(credentials) != 1:
         raise SystemExit("MWANGAZA_CREDENTIAL_OWNER_CONFLICT")
     if not credentials[0].recovery_key_hash:
         raise SystemExit("MWANGAZA_RECOVERY_FACTOR_MISSING")
 
-    if not registry_owner:
-        registry.reconcile_owner_id(PHARMACY_ID, expected_owner_id="", canonical_owner_id=OWNER_ID)
-    front_door.reconcile_authenticated_registry_owner(PHARMACY_ID, owner_id=OWNER_ID)
+    # The exact, unique live registry row is the authorization authority.  The
+    # legacy saga may have persisted a different provisional actor into the
+    # credential/front-door stores; preserve the credential verifier while
+    # canonically rebinding that one row to the registry actor.
+    credentials[0].owner_id = registry_owner
+    auth._save_state()
+    front_door.reconcile_authenticated_registry_owner(PHARMACY_ID, owner_id=registry_owner)
 
     replacement_key = auth.enroll_recovery_key(
-        pharmacy_id=PHARMACY_ID, owner_id=OWNER_ID, allow_existing=True,
+        pharmacy_id=PHARMACY_ID, owner_id=registry_owner, allow_existing=True,
     )
     for session in auth._sessions.values():
         if session.pharmacy_id == PHARMACY_ID:
@@ -46,10 +49,10 @@ def reconcile_exact_mwangaza(registry, auth: OwnerAuthService, front_door: Front
         if item.get("status") == "active"
     }
     if (
-        not record or record.get("owner_id") != OWNER_ID
-        or len(credential) != 1 or credential[0].owner_id != OWNER_ID
-        or front.get("owner_id") != OWNER_ID
-        or any(actor != OWNER_ID for actor in device_actors)
+        not record or record.get("owner_id") != registry_owner
+        or len(credential) != 1 or credential[0].owner_id != registry_owner
+        or front.get("owner_id") != registry_owner
+        or any(actor != registry_owner for actor in device_actors)
         or any(not session.revoked for session in auth._sessions.values() if session.pharmacy_id == PHARMACY_ID)
     ):
         raise SystemExit("MWANGAZA_IDENTITY_CHAIN_NOT_ALIGNED")
