@@ -427,6 +427,27 @@ class OwnerAuthService:
             self._save_state()
             return token, session, replacement_key
 
+    def rotate_recovery_key_with_primary_pin(self, *, pharmacy_id: str, owner_id: str, primary_pin: str, now: float | None = None) -> tuple[str, OwnerSession, str]:
+        """Replace an exposed Recovery Key after fresh Primary Owner proof."""
+        current = time.time() if now is None else now
+        with self._lock:
+            self._refresh_persistent_state()
+            matches = [item for item in self._credentials.values() if item.pharmacy_id == pharmacy_id and item.owner_id == owner_id]
+            credential = matches[0] if len(matches) == 1 else None
+            if not credential or not self._verify_pin(primary_pin, credential.pin_hash):
+                raise self._unauthorized("Primary Owner PIN verification failed.")
+            replacement_key = self._new_recovery_key()
+            credential.recovery_key_hash = self._hash_pin(replacement_key)
+            credential.recovery_failures = 0
+            credential.recovery_locked_until = 0.0
+            credential.recovery_rotated_at = current
+            for session in self._sessions.values():
+                if session.pharmacy_id == pharmacy_id:
+                    session.revoked = True
+            token, session = self._issue_session(credential, now=current, persist=False)
+            self._save_state()
+            return token, session, replacement_key
+
     def _valid_activation(self, raw_token: str, *, now: float | None = None) -> ActivationInvitation:
         current = time.time() if now is None else now
         invitation = self._activations.get(self._digest(raw_token))

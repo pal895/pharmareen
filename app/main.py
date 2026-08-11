@@ -283,7 +283,7 @@ whatsapp_bridge_runtime_status: dict[str, Any] = {
     "last_error": "",
     "updated_at": "",
 }
-MS20_FRONT_DOOR_RELEASE = "owner-recovery-v2"
+MS20_FRONT_DOOR_RELEASE = "owner-recovery-v3"
 
 
 def current_git_commit_short() -> str:
@@ -657,9 +657,25 @@ async def ms20_trusted_device_recover(request: Request, ms20_owner_device: str |
     return owner_session_response(token, session, recovery_key=replacement_key)
 
 
+@app.post("/api/ms20/front-door/recovery-key/rotate")
+async def ms20_rotate_owner_recovery_key(request: Request, actor: ActorContext = Depends(require_owner_actor)) -> JSONResponse:
+    payload = await request.json()
+    token, session, replacement_key = owner_auth_service.rotate_recovery_key_with_primary_pin(
+        pharmacy_id=actor.pharmacy_id,
+        owner_id=actor.actor_id,
+        primary_pin=str((payload or {}).get("primary_pin") or ""),
+    )
+    return owner_session_response(token, session, recovery_key=replacement_key)
+
+
 @app.get("/main-app/protect-pharmacy", response_class=HTMLResponse, include_in_schema=False)
 async def ms20_protect_pharmacy_page() -> HTMLResponse:
-    return HTMLResponse("""<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Protect your pharmacy</title><style>body{font:18px system-ui;background:#f3f8f6;color:#12352e;padding:20px}main{max-width:520px;margin:8vh auto;background:#fff;padding:28px;border-radius:24px}code{display:block;font-size:22px;padding:18px;background:#eef6f3;border-radius:12px;overflow-wrap:anywhere}button{font:inherit;width:100%;padding:15px;margin-top:14px;border:0;border-radius:12px;background:#167563;color:#fff;font-weight:800}</style><main><h1>Protect your pharmacy</h1><p>Keep this Recovery Key somewhere safe. You will need it if you forget your Primary Owner PIN and lose your device.</p><code id=k></code><button id=save>Save Key</button><button id=go>Continue</button><p id=m></p></main><script>const key=sessionStorage.getItem('ms20-recovery-key')||'';k.textContent=key||'Recovery Key unavailable';fetch('/api/ms20/front-door/trusted-device/enroll',{method:'POST',credentials:'same-origin'}).catch(()=>{});save.onclick=async()=>{await navigator.clipboard.writeText(key);m.textContent='Recovery Key copied. Keep it private.'};go.onclick=()=>{sessionStorage.removeItem('ms20-recovery-key');location.replace('/main-app/')}</script>""", headers={"Cache-Control":"no-store","Referrer-Policy":"no-referrer"})
+    return HTMLResponse("""<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Protect your pharmacy</title><style>body{font:18px system-ui;background:#f3f8f6;color:#12352e;padding:20px}main{max-width:520px;margin:8vh auto;background:#fff;padding:28px;border-radius:24px}code{display:block;font-size:22px;padding:18px;background:#eef6f3;border-radius:12px;overflow-wrap:anywhere}button{font:inherit;width:100%;padding:15px;margin-top:14px;border:0;border-radius:12px;background:#167563;color:#fff;font-weight:800}</style><main><h1>Protect your pharmacy</h1><p>Keep this Recovery Key somewhere safe. You will need it if you forget your Primary Owner PIN and lose your device.</p><code id=k></code><button id=save>Save Key</button><button id=go>Continue</button><p id=m></p></main><script>const key=sessionStorage.getItem('ms20-recovery-key')||'';k.textContent=key||'Recovery Key unavailable';const deviceReady=fetch('/api/ms20/front-door/trusted-device/enroll',{method:'POST',credentials:'same-origin'});save.onclick=async()=>{await navigator.clipboard.writeText(key);m.textContent='Recovery Key copied. Keep it private.'};go.onclick=async()=>{go.disabled=true;try{const enrolled=await deviceReady,session=await fetch('/api/ms20/auth/session',{credentials:'same-origin',cache:'no-store'});if(!enrolled.ok||!session.ok)throw Error();sessionStorage.removeItem('ms20-recovery-key');location.replace('/main-app/')}catch{m.textContent='Your secure owner session could not be confirmed. Please sign in again.';go.disabled=false}}</script>""", headers={"Cache-Control":"no-store","Referrer-Policy":"no-referrer"})
+
+
+@app.get("/main-app/rotate-recovery-key", response_class=HTMLResponse, include_in_schema=False)
+async def ms20_rotate_recovery_key_page(actor: ActorContext = Depends(require_owner_actor)) -> HTMLResponse:
+    return HTMLResponse("""<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Replace exposed Recovery Key</title><style>body{font:18px system-ui;background:#f3f8f6;color:#12352e;padding:20px}main{max-width:520px;margin:8vh auto;background:#fff;padding:28px;border-radius:24px}input,button,code{font:inherit;width:100%;box-sizing:border-box;padding:15px;margin-top:14px;border-radius:12px}button{border:0;background:#167563;color:#fff;font-weight:800}code{display:none;background:#eef6f3;overflow-wrap:anywhere}.error{color:#9b1c1c}</style><main><h1>Replace exposed Recovery Key</h1><label>Current Primary Owner PIN<input id=p type=password autocomplete=current-password></label><button id=rotate>Replace key securely</button><code id=k></code><button id=save hidden>Save new key</button><button id=go hidden>Continue to Main App</button><p id=m class=error></p></main><script>rotate.onclick=async()=>{rotate.disabled=true;const r=await fetch('/api/ms20/front-door/recovery-key/rotate',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({primary_pin:p.value})}),d=await r.json();p.value='';if(!r.ok){m.textContent='Primary Owner PIN verification failed.';rotate.disabled=false;return}k.textContent=d.recovery_key;k.style.display='block';rotate.hidden=true;save.hidden=false;go.hidden=false;save.onclick=async()=>{await navigator.clipboard.writeText(d.recovery_key);m.textContent='New Recovery Key copied. Keep it private.'};go.onclick=()=>location.replace('/main-app/')}</script>""", headers={"Cache-Control":"no-store","Referrer-Policy":"no-referrer"})
 
 
 @app.get("/main-app/recover", response_class=HTMLResponse, include_in_schema=False)
@@ -679,9 +695,7 @@ async def ms20_operations_bootstrap(
     actor: ActorContext = Depends(require_front_door_actor),
 ) -> dict[str, Any]:
     """Resume durable pharmacy operations state after owner authentication."""
-    record = first_owner_registry_record(request)
-    if actor.pharmacy_id != record["pharmacy_id"]:
-        raise HTTPException(status_code=403, detail="Authenticated pharmacy does not match the routed pharmacy")
+    record = authenticated_registry_record(actor)
     store = get_sheet_store()
     if not getattr(store, "is_available", False):
         raise HTTPException(status_code=503, detail="Durable pharmacy operations state is unavailable")
@@ -742,9 +756,7 @@ async def ms20_operations_migrate_legacy(
     actor: ActorContext = Depends(require_owner_actor),
 ) -> dict[str, Any]:
     """Move an authenticated pre-durable Main App workspace into Sheets once."""
-    record = first_owner_registry_record(request)
-    if actor.pharmacy_id != record["pharmacy_id"]:
-        raise HTTPException(status_code=403, detail="Authenticated pharmacy does not match the routed pharmacy")
+    record = authenticated_registry_record(actor)
     payload = await request.json()
     catalog = payload.get("catalog") if isinstance(payload, dict) else None
     if not isinstance(catalog, list) or not catalog:
@@ -777,9 +789,7 @@ async def ms20_recover_legacy_page(actor: ActorContext = Depends(require_owner_a
 
 @app.post("/main-app/recover-legacy", include_in_schema=False)
 async def ms20_recover_legacy_submit(request: Request, file: UploadFile = File(...), actor: ActorContext = Depends(require_owner_actor)) -> Response:
-    record = first_owner_registry_record(request)
-    if actor.pharmacy_id != record["pharmacy_id"]:
-        raise HTTPException(status_code=403, detail="Authenticated pharmacy does not match the routed pharmacy")
+    record = authenticated_registry_record(actor)
     try:
         catalog = legacy_inventory_catalog(await file.read())
     except (UnicodeError, ValueError) as exc:
@@ -900,8 +910,16 @@ def first_owner_registry_record(request: Request) -> dict[str, str]:
         record = records[0]
     else:
         record = registry.find_by_id(pharmacy_id, active_only=True)
-    if not record or not registry_phone_key(record.get("phone_number") or record.get("phone")):
+    if not record or not canonical_registry_owner_id(record):
         raise HTTPException(status_code=503, detail="Owner initialization is not configured.")
+    return record
+
+
+def authenticated_registry_record(actor: ActorContext) -> dict[str, str]:
+    """Resolve registry truth from the authenticated tenant, never a default route."""
+    record = get_pharmacy_registry().find_by_id(actor.pharmacy_id, active_only=True)
+    if not record or (actor.role == "owner" and canonical_registry_owner_id(record) != actor.actor_id):
+        raise HTTPException(status_code=403, detail="Authenticated owner does not match the pharmacy registry.")
     return record
 
 
@@ -1156,13 +1174,12 @@ async def main_app_index(
     ms20_staff_session: str | None = Cookie(default=None),
     ms20_device_key: str | None = Cookie(default=None),
 ) -> Response:
-    record = first_owner_registry_record(request)
-    state = owner_auth_service.pharmacy_owner_state(record)
-    if state == "uninitialized":
-        return RedirectResponse(url="/main-app/sign-in", status_code=307)
     if ms20_owner_session:
         try:
-            owner_auth_service.authenticate(ms20_owner_session, pharmacy_id=record["pharmacy_id"], allowed_roles={"owner"})
+            actor = owner_auth_service.authenticate(ms20_owner_session, allowed_roles={"owner"})
+            record = authenticated_registry_record(actor)
+            if owner_auth_service.pharmacy_owner_state(record) != "initialized":
+                return RedirectResponse(url="/main-app/sign-in", status_code=307)
         except HTTPException as exc:
             if exc.status_code == 401:
                 return RedirectResponse(url="/main-app/sign-in", status_code=307)
@@ -1172,8 +1189,9 @@ async def main_app_index(
             staff = get_front_door_workflows().authenticate_staff_any(ms20_staff_session, device_key=ms20_device_key)
         except ValueError:
             return RedirectResponse(url="/main-app/sign-in", status_code=307)
-        if staff["pharmacy_id"] != record["pharmacy_id"]:
-            raise HTTPException(status_code=403, detail="Staff session does not match the routed pharmacy")
+        record = get_pharmacy_registry().find_by_id(staff["pharmacy_id"], active_only=True)
+        if not record:
+            raise HTTPException(status_code=403, detail="Staff session does not match an active pharmacy")
     else:
         return RedirectResponse(url="/main-app/sign-in", status_code=307)
     return main_app_file_response("index.html")

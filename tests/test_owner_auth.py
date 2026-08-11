@@ -210,6 +210,30 @@ def test_trusted_device_recovery_requires_independent_device_proof_not_quick_pin
     assert session.actor_id == "owner-a" and replacement.startswith("IMPALA-")
 
 
+def test_authenticated_recovery_key_rotation_revokes_exposed_key_and_refreshes_session():
+    service = OwnerAuthService()
+    old_token, session = service.initialize_first_owner(
+        {"pharmacy_id": "pharmacy-a", "owner_id": "owner-a", "pharmacy_name": "A", "owner_name": "Owner"},
+        "Owner1234", now=100,
+    )
+    exposed = service.enroll_recovery_key(pharmacy_id="pharmacy-a", owner_id="owner-a", now=101)
+    assert_http_error(401, lambda: service.rotate_recovery_key_with_primary_pin(
+        pharmacy_id="pharmacy-a", owner_id="owner-a", primary_pin="Wrong1234", now=102,
+    ))
+    token, refreshed, replacement = service.rotate_recovery_key_with_primary_pin(
+        pharmacy_id="pharmacy-a", owner_id="owner-a", primary_pin="Owner1234", now=103,
+    )
+    assert refreshed.actor_id == session.actor_id and replacement != exposed
+    assert_http_error(401, lambda: service.authenticate(old_token, now=104))
+    assert service.authenticate(token, now=104).pharmacy_id == "pharmacy-a"
+    assert_http_error(401, lambda: service.recover_with_recovery_key(
+        pharmacy_id="pharmacy-a", recovery_key=exposed, new_pin="Recovered1234", now=105,
+    ))
+    service.recover_with_recovery_key(
+        pharmacy_id="pharmacy-a", recovery_key=replacement, new_pin="Recovered1234", now=106,
+    )
+
+
 def test_mwangaza_migration_canonicalizes_only_exact_unique_tenant_without_changing_pin():
     from scripts.enroll_mwangaza_recovery import PHARMACY_ID, OWNER_ID, enroll_exact_mwangaza
     service = OwnerAuthService()
@@ -298,7 +322,7 @@ def test_authenticated_operations_bootstrap_resumes_durable_existing_pharmacy(mo
     main.app.dependency_overrides[main.require_front_door_actor] = lambda: ActorContext(
         pharmacy_id="pharmacy-a", actor_id="owner_254700000001", role="owner"
     )
-    monkeypatch.setattr(main, "first_owner_registry_record", lambda _request: {
+    monkeypatch.setattr(main, "authenticated_registry_record", lambda _actor: {
         **OWNER, "pharmacy_name": "Zuri Chemist", "branch": "Main", "location": "Nairobi"
     })
     monkeypatch.setattr(main, "get_sheet_store", lambda: Store())
@@ -338,7 +362,7 @@ def test_authenticated_empty_established_registry_reaches_recovery_decision_afte
     main.app.dependency_overrides[main.require_front_door_actor] = lambda: ActorContext(
         pharmacy_id="pharmacy-a", actor_id="owner_254700000001", role="owner"
     )
-    monkeypatch.setattr(main, "first_owner_registry_record", lambda _request: OWNER)
+    monkeypatch.setattr(main, "authenticated_registry_record", lambda _actor: OWNER)
     monkeypatch.setattr(main, "get_sheet_store", lambda: Store())
     try:
         with TestClient(main.app, base_url="https://ms20.test") as client:
@@ -402,7 +426,7 @@ def test_authenticated_legacy_workspace_migrates_once_to_durable_operations_stat
     main.app.dependency_overrides[main.require_owner_actor] = lambda: ActorContext(
         pharmacy_id="pharmacy-a", actor_id="owner-a", role="owner"
     )
-    monkeypatch.setattr(main, "first_owner_registry_record", lambda _request: {
+    monkeypatch.setattr(main, "authenticated_registry_record", lambda _actor: {
         **OWNER, "pharmacy_name": "Zuri Chemist", "owner_name": "Pal", "location": "Nairobi"
     })
     monkeypatch.setattr(main, "get_sheet_store", lambda: Store())

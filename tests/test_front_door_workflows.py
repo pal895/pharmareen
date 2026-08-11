@@ -9,6 +9,7 @@ from app.front_door_workflows import FrontDoorWorkflowService
 from app.owner_auth import OwnerAuthService
 from app.pharmacy_registry import RegistryWriteResult
 from app import main
+from app import owner_auth as owner_auth_module
 
 
 def services():
@@ -231,8 +232,20 @@ def test_recovery_http_boundary_rotates_credentials_sets_session_and_preserves_t
     }
     auth.initialize_first_owner(other, "Other1234", now=100)
     auth.enroll_recovery_key(pharmacy_id="pharmacy-other", owner_id="owner-other", now=101)
+    class PharmacyRegistry:
+        def find_by_id(self, pharmacy_id, active_only=True):
+            if pharmacy_id == existing["pharmacy_id"]:
+                return existing
+            if pharmacy_id == other["pharmacy_id"]:
+                return {**other, "active": "yes", "status": "active"}
+            return None
+        def list_records(self):
+            return [existing, {**other, "active": "yes", "status": "active"}]
     monkeypatch.setattr(main, "front_door_registry", registry)
     monkeypatch.setattr(main, "owner_auth_service", auth)
+    monkeypatch.setattr(owner_auth_module, "owner_auth_service", auth)
+    monkeypatch.setattr(main, "get_pharmacy_registry", lambda: PharmacyRegistry())
+    monkeypatch.delenv("PHARMAREEN_DEFAULT_PHARMACY_ID", raising=False)
 
     with TestClient(main.app, base_url="https://ms20.test") as client:
         page = client.get("/main-app/recover?pharmacy_id=pharmacy-existing")
@@ -242,6 +255,13 @@ def test_recovery_http_boundary_rotates_credentials_sets_session_and_preserves_t
         response = client.post("/api/ms20/front-door/recover-owner", json={
             "pharmacy_id": "pharmacy-existing", "recovery_key": key, "new_pin": "Recovered1234",
         })
+        protect = client.get("/main-app/protect-pharmacy")
+        session = client.get("/api/ms20/auth/session")
+        device = client.post("/api/ms20/front-door/trusted-device/enroll")
+        continued = client.get("/main-app/")
+        wrong_rotation = client.post("/api/ms20/front-door/recovery-key/rotate", json={"primary_pin": "Wrong1234"})
+        rotation = client.post("/api/ms20/front-door/recovery-key/rotate", json={"primary_pin": "Recovered1234"})
+        continued_after_rotation = client.get("/main-app/")
 
     assert page.status_code == 200 and "Recover and open pharmacy" in page.text
     assert wrong_tenant.status_code == 401
@@ -249,6 +269,20 @@ def test_recovery_http_boundary_rotates_credentials_sets_session_and_preserves_t
     assert response.cookies.get("ms20_owner_session")
     assert response.json()["pharmacy_id"] == "pharmacy-existing"
     assert response.json()["recovery_key"] != key
+    assert protect.status_code == 200 and "Recovery Key unavailable" in protect.text
+    assert "deviceReady" in protect.text and "sessionStorage.removeItem" in protect.text
+    assert session.status_code == 200 and session.json()["pharmacy_id"] == "pharmacy-existing"
+    assert device.status_code == 200
+    assert continued.status_code == 200 and continued.headers["content-type"].startswith("text/html")
+    assert "Owner initialization is not configured" not in continued.text
+    assert wrong_rotation.status_code == 401
+    assert rotation.status_code == 200 and rotation.json()["recovery_key"] != response.json()["recovery_key"]
+    assert continued_after_rotation.status_code == 200
+    with pytest.raises(HTTPException):
+        auth.recover_with_recovery_key(
+            pharmacy_id="pharmacy-existing", recovery_key=response.json()["recovery_key"],
+            new_pin="Again1234",
+        )
     assert registry.store.load()["pharmacies"]["pharmacy-existing"]["inventory_marker"] == before["inventory_marker"]
     assert set(registry.store.load()["pharmacies"]) == {"pharmacy-existing"}
     with pytest.raises(HTTPException):
@@ -339,7 +373,7 @@ def test_customer_visible_entry_pages_are_one_form_plain_language_and_no_interna
 def test_joined_staff_session_bootstraps_the_same_established_pharmacy_on_a_fresh_device(monkeypatch):
     registry, _, _ = services()
     monkeypatch.setattr(main, "front_door_registry", registry)
-    monkeypatch.setattr(main, "first_owner_registry_record", lambda _request: {"pharmacy_id": "pharmacy-a", "owner_id": "owner-a", "owner_name": "Owner", "phone_number": "+2547001"})
+    monkeypatch.setattr(main, "authenticated_registry_record", lambda _actor: {"pharmacy_id": "pharmacy-a", "owner_id": "owner-a", "owner_name": "Owner", "phone_number": "+2547001"})
 
     class Store:
         is_available = True
