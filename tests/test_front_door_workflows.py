@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
@@ -216,14 +217,19 @@ def test_recovery_http_boundary_rotates_credentials_sets_session_and_preserves_t
         "status": "active", "active": "yes", "inventory_marker": "preserve-me",
     }
     registry.initialize_pharmacy(
-        pharmacy_id="pharmacy-existing", owner_id="owner-existing",
+        pharmacy_id="pharmacy-existing", owner_id="owner-partial",
         owner_name="Owner", owner_phone_key="",
     )
     state = registry.store.load()
     state["pharmacies"]["pharmacy-existing"]["inventory_marker"] = "preserve-me"
     registry.store.save(state)
     before = registry.store.load()["pharmacies"]["pharmacy-existing"].copy()
+    durable = {"activations": {}, "credentials": {}, "sessions": {}}
+    def save_auth(payload):
+        durable.clear()
+        durable.update(json.loads(json.dumps(payload)))
     auth = OwnerAuthService()
+    auth.configure_persistence(loader=lambda: durable, saver=save_auth)
     old_token, _ = auth.initialize_first_owner(existing, "Owner1234", now=100)
     key = auth.enroll_recovery_key(pharmacy_id="pharmacy-existing", owner_id="owner-existing", now=101)
     other = {
@@ -255,6 +261,10 @@ def test_recovery_http_boundary_rotates_credentials_sets_session_and_preserves_t
         response = client.post("/api/ms20/front-door/recover-owner", json={
             "pharmacy_id": "pharmacy-existing", "recovery_key": key, "new_pin": "Recovered1234",
         })
+        restarted_auth = OwnerAuthService()
+        restarted_auth.configure_persistence(loader=lambda: durable, saver=save_auth)
+        monkeypatch.setattr(main, "owner_auth_service", restarted_auth)
+        monkeypatch.setattr(owner_auth_module, "owner_auth_service", restarted_auth)
         protect = client.get("/main-app/protect-pharmacy")
         session = client.get("/api/ms20/auth/session")
         device = client.post("/api/ms20/front-door/trusted-device/enroll")
@@ -271,6 +281,7 @@ def test_recovery_http_boundary_rotates_credentials_sets_session_and_preserves_t
     assert response.json()["recovery_key"] != key
     assert protect.status_code == 200 and "Recovery Key unavailable" in protect.text
     assert "deviceReady" in protect.text and "sessionStorage.removeItem" in protect.text
+    assert "enrolled.ok" not in protect.text
     assert session.status_code == 200 and session.json()["pharmacy_id"] == "pharmacy-existing"
     assert device.status_code == 200
     assert continued.status_code == 200 and continued.headers["content-type"].startswith("text/html")
@@ -285,6 +296,7 @@ def test_recovery_http_boundary_rotates_credentials_sets_session_and_preserves_t
         )
     assert registry.store.load()["pharmacies"]["pharmacy-existing"]["inventory_marker"] == before["inventory_marker"]
     assert set(registry.store.load()["pharmacies"]) == {"pharmacy-existing"}
+    assert registry.store.load()["pharmacies"]["pharmacy-existing"]["owner_id"] == "owner-existing"
     with pytest.raises(HTTPException):
         auth.authenticate(old_token, now=102)
     with pytest.raises(HTTPException):

@@ -195,6 +195,35 @@ def test_owner_recovery_device_uses_cryptographic_credential_and_quick_pin_is_no
         service.verify_owner_recovery_device("pharmacy-b", device_credential=credential)
 
 
+def test_authenticated_registry_owner_reconciliation_repairs_one_partial_owner_only():
+    service = FrontDoorRegistry(MemoryFrontDoorStore())
+    service.initialize_pharmacy(
+        pharmacy_id="pharmacy-a", owner_id="owner-partial",
+        owner_name="Owner", owner_phone_key="",
+    )
+    service.reconcile_authenticated_registry_owner("pharmacy-a", owner_id="owner-canonical")
+    state = service.store.load()["pharmacies"]["pharmacy-a"]
+    assert state["owner_id"] == "owner-canonical"
+    assert state["members"]["owner-canonical"]["role"] == "owner"
+    assert "owner-partial" not in state["members"]
+    service.enroll_owner_recovery_device(
+        "pharmacy-a", owner_id="owner-canonical", device_credential="d" * 48,
+    )
+
+    conflict = FrontDoorRegistry(MemoryFrontDoorStore())
+    conflict.initialize_pharmacy(
+        pharmacy_id="pharmacy-b", owner_id="owner-old",
+        owner_name="Owner", owner_phone_key="",
+    )
+    raw = conflict.store.load()
+    raw["pharmacies"]["pharmacy-b"]["members"]["owner-second"] = {
+        "actor_id": "owner-second", "role": "owner", "status": "active",
+    }
+    conflict.store.save(raw)
+    with pytest.raises(ValueError):
+        conflict.reconcile_authenticated_registry_owner("pharmacy-b", owner_id="owner-canonical")
+
+
 def test_community_loyalty_and_billing_authority_are_pharmacy_bound():
     service, _ = registry()
     service.initialize_pharmacy(pharmacy_id="pharmacy-a", owner_id="owner-a", owner_name="Owner A", owner_phone_key="2547001")

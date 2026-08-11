@@ -283,7 +283,7 @@ whatsapp_bridge_runtime_status: dict[str, Any] = {
     "last_error": "",
     "updated_at": "",
 }
-MS20_FRONT_DOOR_RELEASE = "owner-recovery-v3"
+MS20_FRONT_DOOR_RELEASE = "owner-recovery-v4"
 
 
 def current_git_commit_short() -> str:
@@ -626,7 +626,10 @@ async def ms20_front_door_recover_owner(request: Request) -> dict[str, Any]:
         new_pin=str((payload or {}).get("new_pin") or ""),
     )
     try:
-        get_front_door_registry().complete_account_recovery(pharmacy_id, owner_id=session.actor_id, verified_identity=True)
+        authenticated_registry_record(ActorContext(pharmacy_id=pharmacy_id, actor_id=session.actor_id, role="owner"))
+        front_door = get_front_door_registry()
+        front_door.reconcile_authenticated_registry_owner(pharmacy_id, owner_id=session.actor_id)
+        front_door.complete_account_recovery(pharmacy_id, owner_id=session.actor_id, verified_identity=True)
     except Exception:
         logger.exception("Front-door recovery trust recheck could not be recorded")
     return owner_session_response(token, session, recovery_key=replacement_key)
@@ -635,7 +638,10 @@ async def ms20_front_door_recover_owner(request: Request) -> dict[str, Any]:
 @app.post("/api/ms20/front-door/trusted-device/enroll")
 async def ms20_enroll_owner_recovery_device(actor: ActorContext = Depends(require_owner_actor)) -> JSONResponse:
     credential = secrets.token_urlsafe(48)
-    get_front_door_registry().enroll_owner_recovery_device(actor.pharmacy_id, owner_id=actor.actor_id, device_credential=credential)
+    authenticated_registry_record(actor)
+    front_door = get_front_door_registry()
+    front_door.reconcile_authenticated_registry_owner(actor.pharmacy_id, owner_id=actor.actor_id)
+    front_door.enroll_owner_recovery_device(actor.pharmacy_id, owner_id=actor.actor_id, device_credential=credential)
     response = JSONResponse({"enrolled": True})
     response.set_cookie("ms20_owner_device", credential, max_age=31536000, httponly=True, secure=True, samesite="strict", path="/")
     return response
@@ -670,7 +676,7 @@ async def ms20_rotate_owner_recovery_key(request: Request, actor: ActorContext =
 
 @app.get("/main-app/protect-pharmacy", response_class=HTMLResponse, include_in_schema=False)
 async def ms20_protect_pharmacy_page() -> HTMLResponse:
-    return HTMLResponse("""<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Protect your pharmacy</title><style>body{font:18px system-ui;background:#f3f8f6;color:#12352e;padding:20px}main{max-width:520px;margin:8vh auto;background:#fff;padding:28px;border-radius:24px}code{display:block;font-size:22px;padding:18px;background:#eef6f3;border-radius:12px;overflow-wrap:anywhere}button{font:inherit;width:100%;padding:15px;margin-top:14px;border:0;border-radius:12px;background:#167563;color:#fff;font-weight:800}</style><main><h1>Protect your pharmacy</h1><p>Keep this Recovery Key somewhere safe. You will need it if you forget your Primary Owner PIN and lose your device.</p><code id=k></code><button id=save>Save Key</button><button id=go>Continue</button><p id=m></p></main><script>const key=sessionStorage.getItem('ms20-recovery-key')||'';k.textContent=key||'Recovery Key unavailable';const deviceReady=fetch('/api/ms20/front-door/trusted-device/enroll',{method:'POST',credentials:'same-origin'});save.onclick=async()=>{await navigator.clipboard.writeText(key);m.textContent='Recovery Key copied. Keep it private.'};go.onclick=async()=>{go.disabled=true;try{const enrolled=await deviceReady,session=await fetch('/api/ms20/auth/session',{credentials:'same-origin',cache:'no-store'});if(!enrolled.ok||!session.ok)throw Error();sessionStorage.removeItem('ms20-recovery-key');location.replace('/main-app/')}catch{m.textContent='Your secure owner session could not be confirmed. Please sign in again.';go.disabled=false}}</script>""", headers={"Cache-Control":"no-store","Referrer-Policy":"no-referrer"})
+    return HTMLResponse("""<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Protect your pharmacy</title><style>body{font:18px system-ui;background:#f3f8f6;color:#12352e;padding:20px}main{max-width:520px;margin:8vh auto;background:#fff;padding:28px;border-radius:24px}code{display:block;font-size:22px;padding:18px;background:#eef6f3;border-radius:12px;overflow-wrap:anywhere}button{font:inherit;width:100%;padding:15px;margin-top:14px;border:0;border-radius:12px;background:#167563;color:#fff;font-weight:800}</style><main><h1>Protect your pharmacy</h1><p>Keep this Recovery Key somewhere safe. You will need it if you forget your Primary Owner PIN and lose your device.</p><code id=k></code><button id=save>Save Key</button><button id=go>Continue</button><p id=m></p></main><script>const key=sessionStorage.getItem('ms20-recovery-key')||'';k.textContent=key||'Recovery Key unavailable';const deviceReady=fetch('/api/ms20/front-door/trusted-device/enroll',{method:'POST',credentials:'same-origin'}).catch(()=>null);save.onclick=async()=>{await navigator.clipboard.writeText(key);m.textContent='Recovery Key copied. Keep it private.'};go.onclick=async()=>{go.disabled=true;try{const session=await fetch('/api/ms20/auth/session',{credentials:'same-origin',cache:'no-store'});if(!session.ok)throw Error();await deviceReady;sessionStorage.removeItem('ms20-recovery-key');location.replace('/main-app/')}catch{m.textContent='Your secure owner session could not be confirmed. Please sign in again.';go.disabled=false}}</script>""", headers={"Cache-Control":"no-store","Referrer-Policy":"no-referrer"})
 
 
 @app.get("/main-app/rotate-recovery-key", response_class=HTMLResponse, include_in_schema=False)

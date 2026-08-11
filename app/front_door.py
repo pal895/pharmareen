@@ -558,6 +558,51 @@ class FrontDoorRegistry:
             self._audit(pharmacy, "owner_recovery_device_enrolled", owner_id, {})
             self.store.save(state)
 
+    def reconcile_authenticated_registry_owner(self, pharmacy_id: str, *, owner_id: str) -> None:
+        """Canonicalize one stale partial owner after credential + registry proof.
+
+        The caller must first authenticate the owner credential and verify that
+        its actor ID is the active registry owner. Conflicts and multiple-owner
+        states remain closed.
+        """
+        with self._lock:
+            state = self.store.load()
+            pharmacy = state.setdefault("pharmacies", {}).get(pharmacy_id)
+            if not pharmacy:
+                raise ValueError("Pharmacy entry state is unavailable")
+            previous = str(pharmacy.get("owner_id") or "")
+            if previous == owner_id:
+                return
+            members = pharmacy.get("members")
+            previous_member = members.get(previous) if isinstance(members, dict) else None
+            active_owners = [
+                key for key, value in (members or {}).items()
+                if value.get("role") == "owner" and value.get("status") == "active"
+            ]
+            if (
+                not previous
+                or active_owners != [previous]
+                or not isinstance(previous_member, dict)
+                or owner_id in members
+            ):
+                raise ValueError("Pharmacy owner mismatch")
+            pharmacy["owner_id"] = owner_id
+            member = members.pop(previous)
+            member["actor_id"] = owner_id
+            members[owner_id] = member
+            for invitation in pharmacy.get("invitations", {}).values():
+                if invitation.get("created_by") == previous:
+                    invitation["created_by"] = owner_id
+            for device in pharmacy.get("devices", {}).values():
+                if device.get("actor_id") == previous:
+                    device["actor_id"] = owner_id
+            billing = pharmacy.get("billing", {})
+            billing["authority_actor_ids"] = [owner_id if value == previous else value for value in billing.get("authority_actor_ids", [])]
+            loyalty = pharmacy.get("loyalty", {})
+            loyalty["contribution_actor_ids"] = [owner_id if value == previous else value for value in loyalty.get("contribution_actor_ids", [])]
+            self._audit(pharmacy, "authenticated_registry_owner_reconciled", owner_id, {"previous_owner_digest": _digest(previous)})
+            self.store.save(state)
+
     def verify_owner_recovery_device(self, pharmacy_id: str, *, device_credential: str) -> str:
         digest = _digest(device_credential)
         with self._lock:
