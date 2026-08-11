@@ -241,6 +241,29 @@ class GoogleSheetsPharmacyRegistry:
         self._worksheet().update("A1", [PHARMACY_REGISTRY_HEADERS, *[row_for_registry_record(row) for row in records]])
         return normalize_registry_record(target)
 
+    def reconcile_owner_id(self, pharmacy_id: str, *, expected_owner_id: str, canonical_owner_id: str) -> dict[str, str]:
+        """Canonically fill one legacy registry owner ID with conflict checks."""
+        if not self.is_available:
+            raise RuntimeError("Pharmacy registry is unavailable")
+        wanted = str(pharmacy_id or "").strip()
+        expected = str(expected_owner_id or "").strip()
+        canonical = str(canonical_owner_id or "").strip()
+        if not wanted or not canonical:
+            raise ValueError("Pharmacy and canonical owner identity are required")
+        records = self.list_records()
+        matches = [row for row in records if row["pharmacy_id"] == wanted]
+        if len(matches) != 1:
+            raise ValueError("Exactly one pharmacy registry record is required")
+        target = matches[0]
+        if target["owner_id"] != expected:
+            raise ValueError("Existing registry owner identity does not match the migration precondition")
+        target["owner_id"] = canonical
+        target["updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        worksheet = self._worksheet()
+        worksheet.clear()
+        worksheet.update("A1", [PHARMACY_REGISTRY_HEADERS, *[row_for_registry_record(row) for row in records]])
+        return normalize_registry_record(target)
+
     def _worksheet(self):
         spreadsheet = getattr(self.store, "spreadsheet", None)
         if spreadsheet is None:

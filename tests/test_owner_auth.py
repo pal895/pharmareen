@@ -253,6 +253,57 @@ def test_mwangaza_migration_canonicalizes_only_exact_unique_tenant_without_chang
         enroll_exact_mwangaza(other)
 
 
+def test_exact_mwangaza_identity_chain_reconciliation_covers_partial_history_and_rejects_conflict():
+    from app.front_door import FrontDoorRegistry, MemoryFrontDoorStore
+    from scripts.reconcile_mwangaza_identity import PHARMACY_ID, OWNER_ID, reconcile_exact_mwangaza
+
+    class Registry:
+        def __init__(self, owner_id=""):
+            self.record = {"pharmacy_id": PHARMACY_ID, "owner_id": owner_id, "active": "yes", "status": "active"}
+        def list_records(self):
+            return [self.record.copy()]
+        def reconcile_owner_id(self, pharmacy_id, *, expected_owner_id, canonical_owner_id):
+            assert pharmacy_id == PHARMACY_ID and self.record["owner_id"] == expected_owner_id
+            self.record["owner_id"] = canonical_owner_id
+            return self.record.copy()
+        def find_by_id(self, pharmacy_id, active_only=False):
+            return self.record.copy() if pharmacy_id == PHARMACY_ID else None
+
+    auth = OwnerAuthService()
+    old_session, _ = auth.initialize_first_owner(
+        {"pharmacy_id": PHARMACY_ID, "owner_id": OWNER_ID, "pharmacy_name": "Mwangaza", "owner_name": "Pal"},
+        "Owner1234", now=100,
+    )
+    exposed = auth.enroll_recovery_key(pharmacy_id=PHARMACY_ID, owner_id=OWNER_ID, now=101)
+    front = FrontDoorRegistry(MemoryFrontDoorStore())
+    front.initialize_pharmacy(
+        pharmacy_id=PHARMACY_ID, owner_id="owner-historical-partial",
+        owner_name="Pal", owner_phone_key="",
+    )
+    registry = Registry()
+
+    replacement = reconcile_exact_mwangaza(registry, auth, front)
+
+    assert registry.record["owner_id"] == OWNER_ID
+    assert front.store.load()["pharmacies"][PHARMACY_ID]["owner_id"] == OWNER_ID
+    assert_http_error(401, lambda: auth.authenticate(old_session, now=102))
+    assert_http_error(401, lambda: auth.recover_with_recovery_key(
+        pharmacy_id=PHARMACY_ID, recovery_key=exposed, new_pin="Recovered1234", now=102,
+    ))
+    auth.recover_with_recovery_key(
+        pharmacy_id=PHARMACY_ID, recovery_key=replacement, new_pin="Recovered1234", now=102,
+    )
+
+    conflict_auth = OwnerAuthService()
+    conflict_auth.initialize_first_owner(
+        {"pharmacy_id": PHARMACY_ID, "owner_id": OWNER_ID, "pharmacy_name": "Mwangaza", "owner_name": "Pal"},
+        "Owner1234", now=100,
+    )
+    conflict_auth.enroll_recovery_key(pharmacy_id=PHARMACY_ID, owner_id=OWNER_ID, now=101)
+    with pytest.raises(SystemExit, match="REGISTRY_OWNER_CONFLICT"):
+        reconcile_exact_mwangaza(Registry("owner-genuinely-different"), conflict_auth, front)
+
+
 def test_unknown_phone_is_not_enumerated_and_no_secret_uses_client_storage_or_ui():
     service = OwnerAuthService()
     delivered: list[tuple[str, str]] = []
@@ -735,6 +786,27 @@ def test_main_app_entry_fails_closed_for_mismatched_owner_state(monkeypatch):
         response = client.get("/main-app/")
 
     assert response.status_code == 503
+
+
+def test_authenticated_registry_owner_mismatch_renders_ms20_screen_not_raw_json(monkeypatch):
+    owner = {"pharmacy_id": "pharmacy-a", "owner_id": "owner-a", "pharmacy_name": "A", "owner_name": "Owner", "phone": "", "active": "yes", "status": "active"}
+    service = OwnerAuthService()
+    token, _ = service.initialize_first_owner(owner, "Owner1234")
+
+    class Registry:
+        def find_by_id(self, pharmacy_id, active_only=True):
+            return {**owner, "owner_id": "owner-different"} if pharmacy_id == "pharmacy-a" else None
+
+    monkeypatch.setattr(main, "owner_auth_service", service)
+    monkeypatch.setattr(main, "get_pharmacy_registry", lambda: Registry())
+    with TestClient(main.app, base_url="https://ms20.test", follow_redirects=False) as client:
+        client.cookies.set(OWNER_SESSION_COOKIE, token)
+        response = client.get("/main-app/")
+
+    assert response.status_code == 403
+    assert response.headers["content-type"].startswith("text/html")
+    assert "Pharmacy access needs attention" in response.text
+    assert "Authenticated owner does not match" not in response.text
 
 
 def test_home_conversation_guidance_wraps_instead_of_truncating():

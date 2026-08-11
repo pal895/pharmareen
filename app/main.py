@@ -283,7 +283,7 @@ whatsapp_bridge_runtime_status: dict[str, Any] = {
     "last_error": "",
     "updated_at": "",
 }
-MS20_FRONT_DOOR_RELEASE = "owner-recovery-v4"
+MS20_FRONT_DOOR_RELEASE = "owner-recovery-v5"
 
 
 def current_git_commit_short() -> str:
@@ -1173,6 +1173,14 @@ async def main_app_redirect() -> RedirectResponse:
     return RedirectResponse(url="/main-app/")
 
 
+def owner_access_problem_response() -> HTMLResponse:
+    return HTMLResponse(
+        """<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Pharmacy access needs attention</title><style>body{font:18px system-ui;background:#f3f8f6;color:#12352e;padding:20px}main{max-width:520px;margin:10vh auto;background:white;padding:28px;border-radius:24px}a{display:block;text-align:center;padding:15px;background:#167563;color:white;border-radius:12px;text-decoration:none;font-weight:800}</style><main><h1>Pharmacy access needs attention</h1><p>MS2.0 could not safely confirm this owner and pharmacy together. Your pharmacy data has not been changed.</p><a href='/start'>Return to secure access</a></main>""",
+        status_code=403,
+        headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+    )
+
+
 @app.get("/main-app/", include_in_schema=False)
 async def main_app_index(
     request: Request,
@@ -1189,7 +1197,7 @@ async def main_app_index(
         except HTTPException as exc:
             if exc.status_code == 401:
                 return RedirectResponse(url="/main-app/sign-in", status_code=307)
-            raise
+            return owner_access_problem_response()
     elif ms20_staff_session and ms20_device_key:
         try:
             staff = get_front_door_workflows().authenticate_staff_any(ms20_staff_session, device_key=ms20_device_key)
