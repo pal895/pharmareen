@@ -18,7 +18,7 @@ import threading
 import time
 import traceback
 from html import escape
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from datetime import date, datetime, timedelta
@@ -97,6 +97,16 @@ logger = logging.getLogger(__name__)
 LEGACY_INVENTORY_HEADERS = ["Medicine", "Strength", "Form", "Unit", "Selling price (KES)", "Cost price (KES)", "Stock", "Supplier", "Barcode", "Batch", "Expiry", "Shelf"]
 MS20_TERMS_VERSION = "ms20-terms-2026-08"
 MS20_PRIVACY_VERSION = "ms20-privacy-2026-08"
+
+
+@contextmanager
+def _ms20_provision_stage(name: str):
+    """Log one secret-free provisioning stage when a production write fails."""
+    try:
+        yield
+    except Exception:
+        logger.exception("MS20_NEW_PHARMACY_FAILED stage=%s", name)
+        raise
 
 
 def legacy_inventory_catalog(raw: bytes) -> list[dict[str, Any]]:
@@ -456,33 +466,35 @@ async def ms20_front_door_new_pharmacy(request: Request) -> JSONResponse:
     if payload.get("terms_version") != MS20_TERMS_VERSION or payload.get("privacy_version") != MS20_PRIVACY_VERSION:
         raise HTTPException(status_code=400, detail="Current Terms and Privacy Notice acceptance is required")
     registry = get_front_door_registry()
-    try:
-        if phone_key:
-            registry.consume_new_pharmacy_context(entry, phone_key=phone_key)
-            details["pharmacy_id"] = pharmacy_id_for_name(details["pharmacy_name"])
-            details["owner_id"] = f"owner_{uuid4().hex}"
-        else:
-            identities = registry.claim_independent_new_pharmacy_context(entry)
-            details.update(identities)
-    except ValueError as exc:
-        raise HTTPException(status_code=403, detail="Verified new-pharmacy entry is unavailable") from exc
+    with _ms20_provision_stage("claim_setup_context"):
+        try:
+            if phone_key:
+                registry.consume_new_pharmacy_context(entry, phone_key=phone_key)
+                details["pharmacy_id"] = pharmacy_id_for_name(details["pharmacy_name"])
+                details["owner_id"] = f"owner_{uuid4().hex}"
+            else:
+                identities = registry.claim_independent_new_pharmacy_context(entry)
+                details.update(identities)
+        except ValueError as exc:
+            raise HTTPException(status_code=403, detail="Verified new-pharmacy entry is unavailable") from exc
     pharmacy_registry = get_pharmacy_registry()
     resume_record = None
     if not phone_key:
-        wanted = (
-            details["pharmacy_name"].casefold(), details["owner_name"].casefold(),
-            details["location"].casefold(), registry_phone_key(details["phone_number"]),
-        )
-        matches = []
-        for candidate in getattr(pharmacy_registry, "list_records", lambda: [])():
-            actual = (
-                str(candidate.get("pharmacy_name") or "").strip().casefold(),
-                str(candidate.get("owner_name") or "").strip().casefold(),
-                str(candidate.get("location") or "").strip().casefold(),
-                registry_phone_key(candidate.get("phone_number") or candidate.get("phone")),
+        with _ms20_provision_stage("registry_lookup"):
+            wanted = (
+                details["pharmacy_name"].casefold(), details["owner_name"].casefold(),
+                details["location"].casefold(), registry_phone_key(details["phone_number"]),
             )
-            if actual == wanted and str(candidate.get("notes") or "") == "registered_by_live_onboarding":
-                matches.append(candidate)
+            matches = []
+            for candidate in getattr(pharmacy_registry, "list_records", lambda: [])():
+                actual = (
+                    str(candidate.get("pharmacy_name") or "").strip().casefold(),
+                    str(candidate.get("owner_name") or "").strip().casefold(),
+                    str(candidate.get("location") or "").strip().casefold(),
+                    registry_phone_key(candidate.get("phone_number") or candidate.get("phone")),
+                )
+                if actual == wanted and str(candidate.get("notes") or "") == "registered_by_live_onboarding":
+                    matches.append(candidate)
         if len(matches) > 1:
             raise HTTPException(status_code=409, detail="Pharmacy setup needs owner support before it can continue")
         if len(matches) == 1 and owner_auth_service.pharmacy_owner_state(matches[0]) == "initialized":
@@ -494,7 +506,8 @@ async def ms20_front_door_new_pharmacy(request: Request) -> JSONResponse:
                 entry, pharmacy_id=resume_record["pharmacy_id"],
                 owner_id=canonical_registry_owner_id(resume_record),
             )
-    result = pharmacy_registry.register_pharmacy(details) if resume_record is None else None
+    with _ms20_provision_stage("registry_register"):
+        result = pharmacy_registry.register_pharmacy(details) if resume_record is None else None
     if resume_record is not None:
         record = resume_record
     else:
@@ -502,29 +515,40 @@ async def ms20_front_door_new_pharmacy(request: Request) -> JSONResponse:
         if not result.accepted:
             raise HTTPException(status_code=503, detail="New-pharmacy registry is temporarily unavailable")
         record = result.record
-    owner_state = owner_auth_service.pharmacy_owner_state(record)
+    with _ms20_provision_stage("owner_state"):
+        owner_state = owner_auth_service.pharmacy_owner_state(record)
     owner_id = canonical_registry_owner_id(record)
-    registry.initialize_pharmacy(
-        pharmacy_id=record["pharmacy_id"],
-        owner_id=owner_id,
-        owner_name=record.get("owner_name") or "Owner",
-        owner_phone_key=phone_key,
-    )
-    registry.record_owner_acceptance(record["pharmacy_id"], owner_id=owner_id, terms_version=MS20_TERMS_VERSION, privacy_version=MS20_PRIVACY_VERSION)
+    with _ms20_provision_stage("front_door_initialize"):
+        registry.initialize_pharmacy(
+            pharmacy_id=record["pharmacy_id"],
+            owner_id=owner_id,
+            owner_name=record.get("owner_name") or "Owner",
+            owner_phone_key=phone_key,
+        )
+    with _ms20_provision_stage("record_owner_acceptance"):
+        registry.record_owner_acceptance(record["pharmacy_id"], owner_id=owner_id, terms_version=MS20_TERMS_VERSION, privacy_version=MS20_PRIVACY_VERSION)
     recovery_key = ""
     if resume_record is not None:
         # The existing Primary Owner PIN was verified before adoption.  If a
         # response failed after credential creation but before recovery-factor
         # enrollment, finish that same tenant instead of stranding it again.
-        if not owner_auth_service.recovery_is_enrolled(pharmacy_id=record["pharmacy_id"], owner_id=owner_id):
-            recovery_key = owner_auth_service.enroll_recovery_key(pharmacy_id=record["pharmacy_id"], owner_id=owner_id)
+        with _ms20_provision_stage("resume_recovery_state"):
+            recovery_enrolled = owner_auth_service.recovery_is_enrolled(pharmacy_id=record["pharmacy_id"], owner_id=owner_id)
+        if not recovery_enrolled:
+            with _ms20_provision_stage("enroll_recovery_key_resume"):
+                recovery_key = owner_auth_service.enroll_recovery_key(pharmacy_id=record["pharmacy_id"], owner_id=owner_id)
     elif owner_state == "uninitialized":
-        token, session = owner_auth_service.initialize_first_owner(record, pin)
-        recovery_key = owner_auth_service.enroll_recovery_key(pharmacy_id=record["pharmacy_id"], owner_id=owner_id)
+        with _ms20_provision_stage("initialize_first_owner"):
+            token, session = owner_auth_service.initialize_first_owner(record, pin)
+        with _ms20_provision_stage("enroll_recovery_key"):
+            recovery_key = owner_auth_service.enroll_recovery_key(pharmacy_id=record["pharmacy_id"], owner_id=owner_id)
     else:
-        token, session = owner_auth_service.sign_in_pharmacy_with_pin(record["pharmacy_id"], pin)
+        with _ms20_provision_stage("sign_in_existing_owner"):
+            token, session = owner_auth_service.sign_in_pharmacy_with_pin(record["pharmacy_id"], pin)
     if not phone_key:
-        registry.complete_independent_new_pharmacy_context(entry)
+        with _ms20_provision_stage("complete_setup_context"):
+            registry.complete_independent_new_pharmacy_context(entry)
+    logger.info("MS20_NEW_PHARMACY_SUCCESS pharmacy_id=%s owner_id=%s", record["pharmacy_id"], owner_id)
     return owner_session_response(token, session, recovery_key=recovery_key)
 
 
