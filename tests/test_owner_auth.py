@@ -945,6 +945,27 @@ def test_owner_auth_store_uses_platform_admin_or_existing_registry_workbook(monk
     assert opened == ["registry-workbook"]
 
 
+def test_owner_auth_store_retries_transient_workbook_open(monkeypatch):
+    registry_settings = Settings(
+        GOOGLE_SHEET_ID="registry-workbook",
+        GOOGLE_SERVICE_ACCOUNT_JSON="unused.json",
+    )
+    attempts = []
+
+    class Client:
+        def open_by_key(self, sheet_id):
+            attempts.append(sheet_id)
+            if len(attempts) < 3:
+                raise ConnectionError("transient Sheets disconnect")
+            return object()
+
+    store = GoogleSheetsOwnerAuthStateStore(registry_settings)
+    monkeypatch.setattr(store._onboarding, "_gspread_client", lambda: Client())
+    monkeypatch.setattr("app.services.owner_auth_persistence.time.sleep", lambda _seconds: None)
+    assert store._spreadsheet() is not None
+    assert attempts == ["registry-workbook", "registry-workbook", "registry-workbook"]
+
+
 def test_durable_store_load_failure_is_not_treated_as_empty_valid_state():
     service = OwnerAuthService()
     with pytest.raises(RuntimeError, match="workbook unavailable"):

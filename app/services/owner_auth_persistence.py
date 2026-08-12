@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import time
 from typing import Any
 
 from app.config import Settings
@@ -22,6 +24,8 @@ SESSION_HEADERS = [
     "Session Digest", "Actor ID", "Pharmacy ID", "Role", "Display Name",
     "Expires At", "Revoked",
 ]
+
+logger = logging.getLogger(__name__)
 
 
 def owner_auth_sheet_id(settings: Settings) -> str:
@@ -49,7 +53,26 @@ class GoogleSheetsOwnerAuthStateStore:
             raise RuntimeError("Owner authentication durable workbook is not configured")
 
     def _spreadsheet(self):
-        return self._onboarding._gspread_client().open_by_key(self._sheet_id)
+        # Google can close an otherwise healthy Sheets HTTP connection between
+        # the credential write and the immediately following Recovery Key
+        # write. Retry only the idempotent workbook-open step; the existing
+        # clear/update operations remain unchanged and never receive secrets.
+        last_error: Exception | None = None
+        for attempt in range(3):
+            try:
+                return self._onboarding._gspread_client().open_by_key(self._sheet_id)
+            except Exception as exc:
+                last_error = exc
+                if attempt == 2:
+                    raise
+                logger.warning(
+                    "OWNER_AUTH_SHEETS_OPEN_RETRY attempt=%d reason=%s",
+                    attempt + 1,
+                    type(exc).__name__,
+                )
+                time.sleep(0.35 * (2 ** attempt))
+        assert last_error is not None
+        raise last_error
 
     def load(self) -> dict[str, Any]:
         spreadsheet = self._spreadsheet()
