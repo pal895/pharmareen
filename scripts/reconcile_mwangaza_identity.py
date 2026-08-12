@@ -1,7 +1,7 @@
 """Exact, fail-closed identity reconciliation for the legacy Mwangaza tenant."""
 from app.config import get_settings
 from app.front_door import FrontDoorRegistry
-from app.owner_auth import OwnerAuthService
+from app.owner_auth import OwnerAuthService, registry_owner_login_key
 from app.pharmacy_registry import GoogleSheetsPharmacyRegistry
 from app.services.front_door_persistence import GoogleSheetsFrontDoorStore
 from app.services.owner_auth_persistence import GoogleSheetsOwnerAuthStateStore
@@ -29,7 +29,13 @@ def reconcile_exact_mwangaza(registry, auth: OwnerAuthService, front_door: Front
     # legacy saga may have persisted a different provisional actor into the
     # credential/front-door stores; preserve the credential verifier while
     # canonically rebinding that one row to the registry actor.
-    credentials[0].owner_id = registry_owner
+    credential = credentials[0]
+    credential.owner_id = registry_owner
+    credential.phone_key = registry_owner_login_key(records[0])
+    auth._credentials = {
+        auth._credential_key(item.pharmacy_id, item.phone_key): item
+        for item in auth._credentials.values()
+    }
     auth._save_state()
     front_door.reconcile_authenticated_registry_owner(PHARMACY_ID, owner_id=registry_owner)
 
@@ -51,6 +57,7 @@ def reconcile_exact_mwangaza(registry, auth: OwnerAuthService, front_door: Front
     if (
         not record or record.get("owner_id") != registry_owner
         or len(credential) != 1 or credential[0].owner_id != registry_owner
+        or credential[0].phone_key != registry_owner_login_key(record)
         or front.get("owner_id") != registry_owner
         or any(actor != registry_owner for actor in device_actors)
         or any(not session.revoked for session in auth._sessions.values() if session.pharmacy_id == PHARMACY_ID)

@@ -283,7 +283,7 @@ whatsapp_bridge_runtime_status: dict[str, Any] = {
     "last_error": "",
     "updated_at": "",
 }
-MS20_FRONT_DOOR_RELEASE = "owner-recovery-v5"
+MS20_FRONT_DOOR_RELEASE = "owner-recovery-v6"
 
 
 def current_git_commit_short() -> str:
@@ -1197,6 +1197,9 @@ async def main_app_index(
         except HTTPException as exc:
             if exc.status_code == 401:
                 return RedirectResponse(url="/main-app/sign-in", status_code=307)
+            return owner_access_problem_response()
+        except Exception:
+            logger.exception("Authenticated Main App destination failed")
             return owner_access_problem_response()
     elif ms20_staff_session and ms20_device_key:
         try:

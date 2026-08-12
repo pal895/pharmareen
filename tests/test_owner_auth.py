@@ -253,7 +253,7 @@ def test_mwangaza_migration_canonicalizes_only_exact_unique_tenant_without_chang
         enroll_exact_mwangaza(other)
 
 
-def test_exact_mwangaza_identity_chain_reconciliation_covers_partial_history_and_rejects_conflict():
+def test_exact_mwangaza_identity_chain_reconciliation_covers_partial_history_and_rejects_conflict(monkeypatch):
     from app.front_door import FrontDoorRegistry, MemoryFrontDoorStore
     from scripts.reconcile_mwangaza_identity import PHARMACY_ID, reconcile_exact_mwangaza
 
@@ -288,14 +288,28 @@ def test_exact_mwangaza_identity_chain_reconciliation_covers_partial_history_and
     replacement = reconcile_exact_mwangaza(registry, auth, front)
 
     assert registry.record["owner_id"] == registry_owner
+    credential = next(item for item in auth._credentials.values() if item.pharmacy_id == PHARMACY_ID)
+    assert credential.owner_id == registry_owner
+    assert credential.phone_key == registry_owner
+    assert auth.pharmacy_owner_state(registry.record) == "initialized"
     assert front.store.load()["pharmacies"][PHARMACY_ID]["owner_id"] == registry_owner
     assert_http_error(401, lambda: auth.authenticate(old_session, now=102))
     assert_http_error(401, lambda: auth.recover_with_recovery_key(
         pharmacy_id=PHARMACY_ID, recovery_key=exposed, new_pin="Recovered1234", now=102,
     ))
-    auth.recover_with_recovery_key(
+    recovered_session, recovered_actor, _ = auth.recover_with_recovery_key(
         pharmacy_id=PHARMACY_ID, recovery_key=replacement, new_pin="Recovered1234", now=102,
     )
+    recovered_actor.expires_at = 10**12
+
+    monkeypatch.setattr(main, "owner_auth_service", auth)
+    monkeypatch.setattr(main, "get_pharmacy_registry", lambda: registry)
+    with TestClient(main.app, base_url="https://ms20.test", follow_redirects=False) as client:
+        client.cookies.set(OWNER_SESSION_COOKIE, recovered_session)
+        main_app = client.get("/main-app/")
+
+    assert main_app.status_code == 200
+    assert "MS2.0" in main_app.text
 
     with pytest.raises(SystemExit, match="REGISTRY_OWNER_MISSING"):
         reconcile_exact_mwangaza(Registry(""), auth, front)
