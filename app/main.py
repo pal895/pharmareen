@@ -566,7 +566,11 @@ async def ms20_front_door_new_pharmacy(request: Request) -> JSONResponse:
                 setup_state = "recovery_key_ack_required"
         else:
             current_status = registry.provisioning_state(record["pharmacy_id"], owner_id=owner_id).get("status")
-            if current_status in {"recovery_pending", "recovery_key_ack_required"}:
+            # Any resumed form submission with an enrolled verifier but no
+            # durable ready acknowledgement is treated as a lost-response
+            # continuation.  This keeps a failed state write from silently
+            # returning the old key or opening Main App without owner proof.
+            if resume_record is not None and current_status != "ready":
                 registry.set_provisioning_state(record["pharmacy_id"], owner_id=owner_id, status="recovery_key_ack_required")
                 setup_state = "recovery_key_ack_required"
     elif owner_state == "uninitialized":
