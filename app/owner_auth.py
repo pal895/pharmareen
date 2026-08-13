@@ -370,6 +370,18 @@ class OwnerAuthService:
             matches = [item for item in self._credentials.values() if item.pharmacy_id == pharmacy_id and item.owner_id == owner_id]
             return len(matches) == 1 and bool(matches[0].recovery_key_hash)
 
+    def verify_recovery_key(self, *, pharmacy_id: str, owner_id: str, recovery_key: str, now: float | None = None) -> None:
+        """Verify a displayed recovery key without returning or rotating it."""
+        self._require_persistence()
+        current = time.time() if now is None else now
+        normalized = self._normalize_recovery_key(recovery_key)
+        with self._lock:
+            self._refresh_persistent_state()
+            matches = [item for item in self._credentials.values() if item.pharmacy_id == pharmacy_id and item.owner_id == owner_id]
+            credential = matches[0] if len(matches) == 1 else None
+            if not credential or not credential.recovery_key_hash or credential.recovery_locked_until > current or not self._verify_pin(normalized, credential.recovery_key_hash):
+                raise self._unauthorized("Recovery Key verification failed.")
+
     def recover_with_recovery_key(self, *, pharmacy_id: str, recovery_key: str, new_pin: str, now: float | None = None) -> tuple[str, OwnerSession, str]:
         self._require_persistence()
         self._validate_pin(new_pin)

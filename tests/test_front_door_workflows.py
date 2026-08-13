@@ -444,3 +444,117 @@ def test_community_comments_appreciation_reports_and_moderation_are_pharmacy_sco
     workflows.moderate_post("pharmacy-a", owner_id="owner-a", post_id=post["post_id"], action="remove")
     with pytest.raises(ValueError):
         workflows.community_interact("pharmacy-a", actor_id=joined["actor_id"], post_id=post["post_id"], action="comment", text="Hidden")
+
+
+def _clean_front_door_http_fixture(monkeypatch):
+    registry = FrontDoorRegistry(MemoryFrontDoorStore(), SignedEntryContext("resumable-front-door-signing-key-123456"))
+    durable = {"activations": {}, "credentials": {}, "sessions": {}}
+
+    def save_auth(payload):
+        durable.clear()
+        durable.update(json.loads(json.dumps(payload)))
+
+    auth = OwnerAuthService()
+    auth.configure_persistence(loader=lambda: durable, saver=save_auth)
+    records = []
+
+    class PharmacyRegistry:
+        def list_records(self):
+            return list(records)
+
+        def register_pharmacy(self, details):
+            record = dict(details)
+            record["notes"] = "registered_by_live_onboarding"
+            records.append(record)
+            return RegistryWriteResult(True, record, True, "created")
+
+        def find_by_id(self, pharmacy_id, active_only=True):
+            return next((item for item in records if item["pharmacy_id"] == pharmacy_id), None)
+
+    monkeypatch.setattr(main, "front_door_registry", registry)
+    monkeypatch.setattr(main, "owner_auth_service", auth)
+    monkeypatch.setattr(owner_auth_module, "owner_auth_service", auth)
+    monkeypatch.setattr(main, "get_pharmacy_registry", lambda: PharmacyRegistry())
+    return registry, auth, records
+
+
+def test_new_pharmacy_recovery_failure_returns_secure_resumable_setup_and_gates_main_app(monkeypatch):
+    registry, auth, records = _clean_front_door_http_fixture(monkeypatch)
+    original_enroll = auth.enroll_recovery_key
+    calls = {"count": 0}
+
+    def transient_failure(*args, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("temporary workbook disconnect")
+        return original_enroll(*args, **kwargs)
+
+    monkeypatch.setattr(auth, "enroll_recovery_key", transient_failure)
+    with TestClient(main.app, base_url="https://ms20.test", follow_redirects=False) as client:
+        entry = client.post("/api/ms20/front-door/start").json()["entry"]
+        created = client.post("/api/ms20/front-door/new-pharmacy", json={
+            "entry": entry, "pharmacy_name": "Resumable Chemist", "owner_name": "Pal",
+            "location": "Nairobi", "pin": "Owner1234", "terms_version": main.MS20_TERMS_VERSION,
+            "privacy_version": main.MS20_PRIVACY_VERSION,
+        })
+        blocked = client.get("/main-app/", follow_redirects=False)
+        protect = client.get("/main-app/protect-pharmacy")
+        finished = client.post("/api/ms20/front-door/recovery/enroll", json={"primary_pin": "Owner1234"})
+        key = finished.json()["recovery_key"]
+        acknowledged = client.post("/api/ms20/front-door/recovery/acknowledge", json={"recovery_key": key})
+        opened = client.get("/main-app/", follow_redirects=False)
+
+    assert created.status_code == 200
+    assert created.json()["setup_state"] == "recovery_pending"
+    assert len(records) == 1
+    assert blocked.status_code == 307 and blocked.headers["location"] == "/main-app/protect-pharmacy"
+    assert protect.status_code == 200 and "Finish secure setup" in protect.text
+    assert finished.status_code == 200 and key.startswith("IMPALA-")
+    assert acknowledged.status_code == 200 and acknowledged.json()["ready"] is True
+    assert opened.status_code == 200
+    assert registry.provisioning_state(records[0]["pharmacy_id"], owner_id=records[0]["owner_id"])["status"] == "ready"
+
+
+def test_response_loss_retry_never_returns_existing_key_and_offers_pin_rotation(monkeypatch):
+    registry, auth, records = _clean_front_door_http_fixture(monkeypatch)
+    with TestClient(main.app, base_url="https://ms20.test", follow_redirects=False) as client:
+        entry = client.post("/api/ms20/front-door/start").json()["entry"]
+        first = client.post("/api/ms20/front-door/new-pharmacy", json={
+            "entry": entry, "pharmacy_name": "Response Loss Chemist", "owner_name": "Pal",
+            "location": "Nairobi", "pin": "Owner1234", "terms_version": main.MS20_TERMS_VERSION,
+            "privacy_version": main.MS20_PRIVACY_VERSION,
+        })
+        assert first.status_code == 200 and first.json().get("recovery_key")
+        retry_entry = client.post("/api/ms20/front-door/start").json()["entry"]
+        retry = client.post("/api/ms20/front-door/new-pharmacy", json={
+            "entry": retry_entry, "pharmacy_name": "Response Loss Chemist", "owner_name": "Pal",
+            "location": "Nairobi", "pin": "Owner1234", "terms_version": main.MS20_TERMS_VERSION,
+            "privacy_version": main.MS20_PRIVACY_VERSION,
+        })
+        assert retry.status_code == 200
+        assert "recovery_key" not in retry.json()
+        assert retry.json()["setup_state"] == "recovery_key_ack_required"
+        rotated = client.post("/api/ms20/front-door/recovery/enroll", json={"primary_pin": "Owner1234"})
+
+    assert rotated.status_code == 200
+    assert rotated.json()["recovery_key"].startswith("IMPALA-")
+    assert len(records) == 1
+
+
+def test_partial_registry_without_owner_credential_resumes_without_duplicate(monkeypatch):
+    registry, auth, records = _clean_front_door_http_fixture(monkeypatch)
+    records.append({
+        "pharmacy_id": "pharmacy-partial", "owner_id": "owner-partial", "pharmacy_name": "Partial Chemist",
+        "owner_name": "Pal", "location": "Nairobi", "phone_number": "", "phone": "",
+        "status": "active", "active": "yes", "notes": "registered_by_live_onboarding",
+    })
+    with TestClient(main.app, base_url="https://ms20.test", follow_redirects=False) as client:
+        entry = client.post("/api/ms20/front-door/start").json()["entry"]
+        response = client.post("/api/ms20/front-door/new-pharmacy", json={
+            "entry": entry, "pharmacy_name": "Partial Chemist", "owner_name": "Pal",
+            "location": "Nairobi", "pin": "Owner1234", "terms_version": main.MS20_TERMS_VERSION,
+            "privacy_version": main.MS20_PRIVACY_VERSION,
+        })
+    assert response.status_code == 200
+    assert response.json()["pharmacy_id"] == "pharmacy-partial"
+    assert len(records) == 1

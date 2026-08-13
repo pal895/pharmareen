@@ -245,6 +245,11 @@ class FrontDoorRegistry:
         nonce = secrets.token_urlsafe(24)
         return signer.issue(pharmacy_id="__new_pharmacy__", kind=EntryKind.NEW_PHARMACY, nonce=nonce)
 
+    def validate_independent_new_pharmacy_context(self, token: str) -> str:
+        """Validate a short-lived setup cookie without claiming it."""
+        self._require_signer().verify(token, expected_kind=EntryKind.NEW_PHARMACY)
+        return str(token)
+
     def claim_independent_new_pharmacy_context(self, token: str) -> dict[str, str]:
         """Return stable provisioning identities; identical retries may resume."""
         payload = self._require_signer().verify(token, expected_kind=EntryKind.NEW_PHARMACY)
@@ -672,6 +677,34 @@ class FrontDoorRegistry:
             pharmacy["provisioning"] = {"status": "resume_required", "failed_step": str(failed_step).strip(), "resume_token_digest": _digest(resume_token)}
             self._audit(pharmacy, "provisioning_resume_recorded", owner_id, {"failed_step": str(failed_step).strip()})
             self.store.save(state)
+
+    def set_provisioning_state(self, pharmacy_id: str, *, owner_id: str, status: str, failed_step: str | None = None) -> dict[str, Any]:
+        """Persist the small, resumable owner-setup state machine.
+
+        This is workflow state only; the owner-auth verifier remains the
+        cryptographic source of truth for recovery-key possession.
+        """
+        allowed = {"identity_ready", "owner_ready", "recovery_pending", "recovery_key_ack_required", "ready"}
+        normalized = str(status or "").strip()
+        if normalized not in allowed:
+            raise ValueError("Unsupported provisioning state")
+        with self._lock:
+            state, pharmacy = self._owner_pharmacy(pharmacy_id, owner_id)
+            previous = str((pharmacy.get("provisioning") or {}).get("status") or "")
+            pharmacy["provisioning"] = {
+                "status": normalized,
+                "failed_step": str(failed_step or "").strip() or None,
+                "resume_token_digest": None,
+            }
+            if previous != normalized or failed_step:
+                self._audit(pharmacy, "provisioning_state_changed", owner_id, {"from": previous, "to": normalized, "failed_step": str(failed_step or "").strip() or None})
+            self.store.save(state)
+            return deepcopy(pharmacy["provisioning"])
+
+    def provisioning_state(self, pharmacy_id: str, *, owner_id: str) -> dict[str, Any]:
+        with self._lock:
+            _, pharmacy = self._owner_pharmacy(pharmacy_id, owner_id)
+            return deepcopy(pharmacy.get("provisioning") or {"status": "identity_ready", "failed_step": None, "resume_token_digest": None})
 
     def record_owner_acceptance(self, pharmacy_id: str, *, owner_id: str, terms_version: str, privacy_version: str) -> None:
         if not terms_version.strip() or not privacy_version.strip():
